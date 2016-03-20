@@ -1,12 +1,12 @@
 <?xml version='1.0' encoding='UTF-8'?>
 <report-views version="2.0" >
  <header>
-  <DateModified>2016-03-20T20:19:09</DateModified>
+  <DateModified>2016-03-20T21:35:10</DateModified>
   <ModuleName>NewCore0</ModuleName>
-  <SummaryTimeStamp>2016-03-20T19:40:24</SummaryTimeStamp>
-  <ImplementationReportsDirectory>C:/Users/frakt_000/Dropbox/ProcDev\</ImplementationReportsDirectory>
+  <SummaryTimeStamp>2016-03-20T21:33:16</SummaryTimeStamp>
+  <ImplementationReportsDirectory>C:/Users/frakt_000/Documents/GitHub/ProcessorProj/ProcDev\</ImplementationReportsDirectory>
   <DateInitialized>2016-03-20T19:29:52</DateInitialized>
-  <SavedFilePath>C:/Users/frakt_000/Dropbox/ProcDev/iseconfig/NewCore0.xreport</SavedFilePath>
+  <SavedFilePath>C:/Users/frakt_000/Documents/GitHub/ProcessorProj/ProcDev/iseconfig/NewCore0.xreport</SavedFilePath>
   <EnableMessageFiltering>false</EnableMessageFiltering>
  </header>
  <body>

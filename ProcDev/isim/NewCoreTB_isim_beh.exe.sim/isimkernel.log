@@ -2,9 +2,28 @@ Command line:
    NewCoreTB_isim_beh.exe
      -simmode  gui
      -simrunnum  0
-     -socket  64430
+     -socket  64850
 
-Sun Mar 20 19:27:20 2016
+Sun Mar 20 21:36:38 2016
 
 
  Elaboration Time: 0.21875 sec
+
+ Current Memory Usage: 924.365 Meg
+
+ Total Signals          : 1542
+ Total Nets             : 72508
+ Total Signal Drivers   : 1065
+ Total Blocks           : 185
+ Total Primitive Blocks : 83
+ Total Processes        : 1027
+ Total Traceable Variables  : 360
+ Total Scalar Nets and Variables : 93813
+Total Line Count : 1140
+
+ Total Simulation Time: 1.40625 sec
+
+ Current Memory Usage: 452.506 Meg
+
+Sun Mar 20 22:33:46 2016
+

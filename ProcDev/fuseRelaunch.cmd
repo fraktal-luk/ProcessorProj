@@ -1,1 +1,0 @@
--intstyle "ise" -incremental -lib "unisims_ver" -lib "unimacro_ver" -lib "xilinxcorelib_ver" -lib "secureip" -o "C:/Users/frakt_000/Dropbox/ProcDev/NewCoreTB_isim_beh.exe" -prj "C:/Users/frakt_000/Dropbox/ProcDev/NewCoreTB_beh.prj" "work.NewCoreTB" "work.glbl" 

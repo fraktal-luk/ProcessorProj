@@ -1,0 +1,86 @@
+# Executables
+*.exe
+
+# Output files
+*.stx
+*.xst
+*.lso
+*.syr
+*.xrpt
+*.prj
+*.ngc
+*.ngr
+*.cmd_log
+*.xmsgs
+*_summary.html
+xst/*
+webtalk_pn.xml
+sch2HdlBatchFile
+*.gise
+*.wdb
+
+# Simulation stuff
+isim/*
+isim.cmd
+isim.log
+fuse.cmd
+fuse.log
+fuseRelaunch.cmd
+xilinxsim.ini
+
+# Output texts
+_xmsgs/*
+
+# Unneeded stuff from ipcores
+ipcore_dir/_xmsgs/*
+ipcore_dir/tmp/*
+
+
+
+# Windows image file caches
+Thumbs.db
+ehthumbs.db
+
+# Folder config file
+Desktop.ini
+
+# Recycle Bin used on file shares
+$RECYCLE.BIN/
+
+# Windows Installer files
+*.cab
+*.msi
+*.msm
+*.msp
+
+# Windows shortcuts
+*.lnk
+
+# =========================
+# Operating System Files
+# =========================
+
+# OSX
+# =========================
+
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Thumbnails
+._*
+
+# Files that might appear in the root of a volume
+.DocumentRevisions-V100
+.fseventsd
+.Spotlight-V100
+.TemporaryItems
+.Trashes
+.VolumeIcon.icns
+
+# Directories potentially created on remote AFP share
+.AppleDB
+.AppleDesktop
+Network Trash Folder
+Temporary Items
+.apdisk
