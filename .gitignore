@@ -13,28 +13,24 @@
 *.cmd_log
 *.xmsgs
 *_summary.html
-xst/*
-webtalk_pn.xml
-sch2HdlBatchFile
+ProcDev/xst/*
+ProcDev/webtalk_pn.xml
+ProcDev/sch2HdlBatchFile
 *.gise
 *.wdb
 
 # Simulation stuff
-isim/*
-isim.cmd
-isim.log
-fuse.cmd
-fuse.log
-fuseRelaunch.cmd
-xilinxsim.ini
+ProcDev/isim/*
+ProcDev/isim.*
+ProcDev/fuse.*
+ProcDev/fuseRelaunch.cmd
+ProcDev/xilinxsim.ini
 
 # Output texts
-_xmsgs/*
+**/_xmsgs/**
 
 # Unneeded stuff from ipcores
-ipcore_dir/_xmsgs/*
-ipcore_dir/tmp/*
-
+ProcDev/ipcore_dir/tmp/**
 
 
 # Windows image file caches
