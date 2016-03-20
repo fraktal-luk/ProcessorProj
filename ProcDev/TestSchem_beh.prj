@@ -1,0 +1,7 @@
+vhdl work "ProcBasicDefs.vhd"
+vhdl work "ProcInstructionsNew.vhd"
+vhdl work "InternalCodingNew.vhd"
+vhdl work "Renaming1.vhd"
+vhdl work "Decoding1.vhd"
+vhdl work "testingModule.vhd"
+vhdl work "TestSchem.vhf"

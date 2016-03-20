@@ -1,0 +1,541 @@
+----------------------------------------------------------------------------------
+-- Company: 
+-- Engineer: 
+-- 
+-- Create Date:    12:33:36 12/08/2015 
+-- Design Name: 
+-- Module Name:    NewCore0 - Behavioral 
+-- Project Name: 
+-- Target Devices: 
+-- Tool versions: 
+-- Description: 
+--
+-- Dependencies: 
+--
+-- Revision: 
+-- Revision 0.01 - File Created
+-- Additional Comments: 
+--
+----------------------------------------------------------------------------------
+library IEEE;
+use IEEE.STD_LOGIC_1164.ALL;
+
+-- Uncomment the following library declaration if using
+-- arithmetic functions with Signed or Unsigned values
+--use IEEE.NUMERIC_STD.ALL;
+
+-- Uncomment the following library declaration if instantiating
+-- any Xilinx primitives in this code.
+--library UNISIM;
+--use UNISIM.VComponents.all;
+
+use work.ProcBasicDefs.all;
+use work.Helpers.all;
+
+use work.ProcInstructionsNew.all;
+
+--use work.Renaming1.all;
+
+use work.NewPipelineData.all;
+
+use work.TEMP_DEV.all;
+use work.GeneralPipeDev.all;
+use work.CommonRouting.all;
+
+
+use work.ProgramCode3.all;
+
+
+entity NewCore0 is
+    Port ( clk : in  STD_LOGIC;
+           reset : in  STD_LOGIC;
+           en : in  STD_LOGIC;
+			  
+			  -- address fot program mem
+           iadrvalid: out std_logic;
+			  iadr : out  Mword;
+			  -- instruction input
+			  ivalid: in std_logic;
+           iin : in  InsGroup;
+			  
+			  dadrvalid: out std_logic;
+			  drw: out std_logic; -- read or write
+           dadr : out  Mword;
+			  dvalid: in std_logic;
+           din : in  Mword;
+           dout : out  Mword;
+			  			  
+			  -- Interrupt input (int0) and additional input (int1)
+           int0 : in  STD_LOGIC;
+           int1 : in  STD_LOGIC;
+			  
+			  -- Other buses for development 
+           iaux : in  Mword;
+           oaux : out  Mword			  
+			  
+			  );
+end NewCore0;
+
+
+--
+--architecture Behavioral of NewCore0 is
+--		
+--	signal prevSendingPC, prevSendingFetch, prevSendingHbuff, prevSending0, prevSending1: PipeFlow;
+--	signal nextAcceptingPC, nextAcceptingFetch, nextAcceptingHbuff, nextAccepting0, nextAccepting1: PipeFlow;
+--	signal acceptingPC, acceptingFetch, acceptingHbuff,accepting0, accepting1: PipeFlow;
+--	signal sendingPC, sendingFetch, sendingHbuff, sending0, sending1: PipeFlow;
+--	signal fullPC, fullFetch, fullHbuff, full0, full1: PipeFlow;
+--	signal livingPC, livingFetch, livingHbuff, living0, living1: PipeFlow;
+--
+--	signal sendingToPC: PipeFlow;
+--		
+--	signal pc: Mword := (others=>'0');	
+--
+--	-- 	
+--	constant FETCH_BLOCK_SIZE: natural := PIPE_WIDTH*2;
+--	constant HBUFFER_SIZE: natural := PIPE_WIDTH*4;
+--
+--	signal fetchBlock: HwordArray(0 to FETCH_BLOCK_SIZE-1);
+--	signal hbufferData, hbufferDataNext: 
+--				HwordArray(0 to HBUFFER_SIZE-1); -- CAREFUL! Mut match capacity of the stage	
+--
+--	signal sendingHbuffHwords: PipeFlow;
+--
+--	signal sendingFetchInt: integer := 0;
+--		
+--	signal hwordSendingSig: PipeFlow;
+--	-- TEMP! 
+--	signal shortOpcodes: std_logic_vector(0 to HBUFFER_SIZE-1) := (others=>'0');	
+--	signal hbd: HwordBufferData;	
+--	
+--	
+--	signal stage0data, stage0dataNext: --WordArray(0 to PIPE_WIDTH-1);
+--													PipeStageData;
+--		--signal stage0dataNextWords: WordArray(0 to PIPE_WIDTH-1);
+--		signal decoded: PipeStageData;
+--	signal stage1data, stage1dataNext: --WordArray(0 to PIPE_WIDTH-1);
+--													PipeStageDataU(0 to PIPE_WIDTH-1);
+--	
+--	signal extractedWords: WordArray(0 to PIPE_WIDTH-1);
+--	
+--	
+--	signal prevSendingA, prevSendingB, prevSendingC, prevSendingD: PipeFlow;
+--	signal nextAcceptingA, nextAcceptingB, nextAcceptingC, nextAcceptingD: PipeFlow;
+--	signal acceptingA, acceptingB, acceptingC, acceptingD: PipeFlow;
+--	signal sendingA, sendingB, sendingC, sendingD: PipeFlow;
+--	signal fullA, fullB, fullC, fullD: PipeFlow;
+--	signal livingA, livingB, livingC, livingD: PipeFlow;
+--	
+--	signal srcVecA, srcVecB, srcVecC, srcVecD: std_logic_vector(0 to PIPE_WIDTH-1);
+--	signal issueRouteVec: IntArray(0 to PIPE_WIDTH-1);
+--	signal iqAccepting: PipeFlow;
+--	
+--	signal routeA, routeB, routeC, routeD: IntArray(0 to PIPE_WIDTH-1);
+--	signal dataA, dataB, dataC, dataD: PipeStageDataU(0 to PIPE_WIDTH*4-1);
+--	signal dataANext, dataBNext, dataCNext, dataDNext: PipeStageDataU(0 to PIPE_WIDTH*4-1);
+--	signal dataNewA, dataNewB, dataNewC, dataNewD: PipeStageDataU(0 to PIPE_WIDTH-1);
+--	
+--	signal readyDataA: std_logic_vector(0 to PIPE_WIDTH*4-1) := (others=>'0');
+--	
+--	signal dataExecA: PipeStageDataU(0 to 0);
+--	signal dataNextExecA: PipeStageDataU(0 to 0);
+--	signal dataNewExecA: PipeStageDataU(0 to 0);
+--	
+--	signal prevSendingExecA: PipeFlow;
+--	signal nextAcceptingExecA: PipeFlow;
+--	signal acceptingExecA: PipeFlow;
+--	signal sendingExecA: PipeFlow;
+--	signal fullExecA: PipeFlow;
+--	signal livingExecA: PipeFlow;
+--	
+--	signal firstOnePositionA: IntArray(0 to 0) := (0 => 0);	
+--begin
+--		FETCH_BLOCK: for i in 0 to PIPE_WIDTH-1 generate
+--			fetchBlock(2*i)	 <= iin(i)(31 downto 16);
+--			fetchBlock(2*i+1) <= iin(i)(15 downto 0);
+--		end generate;	
+--			
+--		--sendingFetchInt <= binFlowNum(sendingFetch);
+--				hbufferDataNext <= bufferHwordNext(hbufferData, fetchBlock, 
+--														binFlowNum(livingHbuff),
+--														binFlowNum(hwordSendingSig),
+--														binFlowNum(sendingFetch));	
+--														
+--			extractedWords <=	extractFromHalves(hbufferData, hbd.cumulSize, hbd.readyOps, hbd.shortInstructions);
+--																		
+--			stage0dataNext <= normalStageNext(stage0data, 
+--												decoded,-- extractedWords, 
+--												binFlowNum(living0), binFlowNum(sending0), binFlowNum(sendingHbuff)
+--												); 
+--			stage1dataNext <= normalStageNext(stage1data, stage0data,
+--												binFlowNum(living1), binFlowNum(sending1), binFlowNum(sending0)
+--												);
+--			
+--			DECODING: for i in 0 to PIPE_WIDTH-1 generate
+--				decoded(i) <= decodeInstruction( 
+--										InstructionState'(
+--											instructionFromWord(extractedWords(i))) 
+--																);									
+--			end generate;		
+--				
+--		PIPE_SYNCHRONOUS: process(clk) 	
+--		begin
+--			if rising_edge(clk) then
+--				if reset = '1' then
+--					
+--				elsif en = '1' then
+--					--if countOnes(sendingFetch) /= 0 then
+--						hbufferData <= hbufferDataNext;	
+--					--end if;
+--					stage0data <= stage0dataNext;
+--					stage1data <= stage1dataNext;
+--					
+--					dataA <= dataANext;
+--					dataB <= dataBNext;
+--					dataC <= dataCNext;
+--					dataD <= dataDNext;
+--				end if;
+--			end if;
+--		end process;	
+--			
+--		sendingToPC <= TEMP_calcSendingZero(
+--						pc2size(pc, ALIGN_BITS, num2flow(2*PIPE_WIDTH, false)), acceptingPC);
+--			
+--		prevSendingPC <= sendingToPC;	
+--		
+--		TEST_SLOT_PC: entity work.PipeSlot(BehavioralPC)
+--		generic map(
+--				CAPACITY => FETCH_BLOCK_SIZE -- PIPE_WIDTH*2
+--		)		
+--		Port map(
+--			  clk => clk, reset =>  reset, en => en,
+--			  
+--			  kill => "00000000",
+--           prevSending => prevSendingPC,
+--           nextAccepting => nextAcceptingPC,
+--           accepting => acceptingPC,
+--			  
+--			  sending => sendingPC,
+--			  full => fullPC,
+--			  living => livingPC	
+--			  -- Some control from pipe stage content and other state info:
+--			  
+--			  -- 			  
+--			  );		
+--		
+--				TEMP_NEXT_PC: process(clk)
+--				begin
+--					if rising_edge(clk) then
+--						if reset = '1' then
+--							pc <= (others=>'0');
+--							fullPC <= num2flow(2*PIPE_WIDTH, false);
+--						elsif en = '1' then
+--							if countOnes(sendingToPC) /= 0 then
+--								pc <= i2slv(slv2u(pc) + PIPE_WIDTH*4, MWORD_SIZE); 
+--							end if;
+--						end if;
+--					end if;
+--				end process;
+--
+--		TEST_SLOT_FETCH: entity work.PipeSlot(Behavioral)
+--		generic map(
+--				CAPACITY => FETCH_BLOCK_SIZE -- PIPE_WIDTH*2
+--		)		
+--		Port map(
+--			  clk => clk, reset =>  reset, en => en,
+--			  
+--			  kill => "00000000",
+--           prevSending => prevSendingFetch,
+--           nextAccepting => nextAcceptingFetch,
+--           accepting => acceptingFetch,
+--			  
+--			  sending => sendingFetch,
+--			  sendingAlt => open,			  
+--			  full => fullFetch,
+--			  living => livingFetch				  
+--			  -- Some control from pipe stage content and other state info:
+--			  
+--			  -- 			  
+--			  );
+--
+--			hbd <=  wholeInstructionData(hbufferData, shortOpcodes, 
+--																binFlowNum(livingHbuff), binFlowNum(nextAcceptingHbuff));
+--			sendingHbuff <= num2flow(countOnes(hbd.readyOps), false);
+--			hwordSendingSig <= TEMP_sendingHwordNumber(sendingHbuff, hbd.cumulSize);			
+--			
+--		TEST_SLOT_HBUFF: entity work.PipeSlot(BehavioralHbuff)
+--		generic map(
+--				CAPACITY => HBUFFER_SIZE -- PIPE_WIDTH*2*2
+--		)		
+--		Port map(
+--			  clk => clk, reset =>  reset, en => en,
+--			  
+--			  kill => "00000000",
+--           prevSending => prevSendingHbuff,
+--           nextAccepting => hwordSendingSig, -- nextAcceptingHbuff,
+--           accepting => acceptingHbuff,
+--			  
+--			  sending => open, --sendingHbuff,
+--			  sendingAlt => open, --sendingHbuffHwords,			  
+--			  full => fullHbuff,
+--			  living => livingHbuff				  
+--			  -- Some control from pipe stage content and other state info:
+--			  
+--			  -- 			  
+--			  );
+--
+--		
+--		TEST_SLOT_0: entity work.PipeSlot(Behavioral)
+--		generic map(
+--				CAPACITY => PIPE_WIDTH
+--		)		
+--		Port map(
+--			  clk => clk, reset =>  reset, en => en,
+--
+--			  kill => "00000000",
+--           prevSending => prevSending0,
+--           nextAccepting => nextAccepting0,
+--           accepting => accepting0,
+--			  
+--			  sending => sending0,
+--			  sendingAlt => open,			  
+--			  full => full0,
+--			  living => living0				  
+--			  -- Some control from pipe stage content and other state info:
+--			  
+--			  -- 			  
+--			  );		
+--		
+--		TEST_SLOT_1: entity work.PipeSlot(Behavioral)
+--		generic map(
+--				CAPACITY => PIPE_WIDTH
+--		)
+--		Port map(
+--			  clk => clk, reset =>  reset, en => en,
+--
+--			  kill => "00000000",
+--           prevSending => prevSending1,
+--           nextAccepting => nextAccepting1,
+--           accepting => accepting1,
+--			  
+--			  sending => sending1,
+--			  sendingAlt => open,
+--			  full => full1,
+--			  living => living1				  
+--			  -- Some control from pipe stage content and other state info:
+--			  
+--			  -- 			  
+--			  );		
+--	
+--	
+--		ISSUE_ROUTING: entity work.IssueRouting(Behavioral) 
+--		port map(
+--			acceptingA => acceptingA, 
+--			acceptingB => acceptingB, 
+--			acceptingC => acceptingC,
+--			acceptingD => acceptingD,
+--		
+--			srcVecA => srcVecA,
+--			srcVecB => srcVecB,
+--			srcVecC => srcVecC,
+--			srcVecD => srcVecD,
+--			
+--			iqAccepting => iqAccepting,
+--			
+--			sendingToA => prevSendingA,
+--			sendingToB => prevSendingB,
+--			sendingToC => prevSendingC,
+--			sendingToD => prevSendingD,			
+--			sendingToIQ => open,
+--			
+--			routingA => routeA,
+--			routingB => routeB,
+--			routingC => routeC,
+--			routingD => routeD			
+--		);
+--		
+--		ROUTE_VEC_GEN: for i in 0 to PIPE_WIDTH-1 generate
+--			issueRouteVec(i) <= unit2queue(stage1data(i).operation.unit);
+--		end generate;
+--	
+--		srcVecA <= findByNumber(issueRouteVec, 0);
+--		srcVecB <= findByNumber(issueRouteVec, 1);
+--		srcVecC <= findByNumber(issueRouteVec, 2);
+--		srcVecD <= findByNumber(issueRouteVec, 3);
+--	
+--		-- Hypothetical IQ
+--		TEST_SLOT_A: entity work.PipeSlot(BehavioralIQ)
+--		generic map(
+--				CAPACITY => PIPE_WIDTH * 4
+--		)
+--		Port map(
+--			  clk => clk, reset =>  reset, en => en,
+--
+--			  kill => "00000000",
+--           prevSending => prevSendingA,
+--           nextAccepting => nextAcceptingA,
+--           accepting => acceptingA,
+--			  
+--			  sending => sendingA,
+--			  sendingAlt => open,
+--			  full => fullA,
+--			  living => livingA				  
+--			  -- Some control from pipe stage content and other state info:
+--			  
+--			  -- 			  
+--			  );		
+--
+--		-- Hypothetical IQ
+--		TEST_SLOT_B: entity work.PipeSlot(BehavioralIQ)
+--		generic map(
+--				CAPACITY => PIPE_WIDTH * 4
+--		)
+--		Port map(
+--			  clk => clk, reset =>  reset, en => en,
+--			  
+--			  kill => "00000000",
+--           prevSending => prevSendingB,
+--           nextAccepting => nextAcceptingB,
+--           accepting => acceptingB,
+--			  
+--			  sending => sendingB,
+--			  sendingAlt => open,
+--			  full => fullB,
+--			  living => livingB				  
+--			  -- Some control from pipe stage content and other state info:
+--			  
+--			  -- 			  
+--			  );	
+--	
+--		-- Hypothetical IQ
+--		TEST_SLOT_C: entity work.PipeSlot(BehavioralIQ)
+--		generic map(
+--				CAPACITY => PIPE_WIDTH * 4
+--		)
+--		Port map(
+--			  clk => clk, reset =>  reset, en => en,
+--			  
+--			  kill => "00000000",
+--           prevSending => prevSendingC,
+--           nextAccepting => nextAcceptingC,
+--           accepting => acceptingC,
+--			  
+--			  sending => sendingC,
+--			  sendingAlt => open,
+--			  full => fullC,
+--			  living => livingC				  
+--			  -- Some control from pipe stage content and other state info:
+--			  
+--			  -- 			  
+--			  );		
+--	
+--		-- Hypothetical IQ
+--		TEST_SLOT_D: entity work.PipeSlot(BehavioralIQ)
+--		generic map(
+--				CAPACITY => PIPE_WIDTH * 4
+--		)
+--		Port map(
+--			  clk => clk, reset =>  reset, en => en,
+--			  
+--			  kill => "00000000",
+--           prevSending => prevSendingD,
+--           nextAccepting => nextAcceptingD,
+--           accepting => acceptingD,
+--			  
+--			  sending => sendingD,
+--			  sendingAlt => open,
+--			  full => fullD,
+--			  living => livingD				  
+--			  -- Some control from pipe stage content and other state info:
+--			  
+--			  -- 			  
+--			  );	
+--			  
+--				dataNewA <= selectInstructions(stage1data, routeA, binFlowNum(prevSendingA));
+--				dataANext <= bufferNext(dataA, dataNewA, 
+--														binFlowNum(livingA),
+--														binFlowNum(sendingA),
+--														binFlowNum(prevSendingA));				  
+--			  
+--				dataNewB <= selectInstructions(stage1data, routeB, binFlowNum(prevSendingB));
+--				dataBNext <= bufferNext(dataB, dataNewB, 
+--														binFlowNum(livingB),
+--														binFlowNum(sendingB),
+--														binFlowNum(prevSendingB));	
+--														
+--				dataNewC <= selectInstructions(stage1data, routeC, binFlowNum(prevSendingC));
+--				dataCNext <= bufferNext(dataC, dataNewC, 
+--														binFlowNum(livingC),
+--														binFlowNum(sendingC),
+--														binFlowNum(prevSendingC));															
+--			  
+--				dataNewD <= selectInstructions(stage1data, routeD, binFlowNum(prevSendingD));
+--				dataDNext <= bufferNext(dataD, dataNewD, 
+--														binFlowNum(livingD),
+--														binFlowNum(sendingD),
+--														binFlowNum(prevSendingD));	
+--
+--		readyDataA <= setToOnes(readyDataA, binFlowNum(livingA));
+--		-- TODO: set only those that are ready!
+--		
+--		
+--			prevSendingExecA <= sendingA;
+--			nextAcceptingA <= 	acceptingExecA when countOnes(getFirstOne(readyDataA)) = 1 
+--									else num2flow(0,false);
+--			 			
+--			firstOnePositionA(0) <= getFirstOnePosition(readyDataA);						
+--			dataNewExecA	<= 
+--				selectInstructions(dataA, 
+--										firstOnePositionA,
+--										binFlowNum(nextAcceptingA))(0 to 0);
+--			
+--			dataNextExecA <= normalStageNext(dataExecA, dataNewExecA,
+--														binFlowNum(livingExecA), 
+--														binFlowNum(sendingExecA),
+--														binFlowNum(sendingExecA)
+--														);				
+--				
+--	
+--
+--		TEST_SLOT_EXEC_A: entity work.PipeSlot(Behavioral)
+--		generic map(
+--				CAPACITY => 1
+--		)
+--		Port map(
+--			  clk => clk, reset =>  reset, en => en,
+--			  
+--			  kill => "00000000",
+--           prevSending => prevSendingExecA,
+--           nextAccepting => nextAcceptingExecA,
+--           accepting => acceptingExecA,
+--			  
+--			  sending => sendingExecA,
+--			  sendingAlt => open,
+--			  full => fullExecA,
+--			  living => livingExecA				  
+--			  -- Some control from pipe stage content and other state info:
+--			  
+--			  -- 			  
+--			  );
+--	
+--	
+--	iadr <= pc;
+--	iadrvalid <= '0' when countOnes(sendingPC) = 0 else '1';
+--	
+--	
+--	nextAcceptingPC <= acceptingFetch;
+--	prevSendingFetch <= sendingPC;
+--	
+--	nextAcceptingFetch <= acceptingHbuff;
+--	prevSendingHbuff <= sendingFetch;
+--	
+--	nextAcceptingHbuff <= accepting0;
+--	prevSending0 <= sendingHbuff;
+--
+--	nextAccepting0 <= accepting1;
+--	prevSending1 <= sending0;
+--
+--	nextAccepting1 <= iqAccepting;
+--	
+--end Behavioral;
+

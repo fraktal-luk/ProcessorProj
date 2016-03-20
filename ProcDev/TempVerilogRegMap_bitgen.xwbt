@@ -1,0 +1,8 @@
+INTSTYLE=ise
+INFILE=C:\Users\frakt_000\Dropbox\ProcDev\TempVerilogRegMap.ncd
+OUTFILE=C:\Users\frakt_000\Dropbox\ProcDev\TempVerilogRegMap.bit
+FAMILY=Spartan6
+PART=xc6slx16-3csg324
+WORKINGDIR=C:\Users\frakt_000\Dropbox\ProcDev
+LICENSE=WebPack
+USER_INFO=210803494_0_0_378

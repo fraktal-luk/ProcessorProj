@@ -1,0 +1,1120 @@
+Program:
+			formatLong655655(other, r16, 0, mfcR, 0, 0),		  -- mfc r16	
+			formatLong655655(other, r0, 0, mtcR, 0, 0),		  -- mtc r0				
+			formatLong6556X(other,  r10, r0, loadRRO, 8),	  -- ld  r10, r0, 8  // r10 <- [r0+8]
+			formatLong655655(other, r5, r8, dummu16, r3, r2), -- undef(dummu16) // Error!	
+			formatLong655655(other, r10,r10, shrlRRC, 31, 0), -- shrl r10,r10,31		
+			formatLong65O(jlRJ, r25, 2),							  -- jl r25, 2	
+			formatLong655H(orRRI,  r1, r0,  10),				  -- mov r1, 10
+			formatLong655H(orRRI,  r30, r0,  5),				  -- mov r1, 5			
+			formatLong655655(other, r20, r1, divuRRR, r30,0), -- divu r20,r1,r30			  							
+			formatLong655655(other, r12, r1, mulsRRR, r1, 0), -- mulu r12, r1, r1
+			formatLong655H(addRRI, r1, r1,   1),				  -- add r1, r1, 1	
+			formatLong655655(other, r3, r0, addRRR,  r1, r0), -- mov r3, r1
+			formatLong6556X(other, r3, r0, storeRRO,  5),	  -- st  r3, r0, 5  // r3 -> [r0+5]	
+			formatLong65O(jzRJ, r0, -3),							  -- jmp [to add...] 	
+			
+			31 => formatLong65O(jzRJ, r0, -31),
+	
+Intermediate coding:
+	formatLong655655(other, r16, 0, mfcR, 0, 0),		  -- mfc r16	
+		sys: move
+			write:			+r16,-x,-x		
+			read: 			-x, -x, -x
+			const: 			-x, -x, -imm
+			store:			no
+			load: 			no
+			jump: 			no
+			writeSys: 		-x
+			readSys:  		+c0
+			cond:		 		Undef
+			changeState: 	no			
+			
+	formatLong655655(other, r0, 0, mtcR, 0, 0),		  -- mtc r0		
+		sys: move
+			write:			-x,-x,-x		
+			read: 			+r0, -x, -x
+			const: 			-x, -x, -imm
+			store:			no
+			load: 			no
+			jump: 			no
+			writeSys: 		+c0
+			readSys:  		-x
+			cond:		 		Undef
+			changeState: 	yes 
+	
+	formatLong6556X(other,  r10, r0, loadRRO, 8),	  -- ld  r10, r0, 8  // r10 <- [r0+8]
+		mem: load 
+			read: 			+r0, -x, -x
+			write:			+r10, -x,-x
+			const: 			-x, -x, +#8 // here + before # is not sign, but 'used' flag
+			store:			no
+			load: 			yes
+			jump: 			no
+			writeSys: 		-x
+			readSys:  		-x
+			cond:		 		Undef
+			changeState:	no
+			
+	formatLong655655(other, r5, r8, dummu16, r3, r2), -- undef(dummu16) // Error!	
+		undef: undef
+			read:				-x, -x, -x
+			write:			-x, -x, -x
+			const: 			-x, -x, -imm
+			store:			no
+			load: 			no
+			jump: 			no
+			writeSys: 		-x
+			readSys:  		-x
+			cond:		 		Undef
+			changeState: 	no
+	
+	formatLong655655(other, r10,r10, shrlRRC, 31, 0), -- shrl r10,r10,31		
+		alu:	shrl 
+			read:				+r10, -x, -x
+			write:			+r10, -x, -x
+			const: 			+31,	-x, -imm
+			store:			no
+			load: 			no
+			jump: 			no
+			writeSys: 		-x
+			readSys:  		-x
+			cond:		 		Undef
+			changeState: 	no
+	
+	formatLong65O(jlRJ, r25, 2),							  -- jl r25, 2	
+		jump:	jl 
+			read:				-x, -x, -x
+			write:			+r25, -x, -x
+			const: 			-x,	-x, +#2
+			store:			no
+			load: 			no
+			jump: 			yes
+			writeSys: 		-x
+			readSys:  		-x
+			cond:		 		Always
+			changeState: 	no	
+	
+	formatLong655H(orRRI,  r1, r0,  10),				  -- mov r1, 10
+		alu:	or 
+			read:				+r0, -x, -x
+			write:			+r1, -x, -x
+			const: 			-x,	-x, +#10
+			store:			no
+			load: 			no
+			jump: 			no
+			writeSys: 		-x
+			readSys:  		-x
+			cond:		 		Undef
+			changeState: 	no
+			
+	formatLong655H(orRRI,  r30, r0,  5),				  -- mov r1, 5	
+		alu:	or 
+			read:				+r0, -x, -x
+			write:			+r30, -x, -x
+			const: 			-x,	-x, +#5
+			store:			no
+			load: 			no
+			jump: 			no
+			writeSys: 		-x
+			readSys:  		-x
+			cond:		 		Undef
+			changeState: 	no
+			
+	formatLong655655(other, r20, r1, divuRRR, r30,0), -- divu r20,r1,r30	
+		div:	divu
+			read:				+r1, +r30, -x
+			write:			+r20, -x, -x
+			const: 			-x,	-x, -imm
+			store:			no
+			load: 			no
+			jump: 			no
+			writeSys: 		-x
+			readSys:  		-x
+			cond:		 		Undef
+			changeState: 	no
+	
+	formatLong655655(other, r12, r1, mulsRRR, r1, 0), -- mulu r12, r1, r1
+		mac:	mulu 
+			read:				+r1, +r1, -x
+			write:			+r12, -x, -x
+			const: 			-x,	-x, -imm
+			store:			no
+			load: 			no
+			jump: 			no
+			writeSys: 		-x
+			readSys:  		-x
+			cond:		 		Undef
+			changeState: 	no
+			
+	formatLong655H(addRRI, r1, r1,   1),				  -- add r1, r1, 1	
+		alu:	add
+			read:				+r1, -x, -x
+			write:			+r1, -x, -x
+			const: 			-x,	-x, +#1
+			store:			no
+			load: 			no
+			jump: 			no
+			writeSys: 		-x
+			readSys:  		-x
+			cond:		 		Undef
+			changeState: 	no
+			
+	formatLong655655(other, r3, r0, addRRR,  r1, r0), -- mov r3, r1
+		alu:	add	
+			read:				+r0, +r1, -x
+			write:			+r3, -x, -x
+			const: 			-x,  -x, -imm
+			store:			no
+			load: 			no
+			jump: 			no
+			writeSys: 		-x
+			readSys:  		-x
+			cond:		 		Undef
+			changeState: 	no
+			
+	formatLong6556X(other, r3, r0, storeRRO,  5),	  -- st  r3, r0, 5  // r3 -> [r0+5]	
+		mem: store 
+			read: 			+r3, +r0, -x
+			write:			-x, -x,-x
+			const: 			-x, -x, +#5 // here + before # is not sign, but 'used' flag
+			store:			yes
+			load: 			no
+			jump: 			no
+			writeSys: 		-x
+			readSys:  		-x
+			cond:		 		Undef
+			changeState:	no	
+	
+	formatLong65O(jzRJ, r0, -3),							  -- jmp [to add...] 			
+		jump: jump 
+			read: 			+r0, -x, -x
+			write:			-x, -x,-x
+			const: 			-x, -x, +#5 // here + before # is not sign, but 'used' flag
+			store:			no
+			load: 			no
+			jump: 			yes
+			writeSys: 		-x
+			readSys:  		-x
+			cond:		 		Z
+			changeState:	no
+
+
+
+
+Template:
+		unit: 
+			read:
+			write:
+			const: 
+			store:
+			load: 
+			jump: 
+			writeSys: 
+			readSys:  
+			cond:		 
+			changeState: 
+
+
+
+
+ "op op op op op op | rd rd rd rd rd | ra ra ra ra ra | oc oc oc oc oc oc | rb rb rb rb rb | qa qa qa qa qa qa"
+
+
+
+
+Renaming
+Let there be 64 physical regs for 32 logical.
+p0 : p63,  p0 = 0 always.
+Table: GPR -> PR
+0:    0
+1:    2
+2:    14
+...   
+31:   49
+
+Is reverse table needed?
+0:   0
+1:   none
+2:	  6
+...
+63:  15		
+
+Is 'none' here equiv to r0? maybe.
+
+For each dest reg in instructions, assign some free physical.
+So we need a table: PR -> free?
+
+When reading reg values, we need to check: r14 is now p7, so read p7, etc.
+
+When writing to GPR, we take a new PR each time. So GPR's prev value is lost in logical sense,
+but it remains in previous PR, which however becomes free and isn't in the table of GPR->PR
+In both tables, always tab(0) = 0.
+p0 is always free.     ????  Rather not, it's always reserved by r0.
+
+So renaming is like:
+> for each dest GPR, take it's PR and set to free
+> for each dest GPR, assign a free PR and set to used
+> for each src GPR, take it's PR and use its value
+> when at the same time read and write a GPR, the PR read must be before freeing it (but can in the same cycle)
+> if PR has to be read, it must keep the 'used' status
+
+Forwarding
+> each result in PR appears after some time, so until that moment its values may be somewhere else,
+	that is in datapath before writeback. The execution unit must update the 'location' tag of the PR.
+	So we need a table PR->loc, where 'loc' can be ALU output, MAC output, actual register etc.
+	Or it may be unavailable yet. Maybe this 'waiting' state can be treated	as just one of the 'loc'-s?	
+		
+> Let's assume that we read a reg, then in next cycle perform arithmetic. So value must be in register
+ 1 cycle before instuction has the vlue and 2 cycles before the result is on output.
+ If in cycle of register read it was 'waiting', we set a flag 'missing val' in the instruction.
+ When a he gates of ALU the instr has 'missing' and 'loc' has changed to 'alu out', we take the output 
+ to the input. If 'loc' were already 'register', we could use it, but register read takes a cycle, so 
+ we in fact can't, so we needed to take it from 'loc' that was 1c before 'register', so it would happen 
+ a the time of "register read", however the reading would be from another location.	
+ If at the gates of ALU the 'loc' is still 'waiting', we must stall the pipeline.
+ For simple ops that take 1 c, stall never happens cause we read form ALU output to its input.
+
+ If we have more than 1 missing, they may come in different cycles. So instuciton should be able to fill
+ a lacking value at any stage before "proper" register read and the ALU stage, at the moment when it becomes
+ available. We can't always wait a cycle to read form reg, so take the value already to instruction object 
+ that is awaiting execution.
+
+ WARNING! It may be so that a value has to remain in PR even after all reads of it, because exception may happen
+ and flush pipeline, so that uncompleted operations are gone and their stored information gets lost. 
+ So maybe it should be that PR is freed only when its successor is being written into.
+ Example:
+	r5 => p7, then r5 => p9, but p7 stays 'used', and becomes 'free' the moment when p9 starts to hold r5 value.
+  So when  p9.loc  becomes 'register', p7 can finally be freed. 
+  So p7 has to remain in another table: tab of prev PR-s. When exception happens, r5.phys is restored to be p7,
+  And p9, which had 'loc' different from 'register' is refused the honor of holding r5
+
+  
+ > Exceptions in execution:
+ Each stage of pipe can generate exception, so each should have a field for triggered exceptions
+ 
+ Fetch:  illegal access to program mem?
+ Decode: undef or illegal instr
+ Rename: ?
+ Read:   ?
+ Exec:   arith 
+ Mem:		illegal access, ?   (when cache miss, we just stall?)
+ WB:		? maybe none
+ 
+ When are they handled? Maybe on WB instead of writing to reg?
+ Exec can be divided into more stages: Mac0, Mac1, etc! Individual for execution units!
+ 
+ When the exception occurs, maybe the address of handler can be immediately loaded to IP?
+ > No, because some more advanced stage could raise exception later but from older instruction!
+   To preserve order, we need to wait until a common stage, like WB.
+		More complex option: handler fetcher early, but instructions killed if "older but later" exc happens
+ But what if exception happens in the handler? 
+ Anyway several exceptions can exist together in the pipeline.
+  
+ 
+ So it seems we need a queue of PR-s for each GPR? At least initially to keep it simple.
+ Each assignment of PR is appended, and each freeing clears first element.  
+ 
+ Each PR has 'used', 'loc', ['ready' (maybe reducible to location)] and 'GPR' desciption. 
+ 
+ 
+ For keeping order 2 options come to mind:
+ 1. Issue round and commit round:
+	List of bits 0 to N, where N is enough for all instructions in execution window
+	On entry, each instr gets next number, and N+1 := 0. Issue counter keeps last one.
+	On commit, instr 'k' is allowed if commit counter is k-1, and it increments when it happens.
+	> It seems that list isn't needed, just counters.
+
+	This works by number tags in operations.
+
+2. Commit queue, where instrs are added when issued and keep that order. The entries contain info about 
+	regs and other states that the operation wants to update. When PR is finally filled at WB, operations
+	in the queue clear their dependency link. The instr at the end of queue is allowed to exit, if
+	it has all dependencies cleared and queue goes a step forward.	
+ 
+	This works by ordered positions in the queue.
+ 
+=========================================================================================================== 
+
+# Pipeline control:
+each stage has autonomous signals  canAccept, wantSend
+each has state: empty/full
+
+If empty, {canAccept, wantSend} = {1,0}
+If full, can be stopped {0,0} or moving {1,1}
+Remaining combination: {0,1} implies that more than 1 cycle is spent in this stage; only for special stages 
+
+Each stage has 'derived' signal: allowed, which is 1 when it's to take new value (or empty and stays so).
+'allowed' propagates backwards: 
+allowed[N]=0 when: canAccept[N]=0
+allowed[N-1]=0 when: (allowed[N]=0 and not empty[N-1]) or canAccept[N-1]=0
+allowed[N-2]=0 when: (allowed[N-1]=0 and not empty[N-1]) or canAccept[N-2]=0
+...
+allowed[0]=0 when: (allowed[1]=0 and not empty[0]) or canAccept[0]=0
+
+/// allowed[x] = canAccept[x] and ((not wantSend[x]) or allowed[x+1])
+
+
+can[x] send[x] all[x+1] | all[x] 
+0        0			0		|	0
+0			0			1		|	0
+0			1			0		|	0
+0			1			1		|	0
+1			0			0		|	1
+1			0			1		|	1
+1			1			0		|	0
+1			1			1		|	1
+
+allowed[x] = canAccept[x] and not (wantSend[x] and not allowed[x+1])
+allowed[x] = canAccept[x] and ((not wantSend[x]) or allowed[x+1])
+
+When allowed[x], the register is written. Content to write depends on wantSend[x-1].
+If 1, written is value of prev stage. If 0, then Empty is written ('live' bit is 0, reg data may be anything?)
+Temp flags: takesEmpty, takesFull will be introduced.
+
+
+There may be side effects of stage: e.g. rename stage modifies desc tables. The effects are done only if
+wantSend[x-1] and (of course) allowed[x]. (That means takesFull[x])
+
+--------------------------
+
+But for queue steps with more storage capacity, numbers may be needed instead of boolean!
+It would be: canAccept - how many, wantSend - how many, capacity - how many can store
+and so [nAllowed] = f(nAllowed[x+1],nStored])    ?? 
+
+
+// nAllowed[x] here means "allowed into x", and nSent[x] <= nAllowed[x+1]
+nSent[x] = min(nStored[x], nAllowed[x+1])  -- or also limited by some other processing restraint?
+											-- min(nStored[x], processingSpeed[x], nAllowed[x+1]) ?
+nRemaining[x] = nStored[x] - nSent[x]
+nAllowed[x] = cap[x] - nRemaining[x] = cap[x]-nStored[x]+nSent[x]
+
+Or we can drop n- prefix and operate on objects other than numbers if need be.
+If so, min(A,B) would be union(A,B)?
+
+When stage reads >=2 inputs, it needs to assign bandwith to them according to some rules!
+If sends to >=2, also; but in our case each op-type goes to specific subpipe, so only 1 option exists
+
+-------------
+Boolean control with branching pipes:
+Stage sending to one of several subpipes can send iff the correct receiver accepts. 
+If only 1 instr is sent in a cycle, only 1 receiver decides. 
+In equation for allowed[x], the allowed[x+1] is taken from the selected subpipe.
+wantSend[x] is multiple (max 1 used).
+allowed[x] is multiple, and the correct part of it selected (where it wants to send)
+	However, bacause it NOT wantSend.partK, it will always be allowed.partK
+	So the only relevant allowed part is the one that would be used this cycle. So in the end, allowed[x] 
+		could be single.
+
+In gather-type stage, canAccept[x] is multiple, but only max 1 used.  
+!! In future, those stages may have higher flow rates, and more than 1 wantSend/canAccept could be high!
+If gather stage can process 2 entries, 2 canAccept's may be high. How to select which? Oldest instructions.
+Of course side effects may depends on which path is used. So multiple side-effect ports can exist and 
+be activated with different bits (different takesFull's of the same stage)
+
+==========================================
+Instruction killing
+If jump or exception, some instrs must be killed. There will be a killer signal. Probably it would 
+cancel the ops with numbers (killingInstruction, lastIssued]
+Of course the code of handlers and branch targets must not be killed, so take care to do the clearing before 
+loading that code. Can it be so always? If not, need to check what was last before handler code.
+Probably in branches, anyway 1 path is selected speculatively, so only when branch is resolved do we know
+if need to flush, and the other path isn't loaded yet.
+On expections, we could load handler code instantly, but remember that older instr can fire an error later,
+so early loading is not perfect. Maybe leave it until exception resolution time?
+
+WARNING! When branching, we also can get a late exception form older instr. If it happens, we must rollback
+the processor, including possibly executed branch. Of course speculative ops are not committed in this 
+scenario, but need to restore IP and state registers. So IP also needs some "renaming", or rather speculative
+doubling.
+Or maybe not, cause exc handler will branch to its proper place, and return will go to instruciton after
+the guilty one(??). 
+
+But if a jump is speculated and it turns out that it was wrong? We must return to instr after the branch.
+It may work like exception return mechanism?
+
+How to kill?
+A conviction list: table (killed/not killed) for each numberTag, on commit not committed if on the list, and 
+position on the list cleard. Would it work?
+Problem: "Zombies" would still take up pipeline resources hindering new operations.
+So it must be an instant action. Whole pipe must react to Kill signal by becoming Empty in stages where 
+convicted number of instruction would be written. So when stage status is 'stops' and has a convict, it
+will become Empty. If a stage has 'takesFull' and prev. one has a convict, we change to 'takesEmpty'.
+
+Another problem: when branch resolves and makes a kill, does it happen in the same cycle (instantly), 
+or is the Kill signal written to register and only the next cycle implements the cleaning?
+Second option is more convenient to implement... ? If we choose it, it would be: 
+	1. set request to kill proper numberTags
+	2. act according to this request 
+
+
+type PipeStage is (fetch, decode, rename, regRead,  
+							alu0,  alu1, -- alu1 needed? Not now, maybe later? Or just to balance w other subpipes
+							mem0, mem1,  -- respectively do  memAddr, memAccess,
+							mac0, mac1, mac2,
+							system0, system1,
+							jump0, jump1,
+							divMulti,
+						 commit, retire);
+
+
+tabWantSend: array(PipeStage) of std_logic;
+tabCanAccept: array(PipeStage) of std_logic;
+
+tabStall: array(PipeStage) of std_logic;
+tabEmpty: array(PipeStage) of std_logic;
+tabFull: array(PipeStage) of std_logic;
+
+tabTakesEmpty: array(PipeStage) of std_logic;
+tabTakesFull: array(PipeStage) of std_logic;
+
+procedures:
+--propagateFront,   propagateAlu, ..., propagateDiv,  propagateEnd  ???
+
+> proposition:
+procedure propagate(tabWS, tabCA, tabFull: in slv; nextA: slv; allowed: out slv); 
+nextA is vector of 'allowed' from parallel next stages
+
+function calcTakesEmpty(inputSend, tabWS, tabAllowed) return slv;
+function calcTakesFull(inputSend,  tabWS, tabAllowed) return slv'
+	-- inputSend is vec of parallel input "wantSend" bits; for Fetch it's 1 when new instruction can be read
+
+Front pipe:
+	fetch, decode, rename, regRead
+	
+		
+	
+	
+End pipe:
+	commit, retire
+
+-------
+
+
+
+...
+
+
+-- End pipe ------------------
+allowed(retire) := canAccept(retire) and ((not wantSend(retire)) or retirementPossible); --??
+
+allowed(commit) := canAccept(commit) and ((not wantSend(commit)) or allowed(retire)); 
+------------------------------
+
+
+-- Div subpipe ------------------
+allowed(divMulti) := canAccept(divMulti) and ((not wantSend(divMulti)) or allowedFromDiv(commit)); 
+
+
+-- Jump subpipe ------------------
+allowed(jump1) := canAccept(jump1) and ((not wantSend(jump1)) or allowedFromJump(commit)); 
+
+allowed(jump0) := canAccept(jump0) and ((not wantSend(jump0)) or allowed(jump1));
+
+
+-- Sys subpipe ------------------
+allowed(sys1) := canAccept(sys1) and ((not wantSend(sys1)) or allowedFromSys(commit)); 
+
+allowed(sys0) := canAccept(sys0) and ((not wantSend(sys0)) or allowed(sys1));
+
+
+-- Mem subpipe ------------------
+allowed(mem1) := canAccept(mem1) and ((not wantSend(mem1)) or allowedFromMem(commit)); 
+
+allowed(mem0) := canAccept(mem0) and ((not wantSend(mem0)) or allowed(mem1));
+
+
+-- MAC subpipe ------------------
+allowed(mac2) := canAccept(mac2) and ((not wantSend(mac2)) or allowedFromMac(commit)); 
+
+allowed(mac1) := canAccept(mac1) and ((not wantSend(mac1)) or allowed(mac2));
+
+allowed(mac0) := canAccept(mac0) and ((not wantSend(mac0)) or allowed(mac1));
+-------------------------------
+
+-- ALU subpipe ------------------
+allowed(alu1) := canAccept(alu1) and ((not wantSend(alu1)) or allowedFromAlu(commit)); 
+
+allowed(alu0) := canAccept(alu0) and ((not wantSend(alu0)) or allowed(alu1));
+-------------------------------
+
+
+-- Front pipe -----------------
+allowed(regRead) :=	
+							canAccept(regRead) and ((not wantSendToAlu(regRead)) or allowed(alu0)) 	or 
+							canAccept(regRead) and ((not wantSendToMac(regRead)) or allowed(mac0)) 	or
+							canAccept(regRead) and ((not wantSendToJump(regRead)) or allowed(jump0)) 	or
+							canAccept(regRead) and ((not wantSendToSys(regRead)) or allowed(sys0)) 	or
+							canAccept(regRead) and ((not wantSendToMem(regRead)) or allowed(mem0)) 	or
+							canAccept(regRead) and ((not wantSendToDiv(regRead)) or allowed(divMulti));
+
+allowed(rename) := canAccept(rename) and ((not wantSend(rename)) or allowed(regRead));
+
+allowed(decode) := canAccept(decode) and ((not wantSend(decode)) or allowed(rename)); 
+
+allowed(fetch) := canAccept(fetch) and ((not wantSend(fetch)) or allowed(decode));
+------------------------------
+
+function calcAllowed(tabCA, tabWS: std_logic_vector; nextA: std_logic) return std_logic_vector is
+	variable aTemp: std_logic;
+	variable res: std_logic_vector(tabCA'range);
+begin
+	aTemp := nextA;
+	for i in tabCA'reverse_range loop
+		aTemp := tabCA(i) and ((not tabWS(i)) or aTemp);
+		res(i) := aTemp;
+	end loop;
+	return res;
+end function;
+
+----------------------------------------------------------------------------------------
+----------------------------------------------------------------------------------------
+----------------------------------------------------------------------------------------
+----------------------------------------------------------------------------------------
+Automated instruction definition
+
+It'd be much bette rif we could just write some standard description and count on the program to 
+understand how to decode etc.
+
+Example:
+and ro, ra, imm; [opcode 6] [rd 5] [ra 5] [imm 16]; alu/and ro <- ra, imm; (here addirional info)
+and ro, ra, rb; [opcode 6] [rd 5] [ra 5] [opcont 6] [rb 5] [ignore 5] alu/and ro <- ra, rb; ...
+
+Introduce standard formats? Like:
+2-arg operation - needs op type, output reg, 2 inputs
+
+Of course division into basic formats is crucial:
+short:
+6,10
+6,5,5
+long:
+6,26
+6,5,21
+6,5,5,16
+6,5,5,6,10
+6,5,5,6,5,5
+
+New! introduce new formats:
+6,10,16 
+6,10,6,10 
+They can be used for hardware loops: [opcode, N, adr] or [opcode, N, opcont, adr] N: repetitions
+Also loops with registers could be done:
+reg for condition (if rC zero/nonzero etc), reg for N times, also reg for adr maybe - 
+there'd be different modes for aguments, just like with other operations!
+
+Introduce operation formats? As opposed to instr formats, they'd express what work is to be done.
+They already exist in some form as funtions in Decoding0, like icJumpNolinkI, etc.
+
+So we could specify sth like this:
+assembly syntax: ins ro, k, imm16  (insert imm16 to ro, shifted left by k)
+opcode q0 q1 imm16  (dont confuse qi fields of machine word with q0, q1 arguments of operation!)
+6 	  5 	5     16
+opc ro  q0  imm16; operation format: unique for this instruciton(?), or just standard ALU long representaiotn:
+	binom.op dest    a0 a1 a2  imm    q0  q1
+	alu/ins,   ro <- x,  x, x, imm16, q0, x 
+
+So the description has "q0" in field .q1, so automatically word.q1 should be sent to operation.q0 
+Define type for names of fields: opcode, q0, q1, opcont, q2, q3
+or opcode, qa, qb, opcont, qc, qd
+Also include names of lager entities: like imm16, imm21, etc. 
+So every possible field should be included.
+Define another type, for operaiton arguments: ro, r0, ..., imm, q0, ...
+Then a table fieldMeanings (one for each instruciton type!) would be used: if fieldMeanings(qa) = q1, then we know to route qa field 
+into q1 of operation!
+
+Another table implicitArgs (for each instruction, could be different even for the same instr. type!) would contain
+implicit args. Like if r1 would be default link register, and instruction was linking to it but not contain
+its name in the encoding, it would be known form this table. It would be indexed with operation arg names.
+Like: (ro => "000001", cond => always)
+
+So 2 tables for each instruction/instr.type will describe how to decode.
+
+-- iw = instruction word
+-- This describes that an instruction has ro in its .qa, ra in .qb, some constant in right half, and
+--	rb is equal to ro:
+tab1 := fields655H(opcode, ro, ra, imm16);
+tab2 := (rb => iw(ro));
+
+So instruction has a table of values: iw(qa) = "01010", ...
+and a table of routing:	fieldMeanings(qa) = ro
+so we know that ic(ro) := "01010" (r10)
+
+> define subformat:
+name: 3reg
+opcode:6, ro:5, ra:5, opcont:6, rb:5, rc:5
+
+Format 655H (or more exactly 6DRI ?) has definition: (opcode, ro, ra, imm16)
+So when we tell the engine to declare format 6DRI with args: (andRRI, 27, 22, 678),
+then it will be automatically understood as ro=27, ra=22, imm16=678
+
+Let's define a jump:
+Jump conditional: (will need special definition of field for jumps!)
+format 65L, (jCond, rCond, imm21)
+Jump always and link:
+format 65J, (jLink, rLink, imm21)
+Jump always:
+format 6L, (jLong, imm26)
+Jump cond and link (if implemented, but not planned so far):
+format 655H, (jCondLink, rLink, rCond, imm16)
+
+So maybe also some instuctions need also info about treatment of constants? Extending cna be sign or zero.
+So instruction'd have additional info: how to extend etc: 3rd table! [fieldMeanings, defaults, extraInfo]
+
+Unconditional jumps could be represented as jump if zero with default rCond = r0, jums without link
+would have r0 as destinaiton. So there would be just 1 jump operaiton:
+jump(rLink, rCond, rAdr, immAdr, cond), of course rAdr and immAdr are mutually eclusive, but just like in 
+other instruciotns, ther's a verison with immediat and with register (as arg1). So jump address is arg1,
+condition is arg0. arg2 probably nonexistent in this type of operaiton, but logically it exists (as unsused).
+
+Memory ops would have rBase as arg0, arg1 is rOffset/immOffset, arg2 is value to store, ro ofc where to load.
+Stores have ro = r0, loads have arg2 = r0
+But what if incrementing rBase? ro1 would be needed, so maybe ro is the incremented and ro1 is loaded value? 
+However loaded value is more important, so maybe ro1 is for updated rB?
+Of course the output for updated adr is always equal to rBase - (ro1 => iw(rBase)), where rBase is ra
+
+We can define patterns: p := (opcode, qa, qb, imm16)
+Then using this pattern and routing table r := (none, ro, arg0, imm) we decode parameters.
+So to define a format to interpret which parts of word are routed (cayse routing table tells where they go,
+not from where)
+So the pattern routes args from an int array like (2, 3, 5, 764) to proper places in fieldMeanings.
+
+But we also have to determine op types. Some table must contain sth like this:
+opcode opcont unit func  (ignore can be 'none' or sth different?)
+(andRRI, ignore, alu, and)
+(jzRJ,	ignore, jump,jump)
+(other,	load,	  memory,load)	
+...
+But it would be another listing of the same opcodes, so better maybe include opcode+opcont in
+operation fieldsand get them routed together with parameters. However, opcont values will be the same
+for different operations differing in opcont. So list of opconts is not bijective with a set of 6b numbers.
+There will be more opconts than 6b space. 
+Example definition:
+(float, fo, fa, addSingle, fb, options) 
+So qa routes to fo (dest0), addSingl to opcont etc.
+
+!! But this way formats of coding would be repeted many times, cause many instruciotns share common formats.
+So definitions with only opcode+opcont translation are necessary. So in format specifiers only words
+"opcode", "opcont" will be used, not concrete names:
+(opcode, rl, ra, offset) rather than (jump, ....)
+So table with op resolving is separate, and param routing tables are part of record for each instr?
+opcode,  opcont, unit, func, format 
+(andRRI, ignore, alu, and, formatRRI) 
+(memory, load,	  memory, load, formatMem) ??
+(jzRJ,	ignore, jump,	 jump, formatJumpCond) ?? formats here are emore specific than word layout, they mean	
+																	complete routing tables	 
+																	// But defaults and copy tbls can be separate (more elems)
+opcode,  opcont, unit, func,     route, dfaults, copied [, more?]
+Opcode   Opcont                							// we have to indicate if extension is signed  
+(andRRI, none,	  alu,  logicAnd, rtRRI, empty,  empty, sign   ???	
+(alu,   andRRR,  alu,  logicAnd, rtRRR, empty,  empty, sign
+...
+!! Some info must be passed about which type of immediate was in InsFieldTable, cause it's needed to 
+	determine from which bit to sign extend
+	There can be (in theory) the immediate(26/21/16) and 2 X-fields, not all at once, but need 
+	individual info about signedness.
+
+Need to define types for unit (PipePurpose, but change name to some better! ExecUnit?) + func
+										^ OpType also exists, but pobably is worse
+Make unified codes: instead of AluOp etc. make one list
+
+Need functions to generate rows of that main table.
+There should be functions for predefined formats, like:
+defImm(opcode => andI, unit => alu, func => logicAnd)
+defReg(opcode => alu, opcont => andR, unit => alu, func => logicAnd)
+... and for specified routing:
+defAny(opcode => alu, opcont => shra, 
+		 unit => alu, func => shra, 
+		 fieldFormat => 	(opcode, qa, 	qb, opcont, qc, qd), 
+			opFields => 	(opcode,	dest0,src0,opcont,q0,none), 
+		 defaults => (others=>none), copy => (others=>none),
+		 ...[constant extending spec]) 
+
+ 
+!!! Idea how to add with carry:
+adc ro, ra, rb, rc => if carry(rb+rc) then ro = ra+1, else ro = ra; <=> ro = ra + carry(rb+rc)
+sbc ... - analogous with borrow
+
+=================================================================================
+=================================================================================
+=================================================================================
+# Types of jumps and exceptions
+
+interrupt
+undef instruction exception
+illegal ins exception
+mem access violation
+fetch exception (counlndt fetch)
+execution exception (arith, no data in cache etc)
+intentional exception (instruction to cause it)
+rete/reti
+jump
+system state change (control reg write...)
+normal instruciton (no jump)
+
+!! interrupt can occur:
+	- when pipe doesnt move
+	- when normal instruciton commits
+	- when jump commits
+	- when exception commits, rete/reti, etc.
+
+
+nothing:
+		-
+normal:
+		commit regs
+jump:	
+		commit regs (that means link reg)
+		convict
+		set target J
+exception
+		convict
+		set target E	
+		write linkRegExc (with next ins)
+sys ret		
+		convict
+		set target linkReg(I/E)
+sys write
+		commit sys write
+		convict	
+		set target next ins
+		
+interupt when nothing
+		convict
+		set target I
+		write linkRegInt (wth next ins)		
+interrupt when normal:
+		commit regs
+		convict
+		set target I
+		write linkRegInt (with next ins)
+interr. when jump
+		commit regs( link reg (link with next ins))
+		convict
+		set target I
+		write linkRegInt (with jump target)
+interr. when exc
+		convict
+		set target I
+		write linkRegExc (with next ins)
+		write linkRegInt (with exc target)
+interr when sys ret:
+		convict ?
+		set target I
+		write linkRegInt (with ret address)  - so sys ret is like jump in this account
+interr when sys write:
+		commit sys write
+		convict		
+		set target I
+		write linkRegInt (with next ins)
+		
+!! Distinguish Restart Exception - when should repeat causing instruction,
+					Go on Exception - when should continue with the next one (or not continue?)
+		
+-- General description:
+type CommitAction is record
+	conviction: std_logic;
+	regCommit: std_logic;
+	sysCommit: std_logic;
+	causingTagW: std_logic;
+	--causingTag: integer;	
+	targetRegW: std_logic;
+	targetReg: word;	
+	linkInt: std_logic; -- strobe
+	linkRegInt: word;
+	linkExc: std_logic; 	
+	linkRegExc: word;	
+end record;	
+
+type CommitMode is (	unknown,
+							idle, 	normal, 		jump, 	exception, 	sysJump,		sysWrite,
+-- target				-(trgR)	+1				j			e				ilr/elr		+1
+-- ilr					-			-				-			-				-				-
+-- elr					-			-				-			+1				-				- 
+							intNone, intNormal,intJump,intException,intSysJump,intSysWrite);
+-- target				int		int		 int     int			 int			int
+-- ilr					targReg	+1			 j			e				 ilr/elr	   +1
+-- elr					-			-			 -			+1				 -				- 
+
+
+
+	Hierarchy:
+		?? idle
+			normal
+			jump / sysJump / ?sysWrite? -- sysWrite  is eq hier. to 'normal' or 'jump'/'sysJump'?
+			exception
+			interrupt
+	
+Above: problem with sysWrite. Has no linking (would be below jump) but has conviction (above normal).
+		So is it eq to normal, to jump, or between them?
+			target works the same as in nrmal: own IP + 1
+			> normal: no special action. targetReg is written but IP already some cycles forward
+			> sysWrite: write IP (+1), targetReg is written as IP+1, but IP also written, so maybe higher level?	
+
+function getCommitMode(state: std_logic_vector) return CommitMode;
+function getCommitMode(int,exc,sysJ,sysW,jump: std_logic) return CommitMode;
+
+-- 
+function getCommitAction(ct: CommitType; ilr, elr, jTarget, incIP: word) return CommitAction is
+	variable res: CommitAction;
+begin
+	assert ct /= unknown report "Unknown commit mode!" severity error;
+	case ct is
+		when idle | normal =>
+			res.conviction := '0';
+			res.causingTagW := '0';
+		when others =>
+			res.conviction := '1';
+			res.causingTagW := '1';
+	end case;
+	
+	if ct = idle then
+		targetRegW := '0';
+	else
+		targetRegW := '1';
+	end if;
+	
+
+	
+	
+	return res;
+end function;
+
+
+
+Different levels:
+
+-- when idle
+> --- ?
+	
+-- when normal	
+>	lr:  -
+	elr: -
+	ilr: -
+	trg: IP+1
+	
+-- when jmp	
+>	lr: IP+1
+	elr: -
+	ilr: -
+	trg: jTarget
+
+-- below: when jump and exception (maybe a situation not happening in practice) 
+>  lr:  IP+1	
+	elr: jTarget
+	ilr: -
+	trg: eTarget
+
+		-- only exception
+		lr: -
+		elr: IP+1
+		ilr: -
+		trg: eTarget
+		
+
+-- jump, exc, interrupt
+>	lr:  IP+1
+	elr: jTarget 
+	ilr: eTarget
+	trg: iTarget		
+	
+-- interrupt when idle
+		lr: -
+		elr: -
+		ilr: targetReg	
+		trg: iTarget	
+	
+-- only normal, interrupt
+	lr: -
+	elr: -
+	ilr: IP+1
+	trg: iTarget
+
+-- jump, interrupt
+	> lr: IP+1
+	> elr: - 
+	> ilr: jTarget
+	> trg: iTarget
+	
+-- exception, interrupt
+	> lr:  -
+	> elr: IP+1 
+	> ilr: eTarget
+	> trg: iTarget
+
+# it seems that sysWrite is on the level of jump: writes to IP (its own IP+1) and convicts. However
+	the category of jump is diverse cause it contains different privilege level transitions:
+	jump, sysJump and sysWrite are types of the same target level, but their consequences for syste state 
+	are different.
+
+
+
+
+lr:  0
+elr: 0
+ilr: 0
+
++1:	0	
+jt:	0	
+et:	0	
+it:	0	
+
+--------
+-- Int while jump
+lr:  1
+elr: 0
+ilr: 1
+
++1:	1	
+jt:	1	
+et:	0	
+it:	1
+.........
+lr:  +1 / 0
+elr: -  / -
+ilr: jt / 1
+ta:  it / 3 
+	
+
+	
+ 1011  lr, elr, ilr, ta
+ 1101  +1, jt,  et,  it
+ 0-13
+.......
+ 0011
+ 1001	
+ --03
+.......
+ 1101 
+ 1110
+ 01-2	
+.......
+ 0111
+ 1011
+ -023 
+...... 
+ 0101
+ 1010
+ -0-2
+.....
+
+function lastPosTo(vec: std_logic_vector; k: integer) return integer is
+begin
+	for i in k downto 0 loop
+		if vec(i) = '1' then
+			return i;
+		end if;	
+	end loop;
+	return -1; 
+end function;
+ 
+ 
+----------- 
+	Arg patterns
+ 
+ 
+opcode,	d0, s0,  opcont, 	s1, s2		- reg3
+opcode,	d0, s0,	opcont,	s1, -	/s2=0 - reg2		
+opcode,	d0, s0,	imm				 		- imm
+opcode,	d0, c0,	imm	/s0 = 0			- insert 1  // or s0 = d0 ??
+
+opcode,	d0, s0,	opcont,	c0, - 		- shift
+opcode,	d0, s0,	opcont,	-,	 c0		- shift?	alternative
+
+opcode,	d0, s0, 	opcont,	imm			- load
+opcode,	s2, s0,	opcont,	imm			- store
+opcode,	d0, s0,	opcont,	s1, -			- load r
+opcode,	s2, s0,	opcont, 	s1, -			- store r
+
+opcode,	imm			/d0 = 0, s0 = 0	- long jump	 //or s2 as cond?
+opcode,	s0, imm		/d0 = 0				- cond jump	 //or s2 as cond? it'd match other patterns with s2 here 
+opcode,	d0, imm		/s0 = 0				- link jump	
+
+opcode,	-,	-,		opcont,	-,	-			- operation without args (link reti/rete etc)	
+
+For each element (d0, s1, imm16, imm26...) we can determine a table of where it is:
+		q0, q1, imm16, "00000", dontCare, ...
+
+From above list: 
+	d0: {qa, 0}
+	s0: {qb, 0, -?}
+	s1: {qc, 0-?}
+	s2: {qd, qa, 0}
+	c0: {qc?, qd?, qb}
+Imm size: 10, 16, 21, 26	
+Imm extension: sign/0
+Left imm: yes/no					-- if applies
+Left imm extension: sign/0		-- if applies
+
+To simplify the thing., let's allow only reasonable options: 
+	d0 from {qa,...qd, 0, 1, none}, never in imm16 etc.
+	other quintets with the same possibilities. 
+	
+	immediate: {10, 16, 21, 26, -}, extension: sign/0
+	leftImm:	  sign/0	
+	
+New decode table design:
+opcode:opcont | d0 | s0 | s1 | s2 | c0 | c1 | imm
+------------------------------------------------- 
+ext0:mad	     | qa | qb | qc | qd | -  | -  | -
+orI:none		  | qa | qb | -  | -  | -  | -  | 16z 	
+ext1:store	  | 0- | qb | -  | -  | -  | -  | 10s 
+
+type QuintetSrc is (qa to qd, zero, one, none);
+type ImmFormat is (imm26, imm21, imm16, imm10, none);
+-- sign: 1b for leftImm, 1 for imm (rightImm will be scrapped) 
+
+instr desc in table: unit, func, argFormat?
+
+argFormat: like example table. imm description is: imm size desc, sign, also leftImm sign
+
+
+
+type QuintetArgName is (d0, d1, s0, s1, s2, c0, c1);
+type QuintetSrcArray is array (QuintetArgName range <>) of QuintetSrc; 
+type QuintetValArray is array (QuintetArgName range <>) of slv5;
+type QuintetSelect is array (QuintetArgName range <>) of std_logic;
+
+type ArgFormat is record
+--	d0: QuintetSrc;
+--	d1: QuintetSrc;
+--	s0: QuintetSrc;
+--	s1: QuintetSrc;
+--	s2: QuintetSrc;
+--	c0: QuintetSrc;
+--	c1: QuintetSrc;
+	quintets: 	QuintetSrcArray;
+	immSize: 	ImmFormat;
+	immSign: 	std_logic;
+	hasLeftImm: std_logic;
+	leftImmSign: std_logic;
+end record;
+
+
+-- result would be like this:
+ record
+--	d0: RegName;
+--	d1: RegName;
+--	s0: RegName;
+--	s1: RegName;
+--	s2: RegName;
+--	c0: slv5;
+--	c1: slv5;
+	quintetSel:		QuintetSelect;
+	quintetValues: QuintetValArray;
+	hasLeftImm: 	std_logic;
+	leftImm: 		word;
+	hasImm: 			std_logic;
+	imm: 				word;
+end record;
+	
+
+
+
+
+
+
+
+ 
+ 
+ 
+ 
