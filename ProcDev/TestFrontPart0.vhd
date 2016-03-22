@@ -114,6 +114,11 @@ architecture Behavioral of TestFrontPart0 is
 		signal stageDataFetchNext: TEMP_StageDataPC; -- ^	
 
 		signal resetSig, enabled: std_logic := '0';	
+		
+		constant hEndings: MwordArray(0 to 2*PIPE_WIDTH-1) := hwordAddressEndings;
+		signal movedIP: Mword := (others => '0');
+		constant pcInc: Mword := (ALIGN_BITS => '1', others=>'0');
+		signal newTargetSize: PipeFlow := (others=>'0');
 	begin	 
 		resetSig <= reset;
 		enabled <= en;
@@ -140,13 +145,14 @@ architecture Behavioral of TestFrontPart0 is
 		FETCH_BLOCK: for i in 0 to PIPE_WIDTH-1 generate
 			fetchBlock(2*i)	 <= iin(i)(31 downto 16);
 			fetchBlock(2*i+1) <= iin(i)(15 downto 0);
-										-- $input
 		end generate;	
 					
-		-- PC stage  		
-		tempTargetInfo <= nextTargetInfo(stageDataPC, frontEvents);
-				
-		stageDataPCNext <= stagePCNext(stageDataPC, tempTargetInfo, 
+		-- PC stage
+		movedIP <= i2slv(slv2u(stageDataPC.pcBase) + slv2u(pcInc), MWORD_SIZE);					
+		tempTargetInfo <= nextTargetInfo(stageDataPC, frontEvents, movedIP);
+		newTargetSize <= pc2size(tempTargetInfo.ip, ALIGN_BITS, num2flow(2*PIPE_WIDTH, false));
+						
+		stageDataPCNext <= stagePCNext(stageDataPC, tempTargetInfo, newTargetSize,
 												flowResponsePC.living, flowResponsePC.sending, flowDrivePC.prevSending);		
 		-- Fetch stage										
 		stageDataFetchNext <= stageFetchNext(stageDataFetch, stageDataPC,
@@ -156,7 +162,8 @@ architecture Behavioral of TestFrontPart0 is
 		hbufferDataANext <= bufferAHNext(hbufferDataA, hbufferDataANew,			
 											binFlowNum(hbufferResponse.living), 
 											binFlowNum(hbufferResponse.sending), binFlowNum(hbufferDrive.prevSending));
-		hbufferDataANew <= getAnnotatedHwords(fetchBlock, stageDataFetch.pcBase, stageDataFetch.basicInfo);														
+		hbufferDataANew <= getAnnotatedHwords(fetchBlock,
+															stageDataFetch.pcBase, stageDataFetch.basicInfo, hEndings);														
 				
 		hbd <= wholeInstructionData(shortOpcodes, 
 									binFlowNum(hbufferResponse.living), binFlowNum(hbufferDriveDown.nextAccepting));

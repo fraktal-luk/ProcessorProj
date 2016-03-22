@@ -103,6 +103,8 @@ architecture Behavioral of TestRenamingCircuit0 is
 			signal reserveVec, commitVec, takeVec, putVec: std_logic_vector(0 to PIPE_WIDTH-1) := (others=>'0');
 			--
 			signal readySet, readyClear: std_logic_vector(0 to PIPE_WIDTH-1) := (others=>'0');
+
+			signal newNumberTags: SmallNumberArray(0 to PIPE_WIDTH-1) := (others=>(others=>'0'));
 			signal renameCtr, renameCtrNext, commitCtr, commitCtrNext: SmallNumber := (others=>'0');
 				signal renameCtrInt: natural := 0;	
 
@@ -116,7 +118,8 @@ architecture Behavioral of TestRenamingCircuit0 is
 		enabled <= en;	
 	
 		-- Rename stage								
-		stageData1New <= renameRegs(TEMP_baptize(frontDataLastLiving, binFlowNum(renameCtr)),
+		stageData1New <= renameRegs(--TEMP_baptize(frontDataLastLiving, binFlowNum(renameCtr)),
+											baptizeVec(frontDataLastLiving, newNumberTags),
 											takeVec, physRenameDestSelects, 											
 											newPhysSources, newPhysDests, newGprTags);
 		--stageData1New_2		<=	
@@ -168,7 +171,9 @@ architecture Behavioral of TestRenamingCircuit0 is
 				physCommitDestSelects(i) <= stageDataCommitNew.fullMask(i)
 													and stageDataCommitNew.data(i).physicalDestArgs.sel(0);	
 				-- CAREFUL! Version for new Free List
-				newGprTags(i) <= "00" & newGprTags6(i);	
+				newGprTags(i) <= "00" & newGprTags6(i);
+
+				newNumberTags(i) <= i2slv(binFlowNum(renameCtr) + i + 1, SMALL_NUMBER_SIZE);		
 			end generate;
 			
 				-- CAREFUL, TODO: shouldn't there be selection based on actual dest selects?	

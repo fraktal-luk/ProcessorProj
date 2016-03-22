@@ -36,14 +36,14 @@ type TEMP_StageDataPC is record
 	nH: PipeFlow; -- number of hwords 	
 end record;
 
-constant DEFAULT_DATA_PC: TEMP_StageDataPC := (pc => (others=>'0'),
+constant DEFAULT_DATA_PC: TEMP_StageDataPC := (			pc => (others=>'0'),
 																		pcBase => (others=>'0'),
 																		nFull => 0,
 																		nH => (others=>'0'),
 																		basicInfo => defaultBasicInfo
 																		);	
 -- CAREFUL: this is PC "before" address 0 																		
-constant INITIAL_DATA_PC: TEMP_StageDataPC := (pc => i2slv(-PIPE_WIDTH*4, MWORD_SIZE),
+constant INITIAL_DATA_PC: TEMP_StageDataPC := (			pc => i2slv(-PIPE_WIDTH*4, MWORD_SIZE),
 																		pcBase => i2slv(-PIPE_WIDTH*4, MWORD_SIZE),
 																		nFull => 0,
 																		nH => (others=>'0'),

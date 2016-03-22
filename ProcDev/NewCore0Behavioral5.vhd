@@ -17,8 +17,7 @@ architecture Behavioral5 of NewCore0 is
 	signal frontLastSending: std_logic := '0';		
 	-- $input FRONT
 	signal renameAccepting: std_logic := '0';
-		
-		
+				
 		signal cqDataLivingOut: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
 		
 	signal srcVecA, srcVecB, srcVecC, srcVecD: std_logic_vector(0 to PIPE_WIDTH-1);
@@ -205,22 +204,22 @@ begin
 				iqAcceptingA <= '1' when --nToA <= binFlowNum(acceptingA) else '0';
 												 PIPE_WIDTH <= binFlowNum(acceptingA) else '0';	
 												 -- CAREFUL! Above simpler but restrictive
-				prevSendingA <= num2flow(nToA, false) when iqAcceptingA = '1' else (others=>'0');		
+				prevSendingA <= num2flow(nToA, false) when iqAccepts = '1' else (others=>'0');		
 				
 				nToB	<= countOnes(dataToB.fullMask);
 				iqAcceptingB <= '1' when --nToB <= binFlowNum(acceptingB) else '0';
 												 PIPE_WIDTH <= binFlowNum(acceptingB) else '0';														
-				prevSendingB <= num2flow(nToB, false) when iqAcceptingB = '1' else (others=>'0');
+				prevSendingB <= num2flow(nToB, false) when iqAccepts = '1' else (others=>'0');
 
 				nToC	<= countOnes(dataToC.fullMask);
 				iqAcceptingC <= '1' when --nToC <= binFlowNum(acceptingC) else '0';
 												 PIPE_WIDTH <= binFlowNum(acceptingC) else '0';					
-				prevSendingC <= num2flow(nToC, false) when iqAcceptingC = '1' else (others=>'0');
+				prevSendingC <= num2flow(nToC, false) when iqAccepts = '1' else (others=>'0');
 
 				nToD	<= countOnes(dataToD.fullMask);
 				iqAcceptingD <= '1' when --nToD <= binFlowNum(acceptingD) else '0';
 												 PIPE_WIDTH <= binFlowNum(acceptingD) else '0';					
-				prevSendingD <= num2flow(nToD, false) when iqAcceptingD = '1' else (others=>'0');				
+				prevSendingD <= num2flow(nToD, false) when iqAccepts = '1' else (others=>'0');				
 				
 				iqAccepts <= iqAcceptingA and iqAcceptingB and iqAcceptingC and iqAcceptingD;
 				
@@ -240,7 +239,7 @@ begin
 			ra => ra, -- TEMP!
 		
 		prevSendingA => prevSendingA, --: in SmallNumber; --std_logic;
-		prevSendingOK => iqAcceptingA,--: in std_logic;
+		prevSendingOK => iqAccepts,--: in std_logic;
 		
 		nextAccepting => execResponses(ExecA0).accepting,--: in std_logic; -- from exec	
 		
@@ -274,7 +273,7 @@ begin
 			ra => ra, -- TEMP!
 		
 		prevSendingA => prevSendingB, --: in SmallNumber; --std_logic;
-		prevSendingOK => iqAcceptingB,--: in std_logic;
+		prevSendingOK => iqAccepts,--: in std_logic;
 		
 		nextAccepting => execResponses(ExecB0).accepting,--: in std_logic; -- from exec	
 		
@@ -308,7 +307,7 @@ begin
 			ra => ra, -- TEMP!
 		
 		prevSendingA => prevSendingC, --: in SmallNumber; --std_logic;
-		prevSendingOK => iqAcceptingC,--: in std_logic;
+		prevSendingOK => iqAccepts,--: in std_logic;
 		
 		nextAccepting => execResponses(ExecC0).accepting,--: in std_logic; -- from exec	
 		
@@ -341,7 +340,7 @@ begin
 			ra => ra, -- TEMP!
 		
 		prevSendingA => prevSendingD, --: in SmallNumber; --std_logic;
-		prevSendingOK => iqAcceptingD,--: in std_logic;
+		prevSendingOK => iqAccepts,--: in std_logic;
 		
 		nextAccepting => execResponses(ExecD0).accepting,--: in std_logic; -- from exec	
 		

@@ -123,6 +123,9 @@ function extractFromAH(arr: AnnotatedHwordArray; cumulSize: IntArray;
 function TEMP_baptize(sd: StageDataMulti; baseNum: integer) 
 return StageDataMulti; 
 
+function baptizeVec(sd: StageDataMulti; tags: SmallNumberArray) 
+return StageDataMulti;
+
 -- Makes physical names the same as virtual names	
 function DUMMY_rename(sd: StageDataMulti) return StageDataMulti;
 		
@@ -622,8 +625,20 @@ return StageDataMulti is
 	variable res: StageDataMulti := sd;
 begin
 	for i in res.data'range loop
-		if res.fullMask(i) = '1' then
+		if true or res.fullMask(i) = '1' then
 			res.data(i).numberTag := i2slv(baseNum + i + 1, SMALL_NUMBER_SIZE);
+		end if;
+	end loop;
+	return res;
+end function;
+
+function baptizeVec(sd: StageDataMulti; tags: SmallNumberArray) 
+return StageDataMulti is
+	variable res: StageDataMulti := sd;
+begin
+	for i in res.data'range loop
+		if true or res.fullMask(i) = '1' then
+			res.data(i).numberTag := tags(i);
 		end if;
 	end loop;
 	return res;

@@ -12,6 +12,7 @@
 *.ngr
 *.cmd_log
 *.xmsgs
+*.xreport
 *_summary.html
 ProcDev/xst/*
 ProcDev/webtalk_pn.xml

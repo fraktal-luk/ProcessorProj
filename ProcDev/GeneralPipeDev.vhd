@@ -181,15 +181,19 @@ function stageCQNext2(content: StageDataCommitQueue; newContent: InstructionStat
 return StageDataCommitQueue;		
 		
 function stagePCNext(content: TEMP_StageDataPC; targetInfo: InstructionBasicInfo;
+							newNH: PipeFlow;
 							full, sending, receiving: std_logic) return TEMP_StageDataPC;
 
 function stageFetchNext(content, newContent: TEMP_StageDataPC;
 							full, sending, receiving: std_logic) return TEMP_StageDataPC;
 
-function nextTargetInfo(pcData: TEMP_StageDataPC; fe: FrontEventInfo) return InstructionBasicInfo;
+function nextTargetInfo(pcData: TEMP_StageDataPC; fe: FrontEventInfo; movedIP: Mword) 
+return InstructionBasicInfo;
 
-function getAnnotatedHwords(arr: HwordArray; ip: Mword; basicInfo: InstructionBasicInfo) 
+function getAnnotatedHwords(arr: HwordArray; ip: Mword; basicInfo: InstructionBasicInfo; hEndings: MwordArray) 
 return AnnotatedHwordArray;
+
+function hwordAddressEndings return MwordArray;
 
 	-- TODO: [this ignores newly read registers]
 	function TEMP_getResultTags(execData: ExecDataTable; stageDataCQ: StageDataCommitQueue;
@@ -411,10 +415,10 @@ begin
 	c3 := nFull-nOut+nIn-1 <= content'length; -- report "C3 failed";
 	
 	if not (c1 and c2 and c3) then
-		--report "Hbuffer bad conditions: " 
-		--			& integer'image(nFull-nOut) & " "
-		--			& integer'image(nFull-nOut+nIn-1);
-		--return res;
+		report "Hbuffer bad conditions: " 
+					& integer'image(nFull-nOut) & " "
+					& integer'image(nFull-nOut+nIn-1);
+		return res;
 	end if;
 	
 	newShift := FETCH_BLOCK_SIZE - nIn;
@@ -487,7 +491,7 @@ begin
 	if receiving = '1' then -- take full
 		res := newContent;
 	elsif sending = '1' then -- take empty
-		res := (fullMask => (others=>'0') , data =>(others => defaultInstructionState));
+		res := DEFAULT_STAGE_DATA_MULTI;
 	else -- stall or killed (kill can be partial)
 		if full = '0' then
 			-- Do nothing: leave it empty
@@ -501,7 +505,7 @@ end function;
 function stageMultiHandleKill(content: StageDataMulti; 
 										killAll: std_logic; killVec: std_logic_vector) 
 										return StageDataMulti is
-	variable res: StageDataMulti := (fullMask => (others=>'0') , data =>(others => defaultInstructionState));
+	variable res: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
 begin										
 	if killAll = '1' then
 		-- Everything gets killed, so we leave it empty
@@ -714,6 +718,7 @@ end function;
 
 
 function stagePCNext(content: TEMP_StageDataPC; targetInfo: InstructionBasicInfo;
+							newNH: PipeFlow;
 							full, sending, receiving: std_logic) return TEMP_StageDataPC is
 	variable res: TEMP_StageDataPC;
 begin
@@ -723,7 +728,8 @@ begin
 		res.basicInfo := targetInfo;
 		res.pc := targetInfo.ip;
 		res.pcBase(MWORD_SIZE-1 downto ALIGN_BITS) := targetInfo.ip(MWORD_SIZE-1 downto ALIGN_BITS); 
-		res.nH := pc2size(targetInfo.ip, ALIGN_BITS, num2flow(2*PIPE_WIDTH, false));
+		res.nH := --pc2size(targetInfo.ip, ALIGN_BITS, num2flow(2*PIPE_WIDTH, false));
+					newNH;
 	elsif sending = '1' then -- take empty
 		-- res := -- empty, default (should neve happen?)
 	else -- stall
@@ -739,9 +745,7 @@ end function;
 
 function stageFetchNext(content, newContent: TEMP_StageDataPC;
 							full, sending, receiving: std_logic) return TEMP_StageDataPC is
-	variable res: TEMP_StageDataPC := (pc=>(others=>'0'), pcBase => (others=>'0'),
-													basicInfo => defaultBasicInfo, nFull=>0,
-													nH=>(others=>'0'));
+	variable res: TEMP_StageDataPC := DEFAULT_DATA_PC;
 begin
 	if receiving = '1' then -- take full
 		res := newContent;
@@ -757,9 +761,10 @@ begin
 	return res;
 end function;
 
-function nextTargetInfo(pcData: TEMP_StageDataPC; fe: FrontEventInfo) return InstructionBasicInfo is
+function nextTargetInfo(pcData: TEMP_StageDataPC; fe: FrontEventInfo; movedIP: Mword) 
+return InstructionBasicInfo is
 	variable res: InstructionBasicInfo := pcData.basicInfo;--defaultBasicInfo;
-	variable baseIpVar: Mword := (others=>'0');
+	variable baseIpVar, baseInc: Mword := (others=>'0');
 begin 
 	if (fe.eventOccured and fe.fromInt) = '1' then
 		--res.ip := (others=>'0');
@@ -772,20 +777,18 @@ begin
 			res.systemLevel := "10000000";
 		end if;
 	else
-		-- NOTE: pcBase has low bits cleared
-		baseIpVar(MWORD_SIZE-1 downto ALIGN_BITS) := pcData.pcBase(MWORD_SIZE-1 downto ALIGN_BITS);
-		-- CAREFUL, TODO: "4B problem"
-		res.ip := i2slv(slv2u(baseIpVar) + PIPE_WIDTH*4, MWORD_SIZE);
+		res.ip := movedIP;	
 	end if;
 	
 	return res;
 end function;
 
 
-function getAnnotatedHwords(arr: HwordArray; ip: Mword; basicInfo: InstructionBasicInfo) 
+function getAnnotatedHwords(arr: HwordArray; ip: Mword; basicInfo: InstructionBasicInfo; hEndings: MwordArray) 
 return AnnotatedHwordArray is
 	variable res: AnnotatedHwordArray(arr'range);
 	variable hwordIP: Mword := (others=>'0');
+	variable hwordBasicInfo: InstructionBasicInfo := basicInfo;
 begin
 	hwordIP := ip;
 	hwordIP(0) := '0';
@@ -793,18 +796,28 @@ begin
 		-- NOTE: cause we use base IP, low bits are cleared. Instead of adding we just fll low bits
 		-- CAREFUL: but the fetched block in 'arr' must be aligned and not exceed aligment size!
 			-- FAIL: somehow this seems to increase LUT number!
-		hwordIP(ALIGN_BITS-1 downto 1) := i2slv(i, ALIGN_BITS-1);
+		--hwordIP(ALIGN_BITS-1 downto 0) := --i2slv(i, ALIGN_BITS-1);
+		hwordIP := ip(MWORD_SIZE-1 downto ALIGN_BITS) &	hEndings(i)(ALIGN_BITS-1 downto 0);
+		hwordBasicInfo.ip := hwordIP;	
 				--report integer'image(slv2u(hwordIP)) & ",, " & integer'image(slv2u(ip) + 2*i);
 		res(i) := (bits => arr(i),
-					  ip => i2slv(slv2u(ip) + 2*i, MWORD_SIZE),
-								--hwordIP, -- CAREFUL: here using the "alignment" version
-							basicInfo => basicInfo --defaultBasicInfo
+					  ip => --i2slv(slv2u(ip) + 2*i, MWORD_SIZE),
+								hwordIP, -- CAREFUL: here using the "alignment" version
+							basicInfo => hwordBasicInfo --defaultBasicInfo
 					  );	
-			res(i).basicInfo.ip := res(i).ip;		  
+		--	res(i).basicInfo.ip := hwordIP; --res(i).ip;		  
 	end loop;
 	return res;
 end function;
 
+function hwordAddressEndings return MwordArray is
+	variable res: MwordArray(0 to 2*PIPE_WIDTH-1) := (others=>(others=>'0'));	
+begin	
+	for i in 0 to 2*PIPE_WIDTH-1 loop
+		res(i)(ALIGN_BITS-1 downto 0) := i2slv(2*i, ALIGN_BITS);
+	end loop;
+	return res;
+end function;
 
 
 	function TEMP_getResultTags(execData: ExecDataTable; stageDataCQ: StageDataCommitQueue;
