@@ -212,20 +212,9 @@ package body Decoding2 is
 							ca: out InstructionConstantArgs;
 							va: out InstructionVirtualArgs;
 							vda: out InstructionVirtualDestArgs)
-	is
-		--variable res: InternalCommand := icDefault;
-		--variable op: BinomialOp;
-		--variable ci: InstructionClassInfo := defaultClassInfo;
-		--variable ca: InstructionConstantArgs;
-		--variable va: InstructionVirtualArgs;
-		--variable vda: InstructionVirtualDestArgs;
-		
+	is		
 		variable num: integer;
-		--variable idef: --InstructionDef;
-		--					OpFieldStruct;
-	begin
-		--idef := ofs;
-		
+	begin		
 		vda.sel(0) := ofs.quintetSel(d0);	
 		vda.d0 := ofs.quintetValues(d0);
 		
@@ -384,10 +373,7 @@ package body Decoding2 is
 		function findInstructionNewW(opcode, opcont: slv6) return integer is
 			variable tempInt: integer;
 		begin
-					--report "blabla findInstructio";
-			tempInt := -1;
-					--report "Find instruction: ";
-					
+			tempInt := -1;					
 			for i in decodeTableNewW'range loop
 				if 		decodeTableNewW(i).opcd = opcode 
 					and (not hasOpcont(slv2opcode(opcode)) or (decodeTableNewW(i).opct = opcont))
@@ -395,13 +381,27 @@ package body Decoding2 is
 				--	and (not hasOpcont(idef.opcd) or  
 				then
 					tempInt := i;
-					--report integer'image(i);
 					exit;
 				end if;
 			end loop;
-					--report "Now return what found";
 			return tempInt;
 		end function;
+
+		function findInstructionDirect(opcode, opcont: slv6) return InsDefNewW is
+			variable res: InsDefNewW := undefInsDef;
+		begin
+			for i in decodeTableNewW'range loop
+				if 		decodeTableNewW(i).opcd = opcode 
+					and (not hasOpcont(slv2opcode(opcode)) or (decodeTableNewW(i).opct = opcont))
+					-- If not hasOpcont, maybe just compare if none is really none, so no additional code needed?
+				--	and (not hasOpcont(idef.opcd) or  
+				then
+					res := decodeTableNewW(i);
+					exit;
+				end if;
+			end loop;
+			return res;
+		end function;		
 
 
 		function getOpFields(w: word) return OpFieldStruct is
@@ -410,6 +410,7 @@ package body Decoding2 is
 			variable ofs: OpFieldStruct;
 			variable opcd: slv6; --ProcOpcode;
 			variable opct: slv6; --ProcOpcont;
+			variable match: InsDefNewW;			
 		begin
 			parts := parseWordNewW(w);
 			opcd := parts(opcode)(5 downto 0);
@@ -418,16 +419,17 @@ package body Decoding2 is
 			num := findInstructionNewW(opcd, opct);
 			if num = -1 then
 				report "[new] Instruction not found!" severity warning;
-																		--		report "Quintets done";
-				parts(opcode) := e32(undefInsDef.opcd);
-				parts(opcont) := e32(undefInsDef.opct);
-											--report integer'image(slv2u(parts(opcode)(5 downto 0)));	
-
+				match := undefInsDef;
+				parts(opcode) := e32(match.opcd);
+				parts(opcont) := e32(match.opct);				
 				ofs := getOpFieldStruct3W(parts, undefInsDef); -- undefinedOpFieldStruct;
 			else
+				match := decodeTableNewW(num);
+				--	parts(opcode) := e32(match.opcd);
+				--	parts(opcont) := e32(match.opct);				
 				ofs := getOpFieldStruct3W(parts, decodeTableNewW(num));						
-			end if;			
-				--	report integer'image(num);
+			end if;	
+			--ofs := getOpFieldStruct3W(parts, match);	
 			return ofs;
 		end function;
 
@@ -438,8 +440,7 @@ package body Decoding2 is
 			for i in dt'range loop
 				res(i) := (opcode2slv(dt(i).opcd), opcont2slv(dt(i).opcd, dt(i).opct),
 								dt(i).unit, dt(i).func, dt(i).fmt);
-			end loop;
-		
+			end loop;		
 			return res;
 		end function;
 

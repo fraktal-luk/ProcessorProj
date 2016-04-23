@@ -127,3 +127,65 @@ begin
 
 end Behavioral;
 
+
+architecture BehavioralIQ of PipeStageLogicBuffer is
+		constant CAP: PipeFlow := num2flow(CAPACITY, false);
+		constant MAX_IN: PipeFlow := num2flow(MAX_INPUT, false);
+		constant MAX_OUT: PipeFlow := num2flow(MAX_OUTPUT, false);
+
+		signal isNewSig: SmallNumber := (others=>'0');
+		signal fullSig: SmallNumber := (others=>'0');
+		signal livingSig: SmallNumber := (others=>'0');
+		
+		signal canAccept: SmallNumber := (others=>'0');
+		signal wantSend: SmallNumber := (others=>'0');
+		signal acceptingSig: SmallNumber := (others=>'0');
+		signal sendingSig: SmallNumber := (others=>'0');
+
+		signal afterSending: SmallNumber := (others=>'0');
+		signal afterReceiving: SmallNumber := (others=>'0');
+begin
+		CLOCKED: process(clk)
+		begin
+			if rising_edge(clk) then
+				if reset = '1' then
+					fullSig <= (others=>'0');
+				elsif en = '1' then
+					assert binFlowNum(livingSig) >= binFlowNum(sendingSig) 
+							report "Try to send more than available" severity warning;
+					assert binFlowNum(afterSending) + binFlowNum(prevSending) <= binFlowNum(CAP)
+							report "Trying to receive too much" severity warning;					
+					fullSig <= afterReceiving;
+					
+				end if;
+			end if;
+		end process;
+		
+		IMPLEM: entity work.IQCounter port map(
+			capacity => CAP,
+			maxInput => MAX_IN,
+			maxOutput => MAX_OUT,
+			
+			full => fullSig,
+				lockAccept => lockAccept,
+				lockSend => lockSend,
+			killAll => killAll,
+			kill => kill,
+			living => livingSig,
+			nextAccepting => nextAccepting,
+			prevSending => prevSending,
+			wantSend => wantSend,
+			canAccept => canAccept,
+			sending => sendingSig,
+			accepting => acceptingSig,
+			afterSending => afterSending,
+			afterReceiving => afterReceiving
+			
+		);
+				
+		sending <= sendingSig;
+		accepting <= acceptingSig;
+		full <= fullSig;	
+		living <= livingSig;	
+
+end BehavioralIQ;

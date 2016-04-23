@@ -37,14 +37,13 @@ use work.ProcInstructionsNew.all;
 use work.NewPipelineData.all;
 
 use work.GeneralPipeDev.all;
---use work.FrontPipeDev.all;
 
 use work.CommonRouting.all;
 use work.TEMP_DEV.all;
 
---use work.FrontPipeDevViewing.all;
+use work.ProcComponents.all;
 
---use work.Renaming1.all;
+use work.ProcLogicFront.all;
 
 
 entity TestFrontPart0 is
@@ -70,13 +69,119 @@ entity TestFrontPart0 is
 	);
 end TestFrontPart0;
 
-
 -- TODO: add feature for invalid "instruction": when (not ivalid), cancel fetched instruction and 
 --			jump back to repeat fetching (or cause exception etc)
-architecture Behavioral of TestFrontPart0 is
-		signal flowDrivePC, flowDriveFetch, flowDriveHBuff, flowDrive0: FlowDriveSimple := (others=>'0');
-		signal flowResponsePC, flowResponseFetch, flowResponseHbuff,
-					flowResponse0: FlowResponseSimple := (others=>'0');																								
+architecture Behavioral2 of TestFrontPart0 is
+	signal fetchBlock: HwordArray(0 to FETCH_BLOCK_SIZE-1);
+	signal resetSig, enabled: std_logic := '0';			
+																										
+	signal dummyKillSignal: std_logic := '0';
+	signal controlChange: std_logic := '0';
+	
+	signal partialKillMask0: std_logic_vector(0 to PIPE_WIDTH-1) := (others=>'0');
+	signal partialKillMaskHbuffer: std_logic_vector(0 to HBUFFER_SIZE-1) := (others=>'0');		
+	signal frontEvents, fe1, fe2, fe3: FrontEventInfo;	-- TEMP: fe2			
+	signal frontStagesToKill: std_logic_vector(0 to 4) := (others=>'0');	
+
+	signal stage0Events: StageMultiEventInfo;	
+
+	-- Interfaces between stages:													
+	signal stageDataOutPC, stageDataOutFetch: StageDataPC := DEFAULT_DATA_PC;
+	signal stageDataOutHbuffer, stageDataOut0: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
+	signal sendingOutPC, sendingOutFetch, sendingOutHbuffer, sendingOut0: std_logic := '0';
+	signal acceptingOutPC, acceptingOutFetch, acceptingOutHbuffer, acceptingOut0: std_logic := '0';				
+begin	 
+	resetSig <= reset;
+	enabled <= en;
+
+	-- Fetched bits: input from instruction bus 
+	FETCH_BLOCK: for i in 0 to PIPE_WIDTH-1 generate
+		fetchBlock(2*i)	<= iin(i)(31 downto 16);
+		fetchBlock(2*i+1) <= iin(i)(15 downto 0);
+	end generate;		
+								
+	-- PC stage	
+	PC_STAGE: block
+		signal stageDataPC, stageDataPCNext, stageDataPCNew: StageDataPC := INITIAL_DATA_PC;
+		
+		signal flowDrivePC: FlowDriveSimple := (others=>'0');
+		signal flowResponsePC: FlowResponseSimple := (others=>'0');	
+	begin 	
+		stageDataPCNew <= newPCData(stageDataPC, frontEvents);
+		stageDataPCNext <= stagePCNext(stageDataPC, stageDataPCNew, 
+												flowResponsePC.living, flowResponsePC.sending, flowDrivePC.prevSending);
+		FRONT_CLOCKED: process(clk)
+		begin					
+			if rising_edge(clk) then
+				if resetSig = '1' then
+					
+				elsif enabled = '1' then
+					stageDataPC <= stageDataPCNext;
+				end if;					
+			end if;
+		end process;
+
+		SIMPLE_SLOT_LOGIC_PC: SimplePipeLogic port map(
+			clk => clk, reset => resetSig, en => en,
+			flowDrive => flowDrivePC,
+			flowResponse => flowResponsePC
+		);		
+
+		flowDrivePC.prevSending <= flowResponsePC.accepting; -- CAREFUL! This way it never gets hungry
+		flowDrivePC.nextAccepting <= acceptingOutFetch; -- flowResponseFetch.accepting;	
+
+		flowDrivePC.kill <= frontStagesToKill(0);		
+
+		stageDataOutPC <= stageDataPC;
+		acceptingOutPC <= flowResponsePC.accepting; -- ?? Used anywhere?
+		sendingOutPC <= flowResponsePC.sending;
+	end block;													
+												
+	-- Fetch stage	
+	FETCH_STAGE: block
+		-- CAREFUL! Here using PC type cause is adequate.		
+		signal stageDataFetch, stageDataFetchNext: StageDataPC := DEFAULT_DATA_PC;	
+		
+		signal flowDriveFetch: FlowDriveSimple := (others=>'0');
+		signal flowResponseFetch: FlowResponseSimple := (others=>'0');		
+	begin	
+		-- stageDataFetchNew <= stageDataPCLiving; // in practice this means just stageDataPC?
+		stageDataFetchNext <= stageFetchNext(stageDataFetch, stageDataOutPC,
+						flowResponseFetch.living, flowResponseFetch.sending, flowDriveFetch.prevSending);
+						
+		FRONT_CLOCKED: process(clk)
+		begin					
+			if rising_edge(clk) then
+				if resetSig = '1' then
+					
+				elsif enabled = '1' then
+					stageDataFetch <= stageDataFetchNext;
+				end if;					
+			end if;
+		end process;	
+
+		SIMPLE_SLOT_LOGIC_FETCH: SimplePipeLogic port map(
+			clk => clk, reset => resetSig, en => en,
+			flowDrive => flowDriveFetch,
+			flowResponse => flowResponseFetch
+		);			
+		
+		flowDriveFetch.prevSending <= sendingOutPC; 
+		flowDriveFetch.nextAccepting <= acceptingOutHbuffer; 				
+		flowDriveFetch.lockAccept <= fetchLockCommand;	
+
+		flowDriveFetch.kill <= frontStagesToKill(1);
+
+		stageDataOutFetch <= stageDataFetch;
+		acceptingOutFetch <= flowResponseFetch.accepting;		
+		sendingOutFetch <= flowResponseFetch.sending;		
+	end block;
+	
+	-- Hword buffer		
+	HBUFFER_STAGE: block
+		signal hbufferDataA, hbufferDataANext: AnnotatedHwordArray(0 to HBUFFER_SIZE-1);
+		signal hbufferDataANew: AnnotatedHwordArray(0 to 2*PIPE_WIDTH-1);	
+		
 		signal hbufferDrive: FlowDriveBuffer := (killAll => '0', lockAccept => '0', lockSend => '0',
 																	others=>(others=>'0'));
 		signal hbufferResponse: FlowResponseBuffer := (others=>(others=>'0'));
@@ -86,113 +191,35 @@ architecture Behavioral of TestFrontPart0 is
 																	others=>(others=>'0'));
 		signal hbufferResponseDown: FlowResponseBuffer := (others=>(others=>'0'));		
 
-		signal fetchBlock: HwordArray(0 to FETCH_BLOCK_SIZE-1);
-		signal hbufferDataA, hbufferDataANext: AnnotatedHwordArray(0 to HBUFFER_SIZE-1);
-		signal hbufferDataANew: AnnotatedHwordArray(0 to 2*PIPE_WIDTH-1);
-		signal shortOpcodes: std_logic_vector(0 to HBUFFER_SIZE-1) := (others=>'0');	
-		signal hbd: HwordBufferData;	
-		signal decoded: PipeStageData;
-		signal extractedFromHbuff: InstructionStateArray(0 to PIPE_WIDTH-1) := (others=>defaultInstructionState);
-		signal fullMaskHbuffer: std_logic_vector(0 to HBUFFER_SIZE-1) := (others=>'0');
-
-		signal stageData0, stageData0Living, stageData0Next, stageData0New:
-															StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
-		signal dummyKillSignal: std_logic := '0';
-		signal dummyControlChange: std_logic := '0';				
-		signal eventMaskPC, eventMaskFetch: std_logic := '0';
-		signal eventMaskHbuffer: std_logic_vector(0 to HBUFFER_SIZE-1) := (others=>'0');
-		signal eventMaskS0: std_logic_vector(0 to PIPE_WIDTH-1) := (others=>'0');
-		signal partialKillMask0: std_logic_vector(0 to PIPE_WIDTH-1) := (others=>'0');
-		signal partialKillMaskHbuffer: std_logic_vector(0 to HBUFFER_SIZE-1) := (others=>'0');		
-		signal frontEvents: FrontEventInfo;				
-		signal tempTargetInfo: InstructionBasicInfo;
-			
-		signal stageDataPC: TEMP_StageDataPC := INITIAL_DATA_PC;
-		signal stageDataPCNext: TEMP_StageDataPC;
-		signal stageDataFetch: TEMP_StageDataPC -- CAREFUL! Here using PC type cause is adequate.
-															:= DEFAULT_DATA_PC;
-		signal stageDataFetchNext: TEMP_StageDataPC; -- ^	
-
-		signal resetSig, enabled: std_logic := '0';	
+		signal shortOpcodes: std_logic_vector(0 to HBUFFER_SIZE-1) := (others=>'0');-- DEPREC but used as dummy
+		signal fullMaskHbuffer, livingMaskHbuffer: std_logic_vector(0 to HBUFFER_SIZE-1) := (others=>'0');
+		signal hbuffOut: HbuffOutData 
+					:= (sd => DEFAULT_STAGE_DATA_MULTI, nOut=>(others=>'0'), nHOut=>(others=>'0'));
+					
+		signal flowDriveHBuff: FlowDriveSimple := (others=>'0');
+		signal flowResponseHbuff: FlowResponseSimple := (others=>'0');		
+	begin
+		hbufferDataANew <= getAnnotatedHwords(stageDataOutFetch, fetchBlock);
+		hbufferDataANext <= bufferAHNext(hbufferDataA, hbufferDataANew,	
+											stageDataOutFetch,
+											binFlowNum(hbufferResponse.living), 
+											binFlowNum(hbufferResponse.sending), binFlowNum(hbufferDrive.prevSending));						
+		fullMaskHbuffer <= setToOnes(shortOpcodes, binFlowNum(hbufferResponse.full));	
+		livingMaskHbuffer <= setToOnes(shortOpcodes, binFlowNum(hbufferResponse.living)); -- TEMP?
+		hbuffOut <= newFromHbuffer(hbufferDataA, livingMaskHbuffer);
 		
-		constant hEndings: MwordArray(0 to 2*PIPE_WIDTH-1) := hwordAddressEndings;
-		signal movedIP: Mword := (others => '0');
-		constant pcInc: Mword := (ALIGN_BITS => '1', others=>'0');
-		signal newTargetSize: PipeFlow := (others=>'0');
-	begin	 
-		resetSig <= reset;
-		enabled <= en;
-	
 		FRONT_CLOCKED: process(clk)
-		begin						-- $input
+		begin					
 			if rising_edge(clk) then
 				if resetSig = '1' then
-					-- $input
 					
 				elsif enabled = '1' then
-						-- $input
-					stageDataPC <= stageDataPCNext;
-					stageDataFetch <= stageDataFetchNext;
-					
 					hbufferDataA <= hbufferDataANext;
-
-					stageData0 <= stageData0Next;
 				end if;					
 			end if;
-		end process;			
-	
-		-- Fetched bits: input from instruction bus 
-		FETCH_BLOCK: for i in 0 to PIPE_WIDTH-1 generate
-			fetchBlock(2*i)	 <= iin(i)(31 downto 16);
-			fetchBlock(2*i+1) <= iin(i)(15 downto 0);
-		end generate;	
-					
-		-- PC stage
-		movedIP <= i2slv(slv2u(stageDataPC.pcBase) + slv2u(pcInc), MWORD_SIZE);					
-		tempTargetInfo <= nextTargetInfo(stageDataPC, frontEvents, movedIP);
-		newTargetSize <= pc2size(tempTargetInfo.ip, ALIGN_BITS, num2flow(2*PIPE_WIDTH, false));
-						
-		stageDataPCNext <= stagePCNext(stageDataPC, tempTargetInfo, newTargetSize,
-												flowResponsePC.living, flowResponsePC.sending, flowDrivePC.prevSending);		
-		-- Fetch stage										
-		stageDataFetchNext <= stageFetchNext(stageDataFetch, stageDataPC,
-						flowResponseFetch.living, flowResponseFetch.sending, flowDriveFetch.prevSending);
-							
-		-- Hword buffer							
-		hbufferDataANext <= bufferAHNext(hbufferDataA, hbufferDataANew,			
-											binFlowNum(hbufferResponse.living), 
-											binFlowNum(hbufferResponse.sending), binFlowNum(hbufferDrive.prevSending));
-		hbufferDataANew <= getAnnotatedHwords(fetchBlock,
-															stageDataFetch.pcBase, stageDataFetch.basicInfo, hEndings);														
-				
-		hbd <= wholeInstructionData(shortOpcodes, 
-									binFlowNum(hbufferResponse.living), binFlowNum(hbufferDriveDown.nextAccepting));
-		extractedFromHbuff <= extractFromAH(hbufferDataA, hbd.cumulSize, hbd.readyOps, hbd.shortInstructions);									
-		fullMaskHbuffer <= setToOnes(shortOpcodes, binFlowNum(hbufferResponse.full));
-				
-		-- Decode stage						
-		DECODING: for i in 0 to PIPE_WIDTH-1 generate
-			decoded(i) <= decodeInstruction(extractedFromHbuff(i));
-		end generate;	
-						
-		stageData0New <= (fullMask => hbd.readyOps, data=>InstructionStateArray(decoded));
-		stageData0Next <= stageMultiNext(stageData0Living, stageData0New,		
-									flowResponse0.living, flowResponse0.sending, flowDrive0.prevSending);				
-		stageData0Living <= stageMultiHandleKill(stageData0, flowDrive0.kill, partialKillMask0);
+		end process;	
 
-			dummyControlChange <= dummyKillSignal;
-		
-		SIMPLE_SLOT_LOGIC_PC: SimplePipeLogic port map(
-				clk => clk, reset => resetSig, en => en,
-				flowDrive => flowDrivePC,
-				flowResponse => flowResponsePC
-			);			
-		SIMPLE_SLOT_LOGIC_FETCH: SimplePipeLogic port map(
-				clk => clk, reset => resetSig, en => en,
-				flowDrive => flowDriveFetch,
-				flowResponse => flowResponseFetch
-			);			
-		SLOT_HBUFF: BufferPipeLogic 
+		SLOT_HBUFF: entity work.BufferPipeLogic(Behavioral) 
 		generic map(
 			CAPACITY => HBUFFER_SIZE, -- PIPE_WIDTH*2*2
 			MAX_OUTPUT => PIPE_WIDTH*2,
@@ -202,89 +229,103 @@ architecture Behavioral of TestFrontPart0 is
 			clk => clk, reset => resetSig, en => en,
 			flowDrive => hbufferDrive,
 			flowResponse => hbufferResponse
-		);
+		);		
+		
+		hbufferDrive.prevSending <= stageDataOutFetch.nH when sendingOutFetch = '1'
+									else 	(others=>'0');
+		hbufferDrive.nextAccepting <= hbuffOut.nHOut when acceptingOut0 = '1'
+										else (others=>'0');			
+								
+		hbufferDriveDown.nextAccepting <= num2flow(PIPE_WIDTH, false) when acceptingOut0 = '1'
+											else 	(others=>'0');	
+		-- CAREFUL! If in future using lockSend for Hbuff, it must be used also here, giving 0 for sending!								
+		hbufferResponseDown.sending <= hbuffOut.nOut when acceptingOut0 = '1'
+										 else (others=>'0');
+		hbufferDrive.killAll <= flowDriveHbuff.kill;
 
-			hbufferDrive.kill <=	num2flow(countOnes(fullMaskHbuffer and partialKillMaskHbuffer), false);
+		flowResponseHbuff.accepting <= 
+						'1' when binFlowNum(hbufferResponse.accepting) >= binFlowNum(stageDataOutFetch.nH) else '0';			
+		flowResponseHbuff.sending <= isNonzero(hbufferResponseDown.sending);	
+											  --isNonzero(hbuffOut.nOut) and flowResponse0.accepting;
+
+		hbufferDrive.kill <=	num2flow(countOnes(fullMaskHbuffer and partialKillMaskHbuffer), false);
+
+
+		flowDriveHbuff.kill <= frontStagesToKill(2);
+
+		stageDataOutHbuffer <= hbuffOut.sd;				
+		acceptingOutHbuffer <= flowResponseHbuff.accepting;	
+		sendingOutHbuffer <= flowResponseHbuff.sending;		
+	end block;
+	
+	-- Decode stage
+	DECODE_STAGE: block 
+		signal stageData0, stageData0Living, stageData0Next, stageData0New:
+															StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
+
+		signal newDecoded: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
+
+		signal flowDrive0: FlowDriveSimple := (others=>'0');	
+		signal flowResponse0: FlowResponseSimple := (others=>'0');	
+	begin	
+		newDecoded <= decodeMulti(stageDataOutHbuffer);		
+		stageData0New <= newDecoded;
+		stageData0Next <= stageMultiNext(stageData0Living, stageData0New,		
+									flowResponse0.living, flowResponse0.sending, flowDrive0.prevSending);				
+		stageData0Living <= stageMultiHandleKill(stageData0, flowDrive0.kill, partialKillMask0);
+		
+		FRONT_CLOCKED: process(clk)
+		begin					
+			if rising_edge(clk) then
+				if resetSig = '1' then
+					
+				elsif enabled = '1' then
+					stageData0 <= stageData0Next;
+				end if;					
+			end if;
+		end process;
 
 		SIMPLE_SLOT_LOGIC_0: SimplePipeLogic port map(
-				clk => clk, reset => resetSig, en => en,
-				flowDrive => flowDrive0,
-				flowResponse => flowResponse0
-			);						
-			
-		FRONT_EVENT_CIRCUIT: block
-			signal frontStagesToKill: std_logic_vector(0 to 4) := (others=>'0'); --FrontStages;		
-		begin	
-			frontStagesToKill <= frontEvents.affectedVec;
-		
-			flowDrivePC.kill <= frontStagesToKill(0);		
-			flowDriveFetch.kill <= frontStagesToKill(1);
-			flowDriveHbuff.kill <= frontStagesToKill(2);
-			flowDrive0.kill <= frontStagesToKill(3);
-			--flowDrive1.kill <= frontStagesToKill(4); 		
-				
-			-- Front pipe exception/branch detection:
-			-- PC: branch predicted from PC?
-			-- Fetch: failed fetch?
-			-- Hbuff: early branch/decode exceptions
-			-- 0: branch/decode exceptions
-			-- 1: should never happen	
-			
-			partialKillMaskHbuffer <= frontEvents.pHbuff;
-			partialKillMask0 <= frontEvents.p0;
-			--partialKillMask1 <= frontEvents.p1;
-					
-			dummyKillSignal <= frontEvents.eventOccured; -- execEventSignal or frontEventSignal;	
-							
-			frontEvents <=	TEMP_frontEvents(
-												stageDataPC, stageDataFetch, hbd, stageData0, stageData0,
-																											-- [no 'stageData1']
-												flowResponsePC.isNew, flowResponseFetch.isNew, 
-												flowResponse0.isNew, '0', -- flowResponse1.isNew, [no 'flowResponse1']
-												intSignal, execEventSignal, execCausing);
-												-- $input			$input
-		end block;
-		
-		-----------------------------------------------------------------------------------------------------	
-		FRONT_FLOW_LINKS: block
-		begin	
-			hbufferDrive.prevSending <= stageDataFetch.nH when flowResponseFetch.sending = '1'
-										else 	(others=>'0');
-			hbufferDrive.nextAccepting <= getHwordNumber(hbufferResponseDown.sending, hbd.cumulSize);																
-										
-			hbufferDriveDown.nextAccepting <= num2flow(PIPE_WIDTH, false) when flowResponse0.accepting = '1'
-										else 	(others=>'0');					
-			hbufferResponseDown.sending <= num2flow(countOnes(hbd.readyOps), false);					
-			
-			hbufferDrive.killAll <= flowDriveHbuff.kill;
+			clk => clk, reset => resetSig, en => en,
+			flowDrive => flowDrive0,
+			flowResponse => flowResponse0
+		);		
 
-			
-			flowDrivePC.prevSending <= flowResponsePC.accepting; -- CAREFUL! This way it never gets hungry
-			flowDrivePC.nextAccepting <= flowResponseFetch.accepting;	
+		-- Local event detection
+		stage0Events <= stageMultiEvents(stageData0, flowResponse0.isNew);								
+		partialKillMask0 <= stage0Events.partialKillMask;
+
+		flowDrive0.kill <= frontStagesToKill(3);
+
+		flowDrive0.prevSending <= sendingOutHbuffer;
+		flowDrive0.nextAccepting <= renameAccepting;
+
+		stageDataOut0 <= stageData0Living;
+		acceptingOut0 <= flowResponse0.accepting;
+		sendingOut0 <= flowResponse0.sending;	
+	end block;
+										
+	FRONT_EVENT_CIRCUIT: block
+	begin					
+		-- Front pipe exception/branch detection:
+		-- PC: branch predicted from PC?
+		-- Fetch: failed fetch?
+		-- Hbuff: early branch/decode exceptions
+		-- 0: branch/decode exceptions
+		-- 1: should never happen	
+						
+		controlChange <= frontEvents.eventOccured; -- execEventSignal or frontEventSignal;							
+		frontEvents <= getFrontEvents(stage0Events, intSignal, execEventSignal, execCausing);
+		frontStagesToKill <= frontEvents.affectedVec;		
+	end block;
 				
-			flowDriveFetch.prevSending <= flowResponsePC.sending;
-			flowDriveFetch.nextAccepting <= flowResponseHbuff.accepting;
-					
-				flowDriveFetch.lockAccept <= fetchLockCommand;	
-					
-			flowResponseHbuff.accepting <= 
-							'1' when binFlowNum(hbufferResponse.accepting) >= binFlowNum(stageDataFetch.nH) else '0';			
-			flowResponseHbuff.sending <= isNonzero(hbufferResponseDown.sending);	
-			
-			flowDrive0.prevSending <= flowResponseHbuff.sending;
-			flowDrive0.nextAccepting <= renameAccepting; -- flowResponse1.accepting;			
-												-- $input	
-		end block;		
-		
-		----------------------------------------------
-		iadr <= stageDataPC.pcBase;
-			-- $output
-		iadrvalid <= flowResponsePC.sending;	
-			-- $output
-		----------------------------------------------	
-				fetchLockRequest <= '0'; -- TEMP
-			dataLastLiving <= stageData0Living;
-			lastSending <= flowResponse0.sending; -- ?
-		----------------------------------------------	
-end Behavioral;
+	----------------------------------------------
+	iadr <= stageDataOutPC.pcBase; 
+	iadrvalid <= sendingOutPC; 
+	----------------------------------------------	
+	fetchLockRequest <= '0'; -- TEMP?
+	dataLastLiving <= stageDataOut0;
+	lastSending <= sendingOut0;
+	----------------------------------------------	
+end Behavioral2;
 

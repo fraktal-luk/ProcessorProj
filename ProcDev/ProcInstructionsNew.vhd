@@ -125,28 +125,34 @@ type InterruptType is (none, unknown,
 --subtype ExceptionTable is WordArray;
 --subtype InterrruptTable is WordArray;
 
+-- TODO: remove those tables and define only 'bases': start address for table, aligned to have 0 as last byte 
 constant EXC_TABLE: WordArray(0 to 8) := (
-	X"ffffffff",
-	X"ffffffff",
-	X"00000200",
-	X"000000cc",
-	X"00000208",
-	X"0000020C",
-	X"0000020E",
+	X"000000c0",
+	X"000000c4",
 	X"000000c8",
-	X"00000214"
+	X"000000cc",
+	X"000000d0",
+	X"000000d4",
+	X"000000d8",
+	X"000000dc",
+	X"000000e0"
 );
 
+constant EXC_BASE: Mword := X"00000100"; -- TODO: enable 64b
+
 constant INT_TABLE: WordArray(0 to 6) := (
-	X"ffffffff",
-	X"ffffffff",
-	X"00000300",
-	X"00000304",
-	X"00000308",
-	X"0000030C",
-	X"0000030E"
+	X"000001c0",
+	X"000001c4",
+	X"000001c8",
+	X"000001cc",
+	X"000001d0",
+	X"000001d4",
+	X"000001d8"
 --	X"00000210"
 );
+
+constant INT_BASE: Mword := X"00000200"; -- TODO: enable 64b
+
 
 function hasOpcont(op: ProcOpcode) return boolean; 
 

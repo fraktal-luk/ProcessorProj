@@ -52,18 +52,15 @@ package ProgramCode3 is
 				25 => ins655655(ext0, r0, r21, addR, r21, 0), -- Overflow
 			
 					30-1 => X"ffffffff",
-			
-				-- ADR 204 is instruction 51!
-				60 => ins65J(jz, r0, 4* (-60)),
-
-			
+						
 			--206 => ins655655(ext2, 2, 3, mtc,  0, 0),
-			207 => ins655655(ext2, 2, 0, mfc, 0, 0),
+			64 + 7 => ins655655(ext2, 2, 0, mfc, 0, 0),
+
+			64 + 9 => ins65J(jz, r0, 4* (-72)),			
 			
+			64 + 10 => ins655655(ext2, 0, 0, rete, 0, 0),
 			
-			210 => ins655655(ext2, 0, 0, rete, 0, 0),
-			
-			310 => ins655655(ext2, 0, 0, reti, 0, 0),
+			75 + 10 => ins655655(ext2, 0, 0, reti, 0, 0),
 				
 			others=> ins655H(orI, r28, r28,479)	
 			--others=>(others=>'0')

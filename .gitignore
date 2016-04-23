@@ -2,6 +2,7 @@
 *.exe
 
 # Output files
+*.html
 *.stx
 *.xst
 *.lso
@@ -10,9 +11,11 @@
 *.prj
 *.ngc
 *.ngr
+*.ncd
 *.cmd_log
 *.xmsgs
 *.xreport
+*.projectmgr
 *_summary.html
 ProcDev/xst/*
 ProcDev/webtalk_pn.xml

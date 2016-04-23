@@ -256,6 +256,139 @@ constant DEFAULT_STAGE_DATA_MULTI: StageDataMulti := (fullMask=>(others=>'0'),
 																		data=>(others=>defaultInstructionState)
 																		);	
 
+
+type StageDataCommitQueue is record
+	fullMask: std_logic_vector(0 to CQ_SIZE-1); 
+	data: InstructionStateArray(0 to CQ_SIZE-1);
+end record;
+
+type StageDataPC is record
+	basicInfo: InstructionBasicInfo;
+	pc: Mword;
+	pcBase: Mword;
+	nFull: natural;
+	nH: PipeFlow; -- number of hwords 	
+end record;
+
+constant DEFAULT_DATA_PC: StageDataPC := (			pc => (others=>'0'),
+																		pcBase => (others=>'0'),
+																		nFull => 0,
+																		nH => (others=>'0'),
+																		basicInfo => defaultBasicInfo
+																		);	
+-- CAREFUL: this is PC "before" address 0 																		
+constant INITIAL_DATA_PC: StageDataPC := (			pc => i2slv(-PIPE_WIDTH*4, MWORD_SIZE),
+																		pcBase => i2slv(-PIPE_WIDTH*4, MWORD_SIZE),
+																		nFull => 0,
+																		nH => (others=>'0'),
+																		basicInfo => defaultBasicInfo
+																		);
+
+type TEMP_StageDataFetch is record
+	pc: Mword;
+	pcBase: Mword; -- DEPREC?
+	nFull: natural;	
+end record;
+
+type AnnotatedHword is record
+	bits: hword;
+	ip: Mword; -- TODO, NOTE: redundant?
+	basicInfo: InstructionBasicInfo;
+		-- TODO: include a structure for storing hword decoding info?
+		--			Maybe extend 'controlInfo' to hold it?
+		shortIns: std_logic; -- This would be there
+end record;
+
+constant DEFAULT_ANNOTATED_HWORD: AnnotatedHword := (bits => (others=>'0'), ip => (others=>'0'),
+																	basicInfo => defaultBasicInfo, shortIns => '0');
+
+type AnnotatedHwordArray is array (integer range <>) of AnnotatedHword;
+
+	type HbuffOutData is record
+		sd: StageDataMulti;
+		nOut: SmallNumber; --integer;
+		nHOut: SmallNumber; -- integer;
+	end record;
+
+
+-- DEPREC?
+-- Info supplied by hword buffer
+type HwordBufferData is record
+	readyOps: std_logic_vector(0 to PIPE_WIDTH-1); --PipeFlow;
+	shortInstructions: std_logic_vector(0 to PIPE_WIDTH-1); 
+	words: WordArray(0 to PIPE_WIDTH-1);
+	cumulSize: IntArray(0 to PIPE_WIDTH);
+end record;
+
+type FrontEventInfo is record
+	eventOccured: std_logic;
+	ePC, eFetch, eHbuff, e0, e1: std_logic;
+	iPC, iFetch, iHbuff, i0, i1: integer;
+	mPC, mFetch, m0, m1: std_logic_vector(0 to PIPE_WIDTH-1); -- Event masks
+	pPC, pFetch, p0, p1: std_logic_vector(0 to PIPE_WIDTH-1); -- Event masks
+	mHbuff, pHbuff: std_logic_vector(0 to HBUFFER_SIZE-1);
+	causing: InstructionState;
+	affectedVec, causingVec: std_logic_vector(0 to 4);	
+	fromExec, fromInt: std_logic;	
+end record;
+
+-- 
+type StageMultiEventInfo is record
+	eventOccured: std_logic;
+	causing: InstructionState;
+	partialKillMask: std_logic_vector(0 to PIPE_WIDTH-1);
+end record;
+
+
+type ExecRelTable is array (ExecStages'left to ExecStages'right) of ExecStages; 
+
+type ExecDriveTable is array (ExecStages'left to ExecStages'right) of FlowDriveSimple;							
+type ExecResponseTable is array (ExecStages'left to ExecStages'right) of FlowResponseSimple;
+	
+type ExecDataTable is array (ExecStages'left to ExecStages'right) of InstructionState;
+	
+	subtype PipeStageDataU is InstructionStateArray;	
+	subtype SingleStageData is PipeStageDataU(0 to 0);
+	subtype PipeStageData is PipeStageDataU(0 to PIPE_WIDTH-1);
+
+	-- CAREFUL, TODO: this holds only for IQ A. Check and solve problem.
+	type IQStepData is record 
+		iqDataNext: InstructionStateArray(0 to IQ_A_SIZE-1);
+		iqFullMaskNext: std_logic_vector(0 to IQ_A_SIZE-1);
+		dispatchDataNew: InstructionState;
+		sends: std_logic;
+	end record;			
+								
+			type ArgStatusInfo is record
+					stored: std_logic_vector(0 to 2); -- those that were already present in prev cycle
+				ready: std_logic_vector(0 to 2);
+				locs: SmallNumberArray(0 to 2);
+				vals: MwordArray(0 to 2);
+					nextReady: std_logic_vector(0 to 2);
+					nextLocs: SmallNumberArray(0 to 2);
+			end record;
+	
+			type ArgStatusStruct is record
+				readyAll: std_logic;
+				readyNextAll: std_logic;
+				ready: std_logic_vector(0 to 2);
+				locs: SmallNumberArray(0 to 2);
+				vals: MwordArray(0 to 2);
+				missing: std_logic_vector(0 to 2);
+					C_missing: std_logic_vector(0 to 2);					
+				readyReg: std_logic_vector(0 to 2);
+				readyNow: std_logic_vector(0 to 2);
+				readyNext: std_logic_vector(0 to 2);
+				stillMissing: std_logic_vector(0 to 2);
+					C_stillMissing: std_logic_vector(0 to 2);
+				nMissing: integer;
+				nextMissing: std_logic_vector(0 to 2);
+				nMissingNext: integer;					
+			end record;
+
+			type ArgStatusInfoArray is array(integer range <>) of ArgStatusInfo;
+			type ArgStatusStructArray is array(integer range <>) of ArgStatusStruct;
+
 end NewPipelineData;
 
 
