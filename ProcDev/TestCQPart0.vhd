@@ -63,10 +63,8 @@ entity TestCQPart0 is
 		selectedToCQ: in std_logic_vector(0 to 3) := (others=>'0');
 		whichAcceptedCQ: out std_logic_vector(0 to 3) := (others=>'0');	
 		cqWhichSend: in std_logic_vector(0 to 3);
-
-		-- REDUNDANT?
-		whichSendingFromCQOut: out std_logic_vector(0 to PIPE_WIDTH-1);
-
+		anySending: out std_logic; 
+		
 		cqOut: out StageDataMulti;
 		-- NOTE: cqOut is for data to commit, dataCQOut is for forwarding info
 		dataCQOut: out StageDataCommitQueue	
@@ -83,6 +81,7 @@ architecture Behavioral of TestCQPart0 is
 		
 	signal cqRoutes: IntArray(0 to 3) := (others=>0);		
 	signal stageDataCQNew: PipeStageDataU(0 to 3);
+	-- NOTE: emptyMask means vector of 0s
 	signal emptyMaskCQ, killMaskCQ, fullMaskCQ, fullMaskCQNew, livingMaskRaw, livingMaskCQ: 
 							std_logic_vector(0 to CQ_SIZE-1) := (others=>'0');
 	signal killMaskRaw, killMaskNeutralize: std_logic_vector(0 to CQ_SIZE-1) := (others=>'0');					
@@ -103,9 +102,9 @@ begin
 	CQ_SYNCHRONOUS: process(clk) 	
 	begin
 		if rising_edge(clk) then
-			if resetSig = '1' then
+			if reset = '1' then
 				
-			elsif enabled = '1' then	
+			elsif en = '1' then	
 				stageDataCQ <= stageDataCQNext;					
 			end if;
 		end if;
@@ -161,7 +160,7 @@ begin
 		MAX_INPUT => 4				
 	)
 	Port map(
-		clk => clk, reset =>  resetSig, en => en,
+		clk => clk, reset =>  reset, en => en,
 		flowDrive => flowDriveCQ,
 		flowResponse => flowResponseCQ
 	);			
@@ -186,14 +185,14 @@ begin
 	--				the feature: Spare "almost committed".
 	--				Otherwise loop would happen: whichSending depends on livingMask, and livingMask
 	--				on next commitCtr, and commitCtr OFC depends on whichSending! 
-	whichSendingFromCQ <= getSendingFromCQ(livingMaskRaw); -- stageDataCQLiving.fullMask; -- ??
+	whichSendingFromCQ <= getSendingFromCQ(livingMaskRaw);
 	
 	cqOut.fullMask <= whichSendingFromCQ;
 	cqOut.data <= stageDataCQLiving.data(0 to PIPE_WIDTH-1); -- ??(some may be killed? careful)			
 	
-	whichSendingFromCQOut <= whichSendingFromCQ;	
+	anySending <= whichSendingFromCQ(0); -- Because CQ(0) must be committing if any other is 		
 	dataCQOut <= stageDataCQLiving;	
 			
-	whichAcceptedCQ <= whichAcceptedCQSig;				
+	whichAcceptedCQ <= whichAcceptedCQSig;	
 end Behavioral;
 

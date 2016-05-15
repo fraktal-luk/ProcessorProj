@@ -1,0 +1,133 @@
+----------------------------------------------------------------------------------
+-- Company: 
+-- Engineer: 
+-- 
+-- Create Date:    23:22:58 04/24/2016 
+-- Design Name: 
+-- Module Name:    SubunitDecode - Behavioral 
+-- Project Name: 
+-- Target Devices: 
+-- Tool versions: 
+-- Description: 
+--
+-- Dependencies: 
+--
+-- Revision: 
+-- Revision 0.01 - File Created
+-- Additional Comments: 
+--
+----------------------------------------------------------------------------------
+library IEEE;
+use IEEE.STD_LOGIC_1164.ALL;
+
+-- Uncomment the following library declaration if using
+-- arithmetic functions with Signed or Unsigned values
+--use IEEE.NUMERIC_STD.ALL;
+
+-- Uncomment the following library declaration if instantiating
+-- any Xilinx primitives in this code.
+--library UNISIM;
+--use UNISIM.VComponents.all;
+
+use work.ProcBasicDefs.all;
+use work.Helpers.all;
+
+use work.ProcInstructionsNew.all;
+
+use work.NewPipelineData.all;
+
+use work.GeneralPipeDev.all;
+
+use work.CommonRouting.all;
+use work.TEMP_DEV.all;
+
+use work.ProcComponents.all;
+
+use work.ProcLogicRenaming.all;
+
+
+entity SubunitRename is
+	port(
+		clk: in std_logic;
+		reset: in std_logic;
+		en: in std_logic;
+		
+		prevSending: in std_logic;
+		nextAccepting: in std_logic;
+		execEventSignal: in std_logic;
+		execCausing: in InstructionState;
+		renameLockCommand: in std_logic;
+		stageDataIn: in StageDataMulti;		
+		acceptingOut: out std_logic;
+		sendingOut: out std_logic;
+		stageDataOut: out StageDataMulti;
+		--stageEventsOut: out StageMultiEventInfo;
+		
+		newPhysSources: in PhysNameArray(0 to 3*PIPE_WIDTH-1);
+		newPhysDests: in PhysNameArray(0 to PIPE_WIDTH-1);
+		newGprTags: in SmallNumberArray(0 to PIPE_WIDTH-1);
+		newNumberTags: in SmallNumberArray(0 to PIPE_WIDTH-1);
+		
+		virtSources: out RegNameArray(0 to 3*PIPE_WIDTH-1);
+		virtDests: out RegNameArray(0 to PIPE_WIDTH-1);
+		renamingMask: out std_logic_vector(0 to PIPE_WIDTH-1);
+		reserveSel: out std_logic_vector(0 to PIPE_WIDTH-1);
+		readyClearSel: out std_logic_vector(0 to PIPE_WIDTH-1)
+	);
+end SubunitRename;
+
+
+architecture Behavioral of SubunitRename is
+	signal flowDrive1: FlowDriveSimple := (others=>'0');
+	signal flowResponse1: FlowResponseSimple := (others=>'0');		
+	signal stageData1, stageData1Living, stageData1Next, stageData1New:
+														StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
+															
+	signal reserveSelSig: std_logic_vector(0 to PIPE_WIDTH-1) := (others => '0' );															
+	signal partialKillMask1: std_logic_vector(0 to PIPE_WIDTH-1) := (others => '0');														
+begin
+	stageData1New <= renameRegs(baptizeVec(stageDataIn, newNumberTags),
+										 stageDataIn.fullMask, reserveSelSig, 											
+										 newPhysSources, newPhysDests, newGprTags);
+										
+	stageData1Next <= stageMultiNext(stageData1Living, stageData1New,
+								flowResponse1.living, flowResponse1.sending, flowDrive1.prevSending);			
+	stageData1Living <= stageMultiHandleKill(stageData1, flowDrive1.kill, partialKillMask1);
+
+	PIPE_CLOCKED: process(clk) 	
+	begin
+		if rising_edge(clk) then
+			if reset = '1' then
+				
+			elsif en = '1' then	
+				stageData1 <= stageData1Next;										
+			end if;
+		end if;
+	end process;
+
+	SIMPLE_SLOT_LOGIC_1: SimplePipeLogic port map(
+		clk => clk, reset => reset, en => en,
+		flowDrive => flowDrive1,
+		flowResponse => flowResponse1
+	);
+	
+	flowDrive1.prevSending <= prevSending;
+	flowDrive1.nextAccepting <= nextAccepting;
+	-- CAREFUL! Is it correct?
+	flowDrive1.kill <= execEventSignal; -- Only later stages can kill Rename
+	flowDrive1.lockAccept <= renameLockCommand;
+
+	acceptingOut <= flowResponse1.accepting;		
+	sendingOut <= flowResponse1.sending;
+	stageDataOut <= stageData1Living;
+
+	--
+	reserveSelSig <= getDestMask(stageDataIn);
+	
+	virtSources <=	getVirtualArgs(stageDataIn);					
+	virtDests <= getVirtualDests(stageDataIn);	
+	renamingMask <= stageDataIn.fullMask;	
+	reserveSel <= reserveSelSig;
+	readyClearSel <= reserveSelSig;
+end Behavioral;
+

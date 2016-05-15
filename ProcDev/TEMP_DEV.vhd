@@ -97,6 +97,30 @@ function iqStep4(dataLiving: InstructionStateArray; dataNew: StageDataMulti;
 					 prevSendingOK: std_logic)					 
 return IQStepData;
 	
+function getArgumentStatusInfo(missing: std_logic_vector;
+										 physNames: PhysNameArray;
+										 ra: std_logic_vector;
+										 tags: PhysNameArray;
+										 tagsNext: PhysNameArray;
+										 vals: MwordArray)
+return ArgumentStatusInfo;	
+
+function getArgumentStatusInfoArray(missing: std_logic_vector;
+										 physNames: PhysNameArray;
+										 ra: std_logic_vector;
+										 tags: PhysNameArray;
+										 tagsNext: PhysNameArray;
+										 vals: MwordArray)
+return ArgumentStatusInfoArray;	
+
+function updateInstructionArgs(ins: InstructionState; argInfo: ArgumentStatusInfo) return InstructionState;
+	
+function updateInstructionArrayArgs(ia: InstructionStateArray; aia: ArgumentStatusInfoArray)
+return InstructionStateArray;
+
+function findReadyInstructions(livingMask: std_logic_vector; aia: ArgumentStatusInfoArray) 
+return std_logic_vector;
+	
 end TEMP_DEV;
 
 
@@ -459,5 +483,154 @@ begin
 	end loop;
 	return res;
 end function;	
+	
+	
+	
+function getArgumentStatusInfo(missing: std_logic_vector;
+										 physNames: PhysNameArray;
+										 ra: std_logic_vector;
+										 tags: PhysNameArray;
+										 tagsNext: PhysNameArray;
+										 vals: MwordArray)
+return ArgumentStatusInfo is
+	variable res: ArgumentStatusInfo;
+begin
+	res.argStored := not missing;
+
+	res.argNew := (others => '0');
+	res.locs(0) := (others => '0');
+	res.locs(1) := (others => '0');
+	res.locs(2) := (others => '0');	
+	res.vals(0) := (others => '0');
+	res.vals(1) := (others => '0');
+	res.vals(2) := (others => '0');
+	
+	res.argNext := (others => '0');
+	res.locsNext(0) := (others => '0');
+	res.locsNext(1) := (others => '0');
+	res.locsNext(2) := (others => '0');
+
+	-- Find in ready results
+	-- Find where tag agrees with s0
+	-- TODO: remove the possibility of multiple hits - it must be ensured by register reading part
+	--			to prevent reading when arg present in forwarding network;
+	--			Maybe also need to build some constraint into comparing logic itself
+	for i in tags'range loop -- CAREFUL! Is this loop optimal for muxing?		
+		-- CAREFUL! showing only nonzero tags (p0 never needs lookup)
+		if isNonzero(tags(i)) = '0' then
+			next;
+		end if;		
+		if tags(i) = physNames(0) then
+			res.argNew(0) := '1';
+			res.locs(0) := i2slv(i, SMALL_NUMBER_SIZE);
+			res.vals(0) := vals(i);
+		end if;
+		if tags(i) = physNames(1) then
+			res.argNew(1) := '1';
+			res.locs(1) := i2slv(i, SMALL_NUMBER_SIZE);
+			res.vals(1) := vals(i);
+		end if;
+		if tags(i) = physNames(2) then
+			res.argNew(2) := '1';
+			res.locs(2) := i2slv(i, SMALL_NUMBER_SIZE);
+			res.vals(2) := vals(i);
+		end if;
+	end loop;
+	-- Find what will be available in next cycle
+	for i in tagsNext'range loop -- CAREFUL! Is this loop optimal for muxing?		
+		-- CAREFUL! showing only nonzero tags (p0 never needs lookup)
+		if isNonzero(tagsNext(i)) = '0' then
+			next;
+		end if;		
+		if tagsNext(i) = physNames(0) then
+			res.argNext(0) := '1';
+			res.locsNext(0) := i2slv(i, SMALL_NUMBER_SIZE);
+		end if;
+		if tagsNext(i) = physNames(1) then
+			res.argNext(1) := '1';
+			res.locsNext(1) := i2slv(i, SMALL_NUMBER_SIZE);
+		end if;
+		if tagsNext(i) = physNames(2) then
+			res.argNext(2) := '1';
+			res.locsNext(2) := i2slv(i, SMALL_NUMBER_SIZE);
+		end if;
+	end loop;
+	-- What ready in registers
+	res.argRegs(0) := ra(slv2u(physNames(0)));
+	res.argRegs(1) := ra(slv2u(physNames(1)));
+	res.argRegs(2) := ra(slv2u(physNames(2)));	
+	
+	-- Derived info
+	res.readyNow := res.argStored or res.argNew;
+	res.readyNext := res.readyNow or res.argNext or res.argRegs; 
+	res.notReady := not res.readyNext;
+
+	res.filling := res.argNew and not res.argStored;
+	
+	res.allReady := res.readyNow(0) and res.readyNow(1) and res.readyNow(2); 
+	res.allNext := res.readyNext(0) and res.readyNext(1) and res.readyNext(2);
+	return res;
+end function;	
+	
+function getArgumentStatusInfoArray(missing: std_logic_vector;
+										 physNames: PhysNameArray;
+										 ra: std_logic_vector;
+										 tags: PhysNameArray;
+										 tagsNext: PhysNameArray;
+										 vals: MwordArray)
+return ArgumentStatusInfoArray is
+	variable res: ArgumentStatusInfoArray(0 to missing'length/3 - 1);
+	variable m: std_logic_vector(0 to 2) := "000";
+	variable p: PhysNameArray(0 to 2) := (others => (others => '0')); 
+begin
+	for i in res'range loop
+		m := missing(3*i to 3*i + 2);
+		p := physNames(3*i to 3*i + 2);
+		res(i) := getArgumentStatusInfo(m, p, ra, 
+														 tags, tagsNext, vals);
+	end loop;
+	return res;
+end function;	
+
+function updateInstructionArgs(ins: InstructionState; argInfo: ArgumentStatusInfo) return InstructionState
+is
+	variable res: InstructionState := ins;
+begin
+	if argInfo.filling(0) = '1' then
+		res.argValues.missing(0) := '0';
+		res.argValues.arg0 := argInfo.vals(0);
+	end if;
+	if argInfo.filling(1) = '1' then
+		res.argValues.missing(1) := '0';
+		res.argValues.arg1 := argInfo.vals(1);
+	end if;
+	if argInfo.filling(2) = '1' then
+		res.argValues.missing(2) := '0';
+		res.argValues.arg2 := argInfo.vals(2);
+	end if;	
+	return res;
+end function;
+	
+function updateInstructionArrayArgs(ia: InstructionStateArray; aia: ArgumentStatusInfoArray)
+return InstructionStateArray
+is
+	variable res: InstructionStateArray(ia'range) := ia;
+begin
+	for i in ia'range loop
+		res(i) := updateInstructionArgs(ia(i), aia(i));
+	end loop;
+	return res;
+end function;
+
+function findReadyInstructions(livingMask: std_logic_vector; aia: ArgumentStatusInfoArray) 
+return std_logic_vector is
+	variable res: std_logic_vector(livingMask'range) := (others => '0');
+begin
+	for i in res'range loop
+		res(i) := livingMask(i) and aia(i).allNext;
+	end loop;
+	return res;
+end function;
+
 	
 end TEMP_DEV;

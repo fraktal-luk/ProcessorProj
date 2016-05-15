@@ -19,7 +19,7 @@ package NewPipelineData is
 	-- Configuration defs 
 	constant MW: natural := 4; -- Max pipe width  
 
-	constant LOG2_PIPE_WIDTH: natural := 0; -- + 2; -- Must match the width!
+	constant LOG2_PIPE_WIDTH: natural := 0 ; -- + 2; -- Must match the width!
 	constant PIPE_WIDTH: positive := 2**LOG2_PIPE_WIDTH; -- + 1 + 2; 
 	constant ALIGN_BITS: natural := LOG2_PIPE_WIDTH + 2;
 
@@ -358,7 +358,18 @@ type ExecDataTable is array (ExecStages'left to ExecStages'right) of Instruction
 		dispatchDataNew: InstructionState;
 		sends: std_logic;
 	end record;			
-								
+					
+	-- Created to enable *Array				
+	type InstructionSlot is record 
+		full: std_logic;
+		ins: InstructionState;
+	end record;
+	
+	constant DEFAULT_INSTRUCTION_SLOT: InstructionSlot := ('0', defaultInstructionState);
+	
+	-- NOTE: index can be negative to enable logical division into 2 different ranges 
+	type InstructionSlotArray is array(integer range <>) of InstructionSlot;
+					
 			type ArgStatusInfo is record
 					stored: std_logic_vector(0 to 2); -- those that were already present in prev cycle
 				ready: std_logic_vector(0 to 2);
@@ -375,12 +386,12 @@ type ExecDataTable is array (ExecStages'left to ExecStages'right) of Instruction
 				locs: SmallNumberArray(0 to 2);
 				vals: MwordArray(0 to 2);
 				missing: std_logic_vector(0 to 2);
-					C_missing: std_logic_vector(0 to 2);					
+					--C_missing: std_logic_vector(0 to 2);					
 				readyReg: std_logic_vector(0 to 2);
 				readyNow: std_logic_vector(0 to 2);
 				readyNext: std_logic_vector(0 to 2);
 				stillMissing: std_logic_vector(0 to 2);
-					C_stillMissing: std_logic_vector(0 to 2);
+					--C_stillMissing: std_logic_vector(0 to 2);
 				nMissing: integer;
 				nextMissing: std_logic_vector(0 to 2);
 				nMissingNext: integer;					
@@ -388,6 +399,28 @@ type ExecDataTable is array (ExecStages'left to ExecStages'right) of Instruction
 
 			type ArgStatusInfoArray is array(integer range <>) of ArgStatusInfo;
 			type ArgStatusStructArray is array(integer range <>) of ArgStatusStruct;
+
+		type ArgumentStatusInfo is record
+			-- Basic state
+			argStored: std_logic_vector(0 to 2); -- ready before
+			argNew: std_logic_vector(0 to 2);   -- ready from this cycle
+			argRegs: std_logic_vector(0 to 2);  -- can be read from reg for next cycle
+			argNext: std_logic_vector(0 to 2);  -- expected in forw. network in next cycle
+			-- Derived state
+			readyNow: std_logic_vector(0 to 2);  -- stored/forw. netw.
+			readyNext: std_logic_vector(0 to 2); -- forw. network next cycle
+			notReady: std_logic_vector(0 to 2);  -- won't be ready in next cycle
+			-- Scheduling status
+			allReady: std_logic; -- can go to exec now
+			allNext: std_logic;  -- can be dispatched now (to exec next cycle)
+			-- Completion info
+			filling: std_logic_vector(0 to 2); -- will be updated this cycle from forw. network/regs
+			locs: SmallNumberArray(0 to 2);	  -- location in FN
+			vals: MwordArray(0 to 2);			  -- arg values
+			locsNext: SmallNumberArray(0 to 2);	
+		end record;
+
+		type ArgumentStatusInfoArray is array(integer range <>) of ArgumentStatusInfo;
 
 end NewPipelineData;
 

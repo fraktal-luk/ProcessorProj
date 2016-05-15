@@ -13,11 +13,12 @@ architecture Behavioral5 of NewCore0 is
 	signal renamedSending: std_logic := '0';			
 	
 	signal readyRegs, readyRegsSig: std_logic_vector(0 to N_PHYSICAL_REGS-1) := (others=>'0');
-	signal fetchLockCommand: std_logic := '0'; 
-	signal fetchLockRequest: std_logic := '0';
-		
-	signal partialKillMask1: std_logic_vector(0 to PIPE_WIDTH-1) := (others=>'0');	
-
+	
+	-- CAREFUL: feature not yet implemented
+	signal fetchLockCommand: std_logic := '0';
+	signal fetchLockRequest: std_logic := '0'; 
+	--
+	
 	signal dataToA, dataToB, dataToC, dataToD: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;						
 
 	signal acceptingA, prevSendingA: SmallNumber := (others=>'0');									
@@ -39,10 +40,7 @@ architecture Behavioral5 of NewCore0 is
 	signal flowResponseOutIQD: FlowResponseSimple := (others=>'0');
 	signal dataOutIQD: InstructionState := defaultInstructionState;		
 	
-	signal readyExecA: std_logic;	
-	signal readyExecB: std_logic;	
-	signal readyExecC: std_logic;		
-	signal readyExecD: std_logic;	
+	signal readyExecA, readyExecB, readyExecC, readyExecD: std_logic := '0';		
 	
 	signal execAcceptingA, execAcceptingB, execAcceptingC, execAcceptingD: std_logic := '0'; 
 	
@@ -58,14 +56,13 @@ architecture Behavioral5 of NewCore0 is
 					:= (others=>'0');		
 	
 	signal selectedToCQ, whichAcceptedCQ: std_logic_vector(0 to 3) := (others=>'0');	
-	signal cqWhichSend: std_logic_vector(0 to 3);	
-	signal whichSendingFromCQ: std_logic_vector(0 to PIPE_WIDTH-1) := (others=>'0');		
+	signal cqWhichSend: std_logic_vector(0 to 3);
+	signal anySendingFromCQ: std_logic := '0';
+	
 	signal dataCQOut: StageDataCommitQueue
 								:= (fullMask=>(others=>'0'), data=>(others=>defaultInstructionState));	
 	signal cqDataLivingOut: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
-	-- REDUNDANT						
-	signal cqOut: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
-										
+				
 	signal execEventSignal: std_logic := '0';						
 	-- This will take the value of operation that causes jump or exception
 	signal execCausing: InstructionState := defaultInstructionState;
@@ -75,7 +72,7 @@ architecture Behavioral5 of NewCore0 is
 									
 		signal tmpPN0, tmpPN1, tmpPN2: PhysName := (others=>'0');
 
-	-- DEPREC? $OUTPUT REN?	
+	-- DEPREC? $OUTPUT REN?
 	signal ra: std_logic_vector(0 to 31) := (others=>'0');
 
 	signal resultTags, nextResultTags: PhysNameArray(0 to N_RES_TAGS-1) := (others=>(others=>'0'));
@@ -91,7 +88,7 @@ begin
 	
 	intSig <= int0;
 	
-	FRONT_PART: entity work.TestFrontPart0(Behavioral2)
+	FRONT_PART: entity work.UnitFront(Behavioral)
 	port map(
 		clk => clk, reset => resetSig, en => en,
 		iin => iin,
@@ -111,10 +108,11 @@ begin
 	------ Front pipe ends here.
 
 	-- Rename stage and register state management	
-	RENAMING_PART: entity work.TestRenamingCircuit0 port map(
+	RENAMING_PART: entity work.UnitReorder(Behavioral) port map( --work.TestRenamingCircuit0 port map(
 		clk => clk, reset => resetSig, en => en,
 		
 		iqAccepts => iqAccepts,
+		
 		execEventSignal => execEventSignal,
 		execCausing => execCausing,
 		
@@ -122,8 +120,8 @@ begin
 		frontLastSending => frontLastSending,
 		
 		cqDataLiving => cqDataLivingOut,
-		-- TODO: remove input below, because doubling 'fullMask' of input 'cqDataLiving'
-		whichSendingFromCQ => whichSendingFromCQ,
+		
+		anySendingFromCQ => anySendingFromCQ,
 		
 		accepting => renameAccepting, -- to frontend
 		renamedDataLiving => renamedDataLiving,
@@ -136,51 +134,28 @@ begin
 		lastCommittedNextOut => lastCommittedNext	
 	);
 			
-	IQ_ROUTING: block
-		signal srcVecA, srcVecB, srcVecC, srcVecD: std_logic_vector(0 to PIPE_WIDTH-1);
-		signal issueRouteVec: IntArray(0 to PIPE_WIDTH-1);
-		signal nToA, nToB, nToC, nToD: natural := 0;	
-		signal iqAcceptingA: std_logic := '0';						
-		signal iqAcceptingB, iqAcceptingC, iqAcceptingD: std_logic := '0';		
-	begin	
-		-- Routing to queues
-		ROUTE_VEC_GEN: for i in 0 to PIPE_WIDTH-1 generate
-			issueRouteVec(i) <= unit2queue(renamedDataLiving.data(i).operation.unit);
-		end generate;
+	
+	ISSUE_ROUTING: entity work.SubunitIssueRouting(Behavioral)
+	port map(
+		renamedDataLiving => renamedDataLiving,
+		acceptingA => acceptingA,
+		acceptingB => acceptingB,
+		acceptingC => acceptingC,
+		acceptingD => acceptingD,
+		renamedSendingIn => renamedSending,
 		
-	-- New concept for IQ routing.  {renamedData, srcVec*} -> (StageDataMulti){A,B,C,D}
-	-- Based on "push left" of each destination type, generating "New" StageDataMulti data for each one
-	-- dataToA <= [func](stageData1Living, srcVecA); -- s.d.1.l includes fullMask!	
-	
-	-- Selection of flow into IQ's
-		srcVecA <= findByNumber(issueRouteVec, 0) and renamedDataLiving.fullMask;
-		srcVecB <= findByNumber(issueRouteVec, 1) and renamedDataLiving.fullMask;
-		srcVecC <= findByNumber(issueRouteVec, 2) and renamedDataLiving.fullMask;
-		srcVecD <= findByNumber(issueRouteVec, 3) and renamedDataLiving.fullMask;
-												
-		dataToA <= routeToIQ(renamedDataLiving, srcVecA);
-		dataToB <= routeToIQ(renamedDataLiving, srcVecB);
-		dataToC <= routeToIQ(renamedDataLiving, srcVecC);
-		dataToD <= routeToIQ(renamedDataLiving, srcVecD);
-	
-		nToA	<= countOnes(dataToA.fullMask);
-		iqAcceptingA <= '1' when PIPE_WIDTH <= binFlowNum(acceptingA) else '0';	
-		prevSendingA <= num2flow(nToA, false) when renamedSending = '1' else (others=>'0');		
+		renamedSendingOut => open,
+		iqAccepts => iqAccepts,
+		prevSendingA => prevSendingA,
+		prevSendingB => prevSendingB,
+		prevSendingC => prevSendingC,
+		prevSendingD => prevSendingD,		
+		dataOutA => dataToA,
+		dataOutB => dataToB,
+		dataOutC => dataToC,
+		dataOutD => dataToD
+	);
 			
-		nToB	<= countOnes(dataToB.fullMask);
-		iqAcceptingB <= '1' when PIPE_WIDTH <= binFlowNum(acceptingB) else '0';														
-		prevSendingB <= num2flow(nToB, false) when renamedSending = '1' else (others=>'0');
-
-		nToC	<= countOnes(dataToC.fullMask);
-		iqAcceptingC <= '1' when PIPE_WIDTH <= binFlowNum(acceptingC) else '0';					
-		prevSendingC <= num2flow(nToC, false) when renamedSending = '1' else (others=>'0');
-
-		nToD	<= countOnes(dataToD.fullMask);
-		iqAcceptingD <= '1' when PIPE_WIDTH <= binFlowNum(acceptingD) else '0';					
-		prevSendingD <= num2flow(nToD, false) when renamedSending = '1' else (others=>'0');				
-			
-		iqAccepts <= iqAcceptingA and iqAcceptingB and iqAcceptingC and iqAcceptingD;
-	end block;	
 		
 	IQ_A: entity work.TestIQ0
 	generic map(
@@ -325,7 +300,26 @@ begin
 		
 	-- Exec part	
 	EXEC_PART: block
-		-- This will serve for automation of sequence connections
+	-- This will serve for automation of sequence connections
+	
+		-- Input
+		-- clk, reset, en
+		-- flowResponseOutIQ[ABCD]
+		-- whichAcceptedCQ
+		-- dataOutIQ[ABCD]
+		-- ? intSig, 
+		-- ? lastCommitted
+		-- ?? lastCommittedNext
+		
+		-- Output
+		-- execAccepting[ABCD]
+		-- selectedToCQ
+		-- cqWhichSend
+		-- execEventSignal, execCausing
+		-- execPreEnds
+		-- execEnds
+		
+		-- Internal signals
 		signal execPrevResponses, execNextResponses: ExecResponseTable := (others=>(others=>'0'));
 		
 		signal execDrives: ExecDriveTable := (others=>(others=>'0')); 
@@ -334,12 +328,7 @@ begin
 		signal execData: ExecDataTable := (others=>defaultInstructionState);		
 		signal execDataNext: ExecDataTable := (others=>defaultInstructionState);
 		signal execDataNew: ExecDataTable := (others=>defaultInstructionState);		
-	begin
-		execAcceptingA <= execResponses(ExecA0).accepting;
-		execAcceptingB <= execResponses(ExecB0).accepting;
-		execAcceptingC <= execResponses(ExecC0).accepting;
-		execAcceptingD <= execResponses(ExecD0).accepting;
-		
+	begin		
 		execPrevResponses <= getExecPrevResponses(execResponses,
 										flowResponseOutIQA, flowResponseOutIQB, flowResponseOutIQC, flowResponseOutIQD);
 		execNextResponses <= getExecNextResponses(execResponses,
@@ -427,6 +416,11 @@ begin
 		flowResponseCPost.accepting <= whichAcceptedCQ(2);
 		flowResponseDPost.accepting <= whichAcceptedCQ(3);	
 	
+		execAcceptingA <= execResponses(ExecA0).accepting;
+		execAcceptingB <= execResponses(ExecB0).accepting;
+		execAcceptingC <= execResponses(ExecC0).accepting;
+		execAcceptingD <= execResponses(ExecD0).accepting;	
+	
 		selectedToCQ <= (0 => readyExecA, 1 => readyExecB, 2 => readyExecC, 3 => readyExecD, others=>'0');
 		cqWhichSend <= (0 => execResponses(ExecA0).sending, 1 => execResponses(ExecB2).sending,
 							 2 => execResponses(ExecC2).sending, 3 =>	execResponses(ExecD0).sending,
@@ -449,15 +443,12 @@ begin
 		inputInstructions => execEnds,
 		selectedToCQ => selectedToCQ,
 		whichAcceptedCQ => whichAcceptedCQ,
-		cqWhichSend => cqWhichSend,
-		
-		whichSendingFromCQOut => whichSendingFromCQ,
-			cqOut => cqOut,
+		cqWhichSend => cqWhichSend,				
+		anySending => anySendingFromCQ,
+			cqOut => cqDataLivingOut,
 			dataCQOut => dataCQOut -- CAREFUL: must remain, because used by forwarding network!
 	);
-	
-	cqDataLivingOut <= cqOut;									
-	
+		
 	---------------------------------
 	-- Result forwarding sketch
 	-- CAREFUL: make sure that killed instructions not considered for tags! (If it be a real problem)
