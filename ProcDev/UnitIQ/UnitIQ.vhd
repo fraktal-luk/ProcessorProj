@@ -2,9 +2,9 @@
 -- Company: 
 -- Engineer: 
 -- 
--- Create Date:    22:26:00 02/29/2016 
+-- Create Date:    13:32:05 05/15/2016 
 -- Design Name: 
--- Module Name:    TestIQ0 - Behavioral 
+-- Module Name:    UnitIQ - Behavioral 
 -- Project Name: 
 -- Target Devices: 
 -- Tool versions: 
@@ -46,7 +46,7 @@ use work.ProcLogicIQ.all;
 use work.ProcComponents.all;
 
 
-entity TestIQ0 is
+entity UnitIQ is
 	generic(
 		IQ_SIZE: natural := 2--;
 		--N_RESULT_TAGS: natural := 1
@@ -76,9 +76,9 @@ entity TestIQ0 is
 		flowResponseOutIQ: out flowResponseSimple		
 	);
 
-end TestIQ0;
+end UnitIQ;
 
-architecture Behavioral of TestIQ0 is
+architecture Behavioral of UnitIQ is
 	signal raSig: std_logic_vector(0 to 3*IQ_SIZE-1) := (others => '0'); -- 31) := (others=>'0');
 
 	signal resetSig: std_logic := '0';
@@ -173,3 +173,4 @@ begin
 	);
 	
 end Behavioral;
+

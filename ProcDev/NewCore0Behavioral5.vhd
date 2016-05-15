@@ -157,7 +157,7 @@ begin
 	);
 			
 		
-	IQ_A: entity work.TestIQ0
+	IQ_A: entity work.UnitIQ
 	generic map(
 		IQ_SIZE => IQ_A_SIZE
 	)
@@ -186,7 +186,7 @@ begin
 		flowResponseOutIQ => flowResponseOutIQA		
 	);
 	
-	IQ_B: entity work.TestIQ0
+	IQ_B: entity work.UnitIQ
 	generic map(
 		IQ_SIZE => IQ_B_SIZE
 	)
@@ -220,7 +220,7 @@ begin
 	);
 	
 		
-	IQ_C: entity work.TestIQ0
+	IQ_C: entity work.UnitIQ
 	generic map(
 		IQ_SIZE => IQ_C_SIZE
 	)
@@ -253,7 +253,7 @@ begin
 		flowResponseOutIQ => flowResponseOutIQC		
 	);					
 	
-	IQ_D: entity work.TestIQ0
+	IQ_D: entity work.UnitIQ
 	generic map(
 		IQ_SIZE => IQ_D_SIZE
 	)
