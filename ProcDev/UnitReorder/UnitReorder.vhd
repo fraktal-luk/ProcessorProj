@@ -67,11 +67,12 @@ entity UnitReorder is
 		renamedDataLiving: out StageDataMulti;
 		renamedSending: out std_logic;
 		
-			ra: out std_logic_vector(0 to 31);
+		-- CAREFUL: readyRegs are read instantly, without cycle delay. But reg file needs a cycle to be read
 		readyRegs: out std_logic_vector(0 to N_PHYSICAL_REGS-1);
 		
 		commitCtrNextOut: out SmallNumber;
 		
+		stageDataCommittedOut: out StageDataMulti;
 		lastCommittedOut: out InstructionState;
 		lastCommittedNextOut: out InstructionState
 	);
@@ -79,7 +80,7 @@ end UnitReorder;
 
 
 architecture Behavioral of UnitReorder is
-	signal resetSig, enabled: std_logic := '0';
+	signal resetSig, enSig: std_logic := '0';
 
 	signal whichSendingFromCQ: std_logic_vector(0 to PIPE_WIDTH-1) := (others => '0');
 
@@ -153,17 +154,22 @@ architecture Behavioral of UnitReorder is
 
 	-- CAREFUL, CHECK: to enable restoring from last committed
 	signal hardTarget: InstructionBasicInfo := defaultBasicInfo;
-	signal lastCommitted, lastCommittedNext: InstructionState := defaultInstructionState;	
+	signal lastCommitted, lastCommittedNext: InstructionState := defaultInstructionState;
+
+	constant HAS_RESET_REORDER: std_logic := '1';
+	constant HAS_EN_REORDER: std_logic := '1';	
 begin
-	resetSig <= reset;
-	enabled <= en;	
+	resetSig <= reset and HAS_RESET_REORDER;
+	enSig <= en or not HAS_EN_REORDER;	
 	
 	anySendingFromCQSig <= anySendingFromCQ;
 	
+	
+	-- TODO: refactor physical destination assignment to allow using block RAM for free reg stack?
 	-- Rename stage
 	SUBUNIT_RENAME: entity work.SubunitRename(Behavioral)
 	port map(
-		clk => clk, reset => reset, en => en,
+		clk => clk, reset => resetSig, en => enSig,
 		
 		prevSending => frontLastSending,	
 		nextAccepting => iqAccepts,
@@ -266,7 +272,7 @@ begin
 		MAX_WIDTH => MW
 	)
 	port map(
-		clk => clk, reset => reset, en => en,
+		clk => clk, reset => resetSig, en => enSig,
 		rewind => gprRewind,
 		
 		commitAllow => gprCommitAllow,
@@ -306,7 +312,7 @@ begin
 		MAX_WIDTH => MW
 	)
 	port map(
-		clk => clk, reset => reset, en => en,
+		clk => clk, reset => resetSig, en => enSig,
 		
 		rewind => freeListRewind,		
 		writeTag => freeListRewindTag(5 downto 0),
@@ -337,7 +343,7 @@ begin
 		MAX_WIDTH => MW
 	)			
 	port map(
-		clk => clk, reset => reset, en => en, 
+		clk => clk, reset => resetSig, en => enSig, 
 		-- Setting inputs
 		-- NOTE: setting 'ready' on commit, but later reg writing maybe before commit if possible?
 		enSet => readyTableSetAllow,
@@ -372,9 +378,9 @@ begin
 		PIPE_SYNCHRONOUS: process(clk) 	
 		begin
 			if rising_edge(clk) then
-				if reset = '1' then
+				if resetSig = '1' then
 					
-				elsif en = '1' then					
+				elsif enSig = '1' then					
 					renameCtr <= renameCtrNext;
 					commitCtr <= commitCtrNext;
 												
@@ -400,7 +406,7 @@ begin
 	-- Commit stage: in order again				
 	SUBUNIT_COMMIT: entity work.SubunitCommit(Behavioral)
 	port map(
-		clk => clk, reset => reset, en => en,
+		clk => clk, reset => resetSig, en => enSig,
 		
 		prevSending => anySendingFromCQSig,
 		nextAccepting => '1',
@@ -409,7 +415,7 @@ begin
 		stageDataIn => cqDataLiving, 		
 		acceptingOut => open, -- unused but don't remove
 		sendingOut => open, -- as above
-		stageDataOut => open, -- as above
+		stageDataOut => stageDataOutCommit,
 		
 		physStable => physStable,
 		
@@ -424,6 +430,7 @@ begin
 		lastCommittedNextOut => lastCommittedNext
 	);
 
+	stageDataCommittedOut <= stageDataOutCommit;		
 			
 	accepting <= acceptingOutRename;
 	renamedDataLiving <= stageDataOutRename;

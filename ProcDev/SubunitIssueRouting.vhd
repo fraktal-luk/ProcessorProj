@@ -99,19 +99,19 @@ begin
 	
 		nToA	<= countOnes(dataToA.fullMask);
 		iqAcceptingA <= '1' when PIPE_WIDTH <= binFlowNum(acceptingA) else '0';	
-		prevSendingA <= num2flow(nToA, false) when renamedSending = '1' else (others=>'0');		
+		prevSendingA <= num2flow(nToA) when renamedSending = '1' else (others=>'0');		
 			
 		nToB	<= countOnes(dataToB.fullMask);
 		iqAcceptingB <= '1' when PIPE_WIDTH <= binFlowNum(acceptingB) else '0';														
-		prevSendingB <= num2flow(nToB, false) when renamedSending = '1' else (others=>'0');
+		prevSendingB <= num2flow(nToB) when renamedSending = '1' else (others=>'0');
 
 		nToC	<= countOnes(dataToC.fullMask);
 		iqAcceptingC <= '1' when PIPE_WIDTH <= binFlowNum(acceptingC) else '0';					
-		prevSendingC <= num2flow(nToC, false) when renamedSending = '1' else (others=>'0');
+		prevSendingC <= num2flow(nToC) when renamedSending = '1' else (others=>'0');
 
 		nToD	<= countOnes(dataToD.fullMask);
 		iqAcceptingD <= '1' when PIPE_WIDTH <= binFlowNum(acceptingD) else '0';					
-		prevSendingD <= num2flow(nToD, false) when renamedSending = '1' else (others=>'0');				
+		prevSendingD <= num2flow(nToD) when renamedSending = '1' else (others=>'0');				
 			
 		iqAccepts <= iqAcceptingA and iqAcceptingB and iqAcceptingC and iqAcceptingD;
 

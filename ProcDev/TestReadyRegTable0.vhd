@@ -74,8 +74,8 @@ architecture Behavioral of TestReadyRegTable0 is
 	signal setVecMW, clearVecMW: std_logic_vector(0 to MAX_WIDTH-1) := (others=>'0'); 
 	signal selectSetMW, selectClearMW: PhysNameArray(0 to MAX_WIDTH-1) := (others=>(others=>'0'));
 begin
-	setVecMW(0 to WIDTH-1) <= setVec;
-	clearVecMW(0 to WIDTH-1) <= clearVec;
+	setVecMW(0 to WIDTH-1) <= setVec when enSet = '1' else (others => '0');
+	clearVecMW(0 to WIDTH-1) <= clearVec when enClear = '1' else (others => '0');
 	selectSetMW(0 to WIDTH-1) <= selectSet;
 	selectClearMW(0 to WIDTH-1) <= selectClear;
 
@@ -83,10 +83,10 @@ begin
 						clk => clk, reset => reset, en => en, 
 						-- Setting inputs
 						-- TEMP: setting 'ready' on commit, but later make reg writing before commit if possible
-						writeEnL(0) => setVecMW(0) and enSet,							
-						writeEnL(1) => setVecMW(1) and enSet,							
-						writeEnL(2) => setVecMW(2) and enSet,							
-						writeEnL(3) => setVecMW(3) and enSet,							
+						writeEnL(0) => setVecMW(0),							
+						writeEnL(1) => setVecMW(1),							
+						writeEnL(2) => setVecMW(2),							
+						writeEnL(3) => setVecMW(3),							
 						
 						writeSelect0 => selectSetMW(0), --newPhysDests(0), --iaux(31 downto 26),
 						writeSelect1 => selectSetMW(1), --iaux(25 downto 20),
@@ -94,10 +94,10 @@ begin
 						writeSelect3 => selectSetMW(3), --iaux(13 downto 8) or "001100",
 						
 						-- Clearing inputs
-						writeEnH(0) => clearVecMW(0) and enClear,							
-						writeEnH(1) => clearVecMW(0) and enClear,							
-						writeEnH(2) => clearVecMW(0) and enClear,							
-						writeEnH(3) => clearVecMW(0) and enClear,							
+						writeEnH(0) => clearVecMW(0),							
+						writeEnH(1) => clearVecMW(0),							
+						writeEnH(2) => clearVecMW(0),							
+						writeEnH(3) => clearVecMW(0),							
 
 						writeSelect4 => selectClearMW(0),  --"000000",
 						writeSelect5 => selectClearMW(1),

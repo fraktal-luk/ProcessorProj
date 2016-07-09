@@ -74,8 +74,10 @@ end SubunitIQBuffer;
 
 
 architecture Behavioral of SubunitIQBuffer is
-	signal queueData, queueDataUpdated: PipeStageDataU(0 to IQ_SIZE-1) := (others=>defaultInstructionState);
-	signal queueDataLiving, queueDataNext: PipeStageDataU(0 to IQ_SIZE-1) := (others=>defaultInstructionState);
+	signal queueData, queueDataUpdated: InstructionStateArray(0 to IQ_SIZE-1) 
+								:= (others=>defaultInstructionState);
+	signal queueDataLiving, queueDataNext: InstructionStateArray(0 to IQ_SIZE-1)
+								:= (others=>defaultInstructionState);
 	signal queueDataNew: InstructionStateArray(0 to PIPE_WIDTH-1) := (others=>defaultInstructionState);	
 	
 	signal emptyMask, fullMask, killMask, livingMask, readyMask, sendingMask: 
@@ -86,7 +88,6 @@ architecture Behavioral of SubunitIQBuffer is
 	signal flowResponseQ: FlowResponseBuffer 
 				:= (others => (others=> '0'));
 
-	signal stepData: IQStepData;
 	signal asArray: ArgStatusStructArray(0 to IQ_SIZE-1);	
 
 	-- NOTE: queueContent UNUSED as of now 
@@ -97,7 +98,6 @@ architecture Behavioral of SubunitIQBuffer is
 	signal iqDataNext: InstructionStateArray(0 to IQ_SIZE-1) := (others => defaultInstructionState);
 	signal sends: std_logic := '0';
 	signal dispatchDataNew: InstructionState := defaultInstructionState;
-
 begin
 	flowDriveQ.prevSending <= prevSending;		
 	
@@ -113,7 +113,7 @@ begin
 		end if;
 	end process;	
 		
-	flowDriveQ.kill <= num2flow(countOnes(killMask), false);		
+	flowDriveQ.kill <= num2flow(countOnes(killMask));		
 	queueDataLiving <= queueDataUpdated; -- TEMP?
 	queueDataNew <= newData.data;									
 	queueDataNext <= iqDataNext;										
@@ -130,15 +130,15 @@ begin
 	sends <= queueContentNext(-1).full;
 	dispatchDataNew <= queueContentNext(-1).ins;
 			
-	queueContentNext <= iqContentNext(queueDataLiving, newData, livingMask, readyMask,
+	queueContentNext <= iqContentNext2(queueDataLiving, newData, livingMask, readyMask,
 													nextAccepting,
 													binFlowNum( truncLiving ),
 													binFlowNum(flowResponseQ.sending),
 													binFlowNum(flowDriveQ.prevSending),
 													prevSendingOK);			
-										
-	flowDriveQ.nextAccepting <=  num2flow(1, false) when (nextAccepting and isNonzero(readyMask)) = '1'			
-									else num2flow(0, false);															
+		
+	flowDriveQ.nextAccepting <=  num2flow(1) when (nextAccepting and isNonzero(readyMask)) = '1'			
+									else num2flow(0);															
 	
 	--physSourcesQ <= extractPhysSources(queueData);
 	--missingQ <= extractMissing(queueData);

@@ -57,11 +57,10 @@ entity UnitIQ is
 		en: in std_logic;		
 		
 		resultTags: in PhysNameArray(0 to N_RES_TAGS-1);
-		nextResultTags: in PhysNameArray(0 to N_RES_TAGS-1);
-		dummyVals: in MwordArray(0 to N_RES_TAGS-1);
+		nextResultTags: in PhysNameArray(0 to N_NEXT_RES_TAGS-1);
+		resultVals: in MwordArray(0 to N_RES_TAGS-1);
 		readyRegs: in std_logic_vector(0 to N_PHYSICAL_REGS-1);				
-			-- TEMP!
-			ra: in std_logic_vector(0 to 31); -- := (others=>'0'); -- CAREFUL: dummy		
+
 		prevSending: in SmallNumber;
 		prevSendingOK: in std_logic;		
 		nextAccepting: in std_logic; -- from exec			
@@ -69,8 +68,10 @@ entity UnitIQ is
 		
 		execCausing: in InstructionState;
 		execEventSignal: in std_logic;		
-			-- TEMP!
-			tmpPN0, tmpPN1, tmpPN2: out PhysName;		
+			
+			-- Phys regs to read - only for "full read ports" configuration 
+			regsForDispatch: out PhysNameArray(0 to 2);
+			
 		accepting: out SmallNumber;
 		dataOutIQ: out InstructionState;
 		flowResponseOutIQ: out flowResponseSimple		
@@ -82,7 +83,7 @@ architecture Behavioral of UnitIQ is
 	signal raSig: std_logic_vector(0 to 3*IQ_SIZE-1) := (others => '0'); -- 31) := (others=>'0');
 
 	signal resetSig: std_logic := '0';
-	signal enabled: std_logic := '0'; 
+	signal enSig: std_logic := '0'; 
 												
 	signal aiDispatch: ArgStatusInfo;
 	signal asDispatch: ArgStatusStruct;		
@@ -105,10 +106,13 @@ architecture Behavioral of UnitIQ is
 	
 	signal dispatchDataSig: InstructionState := defaultInstructionState;	
 	
-	signal toDispatch: InstructionState := defaultInstructionState;	
+	signal toDispatch: InstructionState := defaultInstructionState;
+
+	constant HAS_RESET_IQ: std_logic := '1';
+	constant HAS_EN_IQ: std_logic := '1';	
 begin	
-	resetSig <= reset;
-	enabled <= en;
+	resetSig <= reset and HAS_RESET_IQ;
+	enSig <= en or not HAS_EN_IQ;
 		
 	-- The queue	
 	QUEUE_MAIN_LOGIC: entity work.SubunitIQBuffer(Behavioral)
@@ -116,7 +120,7 @@ begin
 		IQ_SIZE => IQ_SIZE
 	)
 	port map(
-	 	clk => clk, reset => reset, en => en,
+	 	clk => clk, reset => resetSig, en => enSig,
 	 	prevSending => prevSending,
 	 	prevSendingOK => prevSendingOK,
 	 	newData => newData,
@@ -137,7 +141,7 @@ begin
 		queueData => iqData,
 		resultTags => resultTags,
 		nextResultTags => nextResultTags,
-		vals => dummyVals,
+		vals => resultVals,
 		readyRegs => readyRegs,
 		aiArray => aiArray,
 		regsAllow => raSig
@@ -147,7 +151,7 @@ begin
 	-- Dispatch stage			
 	DISPATCH_MAIN_LOGIC: entity work.SubunitDispatch(Behavioral)
 	port map(
-	 	clk => clk, reset => reset, en => en,
+	 	clk => clk, reset => resetSig, en => enSig,
 	 	prevSending => queueSending,
 	 	nextAccepting => nextAccepting,
 		execEventSignal => execEventSignal,
@@ -166,11 +170,14 @@ begin
 		dispatchData => dispatchDataSig,
 		resultTags => resultTags,
 		--nextResultTags => nextResultTags,
-		vals => dummyVals,
+		vals => resultVals,
 		--readyRegs => readyRegs,
 		ai => aiDispatch
 		--regsAllow => raSig		
 	);
 	
+		-- TEMP!
+		regsForDispatch <= (others => (others => '0'));
+		
 end Behavioral;
 

@@ -79,7 +79,7 @@ begin
 	whichAccepted(2) <= selected(2) when routesSig(2) < MAX_SIZE else '0'; 
 	whichAccepted(3) <= selected(3) when routesSig(3) < MAX_SIZE else '0'; 
 	
-	sendingToCQ <= num2flow(countOnes(whichSend), false);
+	sendingToCQ <= num2flow(countOnes(whichSend));
 	routes <= routesSig;
 end Behavioral;
 

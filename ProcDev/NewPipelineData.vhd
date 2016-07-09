@@ -32,7 +32,12 @@ package NewPipelineData is
 	constant IQ_D_SIZE: natural := PIPE_WIDTH * 2;
 	constant CQ_SIZE: natural := PIPE_WIDTH * 4;
 	
-	constant N_RES_TAGS: natural := 20;
+	-- CAREFUL! This selects the mode of reg reading. Should be false only if PIPE_WIDTH = 4 
+	constant PRE_IQ_REG_READING: boolean := true;
+	
+	constant N_RES_TAGS: natural := 4 + CQ_SIZE + PIPE_WIDTH + 3*PIPE_WIDTH; 
+						-- Above: num subpipe results + CQ slots + max commited slots + pre-IQ red ports
+	constant N_NEXT_RES_TAGS: natural := 4; 
 	
 	constant zerosPW: std_logic_vector(0 to PIPE_WIDTH-1) := (others=>'0');	
 	------
@@ -48,7 +53,7 @@ package NewPipelineData is
 
 
 subtype SmallNumber is byte;
-type SmallNumberArray is array(integer range<>) of SmallNumber;
+type SmallNumberArray is array(integer range <>) of SmallNumber;
 constant SMALL_NUMBER_SIZE: natural := SmallNumber'length;
 
 type ExecUnit is (General, ALU, MAC, Divide, Jump, Memory, System );
@@ -190,11 +195,13 @@ type InstructionStateArray is array(integer range <>) of InstructionState;
 	-- Number of words proper for fetch group size
 	subtype InsGroup is WordArray(0 to PIPE_WIDTH-1);
 
-	subtype PipeFlow is std_logic_vector(0 to 4+3); -- TEMP?
+	-- CAREFUL, TODO: try to stop using rising bit ordering in quantity type!
+	subtype PipeFlow is --std_logic_vector(0 to 4+3); -- TEMP?
+								SmallNumber;
 
 -- Use this to convert PipeFlow to numbers 
 function binFlowNum(flow: PipeFlow) return natural;
-function num2flow(n: natural; alignRight: boolean) return PipeFlow;
+function num2flow(n: natural) return PipeFlow;
 
 
 -- Flow control: input structure
@@ -266,20 +273,20 @@ type StageDataPC is record
 	basicInfo: InstructionBasicInfo;
 	pc: Mword;
 	pcBase: Mword;
-	nFull: natural;
+	--nFull: natural;
 	nH: PipeFlow; -- number of hwords 	
 end record;
 
 constant DEFAULT_DATA_PC: StageDataPC := (			pc => (others=>'0'),
 																		pcBase => (others=>'0'),
-																		nFull => 0,
+																		--nFull => 0,
 																		nH => (others=>'0'),
 																		basicInfo => defaultBasicInfo
 																		);	
 -- CAREFUL: this is PC "before" address 0 																		
 constant INITIAL_DATA_PC: StageDataPC := (			pc => i2slv(-PIPE_WIDTH*4, MWORD_SIZE),
 																		pcBase => i2slv(-PIPE_WIDTH*4, MWORD_SIZE),
-																		nFull => 0,
+																		--nFull => 0,
 																		nH => (others=>'0'),
 																		basicInfo => defaultBasicInfo
 																		);
@@ -292,33 +299,24 @@ end record;
 
 type AnnotatedHword is record
 	bits: hword;
-	ip: Mword; -- TODO, NOTE: redundant?
+	--ip: Mword; -- TODO, NOTE: redundant?
 	basicInfo: InstructionBasicInfo;
 		-- TODO: include a structure for storing hword decoding info?
 		--			Maybe extend 'controlInfo' to hold it?
 		shortIns: std_logic; -- This would be there
 end record;
 
-constant DEFAULT_ANNOTATED_HWORD: AnnotatedHword := (bits => (others=>'0'), ip => (others=>'0'),
+constant DEFAULT_ANNOTATED_HWORD: AnnotatedHword := (bits => (others=>'0'), --ip => (others=>'0'),
 																	basicInfo => defaultBasicInfo, shortIns => '0');
 
 type AnnotatedHwordArray is array (integer range <>) of AnnotatedHword;
 
-	type HbuffOutData is record
-		sd: StageDataMulti;
-		nOut: SmallNumber; --integer;
-		nHOut: SmallNumber; -- integer;
-	end record;
-
-
--- DEPREC?
--- Info supplied by hword buffer
-type HwordBufferData is record
-	readyOps: std_logic_vector(0 to PIPE_WIDTH-1); --PipeFlow;
-	shortInstructions: std_logic_vector(0 to PIPE_WIDTH-1); 
-	words: WordArray(0 to PIPE_WIDTH-1);
-	cumulSize: IntArray(0 to PIPE_WIDTH);
+type HbuffOutData is record
+	sd: StageDataMulti;
+	nOut: SmallNumber;
+	nHOut: SmallNumber;
 end record;
+
 
 type FrontEventInfo is record
 	eventOccured: std_logic;
@@ -346,19 +344,7 @@ type ExecDriveTable is array (ExecStages'left to ExecStages'right) of FlowDriveS
 type ExecResponseTable is array (ExecStages'left to ExecStages'right) of FlowResponseSimple;
 	
 type ExecDataTable is array (ExecStages'left to ExecStages'right) of InstructionState;
-	
-	subtype PipeStageDataU is InstructionStateArray;	
-	subtype SingleStageData is PipeStageDataU(0 to 0);
-	subtype PipeStageData is PipeStageDataU(0 to PIPE_WIDTH-1);
-
-	-- CAREFUL, TODO: this holds only for IQ A. Check and solve problem.
-	type IQStepData is record 
-		iqDataNext: InstructionStateArray(0 to IQ_A_SIZE-1);
-		iqFullMaskNext: std_logic_vector(0 to IQ_A_SIZE-1);
-		dispatchDataNew: InstructionState;
-		sends: std_logic;
-	end record;			
-					
+								
 	-- Created to enable *Array				
 	type InstructionSlot is record 
 		full: std_logic;
@@ -434,7 +420,7 @@ begin
 	return slv2u(vec);
 end function;
 
-function num2flow(n: natural; alignRight: boolean) return PipeFlow is
+function num2flow(n: natural) return PipeFlow is
 	variable res: PipeFlow := (others=>'0');
 	variable b: natural := n;
 begin	
@@ -445,7 +431,8 @@ end function;
  
 function defaultBasicInfo return InstructionBasicInfo is
 begin
-	return InstructionBasicInfo'( ip => (others=>'1'),
+	return InstructionBasicInfo'( ip => (others=>'0'),		-- CAREFUL! '1' hinder constant propagation, but 
+																			--				sometimes useful for debugging	
 											intLevel => (others=>'0'),
 											systemLevel => (others=>'0'));
 end function;
@@ -461,7 +448,7 @@ begin
 													execEvent => '0',
 	
 												exception => '0',
-												exceptionCode => (others=>'1'),
+												exceptionCode => (others=>'0'),
 												--branch: std_logic; -- move to system info?
 												branchSpeculated => '0', 
 												branchConfirmed => '0', 

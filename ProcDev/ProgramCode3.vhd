@@ -66,7 +66,16 @@ package ProgramCode3 is
 			--others=>(others=>'0')
 		);		
 
-
+	
+		constant prog0: WordMem := (
+			0 => ins655H(orI, r1, r0, 2),
+			1 => ins655H(orI, r2, r0, 4),
+			2 => ins655655(ext0, r3, r1, muls, r2, 0),
+			3 => ins655H(orI, r4, r3, 8),
+			
+			others => ins655655(ext0, r0, r0, orR, r0, 0)
+		);
+	
 end ProgramCode3;
 
 

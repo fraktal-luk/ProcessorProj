@@ -68,9 +68,7 @@ ARCHITECTURE behavior OF NewCoreTB IS
 			  dvalid: in std_logic;
            din : in  Mword;
            dout : out  Mword;			
-			
-			--outStage: out PipeStageData;
-			
+						
          int0 : IN  std_logic;
          int1 : IN  std_logic;
          iaux : IN  std_logic_vector(31 downto 0);
@@ -102,7 +100,7 @@ ARCHITECTURE behavior OF NewCoreTB IS
    signal iadr : std_logic_vector(31 downto 0);
    signal oaux : std_logic_vector(31 downto 0);
 
-	signal outStage: PipeStageData;
+	signal outStage: InstructionStateArray(0 to PIPE_WIDTH-1) := (others => defaultInstructionState);
 
 
    -- Clock period definitions
@@ -179,7 +177,9 @@ BEGIN
 				--alignedPC(MWORD_SIZE-1 downto ALIGN_BITS)
 				
 				for i in 0 to PIPE_WIDTH-1 loop
-					iin(i) <= programMem(slv2u(iadr(9 downto 2)) + i); -- CAREFUL! 2 low bits unused (32b memory) 									
+					iin(i) <= programMem
+								 --prog0
+								(slv2u(iadr(9 downto 2)) + i); -- CAREFUL! 2 low bits unused (32b memory) 									
 				end loop;
 				
 					if iadrvalid = '1' and countOnes(iadr(iadr'high downto 9)) = 0 then

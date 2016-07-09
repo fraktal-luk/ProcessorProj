@@ -91,19 +91,29 @@ function stageCQNext2(content: StageDataCommitQueue; newContent: InstructionStat
 return StageDataCommitQueue is
 	variable res: StageDataCommitQueue := (fullMask => (others=>'0'), 
 														data => (others=>defaultInstructionState));
-	variable j: integer;															
+	variable j: integer;		
+		constant CLEAR_EMPTY_SLOTS_CQ: boolean := false;
 begin
+	-- CAREFUL: even when not clearing empty slots, result tags probably should be cleared!
+	--				It's to prevent reading of fake results from empty slots
+	if not CLEAR_EMPTY_SLOTS_CQ then
+		res := content;
+	end if;	
+	
 	for i in 0 to content.data'length-1 loop -- to livingContent'length - nOut - 1 loop
 		if i >= content.data'length - nOut then
 			exit;
 		end if;
-		if livingMask(i + nOut) = '1' then
-			res.data(i) := content.data(i + nOut);	
+
+		res.data(i) := content.data(i + nOut);		
+		if livingMask(i + nOut) = '0' and CLEAR_EMPTY_SLOTS_CQ then
+			res.data(i) := defaultInstructionState;	
 		end if;
+		
 		res.fullMask(i) := content.fullMask(i + nOut);	
 	end loop;
 	
-	for i in 0 to livingMask'length-1 loop --  ready'range loop
+	for i in 0 to livingMask'length-1 loop --  ready'range loop			
 		if (vecA(i) and ready(0)) = '1' then 
 			res.data(i) := newContent(0);
 			res.fullMask(i) := '1';
@@ -118,6 +128,21 @@ begin
 			res.fullMask(i) := '1';			
 		end if;		
 	end loop;
+	
+	-- CAREFUL! Clearing tags in empty slots, to avoid incorrect info about available results!
+	for i in 0 to res.fullMask'length-1 loop
+		if res.fullMask(i) = '0' then
+			res.data(i).physicalDestArgs.d0 := (others => '0');
+		end if;
+		
+		-- TEMP: also clear unneeded data for all instructions
+		res.data(i).virtualArgs := defaultVirtualArgs;
+		res.data(i).constantArgs := defaultConstantArgs;
+		res.data(i).argValues := defaultArgValues;
+		res.data(i).basicInfo := defaultBasicInfo;
+		res.data(i).bits := (others => '0');
+	end loop;
+	
 	return res;		
 end function;
  

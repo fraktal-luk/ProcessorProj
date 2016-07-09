@@ -73,14 +73,14 @@ end TestCQPart0;
 
 
 architecture Behavioral of TestCQPart0 is
-	signal resetSig, enabled: std_logic := '0';
+	signal resetSig, enSig: std_logic := '0';
 
 	signal flowDriveCQ: FlowDriveBuffer	:= (killAll => '0', lockAccept => '0', lockSend => '0',
 																others=>(others=>'0'));
 	signal flowResponseCQ: FlowResponseBuffer := (others => (others=> '0'));				
 		
 	signal cqRoutes: IntArray(0 to 3) := (others=>0);		
-	signal stageDataCQNew: PipeStageDataU(0 to 3);
+	signal stageDataCQNew: InstructionStateArray(0 to 3) := (others => defaultInstructionState);
 	-- NOTE: emptyMask means vector of 0s
 	signal emptyMaskCQ, killMaskCQ, fullMaskCQ, fullMaskCQNew, livingMaskRaw, livingMaskCQ: 
 							std_logic_vector(0 to CQ_SIZE-1) := (others=>'0');
@@ -94,17 +94,20 @@ architecture Behavioral of TestCQPart0 is
 		killVec, takeAVec, takeBVec, takeCVec, takeDVec: std_logic_vector(0 to CQ_SIZE-1) := (others=>'0');
 	signal tagA, tagB, tagC, tagD, tagKill: SmallNumber := (others=>'0');
 
-	signal whichAcceptedCQSig: std_logic_vector(0 to 3) := (others=>'0');				
+	signal whichAcceptedCQSig: std_logic_vector(0 to 3) := (others=>'0');
+
+	constant HAS_RESET_CQ: std_logic := '1';
+	constant HAS_EN_CQ: std_logic := '1';
 begin
-	resetSig <= reset;
-	enabled <= en;
+	resetSig <= reset and HAS_RESET_CQ;
+	enSig <= en or not HAS_EN_CQ;
 
 	CQ_SYNCHRONOUS: process(clk) 	
 	begin
 		if rising_edge(clk) then
-			if reset = '1' then
+			if resetSig = '1' then
 				
-			elsif en = '1' then	
+			elsif enSig = '1' then	
 				stageDataCQ <= stageDataCQNext;					
 			end if;
 		end if;
@@ -136,7 +139,7 @@ begin
 		kill => killVec
 	);
 		
-	flowDriveCQ.prevSending <=	num2flow(countOnes(cqWhichSend), false);
+	flowDriveCQ.prevSending <=	num2flow(countOnes(cqWhichSend));
 	
 	stageDataCQLiving.data <= stageDataCQ.data;
 	stageDataCQLiving.fullMask <= livingMaskCQ;
@@ -160,7 +163,7 @@ begin
 		MAX_INPUT => 4				
 	)
 	Port map(
-		clk => clk, reset =>  reset, en => en,
+		clk => clk, reset =>  resetSig, en => enSig,
 		flowDrive => flowDriveCQ,
 		flowResponse => flowResponseCQ
 	);			
@@ -177,9 +180,9 @@ begin
 	livingMaskRaw <= stageDataCQ.fullMask and not killMaskRaw;	
 	livingMaskCQ <= stageDataCQ.fullMask and not killMaskCQ;	
 	
-	flowDriveCQ.kill <= num2flow(countOnes(killMaskCQ and stageDataCQ.fullMask), false);
+	flowDriveCQ.kill <= num2flow(countOnes(killMaskCQ and stageDataCQ.fullMask));
 	
-	flowDriveCQ.nextAccepting <= num2flow(countOnes(whichSendingFromCQ), false);
+	flowDriveCQ.nextAccepting <= num2flow(countOnes(whichSendingFromCQ));
 	
 	-- CAREFUL: using "raw" living mask, cause it prevents a comb. loop when implementing
 	--				the feature: Spare "almost committed".
@@ -190,7 +193,10 @@ begin
 	cqOut.fullMask <= whichSendingFromCQ;
 	cqOut.data <= stageDataCQLiving.data(0 to PIPE_WIDTH-1); -- ??(some may be killed? careful)			
 	
-	anySending <= whichSendingFromCQ(0); -- Because CQ(0) must be committing if any other is 		
+	anySending <= whichSendingFromCQ(0); -- Because CQ(0) must be committing if any other is 
+
+	-- CAREFUL: don't propagate here result tags from empty slots!	
+	--				Clearing result tags for empty slots handled in CQ step function 
 	dataCQOut <= stageDataCQLiving;	
 			
 	whichAcceptedCQ <= whichAcceptedCQSig;	

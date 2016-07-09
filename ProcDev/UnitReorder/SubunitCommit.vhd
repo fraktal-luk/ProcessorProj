@@ -91,7 +91,9 @@ architecture Behavioral of SubunitCommit is
 begin	
 	stageDataCommitLiving <= stageDataCommit; -- Nothing will kill it?
 	stageDataCommitNew <= stageDataIn;	-- ??(some may be killed? careful)					
-																					
+							
+	-- CAREFUL, TODO: maybe clear result tags in committed instructions after 1 cycle, cause 
+	--						values are then already in registers and we shouldn't duplicate tags
 	stageDataCommitNext <= stageMultiNext(stageDataCommitLiving, stageDataCommitNew,
 						flowResponseCommit.living, flowResponseCommit.sending, flowDriveCommit.prevSending);			
 

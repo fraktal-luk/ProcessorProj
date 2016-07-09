@@ -73,7 +73,7 @@ end UnitFront;
 --			jump back to repeat fetching (or cause exception etc)
 architecture Behavioral of UnitFront is
 	signal fetchBlock: HwordArray(0 to FETCH_BLOCK_SIZE-1);
-	signal resetSig, enabled: std_logic := '0';			
+	signal resetSig, enSig: std_logic := '0';			
 													
 	signal frontEvents: FrontEventInfo;
 	signal stage0Events: StageMultiEventInfo;	
@@ -82,10 +82,13 @@ architecture Behavioral of UnitFront is
 	signal stageDataOutPC, stageDataOutFetch: StageDataPC := DEFAULT_DATA_PC;
 	signal stageDataOutHbuffer, stageDataOut0: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
 	signal sendingOutPC, sendingOutFetch, sendingOutHbuffer, sendingOut0: std_logic := '0';
-	signal acceptingOutPC, acceptingOutFetch, acceptingOutHbuffer, acceptingOut0: std_logic := '0';				
+	signal acceptingOutPC, acceptingOutFetch, acceptingOutHbuffer, acceptingOut0: std_logic := '0';
+
+	constant HAS_RESET_FRONT: std_logic := '1';
+	constant HAS_EN_FRONT: std_logic := '1';	
 begin	 
-	resetSig <= reset;
-	enabled <= en;
+	resetSig <= reset and HAS_RESET_FRONT;
+	enSig <= en or not HAS_EN_FRONT;
 
 	-- Fetched bits: input from instruction bus 
 	FETCH_BLOCK: for i in 0 to PIPE_WIDTH-1 generate
@@ -95,7 +98,7 @@ begin
 								
 	-- PC stage															
 	SUBUNIT_PC: entity work.SubunitPC(Behavioral) port map(
-		clk => clk, reset => reset, en => en,			
+		clk => clk, reset => resetSig, en => enSig,			
 		nextAccepting => acceptingOutFetch,
 		frontEvents =>	frontEvents,
 		acceptingOut => acceptingOutPC,
@@ -105,7 +108,7 @@ begin
 		
 	-- Fetch stage		
 	SUBUNIT_FETCH: entity work.SubunitFetch(Behavioral) port map(
-		clk => clk, reset => reset, en => en,
+		clk => clk, reset => resetSig, en => enSig,
 		fetchLockCommand => fetchLockCommand,
 		prevSending => sendingOutPC,	
 		nextAccepting => acceptingOutHbuffer,
@@ -118,7 +121,7 @@ begin
 	
 	-- Hword buffer		
 	SUBUNIT_HBUFFER: entity work.SubunitHbuffer(Behavioral) port map(
-		clk => clk, reset => reset, en => en,
+		clk => clk, reset => resetSig, en => enSig,
 		fetchBlock => fetchBlock,
 		prevSending => sendingOutFetch,	
 		nextAccepting => acceptingOut0,
@@ -131,7 +134,7 @@ begin
 	
 	-- Decode stage		
 	SUBUNIT_DECODE: entity work.SubunitDecode(Behavioral) port map(
-		clk => clk, reset => reset, en => en,
+		clk => clk, reset => resetSig, en => enSig,
 		prevSending => sendingOutHbuffer,	
 		nextAccepting => renameAccepting,
 		frontEvents =>	frontEvents,

@@ -35,17 +35,17 @@ function instructionFromWord(w: word) return InstructionState;
 
 function decodeInstruction(inputState: InstructionState) return InstructionState;
 
--- TEMP?
-function TEMP_branchPredict(ins: InstructionState) return InstructionState;
-
 function decodeMulti(sd: StageDataMulti) return StageDataMulti;
 
+-- How many hwords will be fetched - depends on PC alignment
 function pc2size(pc: Mword; alignBits: natural; capacity: PipeFlow) return PipeFlow;
+
 
 function bufferAHNext(content, newContent: AnnotatedHwordArray; 
 								fetchData: StageDataPC;
 								nFull, nOut, nIn: integer) 
 return AnnotatedHwordArray;
+
 
 function newFromHbuffer(content: AnnotatedHwordArray; fullMask: std_logic_vector)
 return HbuffOutData;
@@ -138,6 +138,7 @@ begin
 	return res;
 end function;	
 
+
 function basicJumpAddress(ins: InstructionState) return Mword is
 begin
 	if ins.controlInfo.branchExecute = '1' then
@@ -186,40 +187,13 @@ begin
 		end if;
 		
 		
+		res.target := (others => '0');
 		-- TEMP!
-		res := setBranchTarget(res); 
+		--res := setBranchTarget(res); 
 		
 	return res;
 end function;
 
-function TEMP_branchPredict(ins: InstructionState) return InstructionState is
-	variable res: InstructionState := ins;
-begin
-	if res.classInfo.branchCond = '1' then
-		res.controlInfo.unseen := '1';	
-	
-		if res.constantArgs.c1 = COND_NONE then -- 'none'; CAREFUL! Use correct codes!
-			-- Jump
-				res.controlInfo.s0Event := '1';
-			res.controlInfo.branchSpeculated := '1'; -- ??
-			res.controlInfo.branchConfirmed := '1'; -- ??
-		elsif res.constantArgs.c1 = COND_Z and res.virtualArgs.s0 = "00000" then -- 'zero'; CAREFUL! ...
-			-- Jump
-				res.controlInfo.s0Event := '1';
-			res.controlInfo.branchSpeculated := '1'; -- ??
-			res.controlInfo.branchConfirmed := '1'; -- ??
-		elsif res.constantArgs.c1 = COND_NZ and res.virtualArgs.s0 /= "00000" then -- 'one'; CAREFUL!...
-			-- No jump!
-		else
-			-- Need to speculate...
-			-- ! src0 should be register other than r0
-			-- Check	if displacement is negative
-			--		TODO	
-		end if;
-	end if;
-	
-	return res;
-end function;
  
 function decodeMulti(sd: StageDataMulti) return StageDataMulti is
 	variable res: StageDataMulti := sd;
@@ -237,26 +211,63 @@ begin
 	ending := slv2u(pc(alignBits-1 downto 0));
 	-- "ending" is eq to num of bytes over aligned PC
 	cap := binFlowNum(capacity);
-	res := i2slv(cap - slv2u(pc(alignBits-1 downto 1)), PipeFlow'length);
+	res := num2flow(cap - slv2u(pc(alignBits-1 downto 1)));
 	return res;
 end function;
+
 
 function bufferAHNext(content, newContent: AnnotatedHwordArray; 
 								fetchData: StageDataPC;
 								nFull, nOut, nIn: integer) 
 return AnnotatedHwordArray is
-	variable temp: AnnotatedHwordArray(0 to content'length + newContent'length - 1) 
-			:= (others => DEFAULT_ANNOTATED_HWORD);	
-	variable res: AnnotatedHwordArray(content'range) 
+	variable res: AnnotatedHwordArray(0 to content'length-1) 
 			:= (others => DEFAULT_ANNOTATED_HWORD);
 	variable newShift: integer := 0; -- CAREFUL! This determines where actual data starts in newContent
+		constant CLEAR_EMPTY_SLOTS_HBUFF: boolean := false;
+		
+		constant MAX_MOVE: natural := newContent'length; -- 2*PIPE_WIDTH;
+	
+	variable tempX: AnnotatedHwordArray(0 to content'length - 1) 
+			:= (others => DEFAULT_ANNOTATED_HWORD);
+	variable tempY: AnnotatedHwordArray(0 to 4*newContent'length - 1) 
+			:= (others => DEFAULT_ANNOTATED_HWORD);
 begin	
-	newShift := slv2u(fetchData.pc(ALIGN_BITS-1 downto 1));				
-	temp(0 to content'length - 1 - nOut) := content(nOut to content'length-1);
-	temp(nFull-nOut to nFull-nOut+nIn-1) := newContent(newShift to newShift + nIn - 1);
-	res := temp(0 to content'length - 1);
+	newShift := slv2u(fetchData.pc(ALIGN_BITS-1 downto 1));					
+		-- For position 'i':
+		-- Y: if taking newContent[y], it must be: nFull + y - newShift = i, so
+		--		y = i + newShift - nFull 
+		-- 	So let's get y := (i + newShift - nFull)
+		-- X: if taking form content[x], it must be: i + nOut = x, so
+		--		x := i + nOut
+		--
+		-- However, for Y: when i is end of queue, it can only take yMax,
+		--					when end-1, it can take {yMax-1, yMax}, etc.
+		-- and for X: x must be smaller than QUEUE_SIZE
+		--
+		-- Selection X vs Y: when nFull-nOut+nIn > i, select X, else select Y
+		--	
+	tempX := content;
+	tempY := newContent & newContent & newContent & newContent;	
+		
+	tempX(0 to content'length-1 - nOut) := tempX(nOut to content'length-1);
+	tempY(0 to content'length-1 - newShift) := 
+		tempY(		(content'length - nFull + nOut) + newShift 
+					to (content'length - nFull + nOut) + content'length-1 );
+	for p in 0 to content'length-1 loop
+		if nFull - nOut > p then
+			res(p) := tempX(p);
+		else
+			res(p) := tempY(p);
+		end if;		
+	end loop;
+	
+	if CLEAR_EMPTY_SLOTS_HBUFF then
+		res(nFull - nOut + nIn to res'length-1) := (others => DEFAULT_ANNOTATED_HWORD);
+	end if;
+		
 	return res;
 end function;
+
 
 function newFromHbuffer(content: AnnotatedHwordArray; fullMask: std_logic_vector)
 return HbuffOutData is
@@ -266,16 +277,25 @@ return HbuffOutData is
 	variable nOut: integer;
 begin
 	for i in 0 to PIPE_WIDTH-1 loop
+		res.data(i).bits := content(i).bits & X"0000"; --content(i+1).bits;
+		res.data(i).basicInfo := content(i).basicInfo;
+	end loop;
+
+	for i in 0 to PIPE_WIDTH-1 loop
 		nOut := PIPE_WIDTH;
 		if (fullMask(j) and content(j).shortIns) = '1' then
 			res.fullMask(i) := '1';
-			res.data(i).bits := content(j).bits & X"0000";
+			res.data(i).bits(31 downto 16) := content(j).bits; -- & content(j+1).bits; --X"0000";
 			res.data(i).basicInfo := content(j).basicInfo;
+				--res.data(i).basicInfo.intLevel(7 downto 2) := "000000";
+				--res.data(i).basicInfo.systemLevel(7 downto 2) := "000000";				
 			j := j + 1;
 		elsif (fullMask(j) and fullMask(j+1)) = '1' then
 			res.fullMask(i) := '1';
 			res.data(i).bits := content(j).bits & content(j+1).bits;
-			res.data(i).basicInfo := content(j).basicInfo;		
+			res.data(i).basicInfo := content(j).basicInfo;	
+				--res.data(i).basicInfo.intLevel(7 downto 2) := "000000";
+				--res.data(i).basicInfo.systemLevel(7 downto 2) := "000000";				
 			j := j + 2;
 		else
 			nOut := i;
@@ -292,15 +312,21 @@ end function;
 function stagePCNext(content, newContent: StageDataPC; 
 							full, sending, receiving: std_logic) return StageDataPC is
 	variable res: StageDataPC := DEFAULT_DATA_PC;
+		constant CLEAR_EMPTY_PC: boolean := false;
 begin
+	-- This may have little or no effect
+	if not CLEAR_EMPTY_PC then
+		res := content; 
+	end if;
+
 	if receiving = '1' then -- take full
 		res := newContent;
 	elsif sending = '1' then -- take empty
-		null; -- default (should neve happen?)
+		null; -- default (should never happen?)
 	else -- stall
 		if full = '1' then
 			res := content;
-		else -- leave it empty
+		else -- leave it
 			null; -- should never happen?
 		end if;
 	end if;	
@@ -315,19 +341,20 @@ begin
 		-- TODO: need more cases to handle exc return and int return etc? Or maybe these are enough?
 		if fe.fromInt = '1' then
 			res.basicInfo.ip := INT_BASE; -- TEMP!
-			res.basicInfo.intLevel := "10000000";	
+			res.basicInfo.intLevel := "00000001";	
 		elsif fe.causing.controlInfo.exception = '1' then
+			-- TODO, FIX: exceptionCode sliced - shift left by ALIGN_BITS? or leave just base address
 			res.basicInfo.ip := EXC_BASE(MWORD_SIZE-1 downto fe.causing.controlInfo.exceptionCode'length)
 									& fe.causing.controlInfo.exceptionCode(
 															fe.causing.controlInfo.exceptionCode'length-1 downto ALIGN_BITS)
 									& EXC_BASE(ALIGN_BITS-1 downto 0);			
-			res.basicInfo.systemLevel := "10000000";
+			res.basicInfo.systemLevel := "00000001";
 		elsif fe.causing.controlInfo.branchExecute = '1' then
 			res.basicInfo.ip := fe.causing.target;
 		elsif fe.causing.controlInfo.branchCancel = '1' then
 			res.basicInfo.ip := fe.causing.result;
 		end if;				
-	else	
+	else	-- Increment by the width of fetch group
 		res.basicInfo.ip := 
 				i2slv(slv2u(content.pcBase(MWORD_SIZE-1 downto ALIGN_BITS)) + 1, MWORD_SIZE - ALIGN_BITS)
 				& i2slv(0, ALIGN_BITS);		
@@ -341,16 +368,21 @@ end function;
 function stageFetchNext(content, newContent: StageDataPC;
 							full, sending, receiving: std_logic) return StageDataPC is
 	variable res: StageDataPC := DEFAULT_DATA_PC;
+		constant CLEAR_EMPTY_FETCH: boolean := false;
 begin
+	if not CLEAR_EMPTY_FETCH then
+		res := content; 
+	end if;
+
 	if receiving = '1' then -- take full
 		res := newContent;
 	elsif sending = '1' then -- take empty
-		null; -- empty, default
+		null;
 	else -- stall
 		if full = '1' then
 			res := content;
 		else
-			null; -- leave it empty
+			null; -- leave it
 		end if;
 	end if;	
 	return res;
@@ -363,8 +395,10 @@ return AnnotatedHwordArray is
 begin
 	for i in 0 to 2*PIPE_WIDTH-1 loop
 		hwordBasicInfo.ip := fetchData.pcBase(MWORD_SIZE-1 downto ALIGN_BITS) & i2slv(2*i, ALIGN_BITS);
+			hwordBasicInfo.intLevel(SMALL_NUMBER_SIZE-1 downto 2) := (others => '0');
+			hwordBasicInfo.systemLevel(SMALL_NUMBER_SIZE-1 downto 2) := (others => '0');			
 		res(i) := (bits => fetchBlock(i),
-					  ip => hwordBasicInfo.ip,
+					  --ip => hwordBasicInfo.ip,
 					  basicInfo => hwordBasicInfo,
 					  shortIns => '0'); -- TEMP!
 	end loop;
@@ -490,7 +524,7 @@ begin
 	else
 		nBytes := 4;
 	end if;	
-	return i2slv( slv2s(ins.basicInfo.ip) + nBytes, MWORD_SIZE);		
+	return i2slv( slv2s(ins.basicInfo.ip) + nBytes, MWORD_SIZE);
 end function;
  
 end ProcLogicFront;

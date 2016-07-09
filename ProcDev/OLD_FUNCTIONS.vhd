@@ -22,10 +22,71 @@ use work.GeneralPipeDev.all;
 
 package OLD_FUNCTIONS is
 
+	subtype PipeStageDataU is InstructionStateArray;	
+	subtype SingleStageData is PipeStageDataU(0 to 0);
+	subtype PipeStageData is PipeStageDataU(0 to PIPE_WIDTH-1);
+
+------------------------------------------------------------------------------------------------
+------------------------------------------------------------------------------------------------
+---- PIPE FLOW CONTROL FUNCTIONS ------
+
+-- If less than all declared can be sent, decides to send nothing
+--	! Based only on total numbers, not positioning
+-- UNUSED
+function TEMP_calcSendingZero(nextAccepting, wantSend: PipeFlow) return PipeFlow;
+
+-- BUFFER: Here capacity/full are interpreted as binary coding, not counting '1'-s!
+--	! Based only on total numbers, not positioning
+-- DEPREC
+function TEMP_calcSendingBuffer(nextAccepting, wantSend: PipeFlow) return PipeFlow;
+-- DEPREC
+function TEMP_calcSendingSimple(nextAccepting, wantSend: std_logic) return std_logic;
+
+-- BUFFER
+-- UNUSED
+function TEMP_stateAfterSendingBuffer(full, sending: PipeFlow) return PipeFlow;
+-- UNUSED
+function TEMP_stateAfterSendingSimple(full, sending: std_logic) return std_logic;
+
+-- UNUSED
+function TEMP_calcAcceptingBuffer(canAccept, capacity, rest: PipeFlow) return PipeFlow;
+-- UNUSED
+function TEMP_calcAcceptingSimple(canAccept, rest: std_logic) return std_logic;
+
+-- UNUSED
+function TEMP_stateAfterReceivingBuffer(full, receiving: PipeFlow) return PipeFlow;
+-- UNUSED
+function TEMP_stateAfterReceivingSimple(full, receiving: std_logic) return std_logic;
+
+-- UNUSED
+procedure TEMP_defaultFlowDeclarations(capacity, full: in PipeFlow; canAccept, wantSend: out PipeFlow);
+----- USED ONLY IN ABOVE FUNCTION!
+function TEMP_defaultCanAccept(capacity, full: in PipeFlow) return PipeFlow;
+function TEMP_defaultWantSend(capacity, full: in PipeFlow) return PipeFlow;
+----------------------------------
+
+--UNUSED
+function TEMP_defaultCanAcceptSimple(full: std_logic) return std_logic;
+-- UNUSED
+function TEMP_defaultWantSendSimple(full: std_logic) return std_logic;
+------------------------------
+--------------------------------------------------------------------------------
+
+
+
+
+
 -- UNUSED				
 function stageIQNext(content, newContent: PipeStageDataU; 
 							sendingMask: std_logic_vector; nFull, nOut, nIn: integer) 
 return PipeStageDataU;
+
+
+-- DONT REMOVE. Reference alg for Hbuffer updating
+function bufferAHNextDefault(content, newContent: AnnotatedHwordArray; 
+								fetchData: StageDataPC;
+								nFull, nOut, nIn: integer) 
+return AnnotatedHwordArray;
 
 -- UNUSED?
 function findReady(arr: InstructionStateArray) return std_logic_vector;
@@ -103,6 +164,134 @@ end OLD_FUNCTIONS;
 
 package body OLD_FUNCTIONS is
 
+--------------------------------
+
+function TEMP_calcSendingZero(nextAccepting, wantSend: PipeFlow) return PipeFlow is
+	variable res: PipeFlow := (others=>'0');
+	variable a, b: natural;
+begin
+	a := binFlowNum(nextAccepting);
+	b := binFlowNum(wantSend);
+	if b > a then
+		b := 0;
+	end if;
+	return num2flow(b);
+end function;
+
+
+function TEMP_calcSendingBuffer(nextAccepting, wantSend: PipeFlow) return PipeFlow is
+	variable res: PipeFlow := (others=>'0');
+	variable a,b: natural;
+begin
+	-- Get minimum of (nextAccepting, wantSend) positive slots
+	a := binFlowNum(nextAccepting);
+	b := binFlowNum(wantSend);
+	if b > a then
+		b := a;
+	end if;
+	return num2flow(b);
+end function;
+
+
+function TEMP_calcSendingSimple(nextAccepting, wantSend: std_logic) return std_logic is
+begin
+	return nextAccepting and wantSend;
+end function;
+
+
+function TEMP_stateAfterSendingBuffer(full, sending: PipeFlow) return PipeFlow is
+	variable res: PipeFlow := (others=>'0');	
+	variable fu, se: integer;
+	variable remaining: integer;	
+begin
+	fu := binFlowNum(full);
+	se := binFlowNum(sending);
+	remaining := fu - se;
+	res := num2flow(remaining);
+	return res;
+end function;
+
+function TEMP_stateAfterSendingSimple(full, sending: std_logic) return std_logic is
+begin
+	--assert (full or not sending) = '1' report "Try to send from empty?" severity warning;
+	return full and not sending;
+end function;
+
+
+function TEMP_calcAcceptingBuffer(canAccept, capacity, rest: PipeFlow) return PipeFlow is
+	variable res: PipeFlow := (others=>'0');
+	variable ca, cap, fu, se: integer;
+	variable remaining, free: integer;
+begin
+	ca := binFlowNum(canAccept);
+	cap := binFlowNum(capacity);
+	-- How many could be inserted?
+	remaining := binFlowNum(rest); --fu - se;
+	free := cap - remaining;
+	-- minimum of 'free' and 'canAccept'
+	if free < ca then
+		ca := free;
+	end if;
+	
+	res := num2flow(ca);
+	return res;
+end function;
+
+
+function TEMP_calcAcceptingSimple(canAccept, rest: std_logic) return std_logic is
+begin
+	return canAccept and not rest;	
+end function;
+
+function TEMP_stateAfterReceivingBuffer(full, receiving: PipeFlow) return PipeFlow is
+	variable res: PipeFlow := (others=>'0');
+	variable re, fu, total: integer;	
+begin
+	re := binFlowNum(receiving);
+	fu := binFlowNum(full);
+	total := fu + re;
+	res := num2flow(total);
+	return res;
+end function;
+
+function TEMP_stateAfterReceivingSimple(full, receiving: std_logic) return std_logic is
+begin
+	--assert (full and receiving) = '0' report "Trying to receive into full slot" severity warning;
+	return full or receiving;
+end function;
+
+
+procedure TEMP_defaultFlowDeclarations(capacity, full: in PipeFlow; canAccept, wantSend: out PipeFlow) is
+begin
+	-- Declare sending whole content and accept whole capacity
+	wantSend := TEMP_defaultWantSend(capacity, full);
+	canAccept := TEMP_defaultCanAccept(capacity, full);	
+end procedure;
+
+function TEMP_defaultCanAccept(capacity, full: in PipeFlow) return PipeFlow is
+begin
+	-- TODO: what about aligning and otherwise normalizing the outputs?
+	return capacity;	
+end function;
+
+function TEMP_defaultWantSend(capacity, full: in PipeFlow) return PipeFlow is
+begin
+	return full;   -- TODO: what about aligning and otherwise normalizing the outputs?
+end function;
+
+
+function TEMP_defaultCanAcceptSimple(full: std_logic) return std_logic is
+begin
+	return '1';
+end function;
+
+function TEMP_defaultWantSendSimple(full: std_logic) return std_logic is
+begin
+	return full;
+end function;
+----------------------------------
+
+
 function stageIQNext(content, newContent: PipeStageDataU; 
 							sendingMask: std_logic_vector; nFull, nOut, nIn: integer) 
 return PipeStageDataU is
@@ -139,6 +328,32 @@ begin
 	end if;
 	return res;
 end function;
+
+
+function bufferAHNextDefault(content, newContent: AnnotatedHwordArray; 
+								fetchData: StageDataPC;
+								nFull, nOut, nIn: integer) 
+return AnnotatedHwordArray is
+	variable temp: AnnotatedHwordArray(0 to content'length + newContent'length - 1) 
+			:= (others => DEFAULT_ANNOTATED_HWORD);	
+	variable res: AnnotatedHwordArray(content'range) 
+			:= (others => DEFAULT_ANNOTATED_HWORD);
+	variable newShift: integer := 0; -- CAREFUL! This determines where actual data starts in newContent
+		constant CLEAR_EMPTY_SLOTS_HBUFF: boolean := false;
+begin	
+	if not CLEAR_EMPTY_SLOTS_HBUFF then
+		--temp(0 to content'length-1) := content;
+		temp := content & newContent;
+	end if;
+
+	newShift := slv2u(fetchData.pc(ALIGN_BITS-1 downto 1));				
+	temp(0 to content'length - 1 - nOut) := content(nOut to content'length-1);
+	temp(nFull-nOut to nFull-nOut+nIn-1) := newContent(newShift to newShift + nIn - 1);		
+	res := temp(0 to content'length - 1);
+	return res;
+end function;
+
+
 
 function findReady(arr: InstructionStateArray) return std_logic_vector is
 	variable res: std_logic_vector(arr'range) := (others=>'0');
@@ -230,7 +445,7 @@ begin
 	
 	-- Check arg value states
 	for i in sd.data'range loop
-		if sd.fullMask(i) = '1' then										-- TODO: change to 'isNonzero'?
+		if sd.fullMask(i) = '1' then
 			if res.data(i).physicalArgs.sel(0) = '1' and res.data(i).physicalArgs.s0 /= "000000" then
 				res.data(i).argValues.missing(0) := '1';
 			end if;
@@ -427,7 +642,6 @@ begin
 	return res;			
 end function;
 
--- TODO: refactor this!
 function frontEvents_OLD(pcData: StageDataPC; fetchData: StageDataPC;--TEMP_StageDataFetch;		
 									--hbufferData: HwordBufferData;
 									stageData0, stageData1: StageDataMulti;

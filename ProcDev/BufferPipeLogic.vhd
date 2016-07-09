@@ -78,9 +78,9 @@ begin
 end Behavioral;
 
 architecture BehavioralDirect of BufferPipeLogic is
-		constant CAP: PipeFlow := num2flow(CAPACITY, false);
-		constant MAX_IN: PipeFlow := num2flow(MAX_INPUT, false);
-		constant MAX_OUT: PipeFlow := num2flow(MAX_OUTPUT, false);
+		constant CAP: PipeFlow := num2flow(CAPACITY);
+		constant MAX_IN: PipeFlow := num2flow(MAX_INPUT);
+		constant MAX_OUT: PipeFlow := num2flow(MAX_OUTPUT);
 
 		signal isNewSig: SmallNumber := (others=>'0');
 		signal fullSig: SmallNumber := (others=>'0');

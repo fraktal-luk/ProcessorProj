@@ -61,6 +61,11 @@ module VerilogALU32(
 	
 	assign {excPre, carryPre, resultPre} = calculate(funcSelect, dataIn0, dataIn1, dataIn2, c0, c1);			
 	
+	initial begin
+		result = 0;
+		carry = 0;
+		exc = 0;
+	end;
 	
 	always @(posedge clk) begin
 		if (allow) begin
@@ -70,15 +75,21 @@ module VerilogALU32(
 		end;
 	end;
 	
-	parameter [5:0] 
-			logicAnd = 4,
-			logicOr = 5,
-			logicXor = 8,
-			
-			arithAdd = 1,
-			arithSub = 2,
-			logicShl = 6,
-			logicShrl = 7,
+	reg [5:0] 
+			logicAnd = 4;
+	reg [5:0]		
+			logicOr = 5;
+	reg [5:0]					
+			logicXor = 8;
+	reg [5:0]		
+			arithAdd = 1;
+	reg [5:0]		
+			arithSub = 2;
+	reg [5:0]		
+			logicShl = 6;
+	reg [5:0]		
+			logicShrl = 7;
+	reg [5:0]		
 			arithShra = 3;
 	
 	// 
@@ -97,37 +108,37 @@ module VerilogALU32(
 		
 		case (funcSel)
 			logicAnd:
-				calculate = {4'b0000, 0, in0 & in1};
+				calculate = {4'b0000, 1'b0, in0 & in1};
 				//calculate[31:0] = in0 & in1;
 			logicOr:
-				calculate = {4'b0000, 0, in0 | in1};
+				calculate = {4'b0000, 1'b0, in0 | in1};
 				//calculate[31:0] = in0 | in1;				
 			logicXor:
-				calculate = {4'b0000, 0, in0 ^ in1};			
+				calculate = {4'b0000, 1'b0, in0 ^ in1};			
 			arithAdd: begin
-				tempResult = {0,in0} + {0,in1};
+				tempResult = {1'b0,in0} + {1'b0,in1};
 				calculate[32:0] = tempResult;
 				ov = (in0[31] == in1[31]) && (in0[31] != tempResult[31]);
 				calculate[36:33] = {3'b0, ov};
 			end
 			arithSub: begin
-				tempResult = {0,in0} - {0,in1};
+				tempResult = {1'b0,in0} - {1'b0,in1};
 				calculate[32:0] = tempResult;
 				ov = (in0[31] != in1[31]) && (in0[31] != tempResult[31]);
 				calculate[36:33] = {3'b0, ov};
 			end
 			
 			logicShl:
-				calculate = {4'b0000, 0, in0 << c0};
+				calculate = {4'b0000, 1'b0, in0 << c0};
 				
 			logicShrl:
-				calculate = {4'b0000, 0, in0 >> c0};
+				calculate = {4'b0000, 1'b0, in0 >> c0};
 
 			arithShra:
-				calculate = {4'b0000, 0, in0 >> c0};
+				calculate = {4'b0000, 1'b0, in0 >> c0};
 
 			default: // Exc: unknown
-				calculate = {4'b1000, 0, 31'b0};
+				calculate = {4'b1000, 1'b0, 31'b0};
 
 		endcase;
 	end;		

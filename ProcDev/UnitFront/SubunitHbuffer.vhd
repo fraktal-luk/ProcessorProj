@@ -64,8 +64,9 @@ entity SubunitHbuffer is
 end SubunitHbuffer;
 
 architecture Behavioral of SubunitHbuffer is
-	signal hbufferDataA, hbufferDataANext: AnnotatedHwordArray(0 to HBUFFER_SIZE-1);
-	signal hbufferDataANew: AnnotatedHwordArray(0 to 2*PIPE_WIDTH-1);	
+	signal hbufferDataA, hbufferDataANext: AnnotatedHwordArray(0 to HBUFFER_SIZE-1)
+			:= (others => DEFAULT_ANNOTATED_HWORD);
+	signal hbufferDataANew: AnnotatedHwordArray(0 to 2*PIPE_WIDTH-1) := (others => DEFAULT_ANNOTATED_HWORD);	
 	
 	signal hbufferDrive: FlowDriveBuffer := (killAll => '0', lockAccept => '0', lockSend => '0',
 																others=>(others=>'0'));
@@ -123,7 +124,7 @@ begin
 	hbufferDrive.nextAccepting <= hbuffOut.nHOut when nextAccepting = '1'
 									else (others=>'0');			
 							
-	hbufferDriveDown.nextAccepting <= num2flow(PIPE_WIDTH, false) when nextAccepting = '1'
+	hbufferDriveDown.nextAccepting <= num2flow(PIPE_WIDTH) when nextAccepting = '1'
 										else 	(others=>'0');	
 	-- CAREFUL! If in future using lockSend for Hbuff, it must be used also here, giving 0 for sending!								
 	hbufferResponseDown.sending <= hbuffOut.nOut when nextAccepting = '1'
@@ -134,7 +135,7 @@ begin
 					'1' when binFlowNum(hbufferResponse.accepting) >= binFlowNum(stageDataIn.nH) else '0';			
 	flowResponseHbuff.sending <= isNonzero(hbufferResponseDown.sending);	
 
-	hbufferDrive.kill <=	num2flow(countOnes(fullMaskHbuffer and partialKillMaskHbuffer), false);
+	hbufferDrive.kill <=	num2flow(countOnes(fullMaskHbuffer and partialKillMaskHbuffer));
 
 	flowDriveHbuff.kill <= frontEvents.affectedVec(2);
 

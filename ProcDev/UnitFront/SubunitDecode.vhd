@@ -67,16 +67,46 @@ architecture Behavioral of SubunitDecode is
 	signal stageData0, stageData0Living, stageData0Next, stageData0New:
 														StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
 
-	signal newDecoded: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
+	signal newDecoded, newDecodedWithTargets: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
 
 	signal flowDrive0: FlowDriveSimple := (others=>'0');	
 	signal flowResponse0: FlowResponseSimple := (others=>'0');	
 	
 	signal stageEvents: StageMultiEventInfo;
 	signal partialKillMask0: std_logic_vector(0 to PIPE_WIDTH-1) := (others=>'0');	
+
+	signal targets: MwordArray(0 to PIPE_WIDTH-1) := (others => (others => '0'));	
+
+	constant EARLY_TARGET_ENABLE: boolean := false;	
 begin	
-	newDecoded <= decodeMulti(stageDataIn);		
-	stageData0New <= newDecoded;
+
+	newDecoded <= decodeMulti(stageDataIn);
+	
+	newDecodedWithTargets.fullMask <= newDecoded.fullMask;
+	
+	CALC_TARGETS: for i in 0 to PIPE_WIDTH-1 generate
+		signal aai0, aai1, aai2: Mword := (others => '0');
+	begin	
+		aai0 <= newDecoded.data(i).basicInfo.ip;
+		aai1 <= newDecoded.data(i).constantArgs.imm;
+		
+		TARGET_ADDER: entity work.VerilogALU32 port map(
+			clk => '0', reset => '0', en => '0', allow => '0',
+			funcSelect => "000001", -- addition
+			dataIn0 => aai0,
+			dataIn1 => aai1,
+			dataIn2 => aai2, -- Ignored
+			c0 => "00000", c1 => "00000", 
+			dataOut0 => open, carryOut => open, exceptionOut => open, 
+			dataOut0Pre => targets(i), carryOutPre => open, exceptionOutPre => open
+		);
+			
+		newDecodedWithTargets.data(i) <= setInstructionTarget(newDecoded.data(i), targets(i));
+																								--targets(i) xor targets(i));
+	end generate;
+	
+	stageData0New <= newDecodedWithTargets when EARLY_TARGET_ENABLE
+					else newDecoded;
 	stageData0Next <= stageMultiNext(stageData0Living, stageData0New,		
 								flowResponse0.living, flowResponse0.sending, flowDrive0.prevSending);				
 	stageData0Living <= stageMultiHandleKill(stageData0, flowDrive0.kill, partialKillMask0);

@@ -25,15 +25,7 @@ package ProcLogicRenaming is
 function baptizeVec(sd: StageDataMulti; tags: SmallNumberArray) 
 return StageDataMulti;
 		
-function getVirtualArgs(insVec: StageDataMulti) return RegNameArray;
-function getVirtualDests(insVec: StageDataMulti) return RegNameArray;
-function getPhysicalDests(insVec: StageDataMulti) return PhysNameArray;
--- Which elements really have a destination, not r0
-function getDestMask(insVec: StageDataMulti) return std_logic_vector;
--- This works on physical arg selection bits, assuming that checking for r0/p0 was done earlier. 
-function getPhysicalDestMask(insVec: StageDataMulti) return std_logic_vector;
-	
-function getExceptionMask(insVec: StageDataMulti) return std_logic_vector;
+
 	
 function renameRegs(insVec: StageDataMulti; takeVec, destMask: std_logic_vector;
 								psVec, pdVec: PhysNameArray; gprTags: SmallNumberArray) 		
@@ -63,66 +55,6 @@ begin
 	return res;
 end function;
 
-function getVirtualArgs(insVec: StageDataMulti) return RegNameArray is
-	variable res: RegNameArray(0 to 3*insVec.fullMask'length-1) := (others=>(others=>'0'));
-begin
-	for i in insVec.fullMask'range loop
-		res(3*i+0) := insVec.data(i).virtualArgs.s0;
-		res(3*i+1) := insVec.data(i).virtualArgs.s1;
-		res(3*i+2) := insVec.data(i).virtualArgs.s2;
-	end loop;
-	return res;
-end function;
-
-function getVirtualDests(insVec: StageDataMulti) return RegNameArray is
-	variable res: RegNameArray(0 to insVec.fullMask'length-1) := (others=>(others=>'0'));
-begin
-	for i in insVec.fullMask'range loop
-		res(i) := insVec.data(i).virtualDestArgs.d0;
-	end loop;
-	return res;
-end function;		
-
-function getPhysicalDests(insVec: StageDataMulti) return PhysNameArray is
-	variable res: PhysNameArray(0 to insVec.fullMask'length-1) := (others=>(others=>'0'));
-begin
-	for i in insVec.fullMask'range loop
-		res(i) := insVec.data(i).physicalDestArgs.d0;
-	end loop;
-	return res;
-end function;
-
-
-function getDestMask(insVec: StageDataMulti) return std_logic_vector is
-	variable res: std_logic_vector(insVec.fullMask'range) := (others=>'0');
-begin
-	for i in insVec.fullMask'range loop
-		res(i) := insVec.fullMask(i) 
-				and insVec.data(i).virtualDestArgs.sel(0) 
-				and isNonzero(insVec.data(i).virtualDestArgs.d0);
-	end loop;			
-	return res;
-end function;
-
-function getPhysicalDestMask(insVec: StageDataMulti) return std_logic_vector is
-	variable res: std_logic_vector(insVec.fullMask'range) := (others=>'0');
-begin
-	for i in insVec.fullMask'range loop
-		res(i) := insVec.fullMask(i) 
-				and insVec.data(i).physicalDestArgs.sel(0);
-	end loop;			
-	return res;
-end function;
-
-function getExceptionMask(insVec: StageDataMulti) return std_logic_vector is
-	variable res: std_logic_vector(insVec.fullMask'range) := (others=>'0');
-begin
-	for i in insVec.fullMask'range loop
-		res(i) := insVec.fullMask(i) 
-				and insVec.data(i).controlInfo.exception;
-	end loop;			
-	return res;
-end function;
 
 
 function renameRegs(insVec: StageDataMulti; takeVec, destMask: std_logic_vector;
@@ -132,7 +64,7 @@ return StageDataMulti is
 	variable k: natural := 0;					
 begin
 	for i in insVec.fullMask'range loop		
-			res.data(i).gprTag := gprTags(i); -- ???
+		res.data(i).gprTag := gprTags(i); -- ???
 		res.data(i).physicalArgs.sel := res.data(i).virtualArgs.sel;
 		res.data(i).physicalArgs.s0 := psVec(3*i+0);	
 		res.data(i).physicalArgs.s1 := psVec(3*i+1);			

@@ -62,10 +62,24 @@ end DispatchTagMatcher;
 
 
 architecture Behavioral of DispatchTagMatcher is
-	signal nextResultTags: PhysNameArray(0 to N_RES_TAGS-1) := (others => (others => '0'));
+	signal nextResultTags: PhysNameArray(0 to N_NEXT_RES_TAGS-1) := (others => (others => '0'));
+	signal zrt: PhysNameArray(0 to 3) := (others => (others => '0'));
+--	signal resultTags2: PhysNameArray(0 to N_RES_TAGS-1) := (others => (others => '0'));	
 begin
-	ai <= getForwardingStatusInfo(dispatchData.argValues, dispatchData.physicalArgs, 
-														vals, resultTags, nextResultTags);
-
+--	ai <= getForwardingStatusInfoD(dispatchData.argValues, dispatchData.physicalArgs, 
+--														vals,--(0 to 3), 
+--														resultTags, 
+--														nextResultTags,
+--															--resultTags(0 to 3),
+--														N_RES_TAGS);
+--														--4);
+														
+	ai <= getForwardingStatusInfoD2(dispatchData.argValues, dispatchData.physicalArgs, 
+														vals, vals, vals, 
+														resultTags(0 to 3), resultTags(0 to 3), resultTags(0 to 3), 
+														nextResultTags,
+															--resultTags(0 to 3),
+														N_RES_TAGS);
+														--4);														
 end Behavioral;
 

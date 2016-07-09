@@ -42,8 +42,8 @@ entity PipeStageLogicSimple is
            reset : in  STD_LOGIC;
            en : in  STD_LOGIC;
 			  
-					lockAccept: in std_logic;
-					lockSend: in std_logic;				  
+			  lockAccept: in std_logic;
+			  lockSend: in std_logic;				  
 			  kill: in std_logic;
 			  
            prevSending : in  std_logic;
@@ -78,18 +78,18 @@ architecture Behavioral of PipeStageLogicSimple is
 		signal afterSending: std_logic := '0';
 		signal afterReceiving: std_logic := '0';	
 begin
-		livingSig <= fullSig and not kill; -- TODO: fix killing mechanism!
+		livingSig <= fullSig and not kill; -- CHECK: killing mechanism correct?
 
-		canAccept <= not lockAccept; -- TEMP_defaultCanAcceptSimple(livingSig);
-		wantSend <= livingSig and not lockSend; -- TEMP_defaultWantSendSimple(livingSig);
+		canAccept <= not lockAccept;
+		wantSend <= livingSig and not lockSend;
 		
 		-- Determine what will be sent
-		sendingSig <= TEMP_calcSendingSimple(nextAccepting, wantSend);
-		afterSending <= TEMP_stateAfterSendingSimple(livingSig, sendingSig);
+		sendingSig <= nextAccepting and wantSend;
+		afterSending <= livingSig and not sendingSig;
 
 		-- Determine what will be received
-		acceptingSig <= TEMP_calcAcceptingSimple(canAccept, afterSending);	
-		afterReceiving <= TEMP_stateAfterReceivingSimple(afterSending, prevSending);
+		acceptingSig <= canAccept and not afterSending;	
+		afterReceiving <= afterSending or prevSending;
 				
 		CLOCKED: process(clk)
 		begin

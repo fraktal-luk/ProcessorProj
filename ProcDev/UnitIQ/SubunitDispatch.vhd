@@ -79,7 +79,7 @@ architecture Behavioral of SubunitDispatch is
 			signal dispatchDataUpdated_N: InstructionState := defaultInstructionState;
 			
 	signal asDispatch: ArgStatusStruct;		
-			
+		constant dummyReadyRegs: std_logic_vector(0 to 2) := (others => '0');
 begin	
 	acceptingOut <= flowResponseDispatch.accepting;
 	flowDriveDispatch.prevSending <= prevSending;
@@ -93,44 +93,19 @@ begin
 		end if;
 	end process;
 	
-	dispatchDataNext <= stageSimpleNext(dispatchDataUpdated, stageDataIn, --dataASel(0),
+	dispatchDataNext <= stageSimpleNext(dispatchDataUpdated, stageDataIn,
 														flowResponseDispatch.living,
 														flowResponseDispatch.sending, 
 														flowDriveDispatch.prevSending);
-
---		physSourcesDispatch <= (dispatchData.physicalArgs.s0,
---										dispatchData.physicalArgs.s1,
---										dispatchData.physicalArgs.s2);
---		missingDispatch <= dispatchData.argValues.missing;	
-	
---			aiDispatch <= getForwardingStatusInfo(dispatchData.argValues, dispatchData.physicalArgs, 
---														dummyVals, resultTags, nextResultTags);
---			scalComp <= '1' when ai_C = aiDispatch else '0';
-		
---			ai_N <= getArgumentStatusInfo(missingDispatch, physSourcesDispatch, readyRegs,
---													resultTags, nextResultTags, dummyVals);	
-	-- Finding ready args
---		aiDispatch <= getForwardingStatusInfo2(missingDispatch, physSourcesDispatch, 
---														dummyVals, resultTags, nextResultTags);														
-	
-	-- Filling ready args														
-				dispatchArgsUpdated <= updateArgValues(	
-							dispatchData.argValues, dispatchData.physicalArgs, ai.ready, ai.vals);												
+												
 	-- Info about readiness now
-	asDispatch <= getArgStatus(ai, "000", "000",		
+	asDispatch <= getArgStatus(ai,		
 				-- CAREFUL! "'1' or" below is to look like prev version of send locking					
-				'1' or flowResponseDispatch.living, "000");	
+				'1' or flowResponseDispatch.living, dummyReadyRegs);	
 
-
-
-	dispatchDataUpdated <= updateInstructionArgValues(dispatchData, dispatchArgsUpdated);					
+	dispatchDataUpdated <= updateInstructionArgValues2(dispatchData, ai);
 	-- Don't allow exec if args somehow are not actualy ready!		
 	flowDriveDispatch.lockSend <= not asDispatch.readyAll;
-	
---			dispatchDataUpdated <= updateInstructionArgs(dispatchData, ai_N);
---			flowDriveDispatch.lockSend <= not ai_N.allReady;
-	
-	
 	
 	-- Dispatch pipe logic
 	SIMPLE_SLOT_LOGIC_DISPATCH_A: SimplePipeLogic port map(

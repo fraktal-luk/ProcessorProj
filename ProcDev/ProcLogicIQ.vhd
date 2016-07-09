@@ -23,52 +23,57 @@ use work.GeneralPipeDev.all;
 package ProcLogicIQ is				
 		
 function extractPhysSources(data: InstructionStateArray) return PhysNameArray;
+
+function extractPhysS0(data: InstructionStateArray) return PhysNameArray;
+function extractPhysS1(data: InstructionStateArray) return PhysNameArray;
+function extractPhysS2(data: InstructionStateArray) return PhysNameArray;
+
 function extractMissing(data: InstructionStateArray) return std_logic_vector;		
-		
-function extractReadyRegBits(bits: std_logic_vector; data: InstructionStateArray)
-return std_logic_vector;
-		
+
+function extractMissing0(data: InstructionStateArray) return std_logic_vector;		
+function extractMissing1(data: InstructionStateArray) return std_logic_vector;		
+function extractMissing2(data: InstructionStateArray) return std_logic_vector;		
+				
 -- Get inputs form registers and immediate value
 function getIssueArgValues(pa: InstructionPhysicalArgs; ca: InstructionConstantArgs;
 									ready: std_logic_vector; vals: MwordArray)
 return InstructionArgValues;
 
 -- get args still missing (used while waiting for issue, possibly in the cycle when going to Exec)
-function updateArgValues(av: InstructionArgValues; pa: InstructionPhysicalArgs; ready: std_logic_vector;
+function updateArgValues(av: InstructionArgValues; --pa: InstructionPhysicalArgs;
+								ready: std_logic_vector;
 								vals: MwordArray) 
 return InstructionArgValues; 
 
-function updateInstructionArgValues(ins: InstructionState; av: InstructionArgValues) 
-return InstructionState;	
+function updateInstructionArgValues2(ins: InstructionState; ai: ArgStatusInfo) 
+return InstructionState;
 
-procedure findForwardingSourcesWithNext(av: in InstructionArgValues; pa: in InstructionPhysicalArgs; 
-										tags: in PhysNameArray; content: in MwordArray;
-										nextTags: in PhysNameArray;
-										stored: out std_logic_vector;
-										ready: out std_logic_vector; locs: out SmallNumberArray;
-										nextReady: out std_logic_vector; nextLocs: out SmallNumberArray;											
-										vals: out MwordArray);																						
-
-function getForwardingStatusInfo(av: in InstructionArgValues; pa: in InstructionPhysicalArgs; 
+function getForwardingStatusInfoD(av: in InstructionArgValues; pa: in InstructionPhysicalArgs; 
 										 content: in MwordArray;--fn: ForwardingNetwork
-										tags, nextTags: in PhysNameArray) return ArgStatusInfo;
+										tags, nextTags: in PhysNameArray; nResultTags: integer) return ArgStatusInfo;
 
-function getArgInfoArray(data: InstructionStateArray; vals: MwordArray; 
-										resultTags, nextTags: PhysNameArray)	
+function getArgInfoArrayD(data: InstructionStateArray; vals: MwordArray; 
+										resultTags, nextTags: PhysNameArray; nResultTags: integer)	
 return ArgStatusInfoArray;	
 
-function getForwardingStatusInfo2(missing: std_logic_vector; pn: PhysNameArray; 
-										 content: in MwordArray;--fn: ForwardingNetwork
-										tags, nextTags: in PhysNameArray) return ArgStatusInfo;
-function getArgInfoArray2(physSources: PhysNameArray; missing: std_logic_vector; vals: MwordArray; 
-										resultTags, nextTags: PhysNameArray)
+
+function getForwardingStatusInfoD2(av: in InstructionArgValues; pa: in InstructionPhysicalArgs; 
+										content0, content1, content2: in MwordArray;--fn: ForwardingNetwork
+										tags0, tags1, tags2, 
+										nextTags: in PhysNameArray; nResultTags: integer) return ArgStatusInfo;
+
+function getArgInfoArrayD2(data: InstructionStateArray; 
+										content0, content1, content2: in MwordArray;--fn: ForwardingNetwork
+										tags0, tags1, tags2, 
+										nextTags: PhysNameArray; nResultTags: integer)
 return ArgStatusInfoArray;
+
 	
 -- True if all args are ready
 function readyForExec(ins: InstructionState) return std_logic;
 
 function getArgStatus(ai: ArgStatusInfo;
-							 missing, uMissing: std_logic_vector(0 to 2);								 
+							 --missing, uMissing: std_logic_vector(0 to 2);								 
 							 living: std_logic;
 							 readyRegs: std_logic_vector)
 return ArgStatusStruct;	
@@ -83,15 +88,8 @@ return InstructionStateArray;
 
 function extractReadyMask(asA: ArgStatusStructArray) return std_logic_vector;	
 
--- DEPREC
-function iqStep(dataLiving: InstructionStateArray; dataNew: StageDataMulti; 
-					 fullMask, readyMask: std_logic_vector;
-					 nextAccepting: std_logic;						 
-					 living, sending, prevSending: integer;
-					 prevSendingOK: std_logic)					 
-return IQStepData;
 
-function iqContentNext(queueData: InstructionStateArray; dataNew: StageDataMulti; 
+function iqContentNext2(queueData: InstructionStateArray; dataNew: StageDataMulti; 
 								 fullMask, readyMask: std_logic_vector;
 								 nextAccepting: std_logic;
 								 living, sending, prevSending: integer;
@@ -120,6 +118,35 @@ begin
 	return res;
 end function;	
 	
+function extractPhysS0(data: InstructionStateArray) return PhysNameArray is
+	variable res: PhysNameArray(0 to data'length-1) := (others => (others => '0'));
+begin
+	for i in data'range loop
+		res(i) := data(i).physicalArgs.s0;		
+	end loop;
+	return res;
+end function;		
+
+function extractPhysS1(data: InstructionStateArray) return PhysNameArray is
+	variable res: PhysNameArray(0 to data'length-1) := (others => (others => '0'));
+begin
+	for i in data'range loop
+		res(i) := data(i).physicalArgs.s1;		
+	end loop;
+	return res;
+end function;		
+
+function extractPhysS2(data: InstructionStateArray) return PhysNameArray is
+	variable res: PhysNameArray(0 to data'length-1) := (others => (others => '0'));
+begin
+	for i in data'range loop
+		res(i) := data(i).physicalArgs.s2;		
+	end loop;
+	return res;
+end function;		
+
+
+	
 function extractMissing(data: InstructionStateArray) return std_logic_vector is
 	variable res: std_logic_vector(0 to 3*data'length-1) := (others => '0');
 begin
@@ -130,19 +157,35 @@ begin
 	end loop;
 	return res;
 end function;	
-	
-	
-function extractReadyRegBits(bits: std_logic_vector; data: InstructionStateArray)
-return std_logic_vector is
-	variable res: std_logic_vector(0 to 3*data'length-1) := (others => '0'); -- 31) := (others=>'0');
+
+function extractMissing0(data: InstructionStateArray) return std_logic_vector is
+	variable res: std_logic_vector(0 to data'length-1) := (others => '0');
 begin
-	for i in 0 to data'length-1 loop
-		res(3*i + 0) := bits(slv2u(data(i).physicalArgs.s0));
-		res(3*i + 1) := bits(slv2u(data(i).physicalArgs.s1));
-		res(3*i + 2) := bits(slv2u(data(i).physicalArgs.s2));					
-	end loop;		
+	for i in data'range loop
+		res(i) := data(i).argValues.missing(0);
+	end loop;
 	return res;
-end function;	
+end function;
+
+function extractMissing1(data: InstructionStateArray) return std_logic_vector is
+	variable res: std_logic_vector(0 to data'length-1) := (others => '0');
+begin
+	for i in data'range loop
+		res(i) := data(i).argValues.missing(1);
+	end loop;
+	return res;
+end function;
+	
+function extractMissing2(data: InstructionStateArray) return std_logic_vector is
+	variable res: std_logic_vector(0 to data'length-1) := (others => '0');
+begin
+	for i in data'range loop
+		res(i) := data(i).argValues.missing(2);
+	end loop;
+	return res;
+end function;
+
+
 	
 -- Get inputs form registers and immediate value
 function getIssueArgValues(pa: InstructionPhysicalArgs; ca: InstructionConstantArgs;
@@ -185,7 +228,7 @@ begin
 end function;
 
 -- get args still missing (used while waiting for issue, possibly in the cycle when going to Exec)
-function updateArgValues(av: InstructionArgValues; pa: InstructionPhysicalArgs;
+function updateArgValues(av: InstructionArgValues; -- pa: InstructionPhysicalArgs;
 									ready: std_logic_vector; vals: MwordArray) 
 return InstructionArgValues is
 	variable res: InstructionArgValues := av;
@@ -194,12 +237,12 @@ begin
 		res.missing(0) := '0';
 		res.arg0 := vals(0);
 	end if;
-
+		--return res;
 	if (res.missing(1) and ready(1)) = '1' then
 		res.missing(1) := '0';
 		res.arg1 := vals(1);
 	end if;
-
+		--		return res;
 	if (res.missing(2) and ready(2)) = '1' then
 		res.missing(2) := '0';
 		res.arg2 := vals(2);
@@ -208,38 +251,49 @@ begin
 	return res;
 end function;	
 
-function updateInstructionArgValues(ins: InstructionState; av: InstructionArgValues) 
+										
+function updateInstructionArgValues2(ins: InstructionState; ai: ArgStatusInfo) 
 return InstructionState is
 	variable res: InstructionState := ins;
 begin
-	res.argValues := av;
+	if (ins.argValues.missing(0) and ai.ready(0)) = '1' then
+		res.argValues.missing(0) := '0';
+		res.argValues.arg0 := ai.vals(0);
+	end if;		
+		--return res;
+	if (ins.argValues.missing(1) and ai.ready(1)) = '1' then
+		res.argValues.missing(1) := '0';
+		res.argValues.arg1 := ai.vals(1);
+	end if;
+		--		return res;
+	if (ins.argValues.missing(2) and ai.ready(2)) = '1' then
+		res.argValues.missing(2) := '0';
+		res.argValues.arg2 := ai.vals(2);
+	end if;
+	
 	return res;
 end function;
-										
-										
-procedure findForwardingSourcesWithNext(av: in InstructionArgValues; pa: in InstructionPhysicalArgs; 
-										tags: in PhysNameArray; content: in MwordArray;
-										nextTags: in PhysNameArray;
-										stored: out std_logic_vector;
-										ready: out std_logic_vector; locs: out SmallNumberArray;
-										nextReady: out std_logic_vector; nextLocs: out SmallNumberArray;											
-										vals: out MwordArray)
-is
-	--variable res: SmallNumberArray(0 to 2) := (others=>(others=>'0'));
+
+
+function getForwardingStatusInfoD(av: in InstructionArgValues; pa: in InstructionPhysicalArgs; 
+										 content: in MwordArray;--fn: ForwardingNetwork
+										tags, nextTags: in PhysNameArray; nResultTags: integer) return ArgStatusInfo
+is		
+	variable stored, ready, nextReady: std_logic_vector(0 to 2) := (others=>'0');
+	variable locs, nextLocs: SmallNumberArray(0 to 2) := (others=>(others=>'0'));
+	variable vals: MwordArray(0 to 2) := (others=>(others=>'0'));
+	variable res: ArgStatusInfo;
 begin
-	stored := not av.missing;
-	ready := "000";
-	locs := (others=>(others=>'0'));
-	vals := (others=>(others=>'0'));
-	nextReady := "000";
-	nextLocs := (others=>(others=>'0'));		
+	stored := not av.missing;	
 	
 	-- Find where tag agrees with s0
-	for i in tags'range loop -- CAREFUL! Is this loop optimal for muxing?		
+	for i in --tags'range loop -- CAREFUL! Is this loop optimal for muxing?
+				--0 to nResultTags-1 loop
+				nResultTags-1 downto 0 loop
 			-- CAREFUL! showing only nonzero tags (p0 never needs lookup)
-			if isNonzero(tags(i)) = '0' then
-				next;
-			end if;		
+--			if isNonzero(tags(i)) = '0' then
+--				next;
+--			end if;		
 		if tags(i) = pa.s0 then
 			ready(0) := '1';
 			locs(0) := i2slv(i, SMALL_NUMBER_SIZE);
@@ -259,9 +313,9 @@ begin
 	
 	for i in nextTags'range loop
 			-- CAREFUL
-			if isNonzero(nextTags(i)) = '0' then
-				next;
-			end if;		
+--			if isNonzero(nextTags(i)) = '0' then
+--				next;
+--			end if;		
 		if nextTags(i) = pa.s0 then
 			nextReady(0) := '1';
 			nextLocs(0) := i2slv(i, SMALL_NUMBER_SIZE);
@@ -276,105 +330,121 @@ begin
 		end if;			
 	end loop;
 	
-end procedure;	
+	res.stored := stored;
+	res.ready := ready;
+	res.locs := locs;
+	res.vals := vals;
+	res.nextReady := nextReady;
+	res.nextLocs := nextLocs;
 	
+	return res;								
+end function;
 
-function getForwardingStatusInfo(av: in InstructionArgValues; pa: in InstructionPhysicalArgs; 
-										 content: in MwordArray;--fn: ForwardingNetwork
-										tags, nextTags: in PhysNameArray) return ArgStatusInfo
-is		
-	variable stored, ready, nextReady: std_logic_vector(0 to 2) := (others=>'0');
-	variable locs, nextLocs: SmallNumberArray(0 to 2) := (others=>(others=>'0'));
-	variable vals: MwordArray(0 to 2) := (others=>(others=>'0'));
-begin
-	findForwardingSourcesWithNext(av, pa, 
-									tags,	content,
-									nextTags,
-									stored,	
-									ready, locs,
-									nextReady, nextLocs,
-									vals);
-	return (stored, ready, locs, vals,		nextReady, nextLocs);								
-end function;	
 
-function getArgInfoArray(data: InstructionStateArray; vals: MwordArray; 
-										resultTags, nextTags: PhysNameArray)
+function getArgInfoArrayD(data: InstructionStateArray; vals: MwordArray; 
+										resultTags, nextTags: PhysNameArray; nResultTags: integer)
 return ArgStatusInfoArray is
 	variable res: ArgStatusInfoArray(data'range);
 begin
 	for i in res'range loop
-		res(i) := getForwardingStatusInfo(data(i).argValues, data(i).physicalArgs, vals, 
-					resultTags, nextTags);
+		res(i) := getForwardingStatusInfoD(data(i).argValues, data(i).physicalArgs, vals, 
+					resultTags, nextTags, nResultTags);
 	end loop;
 	
 	return res;
 end function;
 
 
-function getForwardingStatusInfo2(missing: std_logic_vector; pn: PhysNameArray; 
-										 content: in MwordArray;--fn: ForwardingNetwork
-										tags, nextTags: in PhysNameArray) return ArgStatusInfo
+function getForwardingStatusInfoD2(av: in InstructionArgValues; pa: in InstructionPhysicalArgs; 
+										content0, content1, content2: in MwordArray;--fn: ForwardingNetwork
+										tags0, tags1, tags2, 
+										nextTags: in PhysNameArray; nResultTags: integer) return ArgStatusInfo
 is		
 	variable stored, ready, nextReady: std_logic_vector(0 to 2) := (others=>'0');
 	variable locs, nextLocs: SmallNumberArray(0 to 2) := (others=>(others=>'0'));
 	variable vals: MwordArray(0 to 2) := (others=>(others=>'0'));
-	variable av: InstructionArgValues := defaultArgValues;
-	variable pa: InstructionPhysicalArgs := defaultPhysicalArgs;
+	variable res: ArgStatusInfo;
 begin
-	av.missing := missing(0 to 2);
-	pa.s0 := pn(0);
-	pa.s1 := pn(1);
-	pa.s2 := pn(2);
-	findForwardingSourcesWithNext(av, pa, 
-									tags,	content,
-									nextTags,
-									stored,	
-									ready, locs,
-									nextReady, nextLocs,
-									vals);
-	return (stored, ready, locs, vals,		nextReady, nextLocs);								
-end function;	
+	stored := not av.missing;	
+	
+	-- Find where tag agrees with s0
+	for i in tags0'length-1 downto 0 loop		
+		if tags0(i) = pa.s0 then
+			ready(0) := '1';
+			locs(0) := i2slv(i, SMALL_NUMBER_SIZE);
+			vals(0) := content0(i);
+		end if;
+	end loop;
+		
+	for i in tags1'length-1 downto 0 loop				
+		if tags1(i) = pa.s1 then
+			ready(1) := '1';
+			locs(1) := i2slv(i, SMALL_NUMBER_SIZE);
+			vals(1) := content1(i);
+		end if;
+	end loop;		
+		
+	for i in tags2'length-1 downto 0 loop				
+		if tags2(i) = pa.s2 then
+			ready(2) := '1';
+			locs(2) := i2slv(i, SMALL_NUMBER_SIZE);
+			vals(2) := content2(i);
+		end if;
+	end loop;
+	
+	for i in nextTags'range loop
+			-- CAREFUL
+--			if isNonzero(nextTags(i)) = '0' then
+--				next;
+--			end if;		
+		if nextTags(i) = pa.s0 then
+			nextReady(0) := '1';
+			nextLocs(0) := i2slv(i, SMALL_NUMBER_SIZE);
+		end if;
+		if nextTags(i) = pa.s1 then
+			nextReady(1) := '1';
+			nextLocs(1) := i2slv(i, SMALL_NUMBER_SIZE);
+		end if;
+		if nextTags(i) = pa.s2 then
+			nextReady(2) := '1';
+			nextLocs(2) := i2slv(i, SMALL_NUMBER_SIZE);
+		end if;			
+	end loop;
+	
+	res.stored := stored;
+	res.ready := ready;
+	res.locs := locs;
+	res.vals := vals;
+	res.nextReady := nextReady;
+	res.nextLocs := nextLocs;
+	
+	return res;								
+end function;
 
-function getArgInfoArray2(physSources: PhysNameArray; missing: std_logic_vector; vals: MwordArray; 
-										resultTags, nextTags: PhysNameArray)
+function getArgInfoArrayD2(data: InstructionStateArray; 
+										content0, content1, content2: in MwordArray;--fn: ForwardingNetwork
+										tags0, tags1, tags2, 
+										nextTags: PhysNameArray; nResultTags: integer)
 return ArgStatusInfoArray is
-	variable res: ArgStatusInfoArray(0 to missing'length/3 - 1);
-	variable m: std_logic_vector(0 to 2) := "000";
-	variable p: PhysNameArray(0 to 2) := (others => (others => '0')); 
+	variable res: ArgStatusInfoArray(data'range);
 begin
 	for i in res'range loop
-		m := missing(3*i to 3*i + 2);
-		p := physSources(3*i to 3*i + 2);
-		res(i) := getForwardingStatusInfo2(m, p, vals, 
-					resultTags, nextTags);
+		res(i) := getForwardingStatusInfoD2(data(i).argValues, data(i).physicalArgs,
+														content0, content1, content2, 
+														tags0, tags1, tags2,
+														nextTags, nResultTags);
 	end loop;
 	
 	return res;
 end function;
 
-	
-	
-
-
-function readyForExec(ins: InstructionState) return std_logic is
-	variable res: std_logic;
-begin
-	if ins.argValues.missing = "000" then
-		res := '1';
-	else
-		res := '0';
-	end if;	
-	return res;
-end function;												
 
 
 function getArgStatus(ai: ArgStatusInfo;
-							 missing, uMissing: std_logic_vector(0 to 2);
+							 --missing, uMissing: std_logic_vector(0 to 2);
 							 living: std_logic;
 							 readyRegs: std_logic_vector)
 return ArgStatusStruct is
-	--constant missing: std_logic_vector(0 to 2) := missing; -- data.argValues.missing;
-	--constant uMissing: std_logic_vector(0 to 2) := uMissing; -- dataUpdated.argValues.missing;
 	variable res: ArgStatusStruct;
 begin
 	res.ready := ai.ready;
@@ -382,18 +452,14 @@ begin
 	res.vals := ai.vals;
 	res.readyNext := ai.nextReady;
 	
-	-- NOTE: 'missing' will be 'not ai.stored' 		
 	res.missing := not ai.stored;
-		--	res.C_missing := missing; 
-							--assert res.missing /= not ai.stored report "123" severity error;
+
 	res.readyReg := readyRegs;
 	res.readyNow := res.ready;
 	
 	-- NOTE: 'stillMissing' will be 'missing and not readyNow (??and not readyRegs??)'
 	res.stillMissing := res.missing and not res.readyNow;
-		--	res.C_stillMissing := uMissing;
-				--assert res.stillMissing /= (res.missing and not res.readyNow) report "456" severity error;										
-								
+			
 	res.nextMissing := res.stillMissing and not res.readyNext and not res.readyReg;
 	res.nMissing :=  countOnes(res.missing);
 	res.nMissingNext := countOnes(res.nextMissing);
@@ -403,7 +469,7 @@ begin
 	return res;
 end function;
 	
-								
+	
 function getArgStatusArray(aiA: ArgStatusInfoArray;
 									livingMask: std_logic_vector;
 									readyRegs: std_logic_vector)
@@ -411,23 +477,36 @@ return ArgStatusStructArray is
 	variable res: ArgStatusStructArray(livingMask'range);
 begin
 	for i in res'range loop
-		res(i) := getArgStatus(aiA(i), "000", "000", livingMask(i), readyRegs(3*i to 3*i + 2)); --,
+		res(i) := getArgStatus(aiA(i), livingMask(i), readyRegs(3*i to 3*i + 2)); --,
 	end loop;
 	
 	return res;
 end function;	
+
 
 function updateIQData(data: InstructionStateArray; aiArray: ArgStatusInfoArray)
 return InstructionStateArray is
 	variable res: InstructionStateArray(data'range);
 begin
 	for i in res'range loop
-		res(i) := updateInstructionArgValues(data(i),
-			updateArgValues(data(i).argValues, data(i).physicalArgs, aiArray(i).ready, aiArray(i).vals));
+		res(i) := updateInstructionArgValues2(data(i), aiArray(i));
 	end loop;
 
 	return res;
 end function;
+
+
+function readyForExec(ins: InstructionState) return std_logic is
+	variable res: std_logic;
+begin
+	if --ins.argValues.missing = "000" then
+		isNonzero(ins.argValues.missing) = '0' then
+		res := '1';
+	else
+		res := '0';
+	end if;	
+	return res;
+end function;	
 
 function extractReadyMask(asA: ArgStatusStructArray) return std_logic_vector is
 	variable res: std_logic_vector(asA'range);
@@ -439,72 +518,8 @@ begin
 	return res;
 end function;
 
-	
-function iqStep(dataLiving: InstructionStateArray; dataNew: StageDataMulti; 
-					 fullMask, readyMask: std_logic_vector;
-					 nextAccepting: std_logic;
-					 living, sending, prevSending: integer;
-					 prevSendingOK: std_logic)
-return IQStepData is
-	constant LEN: natural := dataLiving'length;
-	variable res: IQStepData;
-	variable i, j: integer;
-begin
-	res.sends := '0';	
-	res.iqDataNext := (others=>defaultInstructionState);
-	res.iqFullMaskNext := (others=>'0');
-	res.dispatchDataNew := defaultInstructionState;
-	-- CAREFUL: avoid errors at undefined vales:
-	if dataLiving'length > IQ_A_SIZE then
-		return res;
-	end if;		
-	
-	i := 0;
-	-- Copy what's before first ready
-	while 			(fullMask(i) 
-			and not (readyMask(i) and nextAccepting)) = '1' loop
-					-- CAREFUL: never allow shifting subsequent ops into slot which wants to send
-								-- when it can't because next stage doesn't allow!
-		res.iqDataNext(i) := dataLiving(i);
-		res.iqFullMaskNext(i) := '1';			
-		i := i + 1;
-		if i >= LEN then
-			return res;
-		end if;
-	end loop;
-	-- Now we have (or don't have) first ready
-	if (readyMask(i) and nextAccepting) = '1' then
-		res.dispatchDataNew := dataLiving(i);
-		res.sends := '1';
-	end if;
-			
-	-- Are there more full slots after first ready?
-	for k in 0 to LEN-2 loop
-		if k >= i and fullMask(k+1) = '1' then
-			-- CAREFUL: this should never happen if sending is blocked, cause we'd overwrite the instruction!
-			res.iqDataNext(i) := dataLiving(i+1);
-			res.iqFullMaskNext(i) := '1';
-			i := i + 1;				
-		end if;
-	end loop;	
 
-	-- Now copy new input
-	-- if prevSending = 0 then
-	if prevSendingOK = '0' then
-		return res;
-	end if;
-	j := 0;
-	while i < LEN and j < PIPE_WIDTH and dataNew.fullMask(j) = '1' loop
-		res.iqDataNext(i) := dataNew.data(j);
-		res.iqFullMaskNext(i) := '1';
-		i := i + 1;
-		j := j + 1;
-	end loop;
-	return res;
-end function;
-
-
-function iqContentNext(queueData: InstructionStateArray; dataNew: StageDataMulti; 
+function iqContentNext2(queueData: InstructionStateArray; dataNew: StageDataMulti; 
 								 fullMask, readyMask: std_logic_vector;
 								 nextAccepting: std_logic;
 								 living, sending, prevSending: integer;
@@ -519,63 +534,80 @@ return InstructionSlotArray is
 					:= (others => defaultInstructionState);
 	variable iqFullMaskNext: std_logic_vector(0 to QUEUE_SIZE - 1) :=	(others => '0');
 	variable dispatchDataNew: InstructionState := defaultInstructionState;
-	variable sends: std_logic := '0';	
-begin		
-	i := 0;
-	-- Copy what's before first ready
-	while 			(fullMask(i) 
-			and not (readyMask(i) and nextAccepting)) = '1' loop
-					-- CAREFUL: never allow shifting subsequent ops into slot which wants to send
-								-- when it can't because next stage doesn't allow!
-		iqDataNext(i) := queueData(i);
-		iqFullMaskNext(i) := '1';	
-		i := i + 1;
-		if i >= QUEUE_SIZE then
-			-- Fill output array
-			for i in 0 to res'right loop
-				res(i).full := iqFullMaskNext(i);
-				res(i).ins := iqDataNext(i);
-			end loop;
-			res(-1).full := sends;
-			res(-1).ins := dispatchDataNew;		
-			return res;
+	variable sends, anyReady: std_logic := '0';
+		constant CLEAR_EMPTY_SLOTS_IQ: boolean := true;
+		
+		variable xVec: InstructionStateArray(0 to QUEUE_SIZE + PIPE_WIDTH - 1);
+		variable yVec: InstructionStateArray(0 to 3*PIPE_WIDTH-1);
+		variable yMask: std_logic_vector(0 to 3*PIPE_WIDTH-1) := (others => '0');
+		variable x,y: integer := 0; 
+		variable tempMask: std_logic_vector(0 to QUEUE_SIZE-1) := (others => '0');
+		variable nAfterSending: integer := living;
+			variable shiftNum: integer := 0;
+begin
+--	if not CLEAR_EMPTY_SLOTS_IQ then
+--		iqDataNext := queueData;
+--	end if;
+	if nAfterSending < 0 then
+	--	nAfterSending := 0;
+	end if;	
+
+		xVec := queueData & dataNew.data; -- CAREFUL: What to append after queueData?
+					xVec(QUEUE_SIZE) := xVec(QUEUE_SIZE-1);
+		yVec := dataNew.data & dataNew.data & dataNew.data;	
+		yMask := dataNew.fullMask & dataNew.fullMask & dataNew.fullMask; 
+		
+	-- Finding slots that are before first ready
+	for i in 0 to tempMask'length-1 loop
+		dispatchDataNew := queueData(i);	
+		if readyMask(i) = '1' and nextAccepting = '1' then
+			anyReady := '1';
+			-- Assigned for sending			
+			exit;
+		end if;
+		tempMask(i) := '1';
+	end loop;
+		--report "A";
+	if (anyReady and nextAccepting) = '1' then
+		sends := '1';
+		nAfterSending := nAfterSending-1;
+	end if;
+		
+		if nAfterSending < 0 then
+			nAfterSending := 0;
+		elsif nAfterSending > yVec'length then	
+			nAfterSending := yVec'length;
+		end if;
+				
+		shiftNum := nAfterSending;
+					
+		yVec(shiftNum to yVec'length - 1) := yVec(0 to yVec'length - 1 - shiftNum);
+		yMask(shiftNum to yVec'length - 1) := yMask(0 to yVec'length - 1 - shiftNum);
+
+	-- Now assign from x or y
+	iqDataNext := queueData;
+	for i in 0 to QUEUE_SIZE-1 loop
+		if i < nAfterSending + prevSending then
+			iqFullMaskNext(i) := '1';
+		else
+			iqFullMaskNext(i) := '0';
+		end if;
+		
+		if i < nAfterSending then				
+		-- From x	
+			if tempMask(i) = '1' then
+				iqDataNext(i) := xVec(i);
+			else
+				iqDataNext(i) := xVec(i + 1);
+			end if;
+			--iqFullMaskNext(i) := '1';	
+		else
+		-- From y
+			iqDataNext(i) := yVec(i);
+			--iqFullMaskNext(i) := yMask(i);
 		end if;
 	end loop;
-	-- Now we have (or don't have) first ready
-	if (readyMask(i) and nextAccepting) = '1' then
-		dispatchDataNew := queueData(i);
-		sends := '1';
-	end if;
-			
-	-- Are there more full slots after first ready?
-	for k in 0 to QUEUE_SIZE-2 loop
-		if k >= i and fullMask(k+1) = '1' then
-			-- CAREFUL: this should never happen if sending is blocked, cause we'd overwrite the instruction!
-			iqDataNext(i) := queueData(i+1);
-			iqFullMaskNext(i) := '1';
-			i := i + 1;				
-		end if;
-	end loop;	
-
-	-- Now copy new input
-	if prevSendingOK = '0' then
-		-- Fill output array
-		for i in 0 to res'right loop
-			res(i).full := iqFullMaskNext(i);
-			res(i).ins := iqDataNext(i);
-		end loop;
-		res(-1).full := sends;
-		res(-1).ins := dispatchDataNew;		
-		return res;
-	end if;
-	j := 0;
-	while i < QUEUE_SIZE and j < PIPE_WIDTH and dataNew.fullMask(j) = '1' loop
-		iqDataNext(i) := dataNew.data(j);
-		iqFullMaskNext(i) := '1';
-		i := i + 1;
-		j := j + 1;
-	end loop;	
-	
+		
 	-- Fill output array
 	for i in 0 to res'right loop
 		res(i).full := iqFullMaskNext(i);
@@ -583,9 +615,9 @@ begin
 	end loop;
 	res(-1).full := sends;
 	res(-1).ins := dispatchDataNew;
-	
 	return res;
 end function;
+
 
 
 function iqExtractFullMask(queueContent: InstructionSlotArray) return std_logic_vector is
