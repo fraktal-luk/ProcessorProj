@@ -609,8 +609,9 @@ begin
 		for i in res'range loop
 			res(i) := sd.fullMask(i) and 
 			(	sd.data(i).controlInfo.pcEvent
-			or sd.data(i).controlInfo.fetchEvent
-			or sd.data(i).controlInfo.hbuffEvent
+			--or sd.data(i).controlInfo.fetchEvent
+			--or sd.data(i).controlInfo.hbuffEvent
+				'0'
 			or sd.data(i).controlInfo.s0Event);
 		end loop;
 	end if;

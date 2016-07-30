@@ -57,11 +57,19 @@ entity UnitReorder is
 		
 		frontDataLastLiving: in StageDataMulti;
 		frontLastSending: in std_logic;
+				
+				fetchLockRequest: in std_logic;
+				frontEventSig: in std_logic;
 		
 		cqDataLiving: in StageDataMulti;
 
 		anySendingFromCQ: in std_logic;
 		
+				fetchLockCommand: out std_logic;
+				
+				sysRegWriteAllow: out std_logic;
+				sysRegWriteSel: out slv5;
+				sysRegWriteValue: out Mword;		
 		accepting: out std_logic; -- to frontend
 		
 		renamedDataLiving: out StageDataMulti;
@@ -155,6 +163,9 @@ architecture Behavioral of UnitReorder is
 	-- CAREFUL, CHECK: to enable restoring from last committed
 	signal hardTarget: InstructionBasicInfo := defaultBasicInfo;
 	signal lastCommitted, lastCommittedNext: InstructionState := defaultInstructionState;
+		signal fetchLockCommit: std_logic := '0';
+
+		signal fetchLockState: std_logic := '0';
 
 	constant HAS_RESET_REORDER: std_logic := '1';
 	constant HAS_EN_REORDER: std_logic := '1';	
@@ -372,6 +383,11 @@ begin
 
 		-- Re-allow renaming when everything from rename/exec is committed - reg map will be well defined now
 		renameLockRelease <= '1' when commitCtr = renameCtr else '0'; -- CAREFUL! when all committed
+			-- CAREFUL, CHECK: when the counters are equal, renaming can be resumed, but renameLockRelease
+			-- 					 takes effect in next cycle, so before tha cycle renaming is still stopped.
+			--						 Should compare to commitCtrNext instead?
+			--						 But remember that rewinding GPR map needs a cycle, and before it happens,
+			--						 renaming can't be done! So this delay may be caused by this problem.
 			
 		renameLockCommand <= renameLockState;			
 
@@ -390,7 +406,14 @@ begin
 					elsif renameLockRelease = '1' then
 						renameLockState <= '0';
 					end if;												
-																					
+						
+					if fetchLockRequest = '1' then
+						fetchLockState <= '1';
+					elsif (fetchLockCommit or frontEventSig) = '1' then -- CAREFUL! frontEventSig may be not
+																						--				form front?
+						fetchLockState <= '0';
+					end if;	
+					
 					-- Saving info about last committed instr (including exceptional, which don't write state)
 					--	and target (what would be next after that last committed)
 					if anySendingFromCQSig = '1' then --flowDriveCommit.prevSending = '1' then
@@ -426,9 +449,17 @@ begin
 		readySetSel => readySetSel,
 		committingMask => committingMask,
 		
+			fetchLockCommit => fetchLockCommit,
+			
+			sysRegWriteAllow => sysRegWriteAllow,
+			sysRegWriteSel => sysRegWriteSel,
+			sysRegWriteValue => sysRegWriteValue,	
+			
 		lastCommittedOut => lastCommitted,
 		lastCommittedNextOut => lastCommittedNext
 	);
+
+		fetchLockCommand <= fetchLockState;
 
 	stageDataCommittedOut <= stageDataOutCommit;		
 			

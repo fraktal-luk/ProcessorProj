@@ -137,7 +137,7 @@ begin
 	flowDrive0.prevSending <= prevSending;
 	flowDrive0.nextAccepting <= nextAccepting;
 
-	stageDataOut <= stageData0Living;
+	stageDataOut <= clearTempControlInfoMulti(stageData0Living);
 	acceptingOut <= flowResponse0.accepting;
 	sendingOut <= flowResponse0.sending;	
 	stageEventsOut <= stageEvents;

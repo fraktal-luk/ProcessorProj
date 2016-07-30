@@ -87,6 +87,20 @@ architecture Behavioral5 of NewCore0 is
 	
 	constant HAS_RESET: std_logic := '1';
 	constant HAS_EN: std_logic := '1';
+	
+		signal memAddress, memLoadValue, memStoreValue: Mword := (others => '0');
+		signal memStoreAllow, memLoadAllow, memLoadReady: std_logic := '0';
+		
+		signal ilrSig, elrSig: Mword := (others => '0'); -- DEPREC
+		signal frontEventSig: std_logic := '0';
+		
+		signal sysRegReadSel: slv5 := (others => '0');
+		signal sysRegValue: Mword := (others => '0');
+		signal sysRegWriteAllow: std_logic := '0';
+		signal sysRegWriteSel: slv5 := (others => '0');
+		signal sysRegWriteValue: Mword := (others => '0');
+		
+		signal intCausing: InstructionState := defaultInstructionState;
 begin
 	resetSig <= reset and HAS_RESET;
 	enSig <= en or not HAS_EN;
@@ -97,18 +111,27 @@ begin
 	port map(
 		clk => clk, reset => resetSig, en => enSig,
 		iin => iin,
+			ivalid => ivalid,
 		renameAccepting => renameAccepting,
 		execEventSignal => execEventSignal,
 		execCausing => execCausing,
 		fetchLockCommand => fetchLockCommand,
 					
 		intSignal => intSig,
-					
+		intCausing => intCausing,
+			sysRegReadSel => sysRegReadSel,
+			sysRegReadValue => sysRegValue,	
+			sysRegWriteAllow => sysRegWriteAllow,
+			sysRegWriteSel => sysRegWriteSel,
+			sysRegWriteValue => sysRegWriteValue,					
 		iadr => iadr,
 		iadrvalid => iadrvalid,
 		dataLastLiving => frontDataLastLiving,
 		lastSending => frontLastSending,
-		fetchLockRequest => fetchLockRequest
+		fetchLockRequest => fetchLockRequest,
+			frontEventSig => frontEventSig
+		--ilrOut => ilrSig,
+		--elrOut => elrSig
 	);
 
 	-- Rename stage and register state management	
@@ -119,13 +142,23 @@ begin
 		
 		execEventSignal => execEventSignal,
 		execCausing => execCausing,
-		
+				
 		frontDataLastLiving => frontDataLastLiving,
 		frontLastSending => frontLastSending,
+		
+			-- CAREFUL: front info input is for fetchLock handling.
+			--				It creates an inconvenient dependency on front part.
+			fetchLockRequest => fetchLockRequest,
+			frontEventSig => frontEventSig,
 		
 		cqDataLiving => cqDataLivingOut,
 		
 		anySendingFromCQ => anySendingFromCQ,
+			fetchLockCommand => fetchLockCommand, -- This is associated with the front dependency
+		
+			sysRegWriteAllow => sysRegWriteAllow,
+			sysRegWriteSel => sysRegWriteSel,
+			sysRegWriteValue => sysRegWriteValue,
 		
 		accepting => renameAccepting, -- to frontend
 		renamedDataLiving => renamedDataLiving,
@@ -304,7 +337,21 @@ begin
 		lastCommitted => lastCommitted,
 		lastCommittedNext => lastCommittedNext,		
 		
+			memLoadReady => memLoadReady,
+			memLoadValue => memLoadValue,
 		-- Output
+			memAddress => memAddress,
+			memLoadAllow => memLoadAllow,
+			memStoreAllow => memStoreAllow,
+			memStoreValue => memStoreValue,
+			
+			-- This should be cut out, and int/exc return left to PC/CR part.
+			--ilrIn => ilrSig,
+			--elrIn => elrSig,
+
+				sysRegSelect => sysRegReadSel,
+				sysRegIn => sysRegValue,
+
 		execAcceptingA => execAcceptingA,
 		execAcceptingB => execAcceptingB,				
 		execAcceptingC => execAcceptingC,
@@ -314,6 +361,7 @@ begin
 		cqWhichSend => cqWhichSend,
 		execEventSignalOut => execEventSignal,
 		execCausingOut => execCausing,
+		intCausingOut => intCausing,
 		execPreEnds => execPreEnds,
 		execEnds => execEnds
 	);
@@ -361,7 +409,8 @@ begin
 		if rising_edge(clk) then
 			if resetSig = '1' then		
 				
-			elsif enSig = '1' then		
+			elsif enSig = '1' then
+				-- NOTE: this may be developed to connect to CommitQueue into unified reorder buffer 
 				renamedDataPrev <= renamedDataLiving;
 				readyRegsPrev <= readyRegsSig;
 			end if;
@@ -376,7 +425,14 @@ begin
 	nextResultTags <= getNextResultTags(		-- What'll be ready in next cycle
 											execPreEnds, dataOutIQA, dataOutIQB,	dataOutIQC, dataOutIQD);
 	resultVals <= getResultValues(execEnds, dataCQOut, stageDataCommittedOut, regValues);										
-										
+	
+	dadr <= memAddress;
+	dadrvalid <= memLoadAllow or memStoreAllow;
+	dout <= memStoreValue;
+	drw <= memStoreAllow;
+	memLoadValue <= din;
+	memLoadReady <= dvalid;
+	
 	oaux <= execCausing.bits; 
 end Behavioral5;
 

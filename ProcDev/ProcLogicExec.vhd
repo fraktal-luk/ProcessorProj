@@ -51,7 +51,12 @@ package ProcLogicExec is
 	
 	function resolveBranchCondition(av: InstructionArgValues; ca: InstructionConstantArgs) return std_logic;
 
-	function basicBranch(ins: InstructionState) return InstructionState;
+	function basicBranch(ins: InstructionState; sysRegValue: Mword;
+								linkAddress: Mword) return InstructionState;
+
+	function setExecState(ins: InstructionState;
+								result: Mword; carry: std_logic; exc: std_logic_vector(3 downto 0))
+	return InstructionState;
 
 end ProcLogicExec;
 
@@ -136,9 +141,10 @@ package body ProcLogicExec is
 	function raiseExecException(ins: InstructionState) return InstructionState is
 		variable res: InstructionState := ins;
 	begin
-		res.controlInfo.exception := '1';
-		--res.controlInfo.exceptionCode
-		res.controlInfo.unseen := '1';
+		res.controlInfo.newEvent := '1';	
+		res.controlInfo.hasEvent := '1';	
+		res.controlInfo.newException := '1';	
+		res.controlInfo.hasException := '1';			
 		return res;	
 	end function;
 
@@ -160,26 +166,75 @@ package body ProcLogicExec is
 		
 	end function;
 
-	function basicBranch(ins: InstructionState) return InstructionState is
+	function basicBranch(ins: InstructionState; sysRegValue: Mword;
+								linkAddress: Mword) return InstructionState is
 		variable res: InstructionState := ins;
-	begin
-		-- Return address
-		-- CAREFUL, TODO: when introducing 16b instructions, it won't be always 4 bytes ahead!
-		--	4B problem
-		res.result := i2slv(slv2u(ins.basicInfo.ip) + 4, MWORD_SIZE);
-		
-		if ins.classInfo.branchCond = '1' then
-			res.controlInfo.branchConfirmed := resolveBranchCondition(ins.argValues, ins.constantArgs);
-			if res.controlInfo.branchSpeculated = '1' and res.controlInfo.branchConfirmed = '0' then
-				res.controlInfo.branchCancel := '1';
-				res.controlInfo.execEvent := '1';
-			elsif res.controlInfo.branchSpeculated = '0' and res.controlInfo.branchConfirmed = '1' then
-				res.controlInfo.branchExecute := '1';
-				res.controlInfo.execEvent := '1';
-			end if;
+		variable branchTaken: std_logic := '0';
+	begin		
+		if ins.operation.unit = System then
+				if ins.operation.func = sysRetI then
+					res.controlInfo.newIntReturn := '1';
+					res.controlInfo.hasIntReturn := '1';					
+					res.controlInfo.newEvent := '1';
+					res.controlInfo.hasEvent := '1';					
+				elsif ins.operation.func = sysRetE then
+					res.controlInfo.newExcReturn := '1';
+					res.controlInfo.hasExcReturn := '1';						
+					res.controlInfo.newEvent := '1';
+					res.controlInfo.hasEvent := '1';						
+				elsif 
+					ins.operation.func = sysMfc then			
+					res.result := sysRegValue;
+				elsif ins.operation.func = sysMtc then
+					res.result := ins.argValues.arg0;
+				else
+						
+				end if;
+		else		
+			
+			-- Return address
+			-- CAREFUL, TODO: when introducing 16b instructions, it won't be always 4 bytes ahead!
+			--	4B problem
+			res.result := --i2slv(slv2u(ins.basicInfo.ip) + 4, MWORD_SIZE);
+								linkAddress;
+			if ins.classInfo.branchCond = '1' then
+				branchTaken := resolveBranchCondition(ins.argValues, ins.constantArgs);
+				if res.controlInfo.hasBranch = '1' and branchTaken = '0' then
+					res.controlInfo.hasBranch := '0';
+					res.controlInfo.newReturn := '1';
+					res.controlInfo.hasReturn := '1';						
+					res.controlInfo.newEvent := '1';
+					res.controlInfo.hasEvent := '1';						
+				elsif res.controlInfo.hasBranch = '0' and branchTaken = '1' then				
+					res.controlInfo.hasReturn := '0';
+					res.controlInfo.newBranch := '1';
+					res.controlInfo.hasBranch := '1';						
+					res.controlInfo.newEvent := '1';
+					res.controlInfo.hasEvent := '1';					
+				end if;
+			end if;	
+
+			if ins.classInfo.branchReg = '1' then
+				res.target := ins.argValues.arg1;
+			end if;	
 		end if;
-		
+								
 		return res;
 	end function;
  
+	function setExecState(ins: InstructionState;
+								result: Mword; carry: std_logic; exc: std_logic_vector(3 downto 0))
+	return InstructionState is
+		variable res: InstructionState := ins;
+	begin
+		res.result := result;
+		res.controlInfo.newEvent := isNonzero(exc);
+		res.controlInfo.hasEvent := res.controlInfo.newEvent;
+		res.controlInfo.newException := res.controlInfo.newEvent;
+		res.controlInfo.hasException := res.controlInfo.newEvent;						
+		res.controlInfo.exceptionCode := (others => '0');
+		res.controlInfo.exceptionCode(3 downto 0) := exc;
+		return res;
+	end function;
+	 
 end ProcLogicExec;

@@ -71,6 +71,11 @@ entity SubunitCommit is
 		readySetSel: out std_logic_vector(0 to PIPE_WIDTH-1);
 		committingMask: out std_logic_vector(0 to PIPE_WIDTH-1);
 		
+			fetchLockCommit: out std_logic;
+
+			sysRegWriteAllow: out std_logic;
+			sysRegWriteSel: out slv5;
+			sysRegWriteValue: out Mword;			
 		lastCommittedOut: out InstructionState;
 		lastCommittedNextOut: out InstructionState
 	);
@@ -88,6 +93,51 @@ architecture Behavioral of SubunitCommit is
 	signal readySetSelSig, commitSelSig: std_logic_vector(0 to PIPE_WIDTH-1) := (others => '0');
 	
 	signal lastCommitted, lastCommittedNext: InstructionState := defaultInstructionState;
+	
+	function fetchLockCommitting(sd: StageDataMulti) return std_logic is
+	begin
+		for i in sd.fullMask'range loop
+			if sd.fullMask(i) = '1' and sd.data(i).classInfo.fetchLock = '1' then
+				return '1';
+			end if;
+		end loop;
+		return '0';
+	end function;
+	
+	function getsysRegWriteAllow(sd: StageDataMulti) return std_logic is
+	begin
+		for i in sd.fullMask'range loop
+			if 	sd.fullMask(i) = '1' 
+				and sd.data(i).operation.unit = System
+				and sd.data(i).operation.func = sysMtc
+			then
+				return '1';
+			end if;
+		end loop;
+		return '0';
+	end function;
+
+	function getSysRegWriteSel(sd: StageDataMulti) return slv5 is
+		variable res: slv5 := (others => '0');
+	begin
+		for i in sd.fullMask'range loop
+			if sd.fullMask(i) = '1' then
+				res := sd.data(i).constantArgs.c0;
+			end if;
+		end loop;
+		return res;
+	end function;
+
+	function getSysRegWriteValue(sd: StageDataMulti) return Mword is
+		variable res: Mword := (others => '0');
+	begin
+		for i in sd.fullMask'range loop
+			if sd.fullMask(i) = '1' then
+				res := sd.data(i).result;
+			end if;
+		end loop;
+		return res;
+	end function;	
 begin	
 	stageDataCommitLiving <= stageDataCommit; -- Nothing will kill it?
 	stageDataCommitNew <= stageDataIn;	-- ??(some may be killed? careful)					
@@ -118,6 +168,12 @@ begin
 		flowDrive => flowDriveCommit,
 		flowResponse => flowResponseCommit
 	);	
+		
+		fetchLockCommit <= fetchLockCommitting(stageDataIn);
+	
+		sysRegWriteAllow <= getSysRegWriteAllow(stageDataIn);
+		sysRegWriteSel <= getSysRegWriteSel(stageDataIn);
+		sysRegWriteValue <= getSysRegWriteValue(stageDataIn);
 	
 	flowDriveCommit.nextAccepting <= '1'; -- Nothing block it
 	-- NOTE: sending from CQ is in continuous packets; if bit 0 is '0', no else will be '1'

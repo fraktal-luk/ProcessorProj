@@ -52,7 +52,9 @@ return HbuffOutData;
 
 function stagePCNext(content, newContent: StageDataPC;
 							full, sending, receiving: std_logic) return StageDataPC;
-function newPCData(content: StageDataPC; fe: FrontEventInfo) return StageDataPC;
+
+function newPCData(content: StageDataPC; fe: FrontEventInfo; pcNext, causingNext: Mword;
+							eli, ili: InstructionBasicInfo) return StageDataPC;
 
 function stageFetchNext(content, newContent: StageDataPC;
 							full, sending, receiving: std_logic) return StageDataPC;
@@ -60,15 +62,20 @@ function stageFetchNext(content, newContent: StageDataPC;
 function getAnnotatedHwords(fetchData: StageDataPC; fetchBlock: HwordArray)
 return AnnotatedHwordArray;
 
+function detectEventsMulti(sd: StageDataMulti; receiving: std_logic) return InstructionSlot;
+
 function getFrontEvents(se0: StageMultiEventInfo;
 									intEvent: std_logic;
 									backEvent: std_logic;
 									backCausing: InstructionState) 
 return FrontEventInfo;
 
+function getFrontEvents2(eventArr: InstructionSlotArray)
+return FrontEventInfo;
+
 function stageMultiEvents(sd: StageDataMulti; isNew: std_logic) return StageMultiEventInfo;
 
-function getNextInstructionAddress(ins: InstructionState) return Mword;
+function TEMP_events(inputs: InstructionSlotArray) return InstructionSlotArray;
 
 end ProcLogicFront;
 
@@ -108,6 +115,11 @@ begin
 				ci.branchCond := '1';	
 			end if;
 			
+			-- Branch to register
+			if ins.operation.func = jump and ins.constantArgs.immSel = '0' then
+				ci.branchReg := '1';
+			end if;
+			
 			-- TODO: complete this!
 			if  ins.operation.unit = System then
 				ci.system := '1';
@@ -138,16 +150,16 @@ begin
 	return res;
 end function;	
 
-
+-- DEPREC?
 function basicJumpAddress(ins: InstructionState) return Mword is
 begin
-	if ins.controlInfo.branchExecute = '1' then
-		return ins.target;
-	elsif ins.controlInfo.branchCancel = '1' then
-		return ins.result;
-	else -- TODO, CAREFUL: inspect other possible paths
-		return (others=>'0');
-	end if;		
+	--if ins.controlInfo.branchExecute = '1' then
+	--	return ins.target;
+	--elsif ins.controlInfo.branchCancel = '1' then
+	--	return ins.result;
+	--else -- TODO, CAREFUL: inspect other possible paths
+	--	return (others=>'0');
+	--end if;		
 end function;
 
 function instructionFromWord(w: word) return InstructionState is
@@ -170,20 +182,32 @@ begin
 					res.virtualDestArgs);
 	
 	res.classInfo := getInstructionClassInfo(res);	
-		
+				
 	-- TODO: other control flow considerations: detect exceptions etc.! 
 	--...
+				-- TEMP: code for predicting every regular jump (even "branch never"!) as taken
+--				if res.operation.func = jump then
+--					res.controlInfo.newEvent := '1';
+--					res.controlInfo.hasEvent := '1';
+--					res.controlInfo.newBranch := '1';
+--					res.controlInfo.hasBranch := '1';					
+--				end if;
+	
 		if res.classInfo.undef = '1' then
-				res.controlInfo.s0Event := '1';
-			res.controlInfo.unseen := '1';
-			res.controlInfo.exception := '1';
+			res.controlInfo.newEvent := '1';
+			res.controlInfo.hasEvent := '1';			
+					--res.controlInfo.exception := '1';
+			res.controlInfo.newException := '1';
+			res.controlInfo.hasException := '1';
 			res.controlInfo.exceptionCode := i2slv(ExceptionType'pos(undefinedInstruction), SMALL_NUMBER_SIZE);
 		end if;
 		
 		-- CAREFUL! Indicate that fetch lock must be applied
-		if res.classInfo.fetchLock = '1' then 
-			res.controlInfo.unseen := '1';
-			res.controlInfo.fetchLockSignal := '1';
+		if res.classInfo.fetchLock = '1' then
+			res.controlInfo.newEvent := '1';
+			res.controlInfo.hasEvent := '1';				
+			res.controlInfo.newFetchLock := '1';
+			res.controlInfo.hasFetchLock := '1';
 		end if;
 		
 		
@@ -333,37 +357,60 @@ begin
 	return res;
 end function;
 
-function newPCData(content: StageDataPC; fe: FrontEventInfo) return StageDataPC is
+
+function newPCData(content: StageDataPC; fe: FrontEventInfo; pcNext, causingNext: Mword;
+							eli, ili: InstructionBasicInfo)
+return StageDataPC is
 	variable res: StageDataPC := content;
 	variable newPC: Mword := (others=>'0');
 begin
 	if fe.eventOccured = '1' then -- when from exec or front	
 		-- TODO: need more cases to handle exc return and int return etc? Or maybe these are enough?
-		if fe.fromInt = '1' then
+		if --fe.fromInt = '1' then
+			fe.causing.controlInfo.newInterrupt = '1'
+		then
 			res.basicInfo.ip := INT_BASE; -- TEMP!
 			res.basicInfo.intLevel := "00000001";	
-		elsif fe.causing.controlInfo.exception = '1' then
+		elsif fe.causing.controlInfo.newException = '1' then
 			-- TODO, FIX: exceptionCode sliced - shift left by ALIGN_BITS? or leave just base address
 			res.basicInfo.ip := EXC_BASE(MWORD_SIZE-1 downto fe.causing.controlInfo.exceptionCode'length)
 									& fe.causing.controlInfo.exceptionCode(
 															fe.causing.controlInfo.exceptionCode'length-1 downto ALIGN_BITS)
 									& EXC_BASE(ALIGN_BITS-1 downto 0);			
 			res.basicInfo.systemLevel := "00000001";
-		elsif fe.causing.controlInfo.branchExecute = '1' then
+			
+		-- ?????
+		elsif fe.causing.controlInfo.newFetchLock = '1' then	
+			res.basicInfo.ip := --getNextInstructionAddress(fe.causing);
+										causingNext;
+		elsif fe.causing.controlInfo.newBranch = '1' then
 			res.basicInfo.ip := fe.causing.target;
-		elsif fe.causing.controlInfo.branchCancel = '1' then
+		elsif fe.causing.controlInfo.newReturn = '1' then
 			res.basicInfo.ip := fe.causing.result;
+		
+			-- TEMP!
+			elsif fe.causing.controlInfo.newIntReturn = '1' then
+				res.basicInfo := ili; --X"00000210";
+				-- Alternative option: read LRs in branch exec logic and pass here as target
+					--res.basicInfo.ip := fe.causing.target;
+			-- TEMP!	
+			elsif fe.causing.controlInfo.newExcReturn = '1' then	
+				res.basicInfo := eli; --X"00000220";
+					--res.basicInfo.ip := fe.causing.target;
 		end if;				
 	else	-- Increment by the width of fetch group
+		-- CAREFUL: using Verilog adder for this seems to make things worse, not better
 		res.basicInfo.ip := 
 				i2slv(slv2u(content.pcBase(MWORD_SIZE-1 downto ALIGN_BITS)) + 1, MWORD_SIZE - ALIGN_BITS)
 				& i2slv(0, ALIGN_BITS);		
+				--pcNext;
 	end if;	
 	res.pc := res.basicInfo.ip;	
 	res.pcBase := res.basicInfo.ip(MWORD_SIZE-1 downto ALIGN_BITS)	& i2slv(0, ALIGN_BITS);
 	res.nH := i2slv(FETCH_BLOCK_SIZE - (slv2u(res.basicInfo.ip(ALIGN_BITS-1 downto 1))), SMALL_NUMBER_SIZE);
 	return res;
 end function;
+
 
 function stageFetchNext(content, newContent: StageDataPC;
 							full, sending, receiving: std_logic) return StageDataPC is
@@ -404,6 +451,38 @@ begin
 	end loop;
 	return res;
 end function;
+
+
+---- ?????? CHECK: prob. abandoned direction 
+--function detectEventsDecode(sdIn, sdNew: StageDataMulti; receiving: std_logic) return std_logic_vector is
+--	variable res: std_logic_vector(0 to PIPE_WIDTH-1) := (others => '0');
+--begin
+--	if receiving = '0' then
+--		return res;
+--	end if;
+--	
+--	for i in sdIn.fullMask'range loop
+--		if 	sdIn.fullMask(i) = '1' 
+--			and false -- TODO: add other necessary condtions!
+--		then	
+--			res(i) := '1';
+--		end if;
+--	end loop;
+--	
+--	return res;
+--end function;
+
+function detectEventsMulti(sd: StageDataMulti; receiving: std_logic) return InstructionSlot is
+	variable res: InstructionSlot := ('0', sd.data(PIPE_WIDTH-1)); 
+begin
+	for i in sd.fullMask'range loop
+		if sd.fullMask(i) = '1' and sd.data(i).controlInfo.newEvent = '1' then
+			res := ('1', sd.data(i));
+		end if;
+	end loop;
+	return res;
+end function;
+
 
 function getFrontEvents(se0: StageMultiEventInfo;
 									intEvent: std_logic;
@@ -464,17 +543,30 @@ begin
 	res.eventOccured := eventOccured;
 	res.fromExec := fromExec;
 	res.fromInt := fromInt;
-		
-	res.ePC := ePC;
-	res.eFetch := eFetch;
-	res.eHbuff := eHbuff;
-	res.e0 := e0;
-	res.e1 := '0';	
-	
+
 	res.causingVec := causingVec;
 	res.affectedVec := affectedVec;
 	res.causing := causing;
 	
+	return res;
+end function;
+
+
+function getFrontEvents2(eventArr: InstructionSlotArray)
+return FrontEventInfo is	
+	variable res: FrontEventInfo;
+begin
+	res.eventOccured := eventArr(0).full;
+	--res.fromExec := eventArr(6).data.controlInfo.newEvent;
+	res.fromInt := eventArr(0).ins.controlInfo.newInterrupt;
+	res.causing := eventArr(0).ins;
+			
+		-- CAREFUL! Must have matching indices to work correctly!	
+		res.affectedVec := (others => '0');
+		for i in res.affectedVec'range loop
+			res.affectedVec(i) := eventArr(i).full;
+		end loop;
+		
 	return res;
 end function;
 
@@ -492,12 +584,7 @@ begin
 	
 	for i in sd.fullMask'reverse_range loop
 		-- Is there an event at this slot? 
-		t := sd.fullMask(i) and 
-		(	sd.data(i).controlInfo.pcEvent
-		or sd.data(i).controlInfo.fetchEvent
-		or sd.data(i).controlInfo.hbuffEvent
-		or sd.data(i).controlInfo.s0Event);
-		
+		t := sd.fullMask(i) and sd.data(i).controlInfo.newEvent;		
 		eVec(i) := t;
 		if t = '1' then
 			res.causing := sd.data(i);				
@@ -515,16 +602,33 @@ begin
 	return res;
 end function;
 
-function getNextInstructionAddress(ins: InstructionState) return Mword is
-	variable nBytes: natural;
+
+function TEMP_events(inputs: InstructionSlotArray) return InstructionSlotArray is
+	variable res: InstructionSlotArray(0 to inputs'length-1) := --(others => 
+																		--DEFAULT_INSTRUCTION_SLOT);
+																			inputs;
+	variable found: std_logic := '0';
+	variable causing: InstructionState := defaultInstructionState;
+	variable j: integer;
 begin
-	-- TODO: when short instructions introduced, differentiate into 2B and 4B 
-	if false then -- For short ones
-		nBytes := 2;			
-	else
-		nBytes := 4;
-	end if;	
-	return i2slv( slv2s(ins.basicInfo.ip) + nBytes, MWORD_SIZE);
+	--		report integer'image(inputs'left);
+	--		report integer'image(inputs'right);
+	-- Search from latest stages until we find an event, then propagate it to the front
+	for i in res'reverse_range loop
+		j := i + inputs'left; -- correct for possible strange indexing of input array
+		if found = '1' then
+			res(i).ins := causing;
+			res(i).full := '1';
+		elsif inputs(j).full = '1' and inputs(j).ins.controlInfo.newEvent = '1' then
+			found := '1';
+			causing := inputs(j).ins;
+		else
+			null;
+		end if;
+	end loop;
+	
+	return res;
 end function;
+
  
 end ProcLogicFront;

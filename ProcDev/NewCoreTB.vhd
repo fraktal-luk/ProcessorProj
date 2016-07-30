@@ -102,6 +102,13 @@ ARCHITECTURE behavior OF NewCoreTB IS
 
 	signal outStage: InstructionStateArray(0 to PIPE_WIDTH-1) := (others => defaultInstructionState);
 
+	
+		signal memReadDone, memReadDonePrev, memWriteDone: std_logic := '0';
+		signal memReadValue, memReadValuePrev, memWriteAddress, memWriteValue: Mword := (others => '0');
+
+		signal dataMem: WordArray(0 to 255) := (
+					72 => X"00000064",
+					others => (others => '0'));
 
    -- Clock period definitions
    constant clk_period : time := 10 ns;
@@ -169,27 +176,61 @@ BEGIN
 	end process;	
 	
 
-	process (clk)
-		--variable alignedPC: mword := (others=>'0'); 
+	PROGRAM_MEM: process (clk)
+		--variable alignedPC: mword := (others=>'0');
+		constant PM_SIZE: natural := programMem'length; 	
 	begin
 		if rising_edge(clk) then
 			if en = '1' then -- TEMP! It shouldn't exist here
 				--alignedPC(MWORD_SIZE-1 downto ALIGN_BITS)
-				
-				for i in 0 to PIPE_WIDTH-1 loop
-					iin(i) <= programMem
-								 --prog0
-								(slv2u(iadr(9 downto 2)) + i); -- CAREFUL! 2 low bits unused (32b memory) 									
-				end loop;
-				
+					if iadrvalid = '1' then
+						-- CAREFUL! don't fetch if adr not valid, cause it may ovewrite previous, valid fetch block.
+						--				If fetch block is valid but cannot be sent further (pipe stall etc.),
+						--				it must remain in fetch buffer until it can be sent.
+						--				So we can't get new instruction bits when Fetch stalls, cause they'd destroy
+						--				stalled content in fetch buffer!
+						for i in 0 to PIPE_WIDTH-1 loop
+							iin(i) <= programMem
+										 --prog0 -- CAREFUL! if using prog0, PM_SIZE may be wrong
+										(slv2u(iadr(9 downto 2)) + i); -- CAREFUL! 2 low bits unused (32b memory) 									
+						end loop;
+					end if;
+					
 					if iadrvalid = '1' and countOnes(iadr(iadr'high downto 9)) = 0 then
 						ivalid <= '1';					
 					else
 						ivalid <= '0';	
+						--iin(0) <= (others => 'Z');
 					end if;			
 			end if;
 		end if;	
 	end process;	
 
 
+	DATA_MEM: process (clk)
+		--variable alignedPC: mword := (others=>'0'); 
+	begin
+		if rising_edge(clk) then
+			if en = '1' then
+				-- Reading
+				memReadDone <= dadrvalid and not drw;
+				memReadDonePrev <= memReadDone;
+				memReadValue <= dataMem(slv2u(dadr(9 downto 2))); 
+				memReadValuePrev <= memReadValue;	
+				
+				-- Writing
+				memWriteDone <= dadrvalid and drw;
+				memWriteValue <= dout;
+				memWriteAddress <= dadr;
+				if memWriteDone = '1' then
+					dataMem(slv2u(memWriteAddress(9 downto 2))) <= memWriteValue;
+				end if;
+				
+			end if;
+		end if;	
+	end process;
+	
+	din <= memReadValue; --Prev;
+	dvalid <= memReadDone; --Prev;
+	
 END;

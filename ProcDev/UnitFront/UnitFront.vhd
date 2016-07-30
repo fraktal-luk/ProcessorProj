@@ -53,19 +53,33 @@ entity UnitFront is
 		en: in std_logic;
 		
 		iin: in InsGroup; --WordArray(0 to PIPE_WIDTH-1);
+		ivalid: in std_logic;
 		renameAccepting: in std_logic;
 		execEventSignal: in std_logic;
 		execCausing: in InstructionState;
 		fetchLockCommand: in std_logic; 
 						
-		intSignal: in std_logic;				
+		intSignal: in std_logic;
+		intCausing: in InstructionState;
+			sysRegReadSel: in slv5;
+			sysRegReadValue: out Mword;
+		
+			sysRegWriteAllow: in std_logic;
+			sysRegWriteSel: in slv5;
+			sysRegWriteValue: in Mword;		
 	-- Outputs:
 		iadr: out Mword;
 		iadrvalid: out std_logic;
 		dataLastLiving: out StageDataMulti; 
 		--flowResponse0// ?? of just - 
 		lastSending: out std_logic;
-		fetchLockRequest: out std_logic		
+		fetchLockRequest: out std_logic;
+			frontEventSig: out std_logic
+			
+				-- TEMP
+			--	eventCausingForExec: out InstructionState
+	--	ilrOut: out Mword;
+	--	elrOut: out Mword	
 	);
 end UnitFront;
 
@@ -76,6 +90,7 @@ architecture Behavioral of UnitFront is
 	signal resetSig, enSig: std_logic := '0';			
 													
 	signal frontEvents: FrontEventInfo;
+		signal frontEvents_C: FrontEventInfo;	
 	signal stage0Events: StageMultiEventInfo;	
 
 	-- Interfaces between stages:													
@@ -83,7 +98,12 @@ architecture Behavioral of UnitFront is
 	signal stageDataOutHbuffer, stageDataOut0: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
 	signal sendingOutPC, sendingOutFetch, sendingOutHbuffer, sendingOut0: std_logic := '0';
 	signal acceptingOutPC, acceptingOutFetch, acceptingOutHbuffer, acceptingOut0: std_logic := '0';
+	
+	signal eventInsArray: InstructionSlotArray(0 to 6) := (others => DEFAULT_INSTRUCTION_SLOT);
+	signal eventCauseArrayS: InstructionSlotArray(0 to 6) := (others => DEFAULT_INSTRUCTION_SLOT);
+	signal eventCauseArray: InstructionStateArray(0 to 6) := (others => defaultInstructionState);
 
+	
 	constant HAS_RESET_FRONT: std_logic := '1';
 	constant HAS_EN_FRONT: std_logic := '1';	
 begin	 
@@ -98,68 +118,108 @@ begin
 								
 	-- PC stage															
 	SUBUNIT_PC: entity work.SubunitPC(Behavioral) port map(
-		clk => clk, reset => resetSig, en => enSig,			
+		clk => clk, reset => resetSig, en => enSig,
+		
 		nextAccepting => acceptingOutFetch,
-		frontEvents =>	frontEvents,
+					
 		acceptingOut => acceptingOutPC,
 		sendingOut => sendingOutPC,
-		stageDataOut => stageDataOutPC
+		stageDataOut => stageDataOutPC,
+		
+		sysRegWriteAllow => sysRegWriteAllow,
+		sysRegWriteSel => sysRegWriteSel,
+		sysRegWriteValue => sysRegWriteValue,
+
+		sysRegReadSel => sysRegReadSel,
+		sysRegReadValue => sysRegReadValue,
+		
+		frontEvents =>	frontEvents		
 	);
 		
 	-- Fetch stage		
 	SUBUNIT_FETCH: entity work.SubunitFetch(Behavioral) port map(
 		clk => clk, reset => resetSig, en => enSig,
-		fetchLockCommand => fetchLockCommand,
+				
 		prevSending => sendingOutPC,	
 		nextAccepting => acceptingOutHbuffer,
-		frontEvents =>	frontEvents,
 		stageDataIn => stageDataOutPC,
+		ivalid => ivalid,
+		
 		acceptingOut => acceptingOutFetch,
 		sendingOut => sendingOutFetch,
-		stageDataOut => stageDataOutFetch
+		stageDataOut => stageDataOutFetch,
+		
+		frontEvents =>	frontEvents,
+		fetchLockCommand => fetchLockCommand		
 	);	
 	
 	-- Hword buffer		
 	SUBUNIT_HBUFFER: entity work.SubunitHbuffer(Behavioral) port map(
 		clk => clk, reset => resetSig, en => enSig,
-		fetchBlock => fetchBlock,
+		
 		prevSending => sendingOutFetch,	
 		nextAccepting => acceptingOut0,
-		frontEvents =>	frontEvents,
 		stageDataIn => stageDataOutFetch,
+		fetchBlock => fetchBlock,
+		
 		acceptingOut => acceptingOutHbuffer,
 		sendingOut => sendingOutHbuffer,
-		stageDataOut => stageDataOutHbuffer
+		stageDataOut => stageDataOutHbuffer,
+		
+		frontEvents =>	frontEvents		
 	);		
 	
 	-- Decode stage		
 	SUBUNIT_DECODE: entity work.SubunitDecode(Behavioral) port map(
 		clk => clk, reset => resetSig, en => enSig,
+		
 		prevSending => sendingOutHbuffer,	
 		nextAccepting => renameAccepting,
-		frontEvents =>	frontEvents,
 		stageDataIn => stageDataOutHbuffer,
+		
 		acceptingOut => acceptingOut0,
 		sendingOut => sendingOut0,
 		stageDataOut => stageDataOut0,
+
+		frontEvents =>	frontEvents,		
 		stageEventsOut => stage0Events
 	);	
-	
+					
+			frontEvents_C <= getFrontEvents(stage0Events, intSignal, execEventSignal, execCausing);
+		
+	frontEvents <= getFrontEvents2(eventInsArray);
+--		eventCauseArray <= (defaultInstructionState,
+--												defaultInstructionState,
+--												defaultInstructionState,
+--												stage0Events.causing,
+--												defaultInstructionState,
+--												execCausing,
+--												intCausing
+--												);
+			eventCauseArrayS(3) <= (stage0Events.eventOccured, stage0Events.causing);
 			
-	-- Front pipe exception/branch detection:
-	-- PC: branch predicted from PC?
-	-- Fetch: failed fetch?
-	-- Hbuff: early branch/decode exceptions
-	-- 0: branch/decode exceptions
-	frontEvents <= getFrontEvents(stage0Events, intSignal, execEventSignal, execCausing);
-				
+			eventCauseArrayS(5) <= (execEventSignal, execCausing);
+			eventCauseArrayS(6) <= (intSignal, intCausing);
+		
+		eventInsArray <= TEMP_events(eventCauseArrayS); --);
+		
+		
+		fetchLockRequest <= 
+				  	 frontEvents.eventOccured 
+--				and frontEvents.causing.controlInfo.fetchLockSignal
+--				and not frontEvents.fromInt; -- CAREFUL: Don't allow locking by diffrent events involving the
+--														--  			instrucitons later in the pipeline!
+				and frontEvents.causing.controlInfo.newFetchLock;
+														
+		frontEventSig <= frontEvents.eventOccured; -- ???
 	----------------------------------------------
 	iadr <= stageDataOutPC.pcBase; 
 	iadrvalid <= sendingOutPC; 
 	----------------------------------------------	
-	fetchLockRequest <= '0'; -- TEMP?
+
 	dataLastLiving <= stageDataOut0;
 	lastSending <= sendingOut0;
+--			eventCausingForExec <= eventInsArray(6).ins;
 	----------------------------------------------	
 end Behavioral;
 

@@ -97,7 +97,36 @@ return std_logic_vector;
 
 function extractReadyRegBits(bits: std_logic_vector; data: InstructionStateArray)
 return std_logic_vector;
-	
+
+-- Next address, even if after a taken branch
+function getNextInstructionAddress(ins: InstructionState) return Mword;
+
+function getAddressIncrement(ins: InstructionState) return Mword;
+
+-- What would be next in flow without exceptions - that is next one or jump target 
+function getSucceedingInstructionAddress(ins: InstructionState; causingNext: Mword) return Mword;
+
+-- Address to go to if exception happens
+function getHandlerAddress(ins: InstructionState) return Mword;
+
+-- Instruction to be executed next in absence of interrupts: whether next, jump target or exc handler
+function getSyncFlowInstructionAddress(ins: InstructionState; causingNext: Mword; elr: Mword)
+return Mword;
+
+function getLinkInfoN(ins: InstructionState; causingNext: Mword) return InstructionBasicInfo;
+function getLinkInfoJ(ins: InstructionState; causingNext: Mword) return InstructionBasicInfo;
+function getExceptionTarget(ins: InstructionState; causingNext: Mword) return InstructionBasicInfo;
+function getLinkInfoE(ins: InstructionState; linkInfoExc: InstructionBasicInfo; causingNext: Mword)
+return InstructionBasicInfo;
+
+function pcDataFromBasicInfo(bi: InstructionBasicInfo) return stageDataPC;
+
+function clearTempControlInfoSimple(ins: InstructionState) return InstructionState;
+function clearTempControlInfoMulti(sd: StageDataMulti) return StageDataMulti;
+
+function setInterrupt(ins: InstructionState; intSignal: std_logic; intCode: SmallNumber)
+return InstructionState;
+
 end TEMP_DEV;
 
 
@@ -133,18 +162,18 @@ function TEMP_branchPredict(ins: InstructionState) return InstructionState is
 	variable res: InstructionState := ins;
 begin
 	if res.classInfo.branchCond = '1' then
-		res.controlInfo.unseen := '1';	
+		--res.controlInfo.unseen := '1';	
 	
 		if res.constantArgs.c1 = COND_NONE then -- 'none'; CAREFUL! Use correct codes!
 			-- Jump
-				res.controlInfo.s0Event := '1';
-			res.controlInfo.branchSpeculated := '1'; -- ??
-			res.controlInfo.branchConfirmed := '1'; -- ??
+				--res.controlInfo.s0Event := '1';
+			--res.controlInfo.branchSpeculated := '1'; -- ??
+			--res.controlInfo.branchConfirmed := '1'; -- ??
 		elsif res.constantArgs.c1 = COND_Z and res.virtualArgs.s0 = "00000" then -- 'zero'; CAREFUL! ...
 			-- Jump
-				res.controlInfo.s0Event := '1';
-			res.controlInfo.branchSpeculated := '1'; -- ??
-			res.controlInfo.branchConfirmed := '1'; -- ??
+				--res.controlInfo.s0Event := '1';
+			--res.controlInfo.branchSpeculated := '1'; -- ??
+			--res.controlInfo.branchConfirmed := '1'; -- ??
 		elsif res.constantArgs.c1 = COND_NZ and res.virtualArgs.s0 /= "00000" then -- 'one'; CAREFUL!...
 			-- No jump!
 		else
@@ -408,5 +437,178 @@ begin
 	end loop;		
 	return res;
 end function;		
+
+
+function getNextInstructionAddress(ins: InstructionState) return Mword is
+	variable nBytes: natural;
+begin
+	-- TODO: when short instructions introduced, differentiate into 2B and 4B 
+	if false then -- For short ones
+		nBytes := 2;			
+	else
+		nBytes := 4;
+	end if;	
+	return i2slv( slv2s(ins.basicInfo.ip) + nBytes, MWORD_SIZE);
+end function;
+
+function getAddressIncrement(ins: InstructionState) return Mword is
+	variable res: Mword := (others => '0');
+begin
+	-- TODO: short instructions...
+	if false then
+		res(1) := '1'; -- 2
+	else
+		res(2) := '1'; -- 4
+	end if;
+	return res;
+end function;
+
+
+-- TODO: handle the situation of exception returns!
+-- 		Also when committing a write to system reg, if it's the status reg, it must be incorporated
+--			into target. It means that PC value for fetching must be updated with the status reg new value,
+--			and if interrupt comes after that, the savedStateInt also must include the written change!
+--			It seems that PC basicInfo must be constantly mapped from statusReg: it thus becomes a physical
+--			register valid for instructions to be fetched. If so, writing to it obviously must prevent
+--			any instruction from being fetched before the change is committed. Or otherwise it would be allowed
+--			normally, with an exception occuring in writing makes younger ops in the pipeline invalid,
+--			but this would be very complex.
+function getSucceedingInstructionAddress(ins: InstructionState; causingNext: Mword) return Mword is
+begin
+	if ins.controlInfo.hasBranch = '1' then
+		return ins.target;
+	else 
+		return --getNextInstructionAddress(ins);
+				 causingNext;
+	end if;
+end function;
+
+function getHandlerAddress(ins: InstructionState) return Mword is
+begin
+			-- TODO, FIX: exceptionCode sliced - shift left by ALIGN_BITS? or leave just base address
+			return EXC_BASE(MWORD_SIZE-1 downto ins.controlInfo.exceptionCode'length)
+									& ins.controlInfo.exceptionCode(
+															ins.controlInfo.exceptionCode'length-1 downto ALIGN_BITS)
+									& EXC_BASE(ALIGN_BITS-1 downto 0);			
+			--res.basicInfo.systemLevel := "00000001";
+end function;
+
+function getSyncFlowInstructionAddress(ins: InstructionState; causingNext: Mword; elr: Mword)
+return Mword is
 	
+begin
+	if ins.controlInfo.newException = '1' then 
+		return getHandlerAddress(ins);
+	elsif ins.controlInfo.newExcReturn = '1' then
+		return elr;
+	else
+		return getSucceedingInstructionAddress(ins, causingNext);
+	end if;
+end function;
+
+
+function getLinkInfoN(ins: InstructionState; causingNext: Mword) return InstructionBasicInfo is
+	variable res: InstructionBasicInfo := ins.basicInfo;
+begin
+	res.ip := --getNextInstructionAddress(ins);
+					causingNext;
+	return res;
+end function;
+
+function getLinkInfoJ(ins: InstructionState; causingNext: Mword) return InstructionBasicInfo is
+	variable res: InstructionBasicInfo := ins.basicInfo;
+begin
+	-- get next adr considering possible jump 
+	res.ip := getSucceedingInstructionAddress(ins, causingNext);
+	-- CAREFUL! Probably undefined or sth if the instruction were to be exc return or int return
+	--				(such things shoudn't happen probably)
+	return res;
+end function;
+
+
+function getExceptionTarget(ins: InstructionState; causingNext: Mword) return InstructionBasicInfo is
+	variable res: InstructionBasicInfo := ins.basicInfo;
+begin
+	-- get handler adr and system level 
+	res.ip := getSucceedingInstructionAddress(ins, causingNext);
+	res.systemLevel := "00000001";	
+	return res;
+end function;
+
+
+function getLinkInfoE(ins: InstructionState; linkInfoExc: InstructionBasicInfo; causingNext: Mword)
+return InstructionBasicInfo is
+	variable res: InstructionBasicInfo := ins.basicInfo;
+begin
+	
+	if ins.controlInfo.newException = '1' then 
+		return getExceptionTarget(ins, causingNext);
+	elsif ins.controlInfo.newExcReturn = '1' then	
+		-- CAREFUL! when we have interrupt on returning from sync exception
+		-- 			And if int/excReturn instructions are disabled, this should be too!
+		return linkInfoExc;	
+
+	-- CAREFUL! If interupt happens on returning from interrupt, we'd have problems probably.		
+--			-- ?? Enable interrupt chaining by reusing linkInfoInt?	
+--			elsif ins.controlInfo.intRet = '1' then	
+--				return linkInfoInt;
+	-- > Interupt chaining can be implemented in a simple way: when another interrupt appears, 
+	--		jump to handler directly from currently running handler, but don't set ILR.
+	--		ILR will remain from the first interrupt in chain, just like in tail function call
+
+	else
+		return getLinkInfoJ(ins, causingNext);
+	end if;
+end function;
+
+
+function pcDataFromBasicInfo(bi: InstructionBasicInfo) return stageDataPC is
+	variable res: StageDataPC := DEFAULT_DATA_PC;
+begin
+	res.basicInfo := bi;
+	res.pc := bi.ip;
+	res.pcBase := bi.ip(MWORD_SIZE-1 downto ALIGN_BITS)	& i2slv(0, ALIGN_BITS);
+	res.nH := i2slv(FETCH_BLOCK_SIZE - (slv2u(bi.ip(ALIGN_BITS-1 downto 1))), SMALL_NUMBER_SIZE);
+	
+	return res;
+end function;
+
+
+function clearTempControlInfoSimple(ins: InstructionState) return InstructionState is
+	variable res: InstructionState := ins;
+begin
+	res.controlInfo.newEvent := '0';
+	res.controlInfo.newInterrupt := '0';
+	res.controlInfo.newException := '0';
+	res.controlInfo.newBranch := '0';
+	res.controlInfo.newReturn := '0';
+	res.controlInfo.newIntReturn := '0';
+	res.controlInfo.newExcReturn := '0';
+	res.controlInfo.newFetchLock := '0';	
+	return res;
+end function;
+
+function clearTempControlInfoMulti(sd: StageDataMulti) return StageDataMulti is
+	variable res: StageDataMulti := sd;
+begin
+	for i in res.fullMask'range loop
+		res.data(i) := clearTempControlInfoSimple(res.data(i));
+	end loop;
+	return res;
+end function;
+
+
+	-- to integrate interrupt signal into instruction where it is injected
+	function setInterrupt(ins: InstructionState; intSignal: std_logic; intCode: SmallNumber)
+	return InstructionState is
+		variable res: InstructionState := ins;
+	begin
+		res.controlInfo.newEvent := intSignal;
+		res.controlInfo.hasEvent := intSignal;
+		res.controlInfo.newInterrupt := intSignal;
+		res.controlInfo.hasInterrupt := intSignal;
+		-- ...?	
+		return res;
+	end function;	
+
 end TEMP_DEV;

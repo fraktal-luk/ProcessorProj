@@ -19,7 +19,7 @@ use IEEE.STD_LOGIC_1164.all;
 	
 package ProgramCode3 is
 
-		type WordMem is array (0 to 511) of word;
+		type WordMem is array (0 to 511 + 512) of word;
 
 		constant programMem: WordMem := (
 								  0 => ins655H(addI, r3, r0, 1022),
@@ -33,7 +33,7 @@ package ProgramCode3 is
 								  6 => ins655H(addI,  r7, r3, 34),
 								  7 => 	
 										 ins65J(jnz, r0, 4* (-6)), 
-										 --ins655655(ext1, r4, r0, jnzR, r0, 0), -- jmp to adr in register
+										 --ins655655(ext1, r4, r3, jnzR, r0, 0), -- jmp to adr in register
 								  8 => ins655655(ext0,  r12, r3, addR, r0, 0),	
 								  9 => 
 											ins6556X(ext1, r1, r0, load, 250),								  
@@ -54,14 +54,15 @@ package ProgramCode3 is
 					30-1 => X"ffffffff",
 						
 			--206 => ins655655(ext2, 2, 3, mtc,  0, 0),
-			64 + 7 => ins655655(ext2, 2, 0, mfc, 0, 0),
+			64 + 7 => ins655655(ext2, 2, 3, mfc, 1, 2),
 
-			64 + 9 => ins65J(jz, r0, 4* (-72)),			
+			--64 + 9 => ins65J(jz, r0, 4* (-72)),			
 			
 			64 + 10 => ins655655(ext2, 0, 0, rete, 0, 0),
 			
 			75 + 10 => ins655655(ext2, 0, 0, reti, 0, 0),
-				
+				-- When there are more than 512 elements - for testing int return
+				128 => ins655655(ext2, 0, 0, reti, 0, 0),	
 			others=> ins655H(orI, r28, r28,479)	
 			--others=>(others=>'0')
 		);		

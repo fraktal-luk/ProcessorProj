@@ -56,6 +56,9 @@ subtype SmallNumber is byte;
 type SmallNumberArray is array(integer range <>) of SmallNumber;
 constant SMALL_NUMBER_SIZE: natural := SmallNumber'length;
 
+
+constant PROCESSOR_ID: Mword := X"001100aa";
+
 type ExecUnit is (General, ALU, MAC, Divide, Jump, Memory, System );
 type ExecFunc is (unknown,	
 										arithAdd, arithSub, arithShra,
@@ -92,37 +95,34 @@ type InstructionBasicInfo is record
 	--thread: SmallNumber;
 	intLevel: SmallNumber;
 	systemLevel: SmallNumber;
-	-- (?) info: is exception handler?
 end record;
 
 type InstructionControlInfo is record
-	-- DEPREC?
-	unseen: std_logic; -- Set '1' when instruction state requiring actions is handled; clear if sth new appears
-
-		pcEvent: std_logic;
-		fetchEvent: std_logic;
-		hbuffEvent: std_logic;
-		s0Event: std_logic;
-		execEvent: std_logic;
-
-	exception: std_logic;
-	-- CAREFUL! Maybe should have separate excpetionF, exceptionD, exceptionE to indicate at which stage 
-	--				it happened? Stages that can rise exceptions are prob. F, D, E(i) 
-	
-	exceptionCode: SmallNumber;
-	--branch: std_logic; -- move to system info?
-	branchSpeculated: std_logic; 
-	branchConfirmed: std_logic; 
-		branchExecute: std_logic;
-		branchCancel: std_logic;
-	--branchAddress: Mword'
-	--...?
-	fetchLockSignal: std_logic; -- CAREFUL! Must be set when fetchLock decoded, but cleared after detection!
+	-- Momentary data:
+	newEvent: std_logic; -- True if any new event appears
+	newInterrupt: std_logic;
+	newException: std_logic;
+	newBranch: std_logic;
+	newReturn: std_logic; -- going to normal next, as in cancelling a branch
+	newIntReturn: std_logic;
+	newExcReturn: std_logic;
+	newFetchLock: std_logic;
+	-- Persistent data:
+	hasEvent: std_logic; -- Persistent 
+	hasInterrupt: std_logic;
+	hasException: std_logic;
+	hasBranch: std_logic;
+	hasReturn: std_logic;
+	hasIntReturn: std_logic;
+	hasExcReturn: std_logic;
+	hasFetchLock: std_logic;
+	exceptionCode: SmallNumber; -- Set when exception occurs, remains cause exception can be only 1 per op
 end record;
 
 type InstructionClassInfo is record
 	branchAlways: std_logic; -- either taken or not (only constant branches are known at decoding)
 	branchCond: std_logic;
+	branchReg: std_logic;
 	system: std_logic; -- ??
 	--memory: std_logic; -- ??
 	fetchLock: std_logic;
@@ -277,6 +277,10 @@ type StageDataPC is record
 	nH: PipeFlow; -- number of hwords 	
 end record;
 
+constant INITIAL_BASIC_INFO: InstructionBasicInfo := (ip => i2slv(-PIPE_WIDTH*4, MWORD_SIZE),
+																		systemLevel => (others => '0'),
+																		intLevel => (others => '0'));																		
+
 constant DEFAULT_DATA_PC: StageDataPC := (			pc => (others=>'0'),
 																		pcBase => (others=>'0'),
 																		--nFull => 0,
@@ -287,8 +291,9 @@ constant DEFAULT_DATA_PC: StageDataPC := (			pc => (others=>'0'),
 constant INITIAL_DATA_PC: StageDataPC := (			pc => i2slv(-PIPE_WIDTH*4, MWORD_SIZE),
 																		pcBase => i2slv(-PIPE_WIDTH*4, MWORD_SIZE),
 																		--nFull => 0,
-																		nH => (others=>'0'),
-																		basicInfo => defaultBasicInfo
+																		nH => i2slv(FETCH_BLOCK_SIZE, SMALL_NUMBER_SIZE),
+																		basicInfo => --defaultBasicInfo
+																						INITIAL_BASIC_INFO
 																		);
 
 type TEMP_StageDataFetch is record
@@ -320,11 +325,13 @@ end record;
 
 type FrontEventInfo is record
 	eventOccured: std_logic;
-	ePC, eFetch, eHbuff, e0, e1: std_logic;
-	iPC, iFetch, iHbuff, i0, i1: integer;
-	mPC, mFetch, m0, m1: std_logic_vector(0 to PIPE_WIDTH-1); -- Event masks
-	pPC, pFetch, p0, p1: std_logic_vector(0 to PIPE_WIDTH-1); -- Event masks
-	mHbuff, pHbuff: std_logic_vector(0 to HBUFFER_SIZE-1);
+	causing: InstructionState;
+	affectedVec, causingVec: std_logic_vector(0 to 4);	
+	fromExec, fromInt: std_logic;	
+end record;
+
+type FrontEventInfo2 is record
+	eventOccured: std_logic;
 	causing: InstructionState;
 	affectedVec, causingVec: std_logic_vector(0 to 4);	
 	fromExec, fromInt: std_logic;	
@@ -440,23 +447,25 @@ end function;
 function defaultControlInfo return InstructionControlInfo is
 begin
 	return InstructionControlInfo'(
-												unseen => '0',
-													pcEvent => '0',
-													fetchEvent => '0',
-													hbuffEvent => '0',
-													s0Event => '0',
-													execEvent => '0',
-	
-												exception => '0',
-												exceptionCode => (others=>'0'),
-												--branch: std_logic; -- move to system info?
-												branchSpeculated => '0', 
-												branchConfirmed => '0', 
-													branchExecute => '0',
-													branchCancel => '0',
-												--branchAddress: Mword'
-												--...?
-												fetchLockSignal => '0'
+												newEvent => '0',
+												hasEvent => '0',
+												newInterrupt => '0',
+												hasInterrupt => '0',
+												newException => '0',
+												hasException => '0',
+												newBranch => '0',
+												hasBranch => '0',
+												newReturn => '0',
+												hasReturn => '0',
+												newIntReturn => '0',
+												hasIntReturn => '0',
+												newExcReturn => '0',
+												hasExcReturn => '0',												
+												newFetchLock => '0',
+												hasFetchLock => '0',
+												
+												--	exception => '0',
+												exceptionCode => (others=>'0')
 												);
 end function;
 
@@ -465,6 +474,7 @@ begin
 	return InstructionClassInfo'(
 											branchAlways => '0',
 											branchCond => '0',
+											branchReg => '0',
 											system => '0',
 											--memory: std_logic; -- ??
 												-- ?? load => '0',

@@ -137,9 +137,9 @@ begin
 		
 		-- TEMP: also clear unneeded data for all instructions
 		res.data(i).virtualArgs := defaultVirtualArgs;
-		res.data(i).constantArgs := defaultConstantArgs;
+		--res.data(i).constantArgs := defaultConstantArgs; -- c1 needed for sysMtc!
 		res.data(i).argValues := defaultArgValues;
-		res.data(i).basicInfo := defaultBasicInfo;
+		--res.data(i).basicInfo := defaultBasicInfo;
 		res.data(i).bits := (others => '0');
 	end loop;
 	

@@ -234,7 +234,7 @@ function getExceptionMask(insVec: StageDataMulti) return std_logic_vector is
 begin
 	for i in insVec.fullMask'range loop
 		res(i) := insVec.fullMask(i) 
-				and insVec.data(i).controlInfo.exception;
+				and insVec.data(i).controlInfo.newException;
 	end loop;			
 	return res;
 end function;

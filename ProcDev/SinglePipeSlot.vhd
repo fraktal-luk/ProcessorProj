@@ -145,7 +145,7 @@ begin
 				elsif stateAux(0).te = '1' then
 					data(0) <= defaultInstructionState;
 				else -- stall
-					data(0).controlInfo.unseen <= '0';
+					--data(0).controlInfo.unseen <= '0';
 				end if;
 				
 				state <= stateVar;

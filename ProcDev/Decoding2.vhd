@@ -29,7 +29,7 @@ package Decoding2 is
 		-- TODO: Standardize jump conditions and handling them
 		constant COND_NONE: slv5 := "11111";
 		constant COND_Z: slv5 := "00000";
-		constant COND_NZ: slv5 := "10000";
+		constant COND_NZ: slv5 := "00001";
 
 
 		type QuintetArgName is (d0, d1, s0, s1, s2, c0, c1);
@@ -130,9 +130,9 @@ package Decoding2 is
 			constant fmtJumpCondNZ: ArgFormatStruct := 
 					((d0=>zero, d1=>none, s0=>qa, s1=>none, s2=>none, c0=>none, c1=> one), imm21, '1', '0', '0');					
 			constant fmtJumpRZ: ArgFormatStruct := 
-					((d0=>qa, d1=>none, s0=>qb, s1=>qc, s2=>none, c0=>none, c1=> zero), imm26, '1', '0', '0');					
+					((d0=>qa, d1=>none, s0=>qb, s1=>qc, s2=>none, c0=>none, c1=> zero), none, '0', '0', '0');					
 			constant fmtJumpRNZ: ArgFormatStruct := 
-					((d0=>qa, d1=>none, s0=>qb, s1=>qc, s2=>none, c0=>none, c1=> one), imm26, '1', '0', '0');	
+					((d0=>qa, d1=>none, s0=>qb, s1=>qc, s2=>none, c0=>none, c1=> one), none, '0', '0', '0');	
 					
 			constant fmtShiftC: ArgFormatStruct :=		
 					((d0=>qa, d1=>none, s0=>qb, s1=>none, s2=>none, c0=>qc, c1=>none), none, '0', '0', '0');					
@@ -141,9 +141,9 @@ package Decoding2 is
 					((others=>none), none, '0', '0', '0');			
 			
 				constant fmtMFC_TEMP: ArgFormatStruct := 
-					((d0=>qa, others=>none), none, '0','0','0');
+					((d0=>qa, c1=>qd, others=>none), none, '0','0','0');
 				constant fmtMTC_TEMP: ArgFormatStruct := 
-					((s0=>qb, others=>none), none, '0','0','0');			
+					((s0=>qb, c0=>qc, others=>none), none, '0','0','0');			
 		
 		constant undefInsDef: InsDefNewW := (opcode2slv(ext2), opcont2slv(ext2, undef),
 																				System, sysUndef, fmtUndef);

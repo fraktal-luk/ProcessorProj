@@ -51,7 +51,7 @@ entity SubunitFetch is
 		clk: in std_logic;
 		reset: in std_logic;
 		en: in std_logic;
-		
+			ivalid: in std_logic;
 		fetchLockCommand: in std_logic;
 		prevSending: in std_logic;
 		nextAccepting: in std_logic;
@@ -91,6 +91,9 @@ begin
 		flowDrive => flowDriveFetch,
 		flowResponse => flowResponseFetch
 	);			
+	
+	-- CAREFUL, TODO: cause proper control flow correction if full but ivalid = '0', cause it means
+	--						failed fetch!
 	
 	flowDriveFetch.prevSending <= prevSending; 
 	flowDriveFetch.nextAccepting <= nextAccepting; 				
