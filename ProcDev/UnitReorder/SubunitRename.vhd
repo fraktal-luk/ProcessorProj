@@ -54,7 +54,7 @@ entity SubunitRename is
 		
 		prevSending: in std_logic;
 		nextAccepting: in std_logic;
-		execEventSignal: in std_logic;
+		execEventSignal: in std_logic; -- TODO: unify with system used for killing in front stages?
 		execCausing: in InstructionState;
 		renameLockCommand: in std_logic;
 		stageDataIn: in StageDataMulti;		
@@ -68,11 +68,7 @@ entity SubunitRename is
 		newGprTags: in SmallNumberArray(0 to PIPE_WIDTH-1);
 		newNumberTags: in SmallNumberArray(0 to PIPE_WIDTH-1);
 		
-		virtSources: out RegNameArray(0 to 3*PIPE_WIDTH-1);
-		virtDests: out RegNameArray(0 to PIPE_WIDTH-1);
-		renamingMask: out std_logic_vector(0 to PIPE_WIDTH-1);
-		reserveSel: out std_logic_vector(0 to PIPE_WIDTH-1);
-		readyClearSel: out std_logic_vector(0 to PIPE_WIDTH-1)
+			newGroupTag: in SmallNumber
 	);
 end SubunitRename;
 
@@ -83,12 +79,19 @@ architecture Behavioral of SubunitRename is
 	signal stageData1, stageData1Living, stageData1Next, stageData1New:
 														StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
 															
-	signal reserveSelSig: std_logic_vector(0 to PIPE_WIDTH-1) := (others => '0' );															
+	signal reserveSelSig, takeVec: std_logic_vector(0 to PIPE_WIDTH-1) := (others => '0' );															
 	signal partialKillMask1: std_logic_vector(0 to PIPE_WIDTH-1) := (others => '0');														
 begin
-	stageData1New <= renameRegs(baptizeVec(stageDataIn, newNumberTags),
-										 stageDataIn.fullMask, reserveSelSig, 											
-										 newPhysSources, newPhysDests, newGprTags);
+	reserveSelSig <= getDestMask(stageDataIn);
+	takeVec <= 		(others => '1') when ALLOC_REGS_ALWAYS
+				else stageDataIn.fullMask;
+
+	stageData1New <= 	baptizeGroup(
+								renameRegs(baptizeVec(stageDataIn, newNumberTags),
+												takeVec, reserveSelSig, 											
+												newPhysSources, newPhysDests, newGprTags),
+								newGroupTag
+							);
 										
 	stageData1Next <= stageMultiNext(stageData1Living, stageData1New,
 								flowResponse1.living, flowResponse1.sending, flowDrive1.prevSending);			
@@ -97,8 +100,7 @@ begin
 	PIPE_CLOCKED: process(clk) 	
 	begin
 		if rising_edge(clk) then
-			if reset = '1' then
-				
+			if reset = '1' then			
 			elsif en = '1' then	
 				stageData1 <= stageData1Next;										
 			end if;
@@ -121,13 +123,5 @@ begin
 	sendingOut <= flowResponse1.sending;
 	stageDataOut <= stageData1Living;
 
-	--
-	reserveSelSig <= getDestMask(stageDataIn);
-	
-	virtSources <=	getVirtualArgs(stageDataIn);					
-	virtDests <= getVirtualDests(stageDataIn);	
-	renamingMask <= stageDataIn.fullMask;	
-	reserveSel <= reserveSelSig;
-	readyClearSel <= reserveSelSig;
 end Behavioral;
 

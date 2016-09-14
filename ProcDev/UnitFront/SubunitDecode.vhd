@@ -54,7 +54,8 @@ entity SubunitDecode is
 		
 		prevSending: in std_logic;
 		nextAccepting: in std_logic;
-		frontEvents: in FrontEventInfo;
+		--frontEvents: in FrontEventInfo;
+			killIn: in std_logic;		
 		stageDataIn: in StageDataMulti;		
 		acceptingOut: out std_logic;
 		sendingOut: out std_logic;
@@ -132,7 +133,7 @@ begin
 	stageEvents <= stageMultiEvents(stageData0, flowResponse0.isNew);								
 	partialKillMask0 <= stageEvents.partialKillMask;
 
-	flowDrive0.kill <= frontEvents.affectedVec(3);
+	flowDrive0.kill <= killIn; --frontEvents.affectedVec(4);
 
 	flowDrive0.prevSending <= prevSending;
 	flowDrive0.nextAccepting <= nextAccepting;

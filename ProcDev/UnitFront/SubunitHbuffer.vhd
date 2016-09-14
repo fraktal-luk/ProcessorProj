@@ -55,7 +55,8 @@ entity SubunitHbuffer is
 		fetchBlock: in HwordArray(0 to FETCH_BLOCK_SIZE-1);
 		prevSending: in std_logic;
 		nextAccepting: in std_logic;
-		frontEvents: in FrontEventInfo;
+		--frontEvents: in FrontEventInfo;
+			killIn: in std_logic;
 		stageDataIn: in StageDataPC;		
 		acceptingOut: out std_logic;
 		sendingOut: out std_logic;
@@ -137,7 +138,7 @@ begin
 
 	hbufferDrive.kill <=	num2flow(countOnes(fullMaskHbuffer and partialKillMaskHbuffer));
 
-	flowDriveHbuff.kill <= frontEvents.affectedVec(2);
+	flowDriveHbuff.kill <= killIn; --frontEvents.affectedVec(3);
 
 	stageDataOut <= hbuffOut.sd;				
 	acceptingOut <= flowResponseHbuff.accepting;	

@@ -29,8 +29,6 @@ function getInstructionClassInfo(ins: InstructionState) return InstructionClassI
 -- Writes target to the 'target' field
 function setBranchTarget(ins: InstructionState) return InstructionState;
 
-function basicJumpAddress(ins: InstructionState) return Mword;
-
 function instructionFromWord(w: word) return InstructionState;
 
 function decodeInstruction(inputState: InstructionState) return InstructionState;
@@ -53,8 +51,9 @@ return HbuffOutData;
 function stagePCNext(content, newContent: StageDataPC;
 							full, sending, receiving: std_logic) return StageDataPC;
 
-function newPCData(content: StageDataPC; fe: FrontEventInfo; pcNext, causingNext: Mword;
-							eli, ili: InstructionBasicInfo) return StageDataPC;
+function newPCData(content: StageDataPC; fe: FrontEventInfo; pcNext, causingNext: Mword)--;
+							--eli, ili: InstructionBasicInfo)
+return StageDataPC;
 
 function stageFetchNext(content, newContent: StageDataPC;
 							full, sending, receiving: std_logic) return StageDataPC;
@@ -107,8 +106,8 @@ begin
 			ci.branchCond := '0';
 
 			if 	 	(ins.operation.func = jump and ins.constantArgs.c1 = COND_NONE)
-				or		ins.operation.func = sysRetE
-				or 	ins.operation.func = sysRetI
+				--or		ins.operation.func = sysRetE
+				--or 	ins.operation.func = sysRetI
 			then
 				ci.branchAlways := '1';
 			elsif (ins.operation.func = jump and ins.constantArgs.c1 /= COND_NONE) then 
@@ -150,17 +149,6 @@ begin
 	return res;
 end function;	
 
--- DEPREC?
-function basicJumpAddress(ins: InstructionState) return Mword is
-begin
-	--if ins.controlInfo.branchExecute = '1' then
-	--	return ins.target;
-	--elsif ins.controlInfo.branchCancel = '1' then
-	--	return ins.result;
-	--else -- TODO, CAREFUL: inspect other possible paths
-	--	return (others=>'0');
-	--end if;		
-end function;
 
 function instructionFromWord(w: word) return InstructionState is
 	variable res: InstructionState := defaultInstructionState;
@@ -194,11 +182,11 @@ begin
 --				end if;
 	
 		if res.classInfo.undef = '1' then
-			res.controlInfo.newEvent := '1';
-			res.controlInfo.hasEvent := '1';			
+			--res.controlInfo.newEvent := '1';
+			--res.controlInfo.hasEvent := '1';			
 					--res.controlInfo.exception := '1';
-			res.controlInfo.newException := '1';
-			res.controlInfo.hasException := '1';
+			--res.controlInfo.newException := '1';
+			--res.controlInfo.hasException := '1';
 			res.controlInfo.exceptionCode := i2slv(ExceptionType'pos(undefinedInstruction), SMALL_NUMBER_SIZE);
 		end if;
 		
@@ -358,14 +346,13 @@ begin
 end function;
 
 
-function newPCData(content: StageDataPC; fe: FrontEventInfo; pcNext, causingNext: Mword;
-							eli, ili: InstructionBasicInfo)
+function newPCData(content: StageDataPC; fe: FrontEventInfo; pcNext, causingNext: Mword)--;
+							--eli, ili: InstructionBasicInfo)
 return StageDataPC is
 	variable res: StageDataPC := content;
 	variable newPC: Mword := (others=>'0');
 begin
 	if fe.eventOccured = '1' then -- when from exec or front	
-		-- TODO: need more cases to handle exc return and int return etc? Or maybe these are enough?
 		if --fe.fromInt = '1' then
 			fe.causing.controlInfo.newInterrupt = '1'
 		then
@@ -388,15 +375,15 @@ begin
 		elsif fe.causing.controlInfo.newReturn = '1' then
 			res.basicInfo.ip := fe.causing.result;
 		
-			-- TEMP!
-			elsif fe.causing.controlInfo.newIntReturn = '1' then
-				res.basicInfo := ili; --X"00000210";
-				-- Alternative option: read LRs in branch exec logic and pass here as target
-					--res.basicInfo.ip := fe.causing.target;
-			-- TEMP!	
-			elsif fe.causing.controlInfo.newExcReturn = '1' then	
-				res.basicInfo := eli; --X"00000220";
-					--res.basicInfo.ip := fe.causing.target;
+--			-- TEMP!
+--			elsif false and fe.causing.controlInfo.newIntReturn = '1' then
+--				res.basicInfo := ili; --X"00000210";
+--				-- Alternative option: read LRs in branch exec logic and pass here as target
+--					--res.basicInfo.ip := fe.causing.target;
+--			-- TEMP!	
+--			elsif false and fe.causing.controlInfo.newExcReturn = '1' then	
+--				res.basicInfo := eli; --X"00000220";
+--					--res.basicInfo.ip := fe.causing.target;
 		end if;				
 	else	-- Increment by the width of fetch group
 		-- CAREFUL: using Verilog adder for this seems to make things worse, not better
@@ -452,25 +439,6 @@ begin
 	return res;
 end function;
 
-
----- ?????? CHECK: prob. abandoned direction 
---function detectEventsDecode(sdIn, sdNew: StageDataMulti; receiving: std_logic) return std_logic_vector is
---	variable res: std_logic_vector(0 to PIPE_WIDTH-1) := (others => '0');
---begin
---	if receiving = '0' then
---		return res;
---	end if;
---	
---	for i in sdIn.fullMask'range loop
---		if 	sdIn.fullMask(i) = '1' 
---			and false -- TODO: add other necessary condtions!
---		then	
---			res(i) := '1';
---		end if;
---	end loop;
---	
---	return res;
---end function;
 
 function detectEventsMulti(sd: StageDataMulti; receiving: std_logic) return InstructionSlot is
 	variable res: InstructionSlot := ('0', sd.data(PIPE_WIDTH-1)); 
@@ -622,8 +590,9 @@ begin
 		elsif inputs(j).full = '1' and inputs(j).ins.controlInfo.newEvent = '1' then
 			found := '1';
 			causing := inputs(j).ins;
+			res(i).full := '0';
 		else
-			null;
+			res(i).full := '0';
 		end if;
 	end loop;
 	

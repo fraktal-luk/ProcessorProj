@@ -36,6 +36,19 @@ function stageCQNext2(content: StageDataCommitQueue; newContent: InstructionStat
 		nFull, nOut, nIn: integer)
 return StageDataCommitQueue;
 
+
+function compactData(data: InstructionStateArray; mask: std_logic_vector) return InstructionStateArray;
+function compactMask(data: InstructionStateArray; mask: std_logic_vector) return std_logic_vector;
+
+
+function stageCQNext3(content: StageDataCommitQueue; newContent: InstructionStateArray;
+		livingMask: std_logic_vector;
+		ready: std_logic_vector;
+		outWidth: integer;
+		nFull, nOut, nIn: integer)
+return StageDataCommitQueue;
+
+
 end ProcLogicCQ;
 
 
@@ -91,7 +104,8 @@ function stageCQNext2(content: StageDataCommitQueue; newContent: InstructionStat
 return StageDataCommitQueue is
 	variable res: StageDataCommitQueue := (fullMask => (others=>'0'), 
 														data => (others=>defaultInstructionState));
-	variable j: integer;		
+	variable j: integer;
+	variable newFullMask: std_logic_vector(0 to content.fullMask'length-1) := (others => '0');
 		constant CLEAR_EMPTY_SLOTS_CQ: boolean := false;
 begin
 	-- CAREFUL: even when not clearing empty slots, result tags probably should be cleared!
@@ -110,8 +124,10 @@ begin
 			res.data(i) := defaultInstructionState;	
 		end if;
 		
-		res.fullMask(i) := content.fullMask(i + nOut);	
+		newFullMask(i) := content.fullMask(i + nOut);
 	end loop;
+	res.fullMask := newFullMask;
+	
 	
 	for i in 0 to livingMask'length-1 loop --  ready'range loop			
 		if (vecA(i) and ready(0)) = '1' then 
@@ -137,13 +153,156 @@ begin
 		
 		-- TEMP: also clear unneeded data for all instructions
 		res.data(i).virtualArgs := defaultVirtualArgs;
-		--res.data(i).constantArgs := defaultConstantArgs; -- c1 needed for sysMtc!
+		--	res.data(i).virtualDestArgs := defaultVirtualDestArgs;
+		res.data(i).constantArgs := defaultConstantArgs; -- c0 needed for sysMtc if not using temp reg in Exec
 		res.data(i).argValues := defaultArgValues;
-		--res.data(i).basicInfo := defaultBasicInfo;
+		res.data(i).basicInfo := defaultBasicInfo;
 		res.data(i).bits := (others => '0');
 	end loop;
 	
 	return res;		
 end function;
  
+
+
+function compactData(data: InstructionStateArray; mask: std_logic_vector) return InstructionStateArray is
+	variable res: InstructionStateArray(0 to 3) := --data(0 to 3);
+														(data(1), data(2), data(0), data(3));
+	variable k: integer := 0;
+begin
+	res(k) := data(1);
+	if mask(1) = '1' then
+		k := k + 1;
+	end if;
+	
+	res(k) := data(2);
+	if mask(2) = '1' then
+		k := k + 1;
+	end if;
+
+	res(k) := data(0);	
+	if mask(0) = '1' then
+		k := k + 1;
+	end if;	
+
+	res(k) := data(3);	
+	if mask(3) = '1' then
+		k := k + 1;
+	end if;
+	
+	return res;
+end function;
+
+
+function compactMask(data: InstructionStateArray; mask: std_logic_vector) return std_logic_vector is
+	variable res: std_logic_vector(0 to 3) := (others => '0');
+	variable k: integer := 0;
+begin
+	res(k) := mask(1);
+	if mask(1) = '1' then
+		k := k + 1;
+	end if;
+	
+	res(k) := mask(2);
+	if mask(2) = '1' then
+		k := k + 1;
+	end if;
+
+	res(k) := mask(0);	
+	if mask(0) = '1' then
+		k := k + 1;
+	end if;	
+	
+	res(k) := mask(3);	
+	if mask(3) = '1' then
+		k := k + 1;
+	end if;
+	
+	return res;
+end function;
+
+
+
+function stageCQNext3(content: StageDataCommitQueue; newContent: InstructionStateArray;
+		livingMask: std_logic_vector;
+		ready: std_logic_vector;
+		outWidth: integer;
+		nFull, nOut, nIn: integer)
+return StageDataCommitQueue is
+	variable res: StageDataCommitQueue := (fullMask => (others=>'0'), 
+														data => (others=>defaultInstructionState));
+	variable contentExtended: InstructionStateArray(0 to CQ_SIZE+4-1) := 
+								content.data & newContent;
+	variable dataTemp: InstructionStateArray(0 to CQ_SIZE+4-1) := (others => defaultInstructionState);
+	variable fullMaskTemp: std_logic_vector(0 to CQ_SIZE+4-1) := (others => '0');
+		
+	variable j: integer;
+	variable k: integer := 0;
+	variable newFullMask: std_logic_vector(0 to content.fullMask'length-1) := (others => '0');
+		constant CLEAR_EMPTY_SLOTS_CQ: boolean := false;
+		
+	variable newCompactedData: InstructionStateArray(0 to 3);
+	variable newCompactedMask: std_logic_vector(0 to 3);
+begin
+	newCompactedData := newContent; --compactData(newContent, ready);
+	newCompactedMask := ready; --compactMask(newContent, ready);
+	-- CAREFUL: even when not clearing empty slots, result tags probably should be cleared!
+	--				It's to prevent reading of fake results from empty slots
+	if not CLEAR_EMPTY_SLOTS_CQ then
+		dataTemp := contentExtended; -- content.data & newCompactedData;
+	end if;	
+
+--			for i in 0 to content.data'length-1 loop -- to livingContent'length - nOut - 1 loop
+--				if i < nFull - nOut then
+--					dataTemp(i) := content.data(i + nOut);		
+--					fullMaskTemp(i) := '1'; -- content.fullMask(i + nOut);
+--				elsif i < nFull - nOut + 4 then
+--					dataTemp(i) := newCompactedData(k);
+--					fullMaskTemp(i) := newCompactedMask(k);
+--					k := k + 1;
+--				else
+--					--fullMaskTemp(i) := '0';
+--				end if;
+--			end loop;	
+		
+		for i in 0 to contentExtended'length - 1 - outWidth loop
+			contentExtended(i) := contentExtended(i + outWidth);
+		end loop;
+		
+		for i in 0 to content.data'length-1 loop -- to livingContent'length - nOut - 1 loop
+			if i < nFull - nOut then
+				dataTemp(i) := contentExtended(i);		
+				fullMaskTemp(i) := '1'; -- content.fullMask(i + nOut);
+			elsif i < nFull - nOut + 4 then
+				dataTemp(i) := newCompactedData(k);
+				fullMaskTemp(i) := newCompactedMask(k);
+				k := k + 1;
+			else
+				dataTemp(i) := contentExtended(i);
+				--fullMaskTemp(i) := '0';
+			end if;
+		end loop;		
+		
+		
+	res.data := dataTemp(0 to CQ_SIZE-1);
+	res.fullMask := fullMaskTemp(0 to CQ_SIZE-1);
+		
+	-- CAREFUL! Clearing tags in empty slots, to avoid incorrect info about available results!
+	for i in 0 to res.fullMask'length-1 loop
+		if res.fullMask(i) = '0' then
+			res.data(i).physicalDestArgs.d0 := (others => '0');
+		end if;
+		
+		-- TEMP: also clear unneeded data for all instructions
+		res.data(i).virtualArgs := defaultVirtualArgs;
+		--	res.data(i).virtualDestArgs := defaultVirtualDestArgs;
+		res.data(i).constantArgs := defaultConstantArgs; -- c0 needed for sysMtc if not using temp reg in Exec
+		res.data(i).argValues := defaultArgValues;
+		res.data(i).basicInfo := defaultBasicInfo;
+		res.data(i).bits := (others => '0');
+	end loop;
+	
+	return res;		
+end function;
+
 end ProcLogicCQ;

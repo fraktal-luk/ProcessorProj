@@ -60,22 +60,9 @@ entity SubunitCommit is
 		acceptingOut: out std_logic;
 		sendingOut: out std_logic;
 		stageDataOut: out StageDataMulti;
-		--stageEventsOut: out StageMultiEventInfo
 		
-		physStable: in PhysNameArray(0 to PIPE_WIDTH-1);
-		
-		physCommitFreed: out PhysNameArray(0 to PIPE_WIDTH-1);
-		virtCommitDests: out RegNameArray(0 to PIPE_WIDTH-1);
-		physCommitDests: out PhysNameArray(0 to PIPE_WIDTH-1);
-		commitSel: out std_logic_vector(0 to PIPE_WIDTH-1);
-		readySetSel: out std_logic_vector(0 to PIPE_WIDTH-1);
-		committingMask: out std_logic_vector(0 to PIPE_WIDTH-1);
-		
-			fetchLockCommit: out std_logic;
-
-			sysRegWriteAllow: out std_logic;
-			sysRegWriteSel: out slv5;
-			sysRegWriteValue: out Mword;			
+		--physStable: in PhysNameArray(0 to PIPE_WIDTH-1);
+					
 		lastCommittedOut: out InstructionState;
 		lastCommittedNextOut: out InstructionState
 	);
@@ -92,52 +79,7 @@ architecture Behavioral of SubunitCommit is
 	signal physCommitDestsSig: PhysNameArray(0 to PIPE_WIDTH-1) := (others => (others => '0'));
 	signal readySetSelSig, commitSelSig: std_logic_vector(0 to PIPE_WIDTH-1) := (others => '0');
 	
-	signal lastCommitted, lastCommittedNext: InstructionState := defaultInstructionState;
-	
-	function fetchLockCommitting(sd: StageDataMulti) return std_logic is
-	begin
-		for i in sd.fullMask'range loop
-			if sd.fullMask(i) = '1' and sd.data(i).classInfo.fetchLock = '1' then
-				return '1';
-			end if;
-		end loop;
-		return '0';
-	end function;
-	
-	function getsysRegWriteAllow(sd: StageDataMulti) return std_logic is
-	begin
-		for i in sd.fullMask'range loop
-			if 	sd.fullMask(i) = '1' 
-				and sd.data(i).operation.unit = System
-				and sd.data(i).operation.func = sysMtc
-			then
-				return '1';
-			end if;
-		end loop;
-		return '0';
-	end function;
-
-	function getSysRegWriteSel(sd: StageDataMulti) return slv5 is
-		variable res: slv5 := (others => '0');
-	begin
-		for i in sd.fullMask'range loop
-			if sd.fullMask(i) = '1' then
-				res := sd.data(i).constantArgs.c0;
-			end if;
-		end loop;
-		return res;
-	end function;
-
-	function getSysRegWriteValue(sd: StageDataMulti) return Mword is
-		variable res: Mword := (others => '0');
-	begin
-		for i in sd.fullMask'range loop
-			if sd.fullMask(i) = '1' then
-				res := sd.data(i).result;
-			end if;
-		end loop;
-		return res;
-	end function;	
+	signal lastCommitted, lastCommittedNext: InstructionState := defaultInstructionState;	
 begin	
 	stageDataCommitLiving <= stageDataCommit; -- Nothing will kill it?
 	stageDataCommitNew <= stageDataIn;	-- ??(some may be killed? careful)					
@@ -159,7 +101,6 @@ begin
 		end if;
 	end process;
 
-	-- CAREFUL, TODO: redundant selection here?
 	lastCommittedNext <= getLastFull(stageDataIn) when anySendingFromCQSig = '1'				
 						else	lastCommitted;
 		
@@ -167,13 +108,7 @@ begin
 		clk => clk, reset => reset, en => en,
 		flowDrive => flowDriveCommit,
 		flowResponse => flowResponseCommit
-	);	
-		
-		fetchLockCommit <= fetchLockCommitting(stageDataIn);
-	
-		sysRegWriteAllow <= getSysRegWriteAllow(stageDataIn);
-		sysRegWriteSel <= getSysRegWriteSel(stageDataIn);
-		sysRegWriteValue <= getSysRegWriteValue(stageDataIn);
+	);			
 	
 	flowDriveCommit.nextAccepting <= '1'; -- Nothing block it
 	-- NOTE: sending from CQ is in continuous packets; if bit 0 is '0', no else will be '1'
@@ -183,25 +118,9 @@ begin
 	sendingOut <= flowResponseCommit.sending;		 
 	acceptingOut <= flowResponseCommit.accepting; -- NOTE: prob. UNUSED, because always '1'
 	
-	physCommitDestsSig <= getPhysicalDests(stageDataIn);
-	readySetSelSig <= commitSelSig and not getExceptionMask(stageDataIn);
-	
 	anySendingFromCQSig <= prevSending;
-	commitSelSig <= getPhysicalDestMask(stageDataIn);	
-
-	FREED_SELECTION: for i in 0 to PIPE_WIDTH-1 generate	
-		-- Commit
-		physCommitFreed(i) <= physStable(i) when readySetSelSig(i) = '1'
-							  else physCommitDestsSig(i);
-	end generate;		
-	--
-	virtCommitDests <= getVirtualDests(stageDataIn);
-	physCommitDests <= physCommitDestsSig;		
-	commitSel <= commitSelSig; 					
-	readySetSel <= readySetSelSig;		
-	committingMask <= stageDataIn.fullMask;
-
+	
 	lastCommittedOut <= lastCommitted;
-	lastCommittedNextOut <= lastCommittedNext;	
+	lastCommittedNextOut <= lastCommittedNext;
 end Behavioral;
 

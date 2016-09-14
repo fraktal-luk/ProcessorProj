@@ -27,6 +27,11 @@ module TestVerilogRegFile6P(
 	 
 	 input [0:3] commitVec,
 	 
+		input readAllowT0,
+		input readAllowT1,
+		input readAllowT2,
+		input readAllowT3,
+	 
 	 input [5:0] readSelect0,
 	 input [5:0] readSelect1,
 	 input [5:0] readSelect2,
@@ -97,21 +102,29 @@ module TestVerilogRegFile6P(
 	begin		
 
 		// Synchronous reading
-		rd[0] <= pr[readSelect0];
-		rd[1] <= pr[readSelect1];
-		rd[2] <= pr[readSelect2];
-
-		rd[3] <= pr[readSelect3];
-		rd[4] <= pr[readSelect4];
-		rd[5] <= pr[readSelect5];
-
-		rd[6] <= pr[readSelect6];
-		rd[7] <= pr[readSelect7];
-		rd[8] <= pr[readSelect8];
-			
-		rd[9] <= pr[readSelect9];
-		rd[10] <= pr[readSelect10];
-		rd[11] <= pr[readSelect11];	
+		if (readAllowT0) begin
+			rd[0] <= pr[readSelect0];
+			rd[1] <= pr[readSelect1];
+			rd[2] <= pr[readSelect2];
+		end;
+		
+		if (readAllowT1) begin
+			rd[3] <= pr[readSelect3];
+			rd[4] <= pr[readSelect4];
+			rd[5] <= pr[readSelect5];
+		end;
+		
+		if (readAllowT2) begin
+			rd[6] <= pr[readSelect6];
+			rd[7] <= pr[readSelect7];
+			rd[8] <= pr[readSelect8];
+		end;	
+		
+		if (readAllowT3) begin
+			rd[9] <= pr[readSelect9];
+			rd[10] <= pr[readSelect10];
+			rd[11] <= pr[readSelect11];	
+		end;
 	
 		if (commitAllow) begin
 			// Writing	

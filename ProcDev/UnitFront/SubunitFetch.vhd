@@ -55,7 +55,8 @@ entity SubunitFetch is
 		fetchLockCommand: in std_logic;
 		prevSending: in std_logic;
 		nextAccepting: in std_logic;
-		frontEvents: in FrontEventInfo;
+		--frontEvents: in FrontEventInfo;
+			killIn: in std_logic;
 		stageDataIn: in StageDataPC;		
 		acceptingOut: out std_logic;
 		sendingOut: out std_logic;
@@ -99,10 +100,17 @@ begin
 	flowDriveFetch.nextAccepting <= nextAccepting; 				
 	flowDriveFetch.lockAccept <= fetchLockCommand;	
 
-	flowDriveFetch.kill <= frontEvents.affectedVec(1);
+	flowDriveFetch.kill <= killIn; --frontEvents.affectedVec(1);
 
 	stageDataOut <= stageDataFetch;
 	acceptingOut <= flowResponseFetch.accepting;		
 	sendingOut <= flowResponseFetch.sending;
 end Behavioral;
 
+
+architecture Bypassed of SubunitFetch is
+begin
+	stageDataOut <= stageDataIn;
+	acceptingOut <= nextAccepting;
+	sendingOut <= prevSending;
+end Bypassed;

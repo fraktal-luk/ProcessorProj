@@ -877,5 +877,146 @@ begin
 end function;
 
 
+--	
+---- Get inputs form registers and immediate value
+--function getIssueArgValues(pa: InstructionPhysicalArgs; ca: InstructionConstantArgs;
+--									ready: std_logic_vector; vals: MwordArray) 
+--return InstructionArgValues is
+--	variable res: InstructionArgValues := defaultArgValues;
+--begin	
+--	if pa.sel(0) = '1' then
+--		if ready(0) = '1' then
+--			res.arg0 := vals(0);
+--		else
+--			res.missing(0) := '1';
+--		end if;
+--	end if;
+--	
+--	-- CAREFUL! Here we must check if it's immediate value!
+--	assert (ca.immSel and pa.sel(1)) = '0' 	-- Never should have s1 and imm together!
+--			report "Immediate value together with reg src1!" severity error; 
+--	
+--	if ca.immSel = '1' then
+--		res.arg1 := ca.imm;
+--	end if;
+--	
+--	if pa.sel(1) = '1' then
+--		if ready(1) = '1' then
+--			res.arg1 := vals(1);
+--		else
+--			res.missing(1) := '1';
+--		end if;
+--	end if;
+--
+--	if pa.sel(2) = '1' then
+--		if ready(2) = '1' then
+--			res.arg2 := vals(2);
+--		else
+--			res.missing(2) := '1';
+--		end if;
+--	end if;		
+--	return res;
+--end function;
+
+-- get args still missing (used while waiting for issue, possibly in the cycle when going to Exec)
+--function updateArgValues(av: InstructionArgValues;
+--									ready: std_logic_vector; vals: MwordArray) 
+--return InstructionArgValues is
+--	variable res: InstructionArgValues := av;
+--begin
+--	if (res.missing(0) and ready(0)) = '1' then
+--		res.missing(0) := '0';
+--		res.arg0 := vals(0);
+--	end if;
+--
+--	if (res.missing(1) and ready(1)) = '1' then
+--		res.missing(1) := '0';
+--		res.arg1 := vals(1);
+--	end if;
+--
+--	if (res.missing(2) and ready(2)) = '1' then
+--		res.missing(2) := '0';
+--		res.arg2 := vals(2);
+--	end if;
+--	
+--	return res;
+--end function;	
+
+
+
+--
+--function getForwardingStatusInfoD(av: in InstructionArgValues; pa: in InstructionPhysicalArgs; 
+--										 content: in MwordArray;
+--										tags, nextTags: in PhysNameArray; nResultTags: integer) return ArgStatusInfo
+--is		
+--	variable stored, ready, nextReady: std_logic_vector(0 to 2) := (others=>'0');
+--	variable locs, nextLocs: SmallNumberArray(0 to 2) := (others=>(others=>'0'));
+--	variable vals: MwordArray(0 to 2) := (others=>(others=>'0'));
+--	variable res: ArgStatusInfo;
+--begin
+--	stored := not av.missing;	
+--	
+--	-- Find where tag agrees with s0
+--	for i in --tags'range loop -- CAREFUL! Is this loop optimal for muxing?
+--				--0 to nResultTags-1 loop
+--				nResultTags-1 downto 0 loop
+--		
+--		if tags(i) = pa.s0 then
+--			ready(0) := '1';
+--			locs(0) := i2slv(i, SMALL_NUMBER_SIZE);
+--			vals(0) := content(i);
+--		end if;
+--		if tags(i) = pa.s1 then
+--			ready(1) := '1';
+--			locs(1) := i2slv(i, SMALL_NUMBER_SIZE);
+--			vals(1) := content(i);
+--		end if;
+--		if tags(i) = pa.s2 then
+--			ready(2) := '1';
+--			locs(2) := i2slv(i, SMALL_NUMBER_SIZE);
+--			vals(2) := content(i);
+--		end if;
+--	end loop;
+--	
+--	for i in nextTags'range loop
+--		
+--		if nextTags(i) = pa.s0 then
+--			nextReady(0) := '1';
+--			nextLocs(0) := i2slv(i, SMALL_NUMBER_SIZE);
+--		end if;
+--		if nextTags(i) = pa.s1 then
+--			nextReady(1) := '1';
+--			nextLocs(1) := i2slv(i, SMALL_NUMBER_SIZE);
+--		end if;
+--		if nextTags(i) = pa.s2 then
+--			nextReady(2) := '1';
+--			nextLocs(2) := i2slv(i, SMALL_NUMBER_SIZE);
+--		end if;			
+--	end loop;
+--	
+--	res.stored := stored;
+--	res.ready := ready;
+--	res.locs := locs;
+--	res.vals := vals;
+--	res.nextReady := nextReady;
+--	res.nextLocs := nextLocs;
+--	
+--	return res;								
+--end function;
+--
+--
+--function getArgInfoArrayD(data: InstructionStateArray; vals: MwordArray; 
+--										resultTags, nextTags: PhysNameArray; nResultTags: integer)
+--return ArgStatusInfoArray is
+--	variable res: ArgStatusInfoArray(data'range);
+--begin
+--	for i in res'range loop
+--		res(i) := getForwardingStatusInfoD(data(i).argValues, data(i).physicalArgs, vals, 
+--					resultTags, nextTags, nResultTags);
+--	end loop;
+--	
+--	return res;
+--end function;
+
  
 end OLD_FUNCTIONS;

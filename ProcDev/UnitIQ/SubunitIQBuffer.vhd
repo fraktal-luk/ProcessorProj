@@ -61,10 +61,10 @@ entity SubunitIQBuffer is
 		newData: in StageDataMulti;
 		nextAccepting: in std_logic;
 		execEventSignal: in std_logic;
+		intSignal: in std_logic;
 		execCausing: in InstructionState;
 		aiArray: in ArgStatusInfoArray(0 to IQ_SIZE-1);
-		regsAllow: in std_logic_vector(0 to 3*IQ_SIZE-1);
-		
+		readyRegFlags: in std_logic_vector(0 to 3*PIPE_WIDTH-1);
 		accepting: out SmallNumber;
 		queueSending: out std_logic;
 		iqDataOut: out InstructionStateArray(0 to IQ_SIZE-1);
@@ -140,15 +140,10 @@ begin
 	flowDriveQ.nextAccepting <=  num2flow(1) when (nextAccepting and isNonzero(readyMask)) = '1'			
 									else num2flow(0);															
 	
-	--physSourcesQ <= extractPhysSources(queueData);
-	--missingQ <= extractMissing(queueData);
-	
-	queueDataUpdated <= updateIQData(queueData, aiArray);	-- Filling arg fields		
+	queueDataUpdated <= updateIQData(queueData, aiArray, readyRegFlags);	-- Filling arg fields		
 	-- Info about args avalable now, or next cycle, or not
-	asArray <= getArgStatusArray(aiArray, livingMask, regsAllow);
-	readyMask <= extractReadyMask(asArray); -- setting readyMask - directly used by flow logic
-	
-	--------------
+	asArray <= getArgStatusArray(aiArray, queueDataUpdated, livingMask);
+	readyMask <= extractReadyMask(asArray); -- setting readyMask - directly used by flow logic	
 	
 	SLOTS_IQ: entity work.BufferPipeLogic(Behavioral) -- IQ)
 	generic map(
@@ -173,8 +168,8 @@ begin
 			inB =>  b,
 			outC => before
 		);		
-		killMask(i) <= 		before and fullMask(i)
-							and 	execEventSignal; 			
+		killMask(i) <= killByTag(before, execEventSignal, intSignal) -- before and execEventSignal
+								and fullMask(i); 			
 	end generate;	
 	
 	accepting <= flowResponseQ.accepting;	

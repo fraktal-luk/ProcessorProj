@@ -43,7 +43,7 @@ USE ieee.std_logic_1164.ALL;
 	use work.GeneralPipeDev.all;		
 	use work.CommonRouting.all;
  
-	use work.ProgramCode3.all; 
+	use work.ProgramCode4.all; 
  
 ENTITY NewCoreTB IS
 END NewCoreTB;
@@ -150,6 +150,8 @@ BEGIN
 		wait for clk_period/2;
    end process;
  
+	reset <= '1' after 65 ns, '0' after 75 ns; 
+	
 	en <= '1' after 105 ns;
    -- Stimulus process
    stim_proc: process

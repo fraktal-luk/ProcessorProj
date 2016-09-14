@@ -26,16 +26,25 @@ package NewPipelineData is
 	constant FETCH_BLOCK_SIZE: natural := PIPE_WIDTH * 2;
 	constant HBUFFER_SIZE: natural := PIPE_WIDTH * 4;
 	
+	constant N_EVENT_AREAS: natural := 8;-- How many distinct stages or groups of stages have own event signals
+	-- PC, Fetch0, Fetch1, Hbuffer, Decode, Rename, OOO, Committed
+	--	 0			1		  2 		  3		 4			5 	  6			 7	
+	
+	
 	constant IQ_A_SIZE: natural := PIPE_WIDTH * 2;
 	constant IQ_B_SIZE: natural := PIPE_WIDTH * 2;
 	constant IQ_C_SIZE: natural := PIPE_WIDTH * 2;
 	constant IQ_D_SIZE: natural := PIPE_WIDTH * 2;
 	constant CQ_SIZE: natural := PIPE_WIDTH * 4;
 	
-	-- CAREFUL! This selects the mode of reg reading. Should be false only if PIPE_WIDTH = 4 
-	constant PRE_IQ_REG_READING: boolean := true;
+		constant ROB_SIZE: natural := 8; -- ??
+
 	
-	constant N_RES_TAGS: natural := 4 + CQ_SIZE + PIPE_WIDTH + 3*PIPE_WIDTH; 
+		-- If true, physical registers are allocated even for empty slots in instruction group
+		--		and later freed from them.
+		constant ALLOC_REGS_ALWAYS: boolean := false;
+		
+	constant N_RES_TAGS: natural := 4 + CQ_SIZE; -- + PIPE_WIDTH; -- + 3*PIPE_WIDTH; 
 						-- Above: num subpipe results + CQ slots + max commited slots + pre-IQ red ports
 	constant N_NEXT_RES_TAGS: natural := 4; 
 	
@@ -98,14 +107,15 @@ type InstructionBasicInfo is record
 end record;
 
 type InstructionControlInfo is record
+	completed: std_logic;
 	-- Momentary data:
 	newEvent: std_logic; -- True if any new event appears
 	newInterrupt: std_logic;
 	newException: std_logic;
 	newBranch: std_logic;
 	newReturn: std_logic; -- going to normal next, as in cancelling a branch
-	newIntReturn: std_logic;
-	newExcReturn: std_logic;
+	--newIntReturn: std_logic;
+	--newExcReturn: std_logic;
 	newFetchLock: std_logic;
 	-- Persistent data:
 	hasEvent: std_logic; -- Persistent 
@@ -113,8 +123,8 @@ type InstructionControlInfo is record
 	hasException: std_logic;
 	hasBranch: std_logic;
 	hasReturn: std_logic;
-	hasIntReturn: std_logic;
-	hasExcReturn: std_logic;
+	--hasIntReturn: std_logic;
+	--hasExcReturn: std_logic;
 	hasFetchLock: std_logic;
 	exceptionCode: SmallNumber; -- Set when exception occurs, remains cause exception can be only 1 per op
 end record;
@@ -165,6 +175,14 @@ type InstructionPhysicalDestArgs is record
 end record;
 
 type InstructionArgValues is record
+		newInQueue: std_logic;
+		immediate: std_logic;
+		zero: std_logic_vector(0 to 2);
+		readyBefore: std_logic_vector(0 to 2);
+		readyNow: std_logic_vector(0 to 2);
+		readyNext: std_logic_vector(0 to 2);
+			locs: SmallNumberArray(0 to 2);
+			nextLocs: SmallNumberArray(0 to 2);
 	missing: std_logic_vector(0 to 2);
 	arg0: Mword;
 	arg1: Mword;
@@ -185,6 +203,7 @@ type InstructionState is record
 	physicalDestArgs: InstructionPhysicalDestArgs;
 	numberTag: SmallNumber;
 	gprTag: SmallNumber;
+	groupTag: SmallNumber;
 	argValues: InstructionArgValues;
 	result: Mword;
 	target: Mword;
@@ -195,9 +214,7 @@ type InstructionStateArray is array(integer range <>) of InstructionState;
 	-- Number of words proper for fetch group size
 	subtype InsGroup is WordArray(0 to PIPE_WIDTH-1);
 
-	-- CAREFUL, TODO: try to stop using rising bit ordering in quantity type!
-	subtype PipeFlow is --std_logic_vector(0 to 4+3); -- TEMP?
-								SmallNumber;
+	subtype PipeFlow is SmallNumber;
 
 -- Use this to convert PipeFlow to numbers 
 function binFlowNum(flow: PipeFlow) return natural;
@@ -269,6 +286,15 @@ type StageDataCommitQueue is record
 	data: InstructionStateArray(0 to CQ_SIZE-1);
 end record;
 
+	type StageDataMultiArray is array (integer range <>) of StageDataMulti;
+
+
+	type StageDataROB is record
+		fullMask: std_logic_vector(0 to ROB_SIZE-1); 
+		data: StageDataMultiArray(0 to ROB_SIZE-1);
+	end record;
+
+
 type StageDataPC is record
 	basicInfo: InstructionBasicInfo;
 	pc: Mword;
@@ -304,7 +330,6 @@ end record;
 
 type AnnotatedHword is record
 	bits: hword;
-	--ip: Mword; -- TODO, NOTE: redundant?
 	basicInfo: InstructionBasicInfo;
 		-- TODO: include a structure for storing hword decoding info?
 		--			Maybe extend 'controlInfo' to hold it?
@@ -351,7 +376,18 @@ type ExecDriveTable is array (ExecStages'left to ExecStages'right) of FlowDriveS
 type ExecResponseTable is array (ExecStages'left to ExecStages'right) of FlowResponseSimple;
 	
 type ExecDataTable is array (ExecStages'left to ExecStages'right) of InstructionState;
-								
+	
+
+	type InstructionResult is record
+		full: std_logic;
+		tag: SmallNumber;
+		value: Mword;
+	end record;
+
+	constant DEFAULT_INSTRUCTION_RESULT: InstructionResult := ('0', (others => '0'), (others => '0'));
+	
+	type InstructionResultArray is array(integer range <>) of InstructionResult;
+	
 	-- Created to enable *Array				
 	type InstructionSlot is record 
 		full: std_logic;
@@ -365,6 +401,9 @@ type ExecDataTable is array (ExecStages'left to ExecStages'right) of Instruction
 					
 			type ArgStatusInfo is record
 					stored: std_logic_vector(0 to 2); -- those that were already present in prev cycle
+					
+				written: std_logic_vector(0 to 2);
+				
 				ready: std_logic_vector(0 to 2);
 				locs: SmallNumberArray(0 to 2);
 				vals: MwordArray(0 to 2);
@@ -380,7 +419,7 @@ type ExecDataTable is array (ExecStages'left to ExecStages'right) of Instruction
 				vals: MwordArray(0 to 2);
 				missing: std_logic_vector(0 to 2);
 					--C_missing: std_logic_vector(0 to 2);					
-				readyReg: std_logic_vector(0 to 2);
+				--readyReg: std_logic_vector(0 to 2);
 				readyNow: std_logic_vector(0 to 2);
 				readyNext: std_logic_vector(0 to 2);
 				stillMissing: std_logic_vector(0 to 2);
@@ -447,6 +486,7 @@ end function;
 function defaultControlInfo return InstructionControlInfo is
 begin
 	return InstructionControlInfo'(
+												completed => '0',
 												newEvent => '0',
 												hasEvent => '0',
 												newInterrupt => '0',
@@ -457,10 +497,10 @@ begin
 												hasBranch => '0',
 												newReturn => '0',
 												hasReturn => '0',
-												newIntReturn => '0',
-												hasIntReturn => '0',
-												newExcReturn => '0',
-												hasExcReturn => '0',												
+												--newIntReturn => '0',
+												--hasIntReturn => '0',
+												--newExcReturn => '0',
+												--hasExcReturn => '0',												
 												newFetchLock => '0',
 												hasFetchLock => '0',
 												
@@ -515,7 +555,18 @@ end function;
 
 function defaultArgValues return InstructionArgValues is
 begin
-	return InstructionArgValues'("000", (others=>'0'), (others=>'0'), (others=>'0'));
+	return (newInQueue => '0',
+			  immediate => '0',
+			  zero => (others => '0'),
+			  readyBefore => (others=>'0'),
+			  readyNow => (others=>'0'),
+			  readyNext => (others=>'0'),
+					locs => (others => (others => '0')),
+					nextLocs => (others => (others => '0')),
+			  missing => (others=>'0'),
+			  arg0 => (others=>'0'),
+			  arg1 => (others=>'0'),
+			  arg2 => (others=>'0'));
 end function;
 
 function defaultInstructionState return InstructionState is
@@ -533,6 +584,7 @@ begin
 	res.physicalDestArgs := defaultPhysicalDestArgs;
 	res.numberTag := (others => '0'); -- '1');
 	res.gprTag := (others => '0'); -- '1');
+	res.groupTag := (others => '0');
 	res.argValues := defaultArgValues;
 	res.result := (others => '0');
 	res.target := (others => '0');

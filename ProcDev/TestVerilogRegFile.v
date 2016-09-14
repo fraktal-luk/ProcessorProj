@@ -42,16 +42,26 @@ module TestVerilogRegFile(
 	 
     );
 	integer i;
-	reg [31:0] pr[0:63];
+	reg [0:0] pr[0:63];
+
+	reg [1:0] ro0, ro1, ro2;
 
 	initial begin
 		//integer i;
+		ro0 = 0;
+		ro1 = 0;
+		ro2 = 0;
+		
 		for (i = 0; i < 64; i = i + 1)
 			pr[i] = 0;
 	end;
 
 	always @(posedge clk)
 	begin
+		ro0 <= pr[readSelect0];
+		ro1 <= pr[readSelect1];
+		ro2 <= pr[readSelect2];		
+	
 		if (commitAllow) begin
 			// Writing	
 			if (writeAck[0] && (writeSelect0 != 6'b0)) begin
@@ -59,7 +69,7 @@ module TestVerilogRegFile(
 				//pr[23] = 66;	
 			end;
 
-			if (0   && writeAck[1] && writeSelect1 != 0) begin
+			if (writeAck[1] && writeSelect1 != 6'b0) begin
 				pr[writeSelect1] <= writeData1;	
 			end;
 			
@@ -70,9 +80,9 @@ module TestVerilogRegFile(
 		end;	
 	end;
 
-	assign readData0 = pr[readSelect0];
-	assign readData1 = pr[readSelect1];
-	assign readData2 = pr[readSelect2];
+	assign readData0 = ro0; //pr[readSelect0];
+	assign readData1 = ro1; //pr[readSelect1];
+	assign readData2 = ro2; //pr[readSelect2];
 
 //	always begin
 //		if (readAck[0] && readSelect[0] != 0) begin

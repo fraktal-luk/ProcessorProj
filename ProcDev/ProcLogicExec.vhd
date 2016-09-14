@@ -24,11 +24,6 @@ use work.GeneralPipeDev.all;
 
 package ProcLogicExec is
 	
-	-- TODO: probably useless, maybe remove	
-	function getExecDataUpdated(execData: ExecDataTable;
-						dispatchAUpdated, dispatchBUpdated, dispatchCUpdated, dispatchDUpdated: InstructionState)
-	return ExecDataTable;
-
 	function getExecPrevResponses(				
 		execResponses: ExecResponseTable; 
 		frDispatchA, frDispatchB, frDispatchC, frDispatchD: FlowResponseSimple)
@@ -63,20 +58,6 @@ end ProcLogicExec;
 
 
 package body ProcLogicExec is
-
-	function getExecDataUpdated(execData: ExecDataTable;
-						dispatchAUpdated, dispatchBUpdated, dispatchCUpdated, dispatchDUpdated: InstructionState)
-	return ExecDataTable is
-		variable execDataUpdated: ExecDataTable;
-	begin	
-		execDataUpdated := ( 	
-			ExecA0 => execData(ExecA0),
-			ExecB0 => execData(ExecB0), ExecB1 => execData(ExecB1), ExecB2 => execData(ExecB2),
-			ExecC0 => execData(ExecC0), ExecC1 => execData(ExecC1), ExecC2 => execData(ExecC2),
-			ExecD0 => execData(ExecD0),
-			others=> defaultInstructionState);		
-		return execDataUpdated;
-	end function;
 		
 	function getExecPrevResponses(execResponses: ExecResponseTable; 
 											frDispatchA, frDispatchB, frDispatchC, frDispatchD: FlowResponseSimple)
@@ -172,21 +153,27 @@ package body ProcLogicExec is
 		variable branchTaken: std_logic := '0';
 	begin		
 		if ins.operation.unit = System then
-				if ins.operation.func = sysRetI then
-					res.controlInfo.newIntReturn := '1';
-					res.controlInfo.hasIntReturn := '1';					
-					res.controlInfo.newEvent := '1';
-					res.controlInfo.hasEvent := '1';					
-				elsif ins.operation.func = sysRetE then
-					res.controlInfo.newExcReturn := '1';
-					res.controlInfo.hasExcReturn := '1';						
-					res.controlInfo.newEvent := '1';
-					res.controlInfo.hasEvent := '1';						
-				elsif 
+--				if false and ins.operation.func = sysRetI then
+--					res.controlInfo.newIntReturn := '1';
+--					res.controlInfo.hasIntReturn := '1';					
+--					res.controlInfo.newEvent := '1';
+--					res.controlInfo.hasEvent := '1';					
+--				elsif false and ins.operation.func = sysRetE then
+--					res.controlInfo.newExcReturn := '1';
+--					res.controlInfo.hasExcReturn := '1';						
+--					res.controlInfo.newEvent := '1';
+--					res.controlInfo.hasEvent := '1';						
+--				elsif 
+				if 
 					ins.operation.func = sysMfc then			
 					res.result := sysRegValue;
 				elsif ins.operation.func = sysMtc then
 					res.result := ins.argValues.arg0;
+				elsif ins.operation.func = sysUndef then
+					res.controlInfo.newException := '1';
+					res.controlInfo.hasException := '1';				
+					res.controlInfo.newEvent := '1';
+					res.controlInfo.hasEvent := '1';					
 				else
 						
 				end if;

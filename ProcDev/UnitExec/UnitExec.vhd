@@ -51,10 +51,16 @@ entity UnitExec is
            reset : in  STD_LOGIC;
            en : in  STD_LOGIC;
 			  
-			  flowResponseIQA: in FlowResponseSimple;
-			  flowResponseIQB: in FlowResponseSimple;
-			  flowResponseIQC: in FlowResponseSimple;
-			  flowResponseIQD: in FlowResponseSimple;
+			  --flowResponseIQA: in FlowResponseSimple;
+			  --flowResponseIQB: in FlowResponseSimple;
+			  --flowResponseIQC: in FlowResponseSimple;
+			  --flowResponseIQD: in FlowResponseSimple;
+			  
+					sendingIQA: in std_logic;
+					sendingIQB: in std_logic;
+					sendingIQC: in std_logic;
+					sendingIQD: in std_logic;
+			  
 				whichAcceptedCQ: in std_logic_vector(0 to 3);
 
 				dataIQA: in InstructionState;
@@ -63,24 +69,20 @@ entity UnitExec is
 				dataIQD: in InstructionState;				
 
 				intSig: in std_logic;
-				--	eventCausingInt: in InstructionState;				
-				lastCommitted: in InstructionState;
-				lastCommittedNext: in InstructionState;		
+				intCausingIn: in InstructionState;
 		
 				memLoadReady: in std_logic;
 				memLoadValue: in Mword;
-		-- Output
 				memAddress: out Mword;
 				memLoadAllow: out std_logic;
 				memStoreAllow: out std_logic;
 				memStoreValue: out Mword;
-		
-					--ilrIn: in Mword;
-					--elrIn: in Mword;
 					
-					sysRegSelect: out slv5;
-					sysRegIn: in MWord; 
-															
+				sysRegSelect: out slv5;
+				sysRegIn: in Mword;
+					sysRegWriteSelOut: out slv5;
+					sysRegWriteValueOut: out Mword;
+					
 				execAcceptingA: out std_logic;
 				execAcceptingB: out std_logic;
 				execAcceptingC: out std_logic;
@@ -88,9 +90,14 @@ entity UnitExec is
 				selectedToCQ: out std_logic_vector(0 to 3);
 				cqWhichSend: out std_logic_vector(0 to 3);
 				
-				execEventSignalOut: out std_logic;
+				execEvent: out std_logic;
 				execCausingOut: out InstructionState;
-				intCausingOut: out InstructionState;
+				
+				execOrIntEventSignalIn: in std_logic;
+				execOrIntCausingIn: in InstructionState;
+				
+				--	orderedResults: out InstructionResultArray(0 to 3);
+				
 				execPreEnds: out InstructionStateArray(0 to 3);
 				execEnds: out InstructionStateArray(0 to 3)		
 			  );
@@ -130,15 +137,30 @@ architecture Behavioral of UnitExec is
 	signal aluAOut, aguCOut: InstructionState := defaultInstructionState;
 	signal lsOut: InstructionState := defaultInstructionState;
 	
-	--signal sysRegArray: MwordArray(0 to 31) := (others => (others => '0'));
 	signal sysRegValue: Mword := (others => '0');
 	signal sysRegReadSel, sysRegWriteSel: slv5 := (others => '0');
+	
+	signal sysRegWriteValueStore: Mword := (others => '0');
+	signal sysRegWriteSelStore: slv5 := (others => '0');
+	
+	signal execEndsSig: InstructionStateArray(0 to 3) := (others => defaultInstructionState);
+	signal execReadyVec: std_logic_vector(0 to 3) := (others => '0');
+		signal execTags, execOrder: SmallNumberArray(0 to 3) := (others => (others => '0'));
+		signal unsorted, sorted: InstructionResultArray(0 to 3) := (others => DEFAULT_INSTRUCTION_RESULT);
+		
+		signal flowResponseSendingA, flowResponseSendingB, flowResponseSendingC, flowResponseSendingD:
+						FlowResponseSimple := (others=>'0');
 begin		
 		resetSig <= reset and HAS_RESET_EXEC;
 		enSig <= en or not HAS_EN_EXEC; 
 
+			flowResponseSendingA.sending <= sendingIQA;
+			flowResponseSendingB.sending <= sendingIQB;
+			flowResponseSendingC.sending <= sendingIQC;
+			flowResponseSendingD.sending <= sendingIQD;			
+
 		execPrevResponses <= getExecPrevResponses(execResponses,
-										flowResponseIQA, flowResponseIQB, flowResponseIQC, flowResponseIQD);
+					flowResponseSendingA, flowResponseSendingB, flowResponseSendingC, flowResponseSendingD);
 		execNextResponses <= getExecNextResponses(execResponses,
 											flowResponseAPost, flowResponseBPost, flowResponseCPost, flowResponseDPost);
 			
@@ -179,35 +201,21 @@ begin
 			);				
 		end block;			
 		
-			-- TODO: system reg addressing
+			-- System reg addressing
 			sysRegReadSel <= dataIQD.constantArgs.c1;  -- TEMP?
-			--sysRegWriteSel <= dataIQD.constantArgs.c1; -- TEMP
-			--sysRegValue <= sysRegArray(slv2u(sysRegReadSel));
-		
-			--sysRegArray(2) <= elrIn;
-			--sysRegArray(3) <= ilrIn;
 		
 				sysRegSelect <= sysRegReadSel;
 				sysRegValue <= sysRegIn; 
 		
-		execDataNew <= (	ExecA0 => --execLogicXor(dataIQA), -- dataOutIQA,
-											 aluAOut,	
+		execDataNew <= (	ExecA0 => aluAOut,	
 								ExecB0 => dataIQB,
 								ExecB1 => execData(ExecB0), ExecB2 => execLogicXor(execData(ExecB1)),
-								ExecC0 => --dataIQC,
-											 aguCOut,	
-								ExecC1 => execData(ExecC0), ExecC2 => --execLogicXor(execData(ExecC1)),
-																					lsOut,
-								ExecD0 => --basicBranch(dataIQD),
-											 basicBranch(setInstructionTarget(dataIQD, branchTarget),
+								ExecC0 => aguCOut,	
+								ExecC1 => execData(ExecC0), ExecC2 => lsOut,
+								ExecD0 => basicBranch(setInstructionTarget(dataIQD, branchTarget),
 																sysRegValue, branchLink),
 								others => defaultInstructionState);
-			-- CAREFUL! Here we must somehow include actual exec operations!				
-			--execDataNew <= getExecDataNew(execDataUpdated, dataASel, dataBSel, dataCSel, dataDSel);											
-		
-				-- ;
-				--btc <= '1' when branchTarget = dataOutIQD.target else '0';
-		
+
 		-- Automatic exec data passing
 		EXEC_DATA_NEXT: for s in ExecStages'left to ExecStages'right generate
 			execDataNext(s) <= stageSimpleNext(execData(s), execDataNew(s),
@@ -220,7 +228,15 @@ begin
 				if resetSig = '1' then
 					
 				elsif enSig = '1' then	
-					execData <= execDataNext;					
+					execData <= execDataNext;
+
+					if 	execDrives(ExecD0).prevSending = '1' 
+						and dataIQD.operation.unit = System
+						and dataIQD.operation.func = sysMtc
+					then
+						sysRegWriteValueStore <= dataIQD.argValues.arg0;
+						sysRegWriteSelStore <= dataIQD.constantArgs.c0;
+					end if;	
 				end if;
 			end if;
 		end process;	
@@ -302,6 +318,7 @@ begin
 			aguCOut <= setExecState(dataIQC, memAddress, '0', "0000");				
 		end block;	
 		
+		-- TODO: is this correct? What about 'sending'?
 		memLoadAllow <= execResponses(ExecC0).full when execData(ExecC0).operation.func = load else '0';
 		memStoreAllow <= execResponses(ExecC0).full when execData(ExecC0).operation.func = store else '0';
 		
@@ -309,34 +326,32 @@ begin
 		
 -------------------------------------------------------------------------------------------------
 	-- Event selection
-	
-	-- Exec/int events:
-		eventSignal <= intSig or execEventSignal;
-									
-			execEventSignal <= (execData(ExecD0).controlInfo.newEvent and execResponses(ExecD0).isNew);
+										
+		execEventSignal <= (execData(ExecD0).controlInfo.newEvent and execResponses(ExecD0).isNew);
 	
 		-- NOTE: alternatively,here would be lastCommittedNext, and instructions in CQ certain to be committed in
 		--			nearest cycle would be spared from killing (CAREFUL: needed collaboration from CQ killer)
-		intCausing <= setInterrupt(lastCommitted, intSig, "00000000");		
+		intCausing <= intCausingIn;
 		execCausing <= execData(ExecD0);
-		activeCausing <= intCausing when intSig = '1'
-						-- lastCommittedNext when intSig = '1' -- NOTE: this - for sparing "almost committed"		
-						else execCausing; --	execData(ExecD0) when execEventSignal = '1' 
-						--else	defaultInstructionState;  -- CHECK: maybe this option not needed, simpler without it?	
+		
+		eventSignal <= execOrIntEventSignalIn;	
+		activeCausing <= execOrIntCausingIn;	
 				
 		-- CAREFUL! In all automatic blocks for exec, remember about correct range of stages!
 		EXEC_KILL: for s in ExecStages'left to ExecStages'right generate
 			signal before: std_logic;
 			signal a, b: std_logic_vector(7 downto 0);
 		begin
-			a <= activeCausing.numberTag;
+			a <= activeCausing.numberTag; -- CAREFUL: if separated execEvent/interrupt, use execCausing,
+													--				and don't use tags from intCausing
 			b <= execData(s).numberTag;
 			EXEC_KILLER: entity work.CompareBefore8 port map(
 				inA => a, 
 				inB => b, 
 				outC => before
 			);		
-			execDrives(s).kill <= before and eventSignal; 	
+			execDrives(s).kill <= killByTag(before, eventSignal, intSig); -- before and eventSignal;
+												--	execEventSignal) or intSig;
 		end generate;
 	
 			memAddress <= execData(ExecC0).result;
@@ -358,21 +373,31 @@ begin
 		execAcceptingC <= execResponses(ExecC0).accepting;
 		execAcceptingD <= execResponses(ExecD0).accepting;	
 	
-		selectedToCQ <= (0 => readyExecA, 1 => readyExecB, 2 => readyExecC, 3 => readyExecD, others=>'0');
+		execReadyVec <= (0 => readyExecA, 1 => readyExecB, 2 => readyExecC, 3 => readyExecD, others=>'0');
+		selectedToCQ <= execReadyVec;
+		
 		cqWhichSend <= (0 => execResponses(ExecA0).sending, 1 => execResponses(ExecB2).sending,
 							 2 => execResponses(ExecC2).sending, 3 =>	execResponses(ExecD0).sending,
 								others=>'0');
-		execEnds <= (	0=> clearTempControlInfoSimple(execData(ExecA0)),
+		execEndsSig <= (	0=> clearTempControlInfoSimple(execData(ExecA0)),
 							1=> clearTempControlInfoSimple(execData(ExecB2)),
 							2=> clearTempControlInfoSimple(execData(ExecC2)),
 							3=> clearTempControlInfoSimple(execData(ExecD0)),
 						others=> defaultInstructionState);
+		execEnds <= execEndsSig;				
+
+
+					execTags <= -- CAREFUL: using groupTag or numberTag
+					(	execEndsSig(0).numberTag, execEndsSig(1).numberTag,
+						execEndsSig(2).numberTag, execEndsSig(3).numberTag);						
+			
 		execPreEnds <= (1=> execData(ExecB1), 2=> execData(ExecC1),
 						others=> defaultInstructionState);											
-		
-	execEventSignalOut <= eventSignal;
-	execCausingOut <= activeCausing;
-	intCausingOut <= intCausing;
-	
+				
+	execEvent <= execEventSignal;
+	execCausingOut <= execCausing;
+
+		sysRegWriteSelOut <= sysRegWriteSelStore;
+		sysRegWriteValueOut <= sysRegWriteValueStore;
 end Behavioral;
 

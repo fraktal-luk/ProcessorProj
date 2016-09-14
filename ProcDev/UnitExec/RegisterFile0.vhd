@@ -40,11 +40,17 @@ use work.NewPipelineData.all;
 entity RegisterFile0 is
 	generic(
 		WIDTH: natural := 1;
+		WRITE_WIDTH: natural := 1;
 		MAX_WIDTH: natural := 4		
 	);
     Port ( clk : in  STD_LOGIC;
            reset : in  STD_LOGIC;
            en : in  STD_LOGIC;
+			  
+					readAllowT0: in std_logic;
+					readAllowT1: in std_logic;
+					readAllowT2: in std_logic;
+					readAllowT3: in std_logic;
 			  
 			  writeAllow: in std_logic;
 			  writeVec: in std_logic_vector(0 to WIDTH-1);			  
@@ -81,7 +87,7 @@ begin
 	
 	IMPL: entity work.TestVerilogRegfile6P
 	generic map(
-		N_WRITE => WIDTH
+		N_WRITE => WRITE_WIDTH
 	)
 	port map(
 		clk => clk, reset => resetSig, en => enSig,
@@ -96,6 +102,11 @@ begin
 		writeData1 => writeValuesMW(1),
 		writeData2 => writeValuesMW(2),
 		writeData3 => writeValuesMW(3),
+			
+			readAllowT0 => readAllowT0,
+			readAllowT1 => readAllowT1,
+			readAllowT2 => readAllowT2,
+			readAllowT3 => readAllowT3,
 		
 		readSelect0 => selectReadMW(0),
 		readSelect1 => selectReadMW(1),

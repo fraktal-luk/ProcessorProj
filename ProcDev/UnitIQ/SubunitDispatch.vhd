@@ -55,13 +55,19 @@ entity SubunitDispatch is
 	 	prevSending: in std_logic;
 	 	nextAccepting: in std_logic;
 		execEventSignal: in std_logic;
+		intSignal: in std_logic;
 		execCausing: in InstructionState;
 		ai: in ArgStatusInfo;
+			resultVals: in MwordArray(0 to N_RES_TAGS-1);
+			regValues: in MwordArray(0 to 2);
+			
 	 	stageDataIn: in InstructionState;		
 		
 		acceptingOut: out std_logic;
 		--sendingOut: out std_logic;
-		flowResponseOut: out FlowResponseSimple;				
+		-- TODO: change to normal 'sending' bit, don't expose FlowResponse structure
+		--flowResponseOut: out FlowResponseSimple;
+			sendingOut: out std_logic;
 		dispatchDataOut: out InstructionState;
 		stageDataOut: out InstructionState		
 	);
@@ -70,7 +76,9 @@ end SubunitDispatch;
 
 
 architecture Behavioral of SubunitDispatch is
-	signal dispatchData, dispatchDataNext, dispatchDataUpdated: InstructionState := defaultInstructionState;
+	signal dispatchData, dispatchDataNext, dispatchDataUpdated,
+				inputDataWithArgs, dispatchData2, dispatchDataNext2, dispatchDataUpdated2:
+							InstructionState := defaultInstructionState;
 
 	signal flowDriveDispatch: FlowDriveSimple := (others=>'0');											
 	signal flowResponseDispatch: FlowResponseSimple := (others=>'0');
@@ -80,6 +88,8 @@ architecture Behavioral of SubunitDispatch is
 			
 	signal asDispatch: ArgStatusStruct;		
 		constant dummyReadyRegs: std_logic_vector(0 to 2) := (others => '0');
+		signal dummyReadyRegFlags: std_logic_vector(0 to 3*PIPE_WIDTH-1) := (others => '0');
+		
 begin	
 	acceptingOut <= flowResponseDispatch.accepting;
 	flowDriveDispatch.prevSending <= prevSending;
@@ -88,22 +98,23 @@ begin
 	begin
 		if rising_edge(clk) then
 			if en = '1' then
-				dispatchData <= dispatchDataNext;							
+				dispatchData <= dispatchDataNext;
 			end if;				
 		end if;
 	end process;
 	
-	dispatchDataNext <= stageSimpleNext(dispatchDataUpdated, stageDataIn,
-														flowResponseDispatch.living,
-														flowResponseDispatch.sending, 
-														flowDriveDispatch.prevSending);
-												
-	-- Info about readiness now
-	asDispatch <= getArgStatus(ai,		
-				-- CAREFUL! "'1' or" below is to look like prev version of send locking					
-				'1' or flowResponseDispatch.living, dummyReadyRegs);	
+	inputDataWithArgs <= getDispatchArgValues(stageDataIn, resultVals);
+	dispatchDataNext <= stageSimpleNext(dispatchDataUpdated, inputDataWithArgs,
+													flowResponseDispatch.living,
+													flowResponseDispatch.sending, 
+													flowDriveDispatch.prevSending);	
+	dispatchDataUpdated <= updateDispatchArgs(dispatchData, resultVals, regValues);
 
-	dispatchDataUpdated <= updateInstructionArgValues2(dispatchData, ai);
+	-- Info about readiness now
+	asDispatch <= getArgStatus(ai, dispatchDataUpdated,
+				-- CAREFUL! "'1' or" below is to look like prev version of send locking					
+				'1' or flowResponseDispatch.living);	
+	
 	-- Don't allow exec if args somehow are not actualy ready!		
 	flowDriveDispatch.lockSend <= not asDispatch.readyAll;
 	
@@ -119,17 +130,19 @@ begin
 		signal a, b: std_logic_vector(7 downto 0);
 	begin
 		a <= execCausing.numberTag;
-		b <= dispatchData.numberTag;
+		b <= dispatchData.numberTag;	
 		DISPATCH_KILLER: entity work.CompareBefore8 port map(
 			inA => a, 
 			inB => b, 
 			outC => before
 		);		
-		flowDriveDispatch.kill <= before and execEventSignal; 	
+		flowDriveDispatch.kill <= killByTag(before, execEventSignal, intSignal);
+										-- before and execEventSignal; 	
 	end block;			
 				
 	stageDataOut <= dispatchDataUpdated;
-	flowResponseOut <= flowResponseDispatch;
+	--flowResponseOut <= flowResponseDispatch;
+		sendingOut <= flowResponseDispatch.sending;
 
 	flowDriveDispatch.nextAccepting <= nextAccepting;
 	
