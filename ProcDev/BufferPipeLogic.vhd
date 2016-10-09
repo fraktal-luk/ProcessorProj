@@ -31,6 +31,7 @@ use IEEE.STD_LOGIC_1164.ALL;
 
 use work.ProcBasicDefs.all;
 
+use work.Helpers.all;
 --use work.GeneralPipeDev.all;
 
 use work.NewPipelineData.all;
@@ -166,27 +167,86 @@ end BehavioralDirect;
 
 
 architecture BehavioralIQ of BufferPipeLogic is
+		constant CAP: PipeFlow := num2flow(CAPACITY);
+		constant MAX_IN: PipeFlow := num2flow(MAX_INPUT);
+		constant MAX_OUT: PipeFlow := num2flow(MAX_OUTPUT);
 
-begin
-	IMPLEM: entity work.PipeStageLogicBuffer(BehavioralIQ) generic map(
-		CAPACITY => CAPACITY,
-		MAX_OUTPUT => MAX_OUTPUT,
-		MAX_INPUT => MAX_INPUT
-	)
-	port map(
-		clk => clk, reset => reset, en => en,
-			lockAccept => flowDrive.lockAccept,
-			lockSend => flowDrive.lockSend,
-		killAll => flowDrive.killAll,
-		kill => flowDrive.kill,
-		prevSending => flowDrive.prevSending,
-		nextAccepting => flowDrive.nextAccepting,
+		signal isNewSig: SmallNumber := (others=>'0');
+		signal fullSig: SmallNumber := (others=>'0');
+		signal livingSig: SmallNumber := (others=>'0');
 		
-		isNew => flowResponse.isNew,
-		full => flowResponse.full,
-		living => flowResponse.living,
-		accepting => flowResponse.accepting,
-		sending => flowResponse.sending
-	);
+		--signal canAccept: SmallNumber := (others=>'0');
+		signal receivingSig: SmallNumber := (others=>'0');
+		signal acceptingSig: SmallNumber := (others=>'0');
+		signal sendingSig: SmallNumber := (others=>'0');
+
+		signal afterSending: SmallNumber := (others=>'0');
+		signal afterReceiving: SmallNumber := (others=>'0');
+		
+		--- interface signals
+			signal lockAccept: std_logic;
+			signal lockSend: std_logic;					
+			signal killAll: std_logic;
+			signal kill: SmallNumber;
+			  
+         signal prevSending: SmallNumber;
+         signal nextAccepting: SmallNumber;
+--			  
+--			signal isNew: SmallNumber;
+--			  
+--			signal full: SmallNumber;
+--			signal living: SmallNumber;				  
+--			  
+--         signal accepting: SmallNumber;
+--			signal sending: SmallNumber;
+begin
+		lockAccept <= flowDrive.lockAccept;
+		lockSend <= flowDrive.lockSend;
+		killAll <= flowDrive.killAll;
+		kill <= flowDrive.kill;
+		prevSending <= flowDrive.prevSending;
+		nextAccepting <= flowDrive.nextAccepting; -- will mean: IQ has ready AND next stage accepts
+
+		flowResponse.isNew <= isNewSig;
+		flowResponse.full <= fullSig;
+		flowResponse.living <= livingSig;
+		flowResponse.accepting <= acceptingSig;
+		flowResponse.sending <= sendingSig;
+			
+		-- when sending and receiving: ...	
+		-- when sending and not reveiving
+		-- when sending and killed
+		-- when not sending and {...}
+				livingSig <= num2flow(binFlowNum(fullSig) - binFlowNum(kill));
+		
+		
+		sendingSig(0) <= nextAccepting(0);
+		
+		acceptingSig <= num2flow(CAPACITY - binFlowNum(fullSig) + binFlowNum(sendingSig));
+							--	num2flow(2);
+								-- ignore killing, baecause it will flush prev stage
+		
+		receivingSig <= num2flow(-binFlowNum(kill)) when isNonzero(kill) = '1' else 
+								prevSending;
+		
+		afterReceiving <= num2flow( binFlowNum(fullSig) - binFlowNum(sendingSig)
+												+ binFlowNum(receivingSig) );
+									-- when receiving considers 'killed' num 
+				
+		CLOCKED: process(clk)
+		begin
+			if rising_edge(clk) then
+				if reset = '1' then
+					fullSig <= (others=>'0');
+				elsif en = '1' then
+					--assert binFlowNum(livingSig) >= binFlowNum(sendingSig) 
+					--		report "Try to send more than available" severity warning;
+					--assert binFlowNum(afterSending) + binFlowNum(prevSending) <= binFlowNum(CAP)
+					--		report "Trying to receive too much" severity warning;					
+					fullSig <= afterReceiving;
+					
+				end if;
+			end if;
+		end process;
 
 end BehavioralIQ;

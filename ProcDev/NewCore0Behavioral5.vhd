@@ -141,6 +141,9 @@ architecture Behavioral5 of NewCore0 is
 		signal stageDataAfterCQ: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;	
 		
 		--		signal ch0, ch1, ch2, ch3: std_logic := '0'; -- TEST, remove
+	
+	-- CAREFUL: this is used to turn off dependence on iqAccepts
+	constant	OMIT_IQ_ACCEPTS: std_logic := '0';			
 				
 	constant HAS_RESET: std_logic := '1';
 	constant HAS_EN: std_logic := '1';				
@@ -192,7 +195,9 @@ begin
 			fetchLockCommandOut => fetchLockCommand, -- This is associated with the front dependency
 		
 		-- Interface with IQ
-		iqAccepts => iqAccepts and robAccepting,	
+				-- CAREFUL: iqAccepts is needed here, but must be faster (based on 'full' instead of 'living')
+		iqAccepts => --iqAccepts and robAccepting,
+							robAccepting and (iqAccepts or OMIT_IQ_ACCEPTS),
 		renamedDataLiving => renamedDataLiving, -- !!!
 		renamedSending => renamedSending,
 				

@@ -142,11 +142,11 @@ begin
 				when execEventSignal = '1'
 		else (others => '0');
 		
-	isSending <= isNonzero(flowResponse.sending);
-	
+	isSending <= --isNonzero(flowResponse.sending);
+						stageDataLiving.fullMask(0) and groupCompleted(stageDataLiving.data(0));
 	-- TODO: allow accepting also when queue full but sending, that is freeing a place.
-	acceptingOut <= '1' when binFlowNum(flowResponse.living) < ROB_SIZE else '0';
-	
+	acceptingOut <= --'1' when binFlowNum(flowResponse.living) < ROB_SIZE else '0';
+							not stageData.fullMask(ROB_SIZE-1);
 	outputData <= stageData.data(0);
 	sendingOut <= isSending;
 end Behavioral;

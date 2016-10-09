@@ -104,10 +104,12 @@ begin
 	end process;
 	
 	inputDataWithArgs <= getDispatchArgValues(stageDataIn, resultVals);
-	dispatchDataNext <= stageSimpleNext(dispatchDataUpdated, inputDataWithArgs,
+	dispatchDataNext <= stageSimpleNext(dispatchData, --Updated, 
+														inputDataWithArgs,
 													flowResponseDispatch.living,
 													flowResponseDispatch.sending, 
-													flowDriveDispatch.prevSending);	
+													--flowDriveDispatch.prevSending);
+														flowResponseDispatch.accepting);
 	dispatchDataUpdated <= updateDispatchArgs(dispatchData, resultVals, regValues);
 
 	-- Info about readiness now

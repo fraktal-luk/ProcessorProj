@@ -64,6 +64,7 @@ entity SubunitIQBuffer is
 		intSignal: in std_logic;
 		execCausing: in InstructionState;
 		aiArray: in ArgStatusInfoArray(0 to IQ_SIZE-1);
+			aiNew: in ArgStatusInfoArray(0 to PIPE_WIDTH-1);
 		readyRegFlags: in std_logic_vector(0 to 3*PIPE_WIDTH-1);
 		accepting: out SmallNumber;
 		queueSending: out std_logic;
@@ -80,9 +81,20 @@ architecture Behavioral of SubunitIQBuffer is
 								:= (others=>defaultInstructionState);
 	signal queueDataNew: InstructionStateArray(0 to PIPE_WIDTH-1) := (others=>defaultInstructionState);	
 	
-	signal emptyMask, fullMask, killMask, livingMask, readyMask, sendingMask: 
+	
+		signal queueData2, queueDataUpdated2, queueDataUpdated2Sel: InstructionStateArray(0 to IQ_SIZE-1) 
+								:= (others=>defaultInstructionState);
+		signal queueDataLiving2, queueDataNext2: InstructionStateArray(0 to IQ_SIZE-1)
+								:= (others=>defaultInstructionState);
+		signal queueDataNew2: InstructionStateArray(0 to PIPE_WIDTH-1) := (others=>defaultInstructionState);	
+		
+	
+	
+	signal emptyMask, fullMask, killMask, livingMask, readyMask,
+							readyMask2, readyMask_C,
+							sendingMask: 
 								std_logic_vector(0 to IQ_SIZE-1) := (others=>'0');				
-		signal truncLiving: SmallNumber := (others=>'0');	
+		signal truncLiving: SmallNumber := (others=>'0');	-- DEPREC
 	signal flowDriveQ: FlowDriveBuffer 
 				:= (killAll => '0', lockAccept => '0', lockSend => '0', others=>(others=>'0'));
 	signal flowResponseQ: FlowResponseBuffer 
@@ -93,11 +105,17 @@ architecture Behavioral of SubunitIQBuffer is
 	-- NOTE: queueContent UNUSED as of now 
 	signal queueContent, queueContentNext: InstructionSlotArray(-1 to IQ_SIZE-1)
 																:= (others => DEFAULT_INSTRUCTION_SLOT);
+
+			signal queueContent2, queueContentNext2: InstructionSlotArray(-1 to IQ_SIZE-1)
+																:= (others => DEFAULT_INSTRUCTION_SLOT);
 																
+		signal newDataU: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;												
 	signal iqFullMaskNext: std_logic_vector(0 to IQ_SIZE-1) := (others => '0');
-	signal iqDataNext: InstructionStateArray(0 to IQ_SIZE-1) := (others => defaultInstructionState);
+	signal iqDataNext, iqDataNext2: InstructionStateArray(0 to IQ_SIZE-1) := (others => defaultInstructionState);
 	signal sends: std_logic := '0';
 	signal dispatchDataNew: InstructionState := defaultInstructionState;
+			signal	mism: std_logic_vector(0 to 2) := (others => '0');
+				signal c0, c1, c2: std_logic := '0';
 begin
 	flowDriveQ.prevSending <= prevSending;		
 	
@@ -107,45 +125,46 @@ begin
 			if reset = '1' then
 				
 			elsif en = '1' then	
-				queueData <= queueDataNext;
+				queueData2 <= queueDataNext2;
 				fullMask <= iqFullMaskNext;
 			end if;	
 		end if;
 	end process;	
 		
 	flowDriveQ.kill <= num2flow(countOnes(killMask));		
-	queueDataLiving <= queueDataUpdated; -- TEMP?
-	queueDataNew <= newData.data;									
-	queueDataNext <= iqDataNext;										
-									
-	--fullMask <= setToOnes(emptyMask, binFlowNum(flowResponseQ.full));	
-	livingMask <= fullMask and not killMask;
-		
-	-- CAREFUL: quick fix to prevent larger 'living' than queue size		
-	--truncLiving(LOG2_PIPE_WIDTH+1 downto 0) <= flowResponseQ.living(LOG2_PIPE_WIDTH + 1 downto 0);
-	truncLiving <= flowResponseQ.living;
-				
-	iqFullMaskNext <= iqExtractFullMask(queueContentNext(0 to IQ_SIZE-1));
-	iqDataNext <= iqExtractData(queueContentNext(0 to IQ_SIZE-1));
-	sends <= queueContentNext(-1).full;
-	dispatchDataNew <= queueContentNext(-1).ins;
+	queueDataLiving2 <= queueDataUpdated2;
+	queueDataNext2 <= iqDataNext2;		
 			
-	queueContentNext <= iqContentNext2(queueDataLiving, newData, livingMask, readyMask,
-													nextAccepting,
-													binFlowNum( truncLiving ),
-													binFlowNum(flowResponseQ.sending),
-													binFlowNum(flowDriveQ.prevSending),
-													prevSendingOK);			
-		
-	flowDriveQ.nextAccepting <=  num2flow(1) when (nextAccepting and isNonzero(readyMask)) = '1'			
+	livingMask <= fullMask and not killMask;
+					
+	iqFullMaskNext <= iqExtractFullMask(queueContentNext2(0 to IQ_SIZE-1));
+	iqDataNext2 <= iqExtractData(queueContentNext2(0 to IQ_SIZE-1));	
+	sends <= queueContentNext2(-1).full;
+	dispatchDataNew <= queueContentNext2(-1).ins;			
+
+			newDataU.fullMask <= newData.fullMask;
+			newDataU.data <= updateForWaitingArray(newData.data, aiNew, '1');
+		queueContentNext2 <= iqContentNext3(queueDataLiving2, queueDataUpdated2Sel, 
+														newDataU, 
+															fullMask,
+																livingMask, 
+														readyMask2, --_C,
+														nextAccepting,
+														binFlowNum(flowResponseQ.living),
+														binFlowNum(flowResponseQ.sending),
+														binFlowNum(flowDriveQ.prevSending),
+														prevSendingOK);
+				
+	flowDriveQ.nextAccepting <=  num2flow(1) when (nextAccepting and isNonzero(readyMask_C)) = '1'			
 									else num2flow(0);															
 	
-	queueDataUpdated <= updateIQData(queueData, aiArray, readyRegFlags);	-- Filling arg fields		
-	-- Info about args avalable now, or next cycle, or not
-	asArray <= getArgStatusArray(aiArray, queueDataUpdated, livingMask);
-	readyMask <= extractReadyMask(asArray); -- setting readyMask - directly used by flow logic	
-	
-	SLOTS_IQ: entity work.BufferPipeLogic(Behavioral) -- IQ)
+	queueDataUpdated2 <= updateForWaitingArray(queueData2, aiArray, '0');
+	queueDataUpdated2Sel <= updateForSelectionArray(queueData2, readyRegFlags, aiArray);
+
+	readyMask2 <= extractReadyMaskNew(queueDataUpdated2Sel);	
+	readyMask_C <= readyMask2 and livingMask;
+			
+	SLOTS_IQ: entity work.BufferPipeLogic(BehavioralIQ) -- IQ)
 	generic map(
 		CAPACITY => IQ_SIZE,
 		MAX_OUTPUT => 1,	-- CAREFUL! When can send to 2 different units at once, it must change to 2!
@@ -162,7 +181,7 @@ begin
 		signal a, b: std_logic_vector(7 downto 0);
 	begin
 		a <= execCausing.numberTag;
-		b <= queueData(i).numberTag;
+		b <= queueData2(i).numberTag;
 		IQ_KILLER: entity work.CompareBefore8 port map(
 			inA =>  a,
 			inB =>  b,
@@ -176,7 +195,7 @@ begin
 
 	queueSending <= flowResponseQ.sending(0); 
 							-- CAREFUL: this assumes that flowResponseQ.sending is binary: [0,1]
-	iqDataOut <= queueData;						
+	iqDataOut <= queueData2;						
 	newDataOut <= dispatchDataNew;
 end Behavioral;
 

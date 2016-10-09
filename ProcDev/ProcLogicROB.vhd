@@ -51,6 +51,7 @@ return StageDataROB is
 														data => (others => DEFAULT_STAGE_DATA_MULTI));
 		constant CLEAR_EMPTY_SLOTS_ROB: boolean := false;
 		variable newFull: integer := nFull;
+			variable bPrev, bCurrent: std_logic := '0';
 begin
 	-- CAREFUL: even when not clearing empty slots, result tags probably should be cleared!
 	--				It's to prevent reading of fake results from empty slots
@@ -64,7 +65,7 @@ begin
 	if sending = '1' then
 			if nFull <= 0 then
 				report "Trying to send from empty ROB!";
-				return res;
+				--return res;
 			end if;
 		
 		-- shift by 1
@@ -86,14 +87,23 @@ begin
 	
 	-- Accept new content
 	if receiving = '1' then
+		bPrev := '1';
 		for i in 0 to ROB_SIZE-1 loop	-- Trick to avoid transitional out of bounds value of index
-			if i = newFull then
+			bCurrent := res.fullMask(i);
+			if --i = newFull then
+				(bCurrent = '0' and bPrev = '1' --and receiving = '1') then					
+															) then
 				res.fullMask(i) := '1';
 				res.data(i) := newContent;
-				newFull := newFull + 1;
-				exit;
-			end if;	
+				--newFull := newFull + 1;
+				--exit;
+			end if;
+			bPrev := bCurrent;
 		end loop;
+	end if;
+		
+	if receiving = '1' then		
+		newFull := newFull + 1;				
 	end if;
 	
 	-- CAREFUL! Clearing tags in empty slots, to avoid incorrect info about available results!

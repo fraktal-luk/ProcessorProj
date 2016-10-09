@@ -44,6 +44,31 @@ function bufferAHNext(content, newContent: AnnotatedHwordArray;
 								nFull, nOut, nIn: integer) 
 return AnnotatedHwordArray;
 
+function bufferAHNext2(content: AnnotatedHwordArray;
+									livingMask: std_logic_vector;
+								newContent: AnnotatedHwordArray; 
+								fetchData: StageDataPC;
+								nFull, nOut, nIn: integer) 
+return AnnotatedHwordArray;
+
+function TEMP_hbufferFullMaskNext(content: AnnotatedHwordArray;
+											livingMask: std_logic_vector;
+											newContent: AnnotatedHwordArray;
+											prevSending: std_logic;											
+											fetchData: StageDataPC;
+											nFull, nOut, nIn: integer)  
+return std_logic_vector;
+
+
+function TEMP_hbufferStageDataNext(content: AnnotatedHwordArray;
+											livingMask: std_logic_vector;
+											newContent: AnnotatedHwordArray;
+											prevSending: std_logic;
+											fetchData: StageDataPC;
+											nFull, nOut, nIn: integer)  
+return StageDataHbuffer;
+
+
 
 function newFromHbuffer(content: AnnotatedHwordArray; fullMask: std_logic_vector)
 return HbuffOutData;
@@ -244,6 +269,9 @@ return AnnotatedHwordArray is
 	variable tempY: AnnotatedHwordArray(0 to 4*newContent'length - 1) 
 			:= (others => DEFAULT_ANNOTATED_HWORD);
 begin	
+
+						report "Here -1";
+
 	newShift := slv2u(fetchData.pc(ALIGN_BITS-1 downto 1));					
 		-- For position 'i':
 		-- Y: if taking newContent[y], it must be: nFull + y - newShift = i, so
@@ -261,10 +289,16 @@ begin
 	tempX := content;
 	tempY := newContent & newContent & newContent & newContent;	
 		
+		report "Here A";
+		
 	tempX(0 to content'length-1 - nOut) := tempX(nOut to content'length-1);
+						report "Here ..";
+
 	tempY(0 to content'length-1 - newShift) := 
 		tempY(		(content'length - nFull + nOut) + newShift 
 					to (content'length - nFull + nOut) + content'length-1 );
+							report "Here |";
+
 	for p in 0 to content'length-1 loop
 		if nFull - nOut > p then
 			res(p) := tempX(p);
@@ -272,13 +306,319 @@ begin
 			res(p) := tempY(p);
 		end if;		
 	end loop;
-	
+						report "Here B";
+
 	if CLEAR_EMPTY_SLOTS_HBUFF then
 		res(nFull - nOut + nIn to res'length-1) := (others => DEFAULT_ANNOTATED_HWORD);
 	end if;
 		
 	return res;
 end function;
+
+
+function bufferAHNext2(content: AnnotatedHwordArray;
+									livingMask: std_logic_vector;
+								newContent: AnnotatedHwordArray; 
+								fetchData: StageDataPC;
+								nFull, nOut, nIn: integer) 
+return AnnotatedHwordArray is
+	variable res: AnnotatedHwordArray(0 to content'length-1) 
+			:= (others => DEFAULT_ANNOTATED_HWORD);
+	variable newShift: integer := 0; -- CAREFUL! This determines where actual data starts in newContent
+		constant CLEAR_EMPTY_SLOTS_HBUFF: boolean := false;
+		
+		constant MAX_MOVE: natural := newContent'length; -- 2*PIPE_WIDTH;
+	
+	variable tempX: AnnotatedHwordArray(0 to content'length + newContent'length - 1) 
+			:= (others => DEFAULT_ANNOTATED_HWORD);
+	variable tempMaskX: std_logic_vector(0 to content'length + newContent'length - 1) := (others => '0');		
+			
+	variable tempY: AnnotatedHwordArray(0 to 2*content'length + newContent'length - 1) 
+			:= (others => DEFAULT_ANNOTATED_HWORD);
+begin	
+	-- CAREFUL! Hbuffer size MUST be a multiple of newContent size!
+
+	--					report "Here -1";
+
+	newShift := slv2u(fetchData.pc(ALIGN_BITS-1 downto 1));					
+		-- For position 'i':
+		-- Y: if taking newContent[y], it must be: nFull + y - newShift = i, so
+		--		y = i + newShift - nFull 
+		-- 	So let's get y := (i + newShift - nFull)
+		-- X: if taking form content[x], it must be: i + nOut = x, so
+		--		x := i + nOut
+		--
+		-- However, for Y: when i is end of queue, it can only take yMax,
+		--					when end-1, it can take {yMax-1, yMax}, etc.
+		-- and for X: x must be smaller than QUEUE_SIZE
+		--
+		-- Selection X vs Y: when nFull-nOut+nIn > i, select X, else select Y
+		--	
+	tempX := content & newContent;
+			tempMaskX(0 to content'length-1) := livingMask;
+	for k in 0 to --content'length + newContent'length - 1 loop
+						tempY'length-1 loop
+		tempY(k) := newContent(k mod newContent'length); -- & newContent & newContent & newContent;	
+	end loop;
+		
+	--	report "Here A";
+		
+	tempX(0 to content'length-1 - nOut) := tempX(nOut to content'length-1);
+		tempMaskX(0 to content'length-1 - nOut) := tempMaskX(nOut to content'length-1);
+	--					report "Here .. ns: " & integer'image(newShift);
+
+	tempY(0 to content'length-1 - newShift) := 
+		tempY(		(content'length - nFull + nOut) + newShift 
+					to (content'length - nFull + nOut) + content'length-1 );
+	--						report "Here |";
+
+	for p in 0 to content'length-1 loop
+		if nFull - nOut > p then
+			--tempMaskX(p) = '1' then
+			
+			
+			if tempMaskX(p) = '1' then
+			--	report "1 good";
+			else 
+			--	report "1 not good";
+			end if;
+			
+			res(p) := tempX(p);
+		else
+			if tempMaskX(p) = '0' then
+			--	report "2 good";
+			else 
+			--	report "2 not good";
+			end if;		
+		
+			res(p) := tempY(p);
+		end if;		
+	end loop;
+	--					report "Here B";
+
+	if CLEAR_EMPTY_SLOTS_HBUFF then
+		res(nFull - nOut + nIn to res'length-1) := (others => DEFAULT_ANNOTATED_HWORD);
+	end if;
+		
+	return res;
+end function;
+
+
+function TEMP_hbufferFullMaskNext(content: AnnotatedHwordArray;
+											livingMask: std_logic_vector;
+											newContent: AnnotatedHwordArray;
+											prevSending: std_logic;
+											fetchData: StageDataPC;
+											nFull, nOut, nIn: integer)  
+return std_logic_vector is
+	variable res: std_logic_vector(0 to content'length-1) 
+			:= (others => '0');
+	variable newShift: integer := 0; -- CAREFUL! This determines where actual data starts in newContent
+		constant CLEAR_EMPTY_SLOTS_HBUFF: boolean := false;
+		
+		constant MAX_MOVE: natural := newContent'length; -- 2*PIPE_WIDTH;
+	
+	variable tempX: AnnotatedHwordArray(0 to content'length + newContent'length - 1) 
+			:= (others => DEFAULT_ANNOTATED_HWORD);
+	variable tempMaskX: std_logic_vector(0 to content'length + newContent'length - 1) := (others => '0');		
+			
+	variable tempMaskY: std_logic_vector(0 to 2*content'length + newContent'length - 1) 
+			:= (others => '0');
+		variable xs: string(1 to tempMaskX'length);
+		variable ys: string(1 to tempMaskY'length);
+		
+begin	
+	-- CAREFUL! Hbuffer size MUST be a multiple of newContent size!
+
+	--					report "Here -1";
+
+	newShift := slv2u(fetchData.pc(ALIGN_BITS-1 downto 1));					
+		-- For position 'i':
+		-- Y: if taking newContent[y], it must be: nFull + y - newShift = i, so
+		--		y = i + newShift - nFull 
+		-- 	So let's get y := (i + newShift - nFull)
+		-- X: if taking form content[x], it must be: i + nOut = x, so
+		--		x := i + nOut
+		--
+		-- However, for Y: when i is end of queue, it can only take yMax,
+		--					when end-1, it can take {yMax-1, yMax}, etc.
+		-- and for X: x must be smaller than QUEUE_SIZE
+		--
+		-- Selection X vs Y: when nFull-nOut+nIn > i, select X, else select Y
+		--	
+	tempX := content & newContent;
+			tempMaskX(0 to content'length-1) := livingMask;
+	for k in 0 to newContent'length - 1 loop
+		--if nIn /= 0 then
+			tempMaskY(k) := prevSending; --newContentMask(k); -- & newContent & newContent & newContent;
+			tempMaskY(content'length + k) := prevSending; --newContentMask(k); -- & newContent & newContent & newContent;
+		--end if;
+	end loop;
+
+	
+	--	report "Here A";
+		--		report "nout: " & integer'image(nOut);
+		tempMaskX(0 to tempMaskX'length-1 - nOut) := tempMaskX(nOut to tempMaskX'length-1);
+	--					report "Here .. ns: " & integer'image(newShift);
+
+--	tempMaskY(0 to content'length-1 - newShift) := 
+--		tempMaskY(		(content'length - nFull + nOut) + newShift 
+--					to (content'length - nFull + nOut) + content'length-1 );
+					
+
+	tempMaskY(0 to content'length-1) := 
+		tempMaskY(		(content'length - nFull + nOut) + newShift 
+					to (content'length - nFull + nOut) + content'length-1 + newShift);					
+					
+	--						report "Here |";
+
+--			for j in 0 to tempMaskX'length-1 loop
+--				if tempMaskX(j) = '1' then
+--					xs(j+1) := '1';
+--				else 
+--					xs(j+1) := '0';
+--				end if;	
+--			end loop;
+--			
+--			report "xm: " & xs;
+--
+--			for j in 0 to tempMaskY'length-1 loop
+--				if tempMaskY(j) = '1' then
+--					ys(j+1) := '1';
+--				else 
+--					ys(j+1) := '0';
+--				end if;	
+--			end loop;
+--			
+--			report "ym: " & ys;
+
+	for p in 0 to content'length-1 loop
+	
+		--	report integer'image(p);
+		if --nFull - nOut > p then
+			tempMaskX(p) = '1' then
+						
+--				if nFull - nOut <= p then
+--					report "m 1 not good";
+--				else	
+--					report "m 1 good";
+--				end if;	
+					if tempMaskX(p) = '1' then
+					--	report "X: yes, 1!";
+					else
+					--	report "X: no, 0!";	
+					end if;						
+						
+			res(p) := '1';
+		else		
+		
+--				if nFull - nOut > p then
+--					report "m 1 not good";
+--				else	
+--					report "m 1 good";
+--				end if;		
+		
+			res(p) := tempMaskY(p);
+					if tempMaskY(p) = '1' then
+				--		report "Y: yes, 1!";
+					else
+					--	report "Y: no, 0!";	
+					end if;
+		end if;	
+				--	report "......";
+	end loop;
+	--					report "Here B";
+	--	report "fm: " & std_logic'image(res(0)) & std_logic'image(res(1))
+	--			& std_logic'image(res(2)) & std_logic'image(res(3));
+	
+	return res;
+end function;
+
+
+
+function TEMP_hbufferStageDataNext(content: AnnotatedHwordArray;
+											livingMask: std_logic_vector;
+											newContent: AnnotatedHwordArray;
+											prevSending: std_logic;
+											fetchData: StageDataPC;
+											nFull, nOut, nIn: integer)  
+return StageDataHbuffer is
+	variable res: StageDataHbuffer := DEFAULT_STAGE_DATA_HBUFFER;
+	variable newShift: integer := 0; -- CAREFUL! This determines where actual data starts in newContent
+		constant CLEAR_EMPTY_SLOTS_HBUFF: boolean := false;
+		
+		constant MAX_MOVE: natural := newContent'length; -- 2*PIPE_WIDTH;
+	
+	variable tempX: AnnotatedHwordArray(0 to content'length + newContent'length - 1) 
+			:= (others => DEFAULT_ANNOTATED_HWORD);
+	variable tempMaskX: std_logic_vector(0 to content'length + newContent'length - 1) := (others => '0');		
+			
+	variable tempY: AnnotatedHwordArray(0 to 2*content'length + newContent'length - 1) 
+			:= (others => DEFAULT_ANNOTATED_HWORD);			
+			
+	variable tempMaskY: std_logic_vector(0 to 2*content'length + newContent'length - 1) 
+			:= (others => '0');
+		variable xs: string(1 to tempMaskX'length);
+		variable ys: string(1 to tempMaskY'length);
+		
+begin	
+	-- CAREFUL! Hbuffer size MUST be a multiple of newContent size!
+
+	newShift := slv2u(fetchData.pc(ALIGN_BITS-1 downto 1));					
+		-- For position 'i':
+		-- Y: if taking newContent[y], it must be: nFull + y - newShift = i, so
+		--		y = i + newShift - nFull 
+		-- 	So let's get y := (i + newShift - nFull)
+		-- X: if taking form content[x], it must be: i + nOut = x, so
+		--		x := i + nOut
+		--
+		-- However, for Y: when i is end of queue, it can only take yMax,
+		--					when end-1, it can take {yMax-1, yMax}, etc.
+		-- and for X: x must be smaller than QUEUE_SIZE
+		--
+		-- Selection X vs Y: when nFull-nOut+nIn > i, select X, else select Y
+		--	
+	tempX := content & newContent;
+			tempMaskX(0 to content'length-1) := livingMask;
+			
+	for k in 0 to tempY'length-1 loop
+		tempY(k) := newContent(k mod newContent'length); -- & newContent & newContent & newContent;	
+	end loop;			
+			
+	for k in 0 to newContent'length - 1 loop
+		--if nIn /= 0 then
+			tempMaskY(k) := prevSending; --newContentMask(k); -- & newContent & newContent & newContent;
+			tempMaskY(content'length + k) := prevSending; --newContentMask(k); -- & newContent & newContent & newContent;
+		--end if;
+	end loop;
+
+	tempX(0 to content'length-1 - nOut) := tempX(nOut to content'length-1);
+	tempMaskX(0 to tempMaskX'length-1 - nOut) := tempMaskX(nOut to tempMaskX'length-1);
+		
+
+	tempY(0 to content'length-1 - newShift) := 
+		tempY(		(content'length - nFull + nOut) + newShift 
+					to (content'length - nFull + nOut) + content'length-1 );
+
+	tempMaskY(0 to content'length-1) := 
+		tempMaskY(		(content'length - nFull + nOut) + newShift 
+					to (content'length - nFull + nOut) + content'length-1 + newShift);					
+		
+	
+	for p in 0 to content'length-1 loop	
+		if tempMaskX(p) = '1' then
+			res.data(p) := tempX(p);
+			res.fullMask(p) := '1';
+		else
+			res.data(p) := tempY(p);
+			res.fullMask(p) := tempMaskY(p);
+		end if;	
+	end loop;
+	
+	return res;
+end function;
+
+
 
 
 function newFromHbuffer(content: AnnotatedHwordArray; fullMask: std_logic_vector)

@@ -83,17 +83,19 @@ package body GeneralPipeDev is
 
 function stageSimpleNext(content, newContent: InstructionState; full, sending, receiving: std_logic)
 return InstructionState is 
-	variable res: InstructionState := defaultInstructionState;
+	variable res: InstructionState := --defaultInstructionState;
+												content;
 begin
 	if receiving = '1' then -- take full
 		res := newContent;
 	elsif sending = '1' then -- take empty
 		-- CAREFUL: omitting this clearing would spare some logic, but clearing of result tag is needed!
 		--						Otherwise following instructions would read results form empty slots!
-		res := defaultInstructionState;
+		--res := defaultInstructionState;
+			res.physicalDestArgs.d0 := (others => '0'); -- CAREFUL: clear result tag!
 	else -- stall
 		if full = '1' then
-			res := content;
+		--	res := content;
 		else
 			-- leave it empty
 		end if;

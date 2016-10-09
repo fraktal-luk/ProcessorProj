@@ -69,6 +69,8 @@ architecture Behavioral of SubunitHbuffer is
 			:= (others => DEFAULT_ANNOTATED_HWORD);
 	signal hbufferDataANew: AnnotatedHwordArray(0 to 2*PIPE_WIDTH-1) := (others => DEFAULT_ANNOTATED_HWORD);	
 	
+		signal stageData, stageDataNext: StageDataHbuffer := DEFAULT_STAGE_DATA_HBUFFER;
+	
 	signal hbufferDrive: FlowDriveBuffer := (killAll => '0', lockAccept => '0', lockSend => '0',
 																others=>(others=>'0'));
 	signal hbufferResponse: FlowResponseBuffer := (others=>(others=>'0'));
@@ -80,6 +82,7 @@ architecture Behavioral of SubunitHbuffer is
 
 	signal shortOpcodes: std_logic_vector(0 to HBUFFER_SIZE-1) := (others=>'0');-- DEPREC but used as dummy
 	signal fullMaskHbuffer, livingMaskHbuffer: std_logic_vector(0 to HBUFFER_SIZE-1) := (others=>'0');
+		signal fullMask2, fullMask2Next, livingMask2: std_logic_vector(0 to HBUFFER_SIZE-1) := (others=>'0');
 	signal hbuffOut: HbuffOutData 
 				:= (sd => DEFAULT_STAGE_DATA_MULTI, nOut=>(others=>'0'), nHOut=>(others=>'0'));
 				
@@ -89,11 +92,41 @@ architecture Behavioral of SubunitHbuffer is
 	signal partialKillMaskHbuffer: std_logic_vector(0 to HBUFFER_SIZE-1) := (others=>'0');			
 begin
 	hbufferDataANew <= getAnnotatedHwords(stageDataIn, fetchBlock);
-	hbufferDataANext <= bufferAHNext(hbufferDataA, hbufferDataANew,	
+	hbufferDataANext <= bufferAHNext2(hbufferDataA,
+											--livingMaskHbuffer,
+											--fullMaskHbuffer,
+											--fullMask2, -- NOTE: if flushing, no receiving so can be fullMask
+											livingMask2,
+										hbufferDataANew,	
 										stageDataIn,
 										binFlowNum(hbufferResponse.living), 
 										binFlowNum(hbufferResponse.sending), binFlowNum(hbufferDrive.prevSending));						
-	fullMaskHbuffer <= setToOnes(shortOpcodes, binFlowNum(hbufferResponse.full));	
+	fullMaskHbuffer <= setToOnes(shortOpcodes, binFlowNum(hbufferResponse.full));
+		fullMask2Next <= TEMP_hbufferFullMaskNext(hbufferDataA,
+											--livingMaskHbuffer,
+											--fullMaskHbuffer,
+											livingMask2,	
+										hbufferDataANew,
+											prevSending,
+										stageDataIn,
+										binFlowNum(hbufferResponse.living), 
+										binFlowNum(hbufferResponse.sending), binFlowNum(hbufferDrive.prevSending));
+		
+		-- TODO: handle possibility of partial killing by partialKillMask!
+		livingMask2 <= fullMask2 when flowDriveHbuff.kill = '0' else (others => '0');
+		
+-- CAREFUL:	alternative integrated version. Slower but smaller
+--				stageDataNext <= TEMP_hbufferStageDataNext(
+--										hbufferDataA,
+--											--livingMaskHbuffer,
+--											--fullMaskHbuffer,
+--											livingMask2,	
+--										hbufferDataANew,
+--											prevSending,
+--										stageDataIn,
+--										binFlowNum(hbufferResponse.living), 
+--										binFlowNum(hbufferResponse.sending), binFlowNum(hbufferDrive.prevSending));		
+		
 	livingMaskHbuffer <= setToOnes(shortOpcodes, binFlowNum(hbufferResponse.living)); -- TEMP?
 	hbuffOut <= newFromHbuffer(hbufferDataA, livingMaskHbuffer);
 	
@@ -104,6 +137,9 @@ begin
 				
 			elsif en = '1' then
 				hbufferDataA <= hbufferDataANext;
+									--	stageDataNext.data;
+					fullMask2 <= fullMask2Next;
+									--	stageDataNext.fullMask;
 			end if;					
 		end if;
 	end process;	
@@ -141,7 +177,10 @@ begin
 	flowDriveHbuff.kill <= killIn; --frontEvents.affectedVec(3);
 
 	stageDataOut <= hbuffOut.sd;				
-	acceptingOut <= flowResponseHbuff.accepting;	
+	acceptingOut <= --flowResponseHbuff.accepting;	
+						--	not (fullMaskHbuffer(HBUFFER_SIZE-2) or fullMaskHbuffer(HBUFFER_SIZE-1));
+							not isNonzero(fullMaskHbuffer(HBUFFER_SIZE - FETCH_BLOCK_SIZE to HBUFFER_SIZE-1));
+							
 	sendingOut <= flowResponseHbuff.sending;
 
 end Behavioral;

@@ -95,6 +95,7 @@ architecture Behavioral of UnitIQ is
 	signal asDispatch: ArgStatusStruct;		
 	
 	signal aiArray: ArgStatusInfoArray(0 to IQ_SIZE-1);
+		signal aiNew: ArgStatusInfoArray(0 to PIPE_WIDTH-1);
 	signal asArray: ArgStatusStructArray(0 to IQ_SIZE-1); -- UNUSED
 			
 	-- Interface between queue and dispatch
@@ -114,8 +115,8 @@ architecture Behavioral of UnitIQ is
 	
 	signal toDispatch: InstructionState := defaultInstructionState;
 
-	constant HAS_RESET_IQ: std_logic := '1';
-	constant HAS_EN_IQ: std_logic := '1';	
+	constant HAS_RESET_IQ: std_logic := '0'; --'1';
+	constant HAS_EN_IQ: std_logic := '0'; --'1';	
 begin	
 	resetSig <= reset and HAS_RESET_IQ;
 	enSig <= en or not HAS_EN_IQ;
@@ -135,6 +136,7 @@ begin
 		intSignal => intSignal,
 		execCausing => execCausing,
 		aiArray => aiArray,
+			aiNew => aiNew,
 		readyRegFlags => readyRegFlags,
 		accepting => accepting,
 		queueSending => queueSending,
@@ -142,6 +144,16 @@ begin
 		newDataOut => toDispatch
 	);
 
+		NEW_DATA_TAG_MATCHER: entity work.QueueTagMatcher(Behavioral) 
+		generic map(IQ_SIZE => PIPE_WIDTH)
+		port map(
+			queueData => newData.data,
+			resultTags => resultTags,
+			nextResultTags => nextResultTags,
+			writtenTags => writtenTags,
+			aiArray => aiNew
+		);
+		
 	QUEUE_TAG_MATCHER: entity work.QueueTagMatcher(Behavioral) 
 	generic map(IQ_SIZE => IQ_SIZE)
 	port map(
@@ -172,6 +184,16 @@ begin
 		dispatchDataOut => dispatchDataSig, -- before arg updating
 		stageDataOut => dataOutIQ
 	);
+		
+				--	updateInstructionArgValues2(dataOutIQ, aiPreDispatch, readyRegFlags);
+		
+--			PRE_DISPATCH_TAG_MATCHER: entity work.DispatchTagMatcher(Behavioral)
+--			port map(
+--				dispatchData => toDispatch,
+--				resultTags => resultTags,
+--				ai => aiPreDispatch
+--			);
+		
 		
 	DISPATCH_TAG_MATCHER: entity work.DispatchTagMatcher(Behavioral)
 	port map(

@@ -341,6 +341,16 @@ constant DEFAULT_ANNOTATED_HWORD: AnnotatedHword := (bits => (others=>'0'), --ip
 
 type AnnotatedHwordArray is array (integer range <>) of AnnotatedHword;
 
+	
+	type StageDataHbuffer is record
+		fullMask: std_logic_vector(0 to HBUFFER_SIZE-1);
+		data: AnnotatedHwordArray(0 to HBUFFER_SIZE-1);
+	end record;
+	
+	constant DEFAULT_STAGE_DATA_HBUFFER: StageDataHbuffer := 
+		(fullMask => (others => '0'), data => (others => DEFAULT_ANNOTATED_HWORD));
+	
+
 type HbuffOutData is record
 	sd: StageDataMulti;
 	nOut: SmallNumber;
