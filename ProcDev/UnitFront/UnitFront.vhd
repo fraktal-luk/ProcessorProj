@@ -38,7 +38,7 @@ use work.NewPipelineData.all;
 
 use work.GeneralPipeDev.all;
 
-use work.CommonRouting.all;
+--use work.CommonRouting.all;
 use work.TEMP_DEV.all;
 
 use work.ProcComponents.all;
@@ -52,13 +52,11 @@ entity UnitFront is
 		reset: in std_logic;
 		en: in std_logic;
 										
-		-- to front pipe
 		iin: in InsGroup; --WordArray(0 to PIPE_WIDTH-1);
 		ivalid: in std_logic;		
-		----
 
 		-- Interface PC to front
-		pcDataLiving: in StageDataPC;
+		pcDataLiving: in InstructionState; --InstructionState;
 		pcSending: in std_logic;
 		frontAccepting: out std_logic;
 
@@ -69,11 +67,9 @@ entity UnitFront is
 		dataLastLiving: out StageDataMulti; 
 		lastSending: out std_logic;
 		-------
-			killVector: in std_logic_vector(0 to N_EVENT_AREAS-1);
+		killVector: in std_logic_vector(0 to N_EVENT_AREAS-1);
 
-		--frontEventsIn: in FrontEventInfo;  -- UNUSED
 		fetchLockCommand: in std_logic
-		--fetchLockRequest: out std_logic	-- UNUSED					
 	);
 end UnitFront;
 
@@ -81,27 +77,11 @@ end UnitFront;
 --			jump back to repeat fetching (or cause exception etc)
 architecture Behavioral of UnitFront is
 	signal resetSig, enSig: std_logic := '0';							
-	
-	----------------------
-	-- Internal to event part
-	signal eventInsArray: InstructionSlotArray(0 to 6) := (others => DEFAULT_INSTRUCTION_SLOT);
-	signal eventCauseArrayS: InstructionSlotArray(0 to 6) := (others => DEFAULT_INSTRUCTION_SLOT);
-	signal eventCauseArray: InstructionStateArray(0 to 6) := (others => defaultInstructionState);
-	------------------
-	
-	-- Interface to front pipe
-	signal frontEvents: FrontEventInfo; 
-		signal frontEvents_C: FrontEventInfo;	
+		
 	signal stage0Events: StageMultiEventInfo;	-- from later stages
 
-	-- Interfaces between stages:													
-	-- from PC
-	signal stageDataOutPCSig: StageDataPC := DEFAULT_DATA_PC;	
-	signal sendingOutPCSig: std_logic := '0';
-	signal acceptingOutPC: std_logic := '0';
-	--------------------
-	
-	signal stageDataOutFetch: StageDataPC := DEFAULT_DATA_PC;
+	-- Interfaces between stages:														
+	signal stageDataOutFetch: InstructionState := DEFAULT_DATA_PC;
 	signal stageDataOutHbuffer, stageDataOut0: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;	
 	signal sendingOutFetch, sendingOutHbuffer, sendingOut0: std_logic := '0';	
 	signal acceptingOutFetch, acceptingOutHbuffer, acceptingOut0: std_logic := '0';
@@ -109,7 +89,7 @@ architecture Behavioral of UnitFront is
 	signal fetchBlock: HwordArray(0 to FETCH_BLOCK_SIZE-1) := (others => (others => '0'));
 	
 		signal ivalid1: std_logic := '0';
-		signal stageDataOutFetch1: StageDataPC := DEFAULT_DATA_PC;
+		signal stageDataOutFetch1: InstructionState := DEFAULT_DATA_PC;
 		signal sendingOutFetch1: std_logic := '0';	
 		signal acceptingOutFetch1: std_logic := '0';	
 
@@ -117,12 +97,14 @@ architecture Behavioral of UnitFront is
 	
 		signal ivalidFinal: std_logic := '0';
 		signal fetchBlockFinal: HwordArray(0 to FETCH_BLOCK_SIZE-1) := (others => (others => '0'));
-		signal stageDataOutFetchFinal:  StageDataPC := DEFAULT_DATA_PC;
+		signal stageDataOutFetchFinal:  InstructionState := DEFAULT_DATA_PC;
 		signal sendingOutFetchFinal: std_logic := '0';
 		
 		signal acceptingForFetchFirst: std_logic := '0';
 		
-		constant FETCH_DELAYED: boolean := false;
+		signal hbufferDataIn: InstructionState := DEFAULT_INSTRUCTION_STATE;
+		
+	constant FETCH_DELAYED: boolean := false;
 	
 	constant HAS_RESET_FRONT: std_logic := '1';
 	constant HAS_EN_FRONT: std_logic := '1';	
@@ -135,109 +117,146 @@ begin
 		fetchBlock(2*i)	<= iin(i)(31 downto 16);
 		fetchBlock(2*i+1) <= iin(i)(15 downto 0);
 	end generate;			
-		
-	-- Fetch stage		
-	SUBUNIT_FETCH_0: entity work.SubunitFetch(Behavioral) port map(
-		clk => clk, reset => resetSig, en => enSig,
-				
-		prevSending => pcSending,	
-		nextAccepting => acceptingForFetchFirst,
-		stageDataIn => pcDataLiving,
-		ivalid => ivalid,
-		
-		acceptingOut => acceptingOutFetch,
-		sendingOut => sendingOutFetch,
-		stageDataOut => stageDataOutFetch,
-		
-		-- from event part
-		--frontEvents =>	frontEvents,
-			killIn => killVector(1),
-		fetchLockCommand => fetchLockCommand		
-	);	
-			
-			FETCH_DELAY: process (clk)
-			begin
-				if rising_edge(clk) then
-					if resetSig = '1' then
-					
-					elsif enSig = '1' then
-						if sendingOutFetch = '1' then
-							ivalid1 <= ivalid;
-							fetchBlock1 <= fetchBlock;					
-						end if;
-					end if;
-				end if;	
-			end process;				
-			
-			ivalidFinal <= ivalid1 when FETCH_DELAYED else ivalid;
-			fetchBlockFinal <= fetchBlock1 when FETCH_DELAYED else fetchBlock;
-			
-			-- CAREFUL: this part must be bypassed (architecture Bypassed) when
-			--				FETCH_DELAYED is false. If true, this should be normal.	
-			SUBUNIT_FETCH_1: entity work.SubunitFetch(Bypassed)
-																	--(Behavioral)
-			port map(
-				
-				clk => clk, reset => resetSig, en => enSig,
-						
-				prevSending => sendingOutFetch,
-				nextAccepting => acceptingOutHbuffer,
-				stageDataIn => stageDataOutFetch,
-				ivalid => ivalid1,
-				
-				acceptingOut => acceptingOutFetch1,
-				sendingOut => sendingOutFetch1,
-				stageDataOut => stageDataOutFetch1,
-				
-				-- from event part
-				--frontEvents =>	frontEvents,
-					killIn => killVector(2),
-				fetchLockCommand => '0'		
-			);
 	
-		stageDataOutFetchFinal <= stageDataOutFetch1;
-		sendingOutFetchFinal <= sendingOutFetch1;
+	-- Fetch stage				
+	STAGE_FETCH_0: block
+		signal f0input, f0output: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
+	begin
+		f0input.fullMask(0) <= pcSending;
+		f0input.data(0) <= pcDataLiving;
+	
+		SUBUNIT_FETCH_0: entity work.GenericStageMulti(Behavioral) port map(
+			clk => clk, reset => resetSig, en => enSig,
+					
+			prevSending => pcSending,	
+			nextAccepting => acceptingForFetchFirst,
+			stageDataIn => f0input,
+			
+			acceptingOut => acceptingOutFetch,
+			sendingOut => sendingOutFetch,
+			stageDataOut => f0output,
+			
+			execEventSignal => killVector(1),
+			execCausing => DEFAULT_INSTRUCTION_STATE,
+			lockCommand => fetchLockCommand		
+		);	
 		
-		acceptingForFetchFirst <= acceptingOutFetch1;
+		stageDataOutFetch <= f0output.data(0);
+	end block;
+			
+	FETCH_DELAY: process (clk)
+	begin
+		if rising_edge(clk) then
+			if resetSig = '1' then
+			
+			elsif enSig = '1' then
+				if sendingOutFetch = '1' then
+					ivalid1 <= ivalid;
+					fetchBlock1 <= fetchBlock;					
+				end if;
+			end if;
+		end if;	
+	end process;				
+	
+	ivalidFinal <= ivalid1 when FETCH_DELAYED else ivalid;
+	fetchBlockFinal <= fetchBlock1 when FETCH_DELAYED else fetchBlock;
+	
+	-- CAREFUL: this part must be bypassed (architecture Bypassed) when
+	--				FETCH_DELAYED is false. If true, this should be normal.		
+	STAGE_FETCH_1: block
+		signal f1input, f1output: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
+	begin
+		f1input.fullMask(0) <= sendingOutFetch;
+		f1input.data(0) <= stageDataOutFetch;
+	
+		SUBUNIT_FETCH_1: entity work.GenericStageMulti(Bypassed) port map(
+			clk => clk, reset => resetSig, en => enSig,
+					
+			prevSending => sendingOutFetch,	
+			nextAccepting => acceptingoutHbuffer,
+			stageDataIn => f1input,
+			
+			acceptingOut => acceptingOutFetch1,
+			sendingOut => sendingOutFetch1,
+			stageDataOut => f1output,
+			
+			execEventSignal => killVector(1),
+			execCausing => DEFAULT_INSTRUCTION_STATE,
+			lockCommand => '0'		
+		);	
 		
+		stageDataOutFetch1 <= f1output.data(0);
+	end block;	
+
+	stageDataOutFetchFinal <= stageDataOutFetch1;
+	sendingOutFetchFinal <= sendingOutFetch1;
+	
+	acceptingForFetchFirst <= acceptingOutFetch1;
+	
+	hbufferDataIn <= stageDataOutFetchFinal;
 	
 	-- Hword buffer		
-	SUBUNIT_HBUFFER: entity work.SubunitHbuffer(Behavioral) port map(
+	SUBUNIT_HBUFFER: entity work.SubunitHbuffer(--Behavioral)
+																Implem)
+	port map(
 		clk => clk, reset => resetSig, en => enSig,
 		
 		prevSending => sendingOutFetchFinal,	
 		nextAccepting => acceptingOut0,
-		stageDataIn => stageDataOutFetchFinal,
+		stageDataIn => hbufferDataIn,
 		fetchBlock => fetchBlockFinal,
 		
 		acceptingOut => acceptingOutHbuffer,
 		sendingOut => sendingOutHbuffer,
 		stageDataOut => stageDataOutHbuffer,
 		
-		-- from event part
-		--frontEvents =>	frontEvents,
-			killIn => killVector(3)
+		execEventSignal => killVector(3),
+		execCausing => DEFAULT_INSTRUCTION_STATE		
 	);		
 	
-	-- Decode stage		
-	SUBUNIT_DECODE: entity work.SubunitDecode(Behavioral) port map(
-		clk => clk, reset => resetSig, en => enSig,
-		
-		prevSending => sendingOutHbuffer,	
-		nextAccepting => renameAccepting,
-		stageDataIn => stageDataOutHbuffer,
-		
-		acceptingOut => acceptingOut0,
-		sendingOut => sendingOut0,
-		stageDataOut => stageDataOut0,
+	-- Decode stage				
+	STAGE_DECODE: block
+		signal newDecoded, newDecodedWithTargets, stageDataDecodeNew, stageDataDecodeOut: StageDataMulti
+				:= DEFAULT_STAGE_DATA_MULTI;
+		signal targets: MwordArray(0 to PIPE_WIDTH-1) := (others => (others => '0'));	
+				
+		constant EARLY_TARGET_ENABLE: boolean := false;
+	begin	
+		newDecoded <= decodeMulti(stageDataOutHbuffer);
 
-		-- from event part
-		--frontEvents =>	frontEvents,
-			killIn => killVector(4),
-		-- to event part
-		stageEventsOut => stage0Events
-	);				
+		newDecodedWithTargets.fullMask <= newDecoded.fullMask;
+		
+		CALC_TARGETS: for i in 0 to PIPE_WIDTH-1 generate
+			--signal aai0, aai1, aai2: Mword := (others => '0');
+		begin	
+			targets(i) <= addWord(newDecoded.data(i).basicInfo.ip, newDecoded.data(i).constantArgs.imm);
+			newDecodedWithTargets.data(i) <= setInstructionTarget(newDecoded.data(i), targets(i));
+		end generate;
+		
+		stageDataDecodeNew <= newDecodedWithTargets when EARLY_TARGET_ENABLE
+								else newDecoded;	
+		SUBUNIT_DECODE: entity work.GenericStageMulti(Behavioral)
+			port map(
+			clk => clk, reset => resetSig, en => enSig,
 			
+			prevSending => sendingOutHbuffer,	
+			nextAccepting => renameAccepting,
+			stageDataIn => stageDataDecodeNew,
+			
+			acceptingOut => acceptingOut0,
+			sendingOut => sendingOut0,
+			stageDataOut => stageDataDecodeOut,
+
+			execEventSignal => killVector(4),
+			execCausing => DEFAULT_INSTRUCTION_STATE,
+			lockCommand => '0',
+			-- to event part
+			stageEventsOut => stage0Events
+		);	
+		
+		stageDataOut0 <= clearTempControlInfoMulti(stageDataDecodeOut);
+	end block;	
+		
 	-- from later stages
 	dataLastLiving <= stageDataOut0;
 	lastSending <= sendingOut0;

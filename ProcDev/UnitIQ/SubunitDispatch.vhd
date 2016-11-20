@@ -38,7 +38,7 @@ use work.NewPipelineData.all;
 
 use work.GeneralPipeDev.all;
 
-use work.CommonRouting.all;
+--use work.CommonRouting.all;
 use work.TEMP_DEV.all;
 
 use work.ProcLogicIQ.all;
@@ -54,42 +54,31 @@ entity SubunitDispatch is
 		
 	 	prevSending: in std_logic;
 	 	nextAccepting: in std_logic;
-		execEventSignal: in std_logic;
-		intSignal: in std_logic;
-		execCausing: in InstructionState;
-		ai: in ArgStatusInfo;
-			resultVals: in MwordArray(0 to N_RES_TAGS-1);
-			regValues: in MwordArray(0 to 2);
-			
-	 	stageDataIn: in InstructionState;		
 		
+
+	 	stageDataIn: in InstructionState;		
 		acceptingOut: out std_logic;
-		--sendingOut: out std_logic;
-		-- TODO: change to normal 'sending' bit, don't expose FlowResponse structure
-		--flowResponseOut: out FlowResponseSimple;
-			sendingOut: out std_logic;
-		dispatchDataOut: out InstructionState;
-		stageDataOut: out InstructionState		
+		sendingOut: out std_logic;
+		stageDataOut: out InstructionState;
+		
+		execEventSignal: in std_logic;
+		execCausing: in InstructionState;
+		intSignal: in std_logic;
+		
+		ai: in ArgStatusInfo;
+		resultVals: in MwordArray(0 to N_RES_TAGS-1);
+		regValues: in MwordArray(0 to 2);
+		
+		dispatchDataOut: out InstructionState
 	);
 end SubunitDispatch;
 
 
-
 architecture Behavioral of SubunitDispatch is
 	signal dispatchData, dispatchDataNext, dispatchDataUpdated,
-				inputDataWithArgs, dispatchData2, dispatchDataNext2, dispatchDataUpdated2:
-							InstructionState := defaultInstructionState;
-
+				inputDataWithArgs: InstructionState := defaultInstructionState;
 	signal flowDriveDispatch: FlowDriveSimple := (others=>'0');											
-	signal flowResponseDispatch: FlowResponseSimple := (others=>'0');
-
-	signal dispatchArgsUpdated: InstructionArgValues := defaultArgValues;
-			signal dispatchDataUpdated_N: InstructionState := defaultInstructionState;
-			
-	signal asDispatch: ArgStatusStruct;		
-		constant dummyReadyRegs: std_logic_vector(0 to 2) := (others => '0');
-		signal dummyReadyRegFlags: std_logic_vector(0 to 3*PIPE_WIDTH-1) := (others => '0');
-		
+	signal flowResponseDispatch: FlowResponseSimple := (others=>'0');		
 begin	
 	acceptingOut <= flowResponseDispatch.accepting;
 	flowDriveDispatch.prevSending <= prevSending;
@@ -110,15 +99,11 @@ begin
 													flowResponseDispatch.sending, 
 													--flowDriveDispatch.prevSending);
 														flowResponseDispatch.accepting);
-	dispatchDataUpdated <= updateDispatchArgs(dispatchData, resultVals, regValues);
-
-	-- Info about readiness now
-	asDispatch <= getArgStatus(ai, dispatchDataUpdated,
-				-- CAREFUL! "'1' or" below is to look like prev version of send locking					
-				'1' or flowResponseDispatch.living);	
-	
+	dispatchDataUpdated <= updateDispatchArgs(dispatchData, resultVals, regValues, ai); 
+		
 	-- Don't allow exec if args somehow are not actualy ready!		
-	flowDriveDispatch.lockSend <= not asDispatch.readyAll;
+	flowDriveDispatch.lockSend <= --not asDispatch.readyAll;
+							BLOCK_ISSUE_WHEN_MISSING and isNonzero(dispatchDataUpdated.argValues.missing);
 	
 	-- Dispatch pipe logic
 	SIMPLE_SLOT_LOGIC_DISPATCH_A: SimplePipeLogic port map(
@@ -133,21 +118,65 @@ begin
 	begin
 		a <= execCausing.numberTag;
 		b <= dispatchData.numberTag;	
-		DISPATCH_KILLER: entity work.CompareBefore8 port map(
-			inA => a, 
-			inB => b, 
+
+		IQ_KILLER: entity work.CompareBefore8 port map(
+			inA =>  a,
+			inB =>  b,
 			outC => before
-		);		
+		);
+		
+		--before <= '0'; --
+					--tagBefore(a, b);			
 		flowDriveDispatch.kill <= killByTag(before, execEventSignal, intSignal);
 										-- before and execEventSignal; 	
 	end block;			
 				
 	stageDataOut <= dispatchDataUpdated;
-	--flowResponseOut <= flowResponseDispatch;
-		sendingOut <= flowResponseDispatch.sending;
+	sendingOut <= flowResponseDispatch.sending;
 
 	flowDriveDispatch.nextAccepting <= nextAccepting;
 	
 	dispatchDataOut <= dispatchData;
 end Behavioral;
+
+
+architecture Alternative of SubunitDispatch is
+	signal stageDataM, stageDataStored: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
+	signal inputDataWithArgs, dispatchDataUpdated:
+					InstructionState := defaultInstructionState;
+		signal lockSend: std_logic := '0';
+begin
+
+	inputDataWithArgs <= getDispatchArgValues(stageDataIn, resultVals);
+
+	stageDataM.fullMask(0) <= prevSending;
+	stageDataM.data(0) <= inputDataWithArgs;
+	
+	BASIC_LOGIC: entity work.GenericStageMulti(SingleTagged)
+	port map(
+		clk => clk, reset => reset, en => en,
+		
+		prevSending => prevSending,
+		nextAccepting => nextAccepting,
+		
+		stageDataIn => stageDataM,
+		acceptingOut => acceptingOut,
+		sendingOut => sendingOut,
+		stageDataOut => stageDataStored,
+		
+		execEventSignal => execEventSignal,
+		execCausing => execCausing,
+		lockCommand => '0'
+	);
+
+	dispatchDataUpdated <= updateDispatchArgs(stageDataStored.data(0), resultVals, regValues, ai); 
+
+		-- CAREFUL: this does nothing. To make it work:
+		--											nextAcceptingEffective <= nextAccepting and not lockSend
+		lockSend <= BLOCK_ISSUE_WHEN_MISSING and isNonzero(dispatchDataUpdated.argValues.missing);
+	
+	stageDataOut <= dispatchDataUpdated;
+	
+end Alternative;
+
 

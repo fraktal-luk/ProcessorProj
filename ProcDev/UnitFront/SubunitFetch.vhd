@@ -38,7 +38,7 @@ use work.NewPipelineData.all;
 
 use work.GeneralPipeDev.all;
 
-use work.CommonRouting.all;
+--use work.CommonRouting.all;
 use work.TEMP_DEV.all;
 
 use work.ProcComponents.all;
@@ -51,29 +51,33 @@ entity SubunitFetch is
 		clk: in std_logic;
 		reset: in std_logic;
 		en: in std_logic;
-			ivalid: in std_logic;
-		fetchLockCommand: in std_logic;
+
 		prevSending: in std_logic;
 		nextAccepting: in std_logic;
-		--frontEvents: in FrontEventInfo;
-			killIn: in std_logic;
-		stageDataIn: in StageDataPC;		
+		killIn: in std_logic;
+
+		stageDataIn: in InstructionState;		
 		acceptingOut: out std_logic;
 		sendingOut: out std_logic;
-		stageDataOut: out StageDataPC
+		stageDataOut: out InstructionState;
+		
+			ivalid: in std_logic;
+		fetchLockCommand: in std_logic		
 	);
 end SubunitFetch;
 
 
 architecture Behavioral of SubunitFetch is
 	-- CAREFUL! Here using PC type cause is adequate.		
-	signal stageDataFetch, stageDataFetchNext: StageDataPC := DEFAULT_DATA_PC;	
+	signal stageDataFetch, stageDataFetchNext: InstructionState := DEFAULT_DATA_PC;	
 	
 	signal flowDriveFetch: FlowDriveSimple := (others=>'0');
 	signal flowResponseFetch: FlowResponseSimple := (others=>'0');		
 begin	
-	-- stageDataFetchNew <= stageDataPCLiving; // in practice this means just stageDataPC?
-	stageDataFetchNext <= stageFetchNext(stageDataFetch, stageDataIn,
+	-- stageDataFetchNew <= InstructionStateLiving; // in practice this means just InstructionState?
+	stageDataFetchNext <= --stageFetchNext
+									stageSimpleNext
+												(stageDataFetch, stageDataIn,
 					flowResponseFetch.living, flowResponseFetch.sending, flowDriveFetch.prevSending);
 					
 	FRONT_CLOCKED: process(clk)

@@ -38,7 +38,7 @@ use work.NewPipelineData.all;
 
 use work.GeneralPipeDev.all;
 
-use work.CommonRouting.all;
+--use work.CommonRouting.all;
 use work.TEMP_DEV.all;
 
 use work.ProcComponents.all;
@@ -58,7 +58,8 @@ entity UnitSequencer is
 		
 		-- Interface with front pipe
 		frontAccepting: in std_logic;
-		pcDataLiving: out StageDataPC;
+		pcDataLiving: out InstructionState; --StageDataPC;
+			
 		pcSending: out std_logic;
 
 		-- System reg interface
@@ -124,7 +125,7 @@ end UnitSequencer;
 architecture Behavioral of UnitSequencer is
 	signal resetSig, enSig: std_logic := '0';							
 	
-	signal stageDataOutPC: StageDataPC := DEFAULT_DATA_PC;	
+	signal stageDataOutPC: InstructionState := DEFAULT_INSTRUCTION_STATE;
 	signal sendingOutPC: std_logic := '0';
 	signal acceptingOutPC: std_logic := '0';
 	
@@ -143,6 +144,8 @@ architecture Behavioral of UnitSequencer is
 -------------------------------
 				signal committing: std_logic := '0';
 	
+
+		signal stageDataRenameIn: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
 	
 		signal stageDataOutRename: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
 		signal sendingOutRename: std_logic:= '0';
@@ -184,18 +187,22 @@ architecture Behavioral of UnitSequencer is
 		signal readyRegsSig: std_logic_vector(0 to N_PHYSICAL_REGS-1) := (0 to 31 => '1', others=>'0');
 	signal readyRegFlags, readyRegFlagsNext: std_logic_vector(0 to 3*PIPE_WIDTH-1) := (others => '0');
 	
+			signal dataPCOut: InstructionState := DEFAULT_DATA_PC;
 begin	 
 	resetSig <= reset and HAS_RESET_SEQ;
 	enSig <= en or not HAS_EN_SEQ;
 								
 	-- PC stage															
-	SUBUNIT_PC: entity work.SubunitPC(Behavioral) port map(
+	SUBUNIT_PC: entity work.SubunitPC(--Behavioral)
+													Implem)
+	port map(
 		clk => clk, reset => resetSig, en => enSig,
 		
 		-- Committed/being committed
 			lastCommittedNextIn => lastCommittedNext,
 			committingIn => committing,
 			
+			lockSendCommand => fetchLockState,
 		-- Interface with hypothetical previous stage
 		acceptingOut => acceptingOutPC,
 		
@@ -203,6 +210,7 @@ begin
 		nextAccepting => frontAccepting,	
 		sendingOut => sendingOutPC,
 		stageDataOut => stageDataOutPC,
+		--	dataPCOut => dataPCOut,
 			
 		-- Sys reg interface
 		sysRegWriteAllow => sysRegWriteAllow,
@@ -229,8 +237,8 @@ begin
 		eventCauseArrayS(7) <= (intSignal, intCausing);	
 		
 		eventInsArray <= TEMP_events(eventCauseArrayS);
-		killVecOut <= iqExtractFullMask(eventInsArray);		
-		frontEvents <= getFrontEvents2(eventInsArray);
+		killVecOut <= extractFullMask(eventInsArray);		
+		frontEvents <= getFrontEvents(eventInsArray);
 
 		intCausing <= setInterrupt(lastCommitted, intSignal, "00000000");		
 		execOrIntEventSignal <= intSignal or execEventSignal;
@@ -241,17 +249,16 @@ begin
 		execOrIntCausingOut <= execOrIntCausing;
 	end block;
 
-		frontEventSig <= frontEvents.eventOccured;
+	frontEventSig <= frontEvents.eventOccured;
 	frontEventSigOut <= frontEventSig;
 		
-		fetchLockRequest <= 
-				  	 frontEvents.eventOccured 
-				and frontEvents.causing.controlInfo.newFetchLock;
+	fetchLockRequest <= frontEvents.eventOccured and frontEvents.causing.controlInfo.newFetchLock;
 				
 
-	iadr <= stageDataOutPC.pcBase;
+	iadr <= stageDataOutPC.basicInfo.ip and i2slv(-PIPE_WIDTH*4, MWORD_SIZE); -- Clearing low bits
+				
 	iadrvalid <= sendingOutPC;
-		
+	
 	pcDataLiving <= stageDataOutPC;
 	pcSending <= sendingOutPC;	
 
@@ -260,36 +267,47 @@ begin
 
 	anySendingFromCQSig <= anySendingFromCQ;
 		
-	-- Rename stage
-	SUBUNIT_RENAME: entity work.SubunitRename(Behavioral)
-	port map(
-		clk => clk, reset => resetSig, en => enSig,
-		
-		-- Interface with front
-		prevSending => frontLastSending,	
-		stageDataIn => frontDataLastLiving,
-		acceptingOut => acceptingOutRename,
-		
-		-- Interface with IQ
-		nextAccepting => iqAccepts,
-		sendingOut => sendingOutRename,
-		stageDataOut => stageDataOutRename,
-		
-		-- Event interface
-		execEventSignal => execOrIntEventSignal,
-		execCausing => execOrIntCausing,
-		renameLockCommand => renameLockCommand,
-			
-		-- New state from tables
-		newPhysSources => newPhysSources,
-		newPhysDests => newPhysDests,
 
-		-- Tags obtainedat Rename from state tables
-		newGprTags => newGprTags,
-		newNumberTags => newNumberTags,
-			newGroupTag => renameGroupCtrNext		
-	);
+	-- Rename stage
+	RENAMING: block
+		use work.ProcLogicRenaming.all;
+		
+		signal stageDataRenameIn_C: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
+		signal reserveSelSig, takeVec: std_logic_vector(0 to PIPE_WIDTH-1) := (others => '0' );															
+	begin
+		stageDataRenameIn_C <= frontDataLastLiving;
 	
+		reserveSelSig <= getDestMask(frontDataLastLiving);
+		takeVec <= (others => '1') when ALLOC_REGS_ALWAYS
+				else frontDataLastLiving.fullMask;		
+
+		stageDataRenameIn <= baptizeGroup(
+									renameRegs(baptizeVec(frontDataLastLiving, newNumberTags),
+												takeVec, reserveSelSig, 											
+												newPhysSources, newPhysDests, newGprTags),
+									renameGroupCtrNext
+								);
+	
+		SUBUNIT_RENAME: entity work.GenericStageMulti(Behavioral)
+		port map(
+			clk => clk, reset => resetSig, en => enSig,
+			
+			-- Interface with front
+			prevSending => frontLastSending,	
+			stageDataIn => stageDataRenameIn,
+			acceptingOut => acceptingOutRename,
+			
+			-- Interface with IQ
+			nextAccepting => iqAccepts,
+			sendingOut => sendingOutRename,
+			stageDataOut => stageDataOutRename,
+			
+			-- Event interface
+			execEventSignal => execOrIntEventSignal,
+			execCausing => execOrIntCausing,
+			lockCommand => renameLockCommand		
+		);
+	end block;
 	
 	GEN_NUMBER_TAGS: for i in 0 to PIPE_WIDTH-1 generate	
 		newNumberTags(i) <= i2slv(binFlowNum(renameCtr) + i + 1, SMALL_NUMBER_SIZE);
@@ -324,7 +342,8 @@ begin
 		physCommitDests <= getPhysicalDests(stageDataToCommit);  -- for GPR map
 
 		
-		GPR_MAP: entity work.RegisterMap0				
+		GPR_MAP: entity work.RegisterMap0 (Behavioral)
+													--	(Implem)
 		generic map(
 			WIDTH => PIPE_WIDTH,
 			MAX_WIDTH => MW
@@ -397,7 +416,8 @@ begin
 						else stageDataOutCommit.fullMask;		
 		freeListRewind <= execOrIntEventSignal;
 		
-		GPR_FREE_LIST: entity work.FreeListQuad
+		GPR_FREE_LIST: entity work.FreeListQuad (Behavioral)
+															--	(Implem)
 		generic map(
 			WIDTH => PIPE_WIDTH,
 			MAX_WIDTH => MW
@@ -447,7 +467,8 @@ begin
 		readyTableClearSel <= getDestMask(frontDataLastLiving);	-- for ready table		
 		
 		-- Reg avalability map
-		REG_READY_TABLE_NEW: entity work.TestReadyRegTable0
+		REG_READY_TABLE_NEW: entity work.TestReadyRegTable0 (Behavioral)
+																			 --(Implem)
 		generic map(
 			WIDTH => PIPE_WIDTH,
 			MAX_WIDTH => MW
@@ -470,7 +491,6 @@ begin
 			outputData => readyRegsSig -- readyRegs	
 		);	
 		
-		--	readyRegs <= readyRegsSig;
 		readyRegFlagsNext <= extractReadyRegBits(readyRegsSig, stageDataOutRename.data);
 	end block;
 
@@ -535,8 +555,8 @@ begin
 						fetchLockState <= '0';
 					end if;	
 					
-					physStableDelayed <= --physStable;
-										 getStableDestsParallel(stageDataToCommit, physStable);
+					physStableDelayed <= getStableDestsParallel(stageDataToCommit, physStable);
+					lastCommitted <= lastCommittedNext;
 				end if;
 			end if;
 		end process;
@@ -548,7 +568,7 @@ begin
 	stageDataToCommit <= robDataLiving;
 
 	-- Commit stage: in order again				
-	SUBUNIT_COMMIT: entity work.SubunitCommit(Behavioral)
+	SUBUNIT_COMMIT: entity work.GenericStageMulti(Behavioral)
 	port map(
 		clk => clk, reset => resetSig, en => enSig,
 		
@@ -563,13 +583,15 @@ begin
 		stageDataOut => stageDataOutCommit,
 		
 		-- Event interface
-		execEventSignal => execOrIntEventSignal,
+		execEventSignal => '0', -- CAREFUL: committed cannot be killed!
 		execCausing => execOrIntCausing,		
 
-		-- Additional info about committed or being committed
-		lastCommittedOut => lastCommitted,
-		lastCommittedNextOut => lastCommittedNext --,
+		lockCommand => '0'
 	);
+
+		lastCommittedNext <= getLastFull(stageDataToCommit) when sendingToCommit = '1'				
+								else	lastCommitted;
+
 		
 		committing <= sendingToCommit;
 		
@@ -578,7 +600,7 @@ begin
 		sysRegWriteAllow <= getSysRegWriteAllow(stageDataToCommit);
 
 	renameLockCommand <= renameLockState;
-	fetchLockCommandOut <= fetchLockState;
+	fetchLockCommandOut <= '0'; --fetchLockState;
 
 			
 	renameAccepting <= acceptingOutRename;

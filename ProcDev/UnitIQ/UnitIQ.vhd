@@ -38,7 +38,7 @@ use work.NewPipelineData.all;
 
 use work.GeneralPipeDev.all;
 
-use work.CommonRouting.all;
+--use work.CommonRouting.all;
 use work.TEMP_DEV.all;
 
 use work.ProcLogicIQ.all;
@@ -92,11 +92,11 @@ architecture Behavioral of UnitIQ is
 	signal enSig: std_logic := '0'; 
 												
 	signal aiDispatch: ArgStatusInfo;
-	signal asDispatch: ArgStatusStruct;		
+	--signal asDispatch: ArgStatusStruct;	-- UNUSED
 	
 	signal aiArray: ArgStatusInfoArray(0 to IQ_SIZE-1);
-		signal aiNew: ArgStatusInfoArray(0 to PIPE_WIDTH-1);
-	signal asArray: ArgStatusStructArray(0 to IQ_SIZE-1); -- UNUSED
+	signal aiNew: ArgStatusInfoArray(0 to PIPE_WIDTH-1);
+	--signal asArray: ArgStatusStructArray(0 to IQ_SIZE-1); -- UNUSED
 			
 	-- Interface between queue and dispatch
 	signal dispatchAccepting: std_logic := '0';		
@@ -122,7 +122,8 @@ begin
 	enSig <= en or not HAS_EN_IQ;
 		
 	-- The queue	
-	QUEUE_MAIN_LOGIC: entity work.SubunitIQBuffer(Behavioral)
+	QUEUE_MAIN_LOGIC: entity work.SubunitIQBuffer(--Behavioral) --
+																	Implem)
 	generic map(
 		IQ_SIZE => IQ_SIZE
 	)
@@ -166,7 +167,8 @@ begin
 	
 
 	-- Dispatch stage			
-	DISPATCH_MAIN_LOGIC: entity work.SubunitDispatch(Behavioral)
+	DISPATCH_MAIN_LOGIC: entity work.SubunitDispatch(--Behavioral)
+																		Alternative)	
 	port map(
 	 	clk => clk, reset => resetSig, en => enSig,
 	 	prevSending => queueSending,

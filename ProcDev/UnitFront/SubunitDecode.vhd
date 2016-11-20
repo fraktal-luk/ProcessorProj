@@ -38,7 +38,7 @@ use work.NewPipelineData.all;
 
 use work.GeneralPipeDev.all;
 
-use work.CommonRouting.all;
+--use work.CommonRouting.all;
 use work.TEMP_DEV.all;
 
 use work.ProcComponents.all;
@@ -54,12 +54,13 @@ entity SubunitDecode is
 		
 		prevSending: in std_logic;
 		nextAccepting: in std_logic;
-		--frontEvents: in FrontEventInfo;
-			killIn: in std_logic;		
+		killIn: in std_logic;		
+
 		stageDataIn: in StageDataMulti;		
 		acceptingOut: out std_logic;
 		sendingOut: out std_logic;
 		stageDataOut: out StageDataMulti;
+		
 		stageEventsOut: out StageMultiEventInfo
 	);
 end SubunitDecode;
@@ -86,24 +87,10 @@ begin
 	newDecodedWithTargets.fullMask <= newDecoded.fullMask;
 	
 	CALC_TARGETS: for i in 0 to PIPE_WIDTH-1 generate
-		signal aai0, aai1, aai2: Mword := (others => '0');
+		--signal aai0, aai1, aai2: Mword := (others => '0');
 	begin	
-		aai0 <= newDecoded.data(i).basicInfo.ip;
-		aai1 <= newDecoded.data(i).constantArgs.imm;
-		
-		TARGET_ADDER: entity work.VerilogALU32 port map(
-			clk => '0', reset => '0', en => '0', allow => '0',
-			funcSelect => "000001", -- addition
-			dataIn0 => aai0,
-			dataIn1 => aai1,
-			dataIn2 => aai2, -- Ignored
-			c0 => "00000", c1 => "00000", 
-			dataOut0 => open, carryOut => open, exceptionOut => open, 
-			dataOut0Pre => targets(i), carryOutPre => open, exceptionOutPre => open
-		);
-			
+		targets(i) <= addWord(newDecoded.data(i).basicInfo.ip, newDecoded.data(i).constantArgs.imm);
 		newDecodedWithTargets.data(i) <= setInstructionTarget(newDecoded.data(i), targets(i));
-																								--targets(i) xor targets(i));
 	end generate;
 	
 	stageData0New <= newDecodedWithTargets when EARLY_TARGET_ENABLE

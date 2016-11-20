@@ -1,81 +1,5 @@
-----------------------------------------------------------------------------------
--- Company: 
--- Engineer: 
--- 
--- Create Date:    20:22:53 04/24/2016 
--- Design Name: 
--- Module Name:    SubunitPC - Behavioral 
--- Project Name: 
--- Target Devices: 
--- Tool versions: 
--- Description: 
---
--- Dependencies: 
---
--- Revision: 
--- Revision 0.01 - File Created
--- Additional Comments: 
---
-----------------------------------------------------------------------------------
-library IEEE;
-use IEEE.STD_LOGIC_1164.ALL;
 
--- Uncomment the following library declaration if using
--- arithmetic functions with Signed or Unsigned values
---use IEEE.NUMERIC_STD.ALL;
-
--- Uncomment the following library declaration if instantiating
--- any Xilinx primitives in this code.
---library UNISIM;
---use UNISIM.VComponents.all;
-
-use work.ProcBasicDefs.all;
-use work.Helpers.all;
-
-use work.ProcInstructionsNew.all;
-
-use work.NewPipelineData.all;
-
-use work.GeneralPipeDev.all;
-
---use work.CommonRouting.all;
-use work.TEMP_DEV.all;
-
-use work.ProcComponents.all;
-
-use work.ProcLogicFront.all;
-
-
-entity SubunitPC is
-	port(
-		clk: in std_logic;
-		reset: in std_logic;
-		en: in std_logic;
-		
-		committingIn: in std_logic; -- *
-		nextAccepting: in std_logic;		
-
-
-		lastCommittedNextIn: in InstructionState;
-		acceptingOut: out std_logic;
-		sendingOut: out std_logic;
-		stageDataOut: out InstructionState;		
-		
-		lockSendCommand: in std_logic;
-				
-		sysRegReadSel: in slv5;
-		sysRegReadValue: out Mword;		
-		
-		sysRegWriteAllow: in std_logic;
-		sysRegWriteSel: in slv5;
-		sysRegWriteValue: in Mword;
-
-		frontEvents: in FrontEventInfo		
-	);
-end SubunitPC;
-
-
-architecture Implem of SubunitPC is	
+architecture Behavioral of SubunitPC is	
 	signal flowDrivePC: FlowDriveSimple := (others=>'0');
 	signal flowResponsePC: FlowResponseSimple := (others=>'0');
 	
@@ -103,61 +27,39 @@ architecture Implem of SubunitPC is
 	alias savedStateInt is sysRegArray(5);	
 	
 	alias currentState is sysRegArray(1);
+			
+	signal full, fullNext, living, killed, accepting, remaining, sending, receiving: std_logic := '0';
 		
-	signal stageData, stageDataNext, stageDataNew: InstructionState := DEFAULT_INSTRUCTION_STATE;	
-begin
+	signal stageData, stageDataNext, stageDataNew: InstructionState := DEFAULT_INSTRUCTION_STATE;		
+begin	
 	committingPC <= lastCommittedNextIn.basicInfo.ip;
 	committingInc <= getAddressIncrement(lastCommittedNextIn);
 	
 	causingPC <= frontEvents.causing.basicInfo.ip;
 	causingInc <= getAddressIncrement(frontEvents.causing);
-	
-		EXC_ADDER: entity work.VerilogALU32 port map(
-			clk => '0', reset => '0', en => '0', allow => '0',
-			funcSelect => "000001", -- addition
-			dataIn0 => committingPC,
-			dataIn1 => committingInc,
-			dataIn2 => committingInc, -- Ignored
-			c0 => "00000", c1 => "00000", 
-			dataOut0 => open, carryOut => open, exceptionOut => open, 
-			dataOut0Pre => committingNext, carryOutPre => open, exceptionOutPre => open
-		);	
-	
-		TARGET_ADDER: entity work.VerilogALU32 port map(
-			clk => '0', reset => '0', en => '0', allow => '0',
-			funcSelect => "000001", -- addition
-			dataIn0 => causingPC,
-			dataIn1 => causingInc,
-			dataIn2 => causingInc, -- Ignored
-			c0 => "00000", c1 => "00000", 
-			dataOut0 => open, carryOut => open, exceptionOut => open, 
-			dataOut0Pre => causingNext, carryOutPre => open, exceptionOutPre => open
-		);
-		
-		pcBase <= stageData.basicInfo.ip and i2slv(-PIPE_WIDTH*4, MWORD_SIZE); -- Clearing low bits
-		
-		INC_ADDER: entity work.VerilogALU32 port map(
-			clk => '0', reset => '0', en => '0', allow => '0',
-			funcSelect => "000001", -- addition
-			dataIn0 => pcBase,
-			dataIn1 => pcInc,
-			dataIn2 => pcInc, -- Ignored
-			c0 => "00000", c1 => "00000", 
-			dataOut0 => open, carryOut => open, exceptionOut => open, 
-			dataOut0Pre => pcNext, carryOutPre => open, exceptionOutPre => open
-		);
+	 
+	 
+		committingNext <= addMword(committingPC, committingInc);
+		causingNext <= addMword(causingPC, causingInc);
+		pcBase <= stageData.basicInfo.ip and i2slv(-PIPE_WIDTH*4, MWORD_SIZE);
+			
+		pcNext <= addMword(pcBase, pcInc);
 		
 	stageDataNew <= newPCData(stageData, frontEvents, pcNext, causingNext);--, linkInfoExc, linkInfoInt);
 	stageDataNext <= stageSimpleNext(stageData, stageDataNew,
 											flowResponsePC.living, flowResponsePC.sending, flowDrivePC.prevSending);
-											
+
 	FRONT_CLOCKED: process(clk)
 		variable linkInfoExcVar, linkInfoIntVar: InstructionBasicInfo := defaultBasicInfo;	
 		variable targetInfoVar: InstructionBasicInfo := defaultBasicInfo;
 	begin					
 		if rising_edge(clk) then
-			if reset = '1' then			
+			if reset = '1' then
+
 			elsif en = '1' then
+			
+				--	full <= fullNext;
+			
 				-- CAREFUL: writing to currentState BEFORE normal sys reg write gives priority to the latter;
 				--				otherwise explicit setting of currentState wouln't work.
 				--				So maybe other sys regs should have it done the same way, not conversely? 
@@ -193,7 +95,6 @@ begin
 				end loop;
 
 				logSimple(stageData, flowResponsePC);
-				checkSimple(stageData, stageDataNext, flowDrivePC, flowResponsePC);
 			end if;					
 		end if;
 	end process;
@@ -209,7 +110,7 @@ begin
 		targetInfo <= (ip => targetPC,
 							systemLevel => currentState(15 downto 8),
 							intLevel => currentState(7 downto 0));		
-				
+			
 	flowDrivePC.prevSending <= flowResponsePC.accepting; -- CAREFUL! This way it never gets hungry
 	flowDrivePC.nextAccepting <= nextAccepting;	
 
@@ -221,5 +122,5 @@ begin
 	sendingOut <= flowResponsePC.sending;
 		
 	sysRegReadValue <= sysRegArray(slv2u(sysRegReadSel));							
-end Implem;
+end Behavioral;
 

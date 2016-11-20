@@ -38,7 +38,7 @@ use work.NewPipelineData.all;
 
 use work.GeneralPipeDev.all;
 
-use work.CommonRouting.all;
+--use work.CommonRouting.all;
 use work.TEMP_DEV.all;
 
 use work.ProcLogicExec.all;
@@ -105,7 +105,7 @@ end UnitExec;
 
 
 
-architecture Behavioral of UnitExec is
+architecture Implem of UnitExec is
 		signal resetSig, enSig: std_logic := '0';
 			signal	execEventSignal, eventSignal: std_logic := '0';
 			signal	execCausing, intCausing: InstructionState := defaultInstructionState;
@@ -150,6 +150,11 @@ architecture Behavioral of UnitExec is
 		
 		signal flowResponseSendingA, flowResponseSendingB, flowResponseSendingC, flowResponseSendingD:
 						FlowResponseSimple := (others=>'0');
+		
+		signal dataA0, dataB0, dataB1, dataB2, dataC0, dataC1, dataC2, dataD0: InstructionState
+					:= DEFAULT_INSTRUCTION_STATE;
+		signal dataA0N, dataB0N, dataB1N, dataB2N, dataC0N, dataC1N, dataC2N, dataD0N: InstructionState
+					:= DEFAULT_INSTRUCTION_STATE;					
 begin		
 		resetSig <= reset and HAS_RESET_EXEC;
 		enSig <= en or not HAS_EN_EXEC; 
@@ -222,6 +227,24 @@ begin
 					execResponses(s).living, execResponses(s).sending, execDrives(s).prevSending);	
 		end generate;
 			
+			dataA0 <= execData(ExecA0);
+			dataB0 <= execData(ExecB0);
+			dataB1 <= execData(ExecB1);
+			dataB2 <= execData(ExecB2);
+			dataC0 <= execData(ExecC0);
+			dataC1 <= execData(ExecC1);
+			dataC2 <= execData(ExecC2);
+			dataD0 <= execData(ExecD0);
+
+			dataA0N <= execDataNext(ExecA0);
+			dataB0N <= execDataNext(ExecB0);
+			dataB1N <= execDataNext(ExecB1);
+			dataB2N <= execDataNext(ExecB2);
+			dataC0N <= execDataNext(ExecC0);
+			dataC1N <= execDataNext(ExecC1);
+			dataC2N <= execDataNext(ExecC2);
+			dataD0N <= execDataNext(ExecD0);			
+			
 		EXEC_SYNCHRONOUS: process(clk) 	
 		begin
 			if rising_edge(clk) then
@@ -236,7 +259,23 @@ begin
 					then
 						sysRegWriteValueStore <= dataIQD.argValues.arg0;
 						sysRegWriteSelStore <= dataIQD.constantArgs.c0;
-					end if;	
+					end if;
+					
+					--for s in ExecStages'left to ExecStages'right loop
+					--	logSimple(execData(s), execResponses(s));
+					--end loop;
+					logSimple(dataA0, execResponses(ExecA0));
+					logSimple(dataB0, execResponses(ExecB0));
+					logSimple(dataB1, execResponses(ExecB1));
+					logSimple(dataB2, execResponses(ExecB2));
+					logSimple(dataC0, execResponses(ExecC0));
+					logSimple(dataC1, execResponses(ExecC1));
+					logSimple(dataC2, execResponses(ExecC2));
+					logSimple(dataD0, execResponses(ExecD0));
+					
+					checkSimple(dataA0, dataA0N, execDrives(ExecA0), execResponses(ExecA0));
+					checkSimple(dataB0, dataB0N, execDrives(ExecB0), execResponses(ExecB0));
+					
 				end if;
 			end if;
 		end process;	
@@ -399,5 +438,5 @@ begin
 
 		sysRegWriteSelOut <= sysRegWriteSelStore;
 		sysRegWriteValueOut <= sysRegWriteValueStore;
-end Behavioral;
+end Implem;
 

@@ -38,11 +38,11 @@ use work.NewPipelineData.all;
 
 use work.TEMP_DEV.all;
 use work.GeneralPipeDev.all;
-use work.CommonRouting.all;
+--use work.CommonRouting.all;
 
 use work.ProcComponents.all;
 
-use work.ProgramCode3.all;
+--use work.ProgramCode3.all;
 
 
 entity NewCore0 is

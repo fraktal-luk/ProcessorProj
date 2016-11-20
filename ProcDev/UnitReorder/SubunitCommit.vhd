@@ -38,7 +38,7 @@ use work.NewPipelineData.all;
 
 use work.GeneralPipeDev.all;
 
-use work.CommonRouting.all;
+--use work.CommonRouting.all;
 use work.TEMP_DEV.all;
 
 use work.ProcComponents.all;
@@ -54,15 +54,16 @@ entity SubunitCommit is
 		
 		prevSending: in std_logic;
 		nextAccepting: in std_logic;
-		execEventSignal: in std_logic;
-		execCausing: in InstructionState;
+
+
 		stageDataIn: in StageDataMulti;		
 		acceptingOut: out std_logic;
 		sendingOut: out std_logic;
 		stageDataOut: out StageDataMulti;
 		
-		--physStable: in PhysNameArray(0 to PIPE_WIDTH-1);
-					
+		execEventSignal: in std_logic;
+		execCausing: in InstructionState;
+		
 		lastCommittedOut: out InstructionState;
 		lastCommittedNextOut: out InstructionState
 	);

@@ -62,7 +62,7 @@ entity RegisterFile0 is
 			  );
 end RegisterFile0;
 
-architecture Behavioral of RegisterFile0 is
+architecture Implem of RegisterFile0 is
 	signal resetSig, enSig: std_logic := '0';
 
 	signal writeVecMW: std_logic_vector(0 to MAX_WIDTH-1) := (others => '0');
@@ -135,5 +135,5 @@ begin
 		readData11 => readValuesMW(11)		
 	);
 	
-end Behavioral;
+end Implem;
 

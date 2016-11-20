@@ -23,6 +23,24 @@ ProcDev/sch2HdlBatchFile
 *.gise
 *.wdb
 
+ProcDev/*.html
+
+**.stx
+**.xst
+**.lso
+**.syr
+**.xrpt
+**.prj
+**.ngc
+**.ngr
+**.ncd
+**.cmd_log
+**.xmsgs
+**.xreport
+**.projectmgr
+**_summary.html
+
+
 # Simulation stuff
 ProcDev/isim/*
 ProcDev/isim.*

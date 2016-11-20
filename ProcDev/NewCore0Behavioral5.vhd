@@ -5,40 +5,29 @@
 architecture Behavioral5 of NewCore0 is	
 	signal resetSig, enSig: std_logic := '0';				
 				
-
-	signal pcDataSig: StageDataPC :=	DEFAULT_DATA_PC;
+	signal pcDataSig: InstructionState := DEFAULT_INSTRUCTION_STATE;
 	signal pcSendingSig: std_logic := '0';
-
 				
 	signal frontDataLastLiving: StageDataMulti;
 	signal frontLastSending: std_logic := '0';		
 	signal renameAccepting: std_logic := '0';
 
-
-		signal acceptingOutFront: std_logic := '0';
-		signal stage0Events: StageMultiEventInfo;
+	signal acceptingOutFront: std_logic := '0';
+	signal stage0Events: StageMultiEventInfo;
 		
-		-- for Front
-		signal killVec: std_logic_vector(0 to N_EVENT_AREAS-1) := (others => '0');	
+	-- for Front
+	signal killVec: std_logic_vector(0 to N_EVENT_AREAS-1) := (others => '0');	
 		
 	signal fetchLockCommand: std_logic := '0';
 
-
 	signal renamedDataLiving, stageDataCommittedOut: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;				
 	signal renamedSending: std_logic := '0';			
-	
-	
-	-- For storing prev reg tags that triggered reg file reading		
-	signal renamedDataPrev: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
-	
-	
+		
 	-- CAREFUL, TODO: make this robust for changes in renaming details!
 	signal readyRegs, readyRegsSig, readyRegsPrev: std_logic_vector(0 to N_PHYSICAL_REGS-1)
 		:= (0 to 31 => '1', others=>'0'); -- p0-p31 are initially mapped to logical regs and ready
 	
-	signal readyRegFlags, readyRegFlagsNext: std_logic_vector(0 to 3*PIPE_WIDTH-1) := (others => '0');
-	
-	
+	signal readyRegFlags: std_logic_vector(0 to 3*PIPE_WIDTH-1) := (others => '0');
 	
 	signal dataToA, dataToB, dataToC, dataToD: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;						
 
@@ -49,45 +38,34 @@ architecture Behavioral5 of NewCore0 is
 	
 	signal iqAccepts: std_logic := '0';	
 		
-	-- TODO: change to simple bit interface?
-	signal flowResponseOutIQA: FlowResponseSimple := (others=>'0');
-	signal dataOutIQA: InstructionState := defaultInstructionState;	
-			
-	signal flowResponseOutIQB: FlowResponseSimple := (others=>'0');
+	signal dataOutIQA: InstructionState := defaultInstructionState;				
 	signal dataOutIQB: InstructionState := defaultInstructionState;
-
-	signal flowResponseOutIQC: FlowResponseSimple := (others=>'0');
-	signal dataOutIQC: InstructionState := defaultInstructionState;
-	
-	signal flowResponseOutIQD: FlowResponseSimple := (others=>'0');
+	signal dataOutIQC: InstructionState := defaultInstructionState;	
 	signal dataOutIQD: InstructionState := defaultInstructionState;		
 	
 	signal sendingSchedA, sendingSchedB, sendingSchedC, sendingSchedD: std_logic := '0';
 	
-
-		-- Physical register interface
-		signal regsSelA, regsSelB, regsSelC, regsSelD: PhysNameArray(0 to 2) := (others => (others => '0'));
-		signal regValsA, regValsB, regValsC, regValsD: MwordArray(0 to 2) := (others => (others => '0'));
-		signal regsAllowA, regsAllowB, regsAllowC, regsAllowD: std_logic := '0';
-
+	-- Physical register interface
+	signal regsSelA, regsSelB, regsSelC, regsSelD: PhysNameArray(0 to 2) := (others => (others => '0'));
+	signal regValsA, regValsB, regValsC, regValsD: MwordArray(0 to 2) := (others => (others => '0'));
+	signal regsAllowA, regsAllowB, regsAllowC, regsAllowD: std_logic := '0';
 
 	signal execAcceptingA, execAcceptingB, execAcceptingC, execAcceptingD: std_logic := '0'; 
 
-		-- Mem interface
-		signal memAddress, memLoadValue, memStoreValue: Mword := (others => '0');
-		signal memStoreAllow, memLoadAllow, memLoadReady: std_logic := '0';
+	-- Mem interface
+	signal memAddress, memLoadValue, memStoreValue: Mword := (others => '0');
+	signal memStoreAllow, memLoadAllow, memLoadReady: std_logic := '0';
 		
-		-- Sys reg interface	
-		signal sysRegReadSel: slv5 := (others => '0');
-		signal sysRegValue: Mword := (others => '0');
-		signal sysRegWriteAllow: std_logic := '0';
-		-- CAREFUL: *E names are from temporary register in exec block, without "E" from commiting (alternative)
-		signal sysRegWriteSel, sysRegWriteSelE: slv5 := (others => '0');
-		signal sysRegWriteValue, sysRegWriteValueE: Mword := (others => '0');
+	-- Sys reg interface	
+	signal sysRegReadSel: slv5 := (others => '0');
+	signal sysRegValue: Mword := (others => '0');
+	signal sysRegWriteAllow: std_logic := '0';
+	-- CAREFUL: *E names are from temporary register in exec block, without "E" from commiting (alternative)
+	signal sysRegWriteSel, sysRegWriteSelE: slv5 := (others => '0');
+	signal sysRegWriteValue, sysRegWriteValueE: Mword := (others => '0');
 
 	signal execEnds: InstructionStateArray(0 to 3);
 	signal execPreEnds: InstructionStateArray(0 to 3); -- For 'nextResultTags'
-
 	
 	-- forw network
 	signal resultTags: PhysNameArray(0 to N_RES_TAGS-1) := (others=>(others=>'0'));
@@ -97,25 +75,15 @@ architecture Behavioral5 of NewCore0 is
 	--		rather than from forw. network, but readyRegFlags are not available in the 1st cycle after WB.
 	signal writtenTags: PhysNameArray(0 to PIPE_WIDTH-1) := (others => (others => '0'));
 	
-	
 	-- evt
-	signal execEventSignal, execOrIntEventSignal: std_logic := '0';						
+	signal execEventSignal, intSig, execOrIntEventSignal: std_logic := '0';						
 	-- This will take the value of operation that causes jump or exception
-	signal execCausing, execOrIntCausing: InstructionState := defaultInstructionState;																			
-	signal intSig: std_logic := '0';
-	signal intCausing: InstructionState := defaultInstructionState;
-
+	signal execCausing, intCausing, execOrIntCausing: InstructionState := defaultInstructionState;																			
 
 	-- Hidden to some degree, but may be useful for sth
 	signal renameCtrSig, renameCtrNextSig, commitCtrSig, commitCtrNextSig: SmallNumber := (others=>'0');
 	signal commitGroupCtrSig, commitGroupCtrNextSig: SmallNumber := (others => '0');
-					
-					
-			-- TODO: to remove
-			signal TEMP_completed: std_logic_vector(0 to 3) := (others => '0');
-			signal TEMP_results: InstructionStateArray(0 to 3) := (others => defaultInstructionState);
-		
-		
+												
 	-- ROB interface	
 	signal robSending, robAccepting: std_logic := '0';
 	signal dataOutROB: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;					
@@ -129,19 +97,16 @@ architecture Behavioral5 of NewCore0 is
 								:= (fullMask=>(others=>'0'), data=>(others=>defaultInstructionState));	
 	signal cqDataLivingOut: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
 
+	signal cqPhysDestMask: std_logic_vector(0 to PIPE_WIDTH-1) := (others => '0');
+	signal cqPhysicalDests: PhysNameArray(0 to PIPE_WIDTH-1) := (others => (others => '0'));
+	signal cqInstructionResults: MwordArray(0 to PIPE_WIDTH-1) := (others => (others => '0'));
 
-		signal cqPhysDestMask: std_logic_vector(0 to PIPE_WIDTH-1) := (others => '0');
-		signal cqPhysicalDests: PhysNameArray(0 to PIPE_WIDTH-1) := (others => (others => '0'));
-		signal cqInstructionResults: MwordArray(0 to PIPE_WIDTH-1) := (others => (others => '0'));
-
-		signal rfWriteVec: std_logic_vector(0 to 3) := (others => '0');
-		signal rfSelectWrite: PhysNameArray(0 to 3) := (others => (others => '0'));
-		signal rfWriteValues: MwordArray(0 to 3) := (others => (others => '0'));
-		
-		signal stageDataAfterCQ: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;	
-		
-		--		signal ch0, ch1, ch2, ch3: std_logic := '0'; -- TEST, remove
+	signal rfWriteVec: std_logic_vector(0 to 3) := (others => '0');
+	signal rfSelectWrite: PhysNameArray(0 to 3) := (others => (others => '0'));
+	signal rfWriteValues: MwordArray(0 to 3) := (others => (others => '0'));
 	
+	signal stageDataAfterCQ: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;	
+			
 	-- CAREFUL: this is used to turn off dependence on iqAccepts
 	constant	OMIT_IQ_ACCEPTS: std_logic := '0';			
 				
@@ -207,8 +172,7 @@ begin
 		commitGroupCtrNextOut => commitGroupCtrNextSig						
 	);
 	
-	
-	
+		
 	FRONT_PART: entity work.UnitFront(Behavioral)
 	port map(
 		clk => clk, reset => resetSig, en => enSig,
@@ -230,7 +194,6 @@ begin
 		lastSending => frontLastSending
 	);
 
-	
 	
 	ISSUE_ROUTING: entity work.SubunitIssueRouting(Behavioral)
 	port map(
@@ -395,7 +358,9 @@ begin
 			sendingOut => sendingSchedD
 	);	
 															
-	EXEC_BLOCK: entity work.UnitExec(Behavioral) port map(
+	EXEC_BLOCK: entity work.UnitExec --(Behavioral)
+												(Implem)
+	port map(
 		clk => clk, reset => resetSig, en => enSig,
 			sendingIQA => sendingSchedA,
 			sendingIQB => sendingSchedB,
@@ -440,7 +405,9 @@ begin
 	);	
 	
 	
-	COMMIT_QUEUE: entity work.TestCQPart0(Behavioral2) port map(
+	COMMIT_QUEUE: entity work.TestCQPart0 --(Behavioral)
+														(Implem)
+	port map(
 		clk => clk, reset => resetSig, en => enSig,
 		
 		intSignal => intSig,
@@ -461,7 +428,7 @@ begin
 		
 		-- CAREFUL! This stage is needed to keep result tags 1 for cycle when writing to reg file,
 		--				so that "black hole" of inivisible readiness doesn't occur
-		AFTER_CQ: entity work.SubunitCommit port map(
+		AFTER_CQ: entity work.GenericStageMulti(Behavioral) port map(
 			clk => clk, reset => resetSig, en => enSig,
 			
 			prevSending => anySendingFromCQ,
@@ -473,9 +440,7 @@ begin
 			sendingOut => open,
 			stageDataOut => stageDataAfterCQ,
 			
-			
-			lastCommittedOut => open,
-			lastCommittedNextOut => open
+			lockCommand => '0'			
 		);
 			
 		cqPhysDestMask <= getPhysicalDestMask(cqDataLivingOut);
@@ -488,7 +453,8 @@ begin
 			rfWriteValues(i) <= cqInstructionResults(i);
 		end generate;		
 		
-		GPR_FILE_DISPATCH: entity work.RegisterFile0(Behavioral)
+		GPR_FILE_DISPATCH: entity work.RegisterFile0 (Behavioral)
+																	--(Implem)
 		generic map(WIDTH => 4,
 						WRITE_WIDTH => PIPE_WIDTH)
 		port map(
@@ -533,7 +499,9 @@ begin
 		--	TEMP_completed(i) <= anySendingFromCQ and cqDataLivingOut.fullMask(i);
 		--end generate;	
 	
-	REORDER_BUFFER: entity work.ReorderBuffer port map(
+	REORDER_BUFFER: entity work.ReorderBuffer --(Behavioral) 
+															(Implem)
+	port map(
 		clk => clk, reset => resetSig, en => enSig,
 		
 		intSignal => '0',

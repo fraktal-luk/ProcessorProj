@@ -38,7 +38,7 @@ use work.NewPipelineData.all;
 
 use work.GeneralPipeDev.all;
 
-use work.CommonRouting.all;
+--use work.CommonRouting.all;
 use work.TEMP_DEV.all;
 
 use work.ProcLogicROB.all;
@@ -56,10 +56,10 @@ entity ReorderBuffer is
 		execCausing: in InstructionState; -- Redundant cause we have inputs from all Exec ends? 
 		
 		commitCtrNext: in SmallNumber;  -- UNUSED?
-			commitGroupCtr: in SmallNumber;
-			commitGroupCtrNext: in SmallNumber;
+		commitGroupCtr: in SmallNumber;
+		commitGroupCtrNext: in SmallNumber;
 		execEnds: in InstructionStateArray(0 to 3);
-			execReady: in std_logic_vector(0 to 3);
+		execReady: in std_logic_vector(0 to 3);
 		
 		inputData: in StageDataMulti;
 		prevSending: in std_logic;
@@ -73,7 +73,7 @@ end ReorderBuffer;
 
 
 
-architecture Behavioral of ReorderBuffer is
+architecture Implem of ReorderBuffer is
 	signal stageData, stageDataLiving, stageDataNext, stageDataUpdated: 
 							StageDataROB := (fullMask => (others => '0'),
 												  data => (others => DEFAULT_STAGE_DATA_MULTI));
@@ -90,19 +90,17 @@ architecture Behavioral of ReorderBuffer is
 begin
 	resetSig <= reset and ROB_HAS_RESET;
 	enSig <= en or not ROB_HAS_EN;
-
-	stageDataNext <= stageROBNext(stageDataUpdated, inputData,
+	
+	-- This is before shifting!
+	stageDataLiving <= killInROB(stageData, commitGroupCtr, execCausing.groupTag, execEventSignal);	
+	stageDataUpdated <= setCompleted(stageDataLiving, commitGroupCtr, execEnds, execReady);
+	
+	-- CAREFUL! fullMask before kills is used along with fullMask after killing!
+	stageDataNext <= stageROBNext(stageDataUpdated, stageData.fullMask, inputData, 
 											binFlowNum(flowResponse.living),
 											isSending,
 											prevSending);
-	
-	-- This is before shifting!
-	stageDataUpdated <= setCompleted(stageDataLiving, commitGroupCtr, execEnds, execReady);
-	
-	stageDataLiving <=
-					killInROB(stageData, commitGroupCtr, execCausing.groupTag, execEventSignal);
-	
-	
+											
 	ROB_SYNCHONOUS: process (clk)
 	begin
 		if rising_edge(clk) then
@@ -110,44 +108,49 @@ begin
 			
 			elsif enSig = '1' then
 				stageData <= stageDataNext;
+				
+				logROB(stageData, stageDataLiving, flowResponse);
+				checkROB(stageData, stageDataNext, flowDrive, flowResponse);
 			end if;
 		end if;		
 	end process;
 	
 
-	SLOT_ROB: entity work.BufferPipeLogic(Behavioral)
+	SLOT_ROB: entity work.BufferPipeLogic(--Behavioral)
+														BehavioralDirect)
 	generic map(
 		CAPACITY => ROB_SIZE,
 		MAX_OUTPUT => 1,	
 		MAX_INPUT => 1				
 	)
 	Port map(
-		clk => clk, reset =>  resetSig, en => enSig,
+		clk => clk, reset => resetSig, en => enSig,
 		flowDrive => flowDrive,
 		flowResponse => flowResponse
 	);			
 	
 	flowDrive.prevSending <= num2flow(1) when prevSending = '1' else num2flow(0);
-	flowDrive.nextAccepting <= --(others => '0');
-				num2flow(1) when (stageDataLiving.fullMask(0) and groupCompleted(stageDataLiving.data(0))) = '1'
-		else  (others => '0');
+	flowDrive.nextAccepting <= num2flow(1) when isSending = '1'
+								else  (others => '0');
 	
 	flowDrive.kill <=
 		i2slv((
 					slv2s(flowResponse.full)
-				+	integer(slv2u(commitGroupCtr(SMALL_NUMBER_SIZE-1 downto LOG2_PIPE_WIDTH)))
-				- 	integer(slv2u(execCausing.groupTag(SMALL_NUMBER_SIZE-1 downto LOG2_PIPE_WIDTH)))
-				) mod (256/PIPE_WIDTH),
+				+	--integer(slv2u(commitGroupCtr(SMALL_NUMBER_SIZE-1 downto LOG2_PIPE_WIDTH)))
+						integer(slv2u(tagHigh(commitGroupCtr)))
+				- 	--integer(slv2u(execCausing.groupTag(SMALL_NUMBER_SIZE-1 downto LOG2_PIPE_WIDTH)))
+						integer(slv2u(tagHigh(execCausing.groupTag)))
+				) mod --(256/PIPE_WIDTH),
+							2**(SMALL_NUMBER_SIZE - LOG2_PIPE_WIDTH),
 			SMALL_NUMBER_SIZE)
 				when execEventSignal = '1'
 		else (others => '0');
 		
-	isSending <= --isNonzero(flowResponse.sending);
-						stageDataLiving.fullMask(0) and groupCompleted(stageDataLiving.data(0));
+	isSending <= stageDataLiving.fullMask(0) and groupCompleted(stageDataLiving.data(0));
 	-- TODO: allow accepting also when queue full but sending, that is freeing a place.
-	acceptingOut <= --'1' when binFlowNum(flowResponse.living) < ROB_SIZE else '0';
+	acceptingOut <= --'1' when binFlowNum(flowResponse.full) < ROB_SIZE else '0';
 							not stageData.fullMask(ROB_SIZE-1);
 	outputData <= stageData.data(0);
 	sendingOut <= isSending;
-end Behavioral;
+end Implem;
 

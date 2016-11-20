@@ -38,7 +38,7 @@ use work.NewPipelineData.all;
 
 use work.GeneralPipeDev.all;
 
-use work.CommonRouting.all;
+--use work.CommonRouting.all;
 use work.TEMP_DEV.all;
 
 use work.ProcComponents.all;
@@ -54,21 +54,23 @@ entity SubunitRename is
 		
 		prevSending: in std_logic;
 		nextAccepting: in std_logic;
-		execEventSignal: in std_logic; -- TODO: unify with system used for killing in front stages?
-		execCausing: in InstructionState;
-		renameLockCommand: in std_logic;
+
+
 		stageDataIn: in StageDataMulti;		
 		acceptingOut: out std_logic;
 		sendingOut: out std_logic;
 		stageDataOut: out StageDataMulti;
-		--stageEventsOut: out StageMultiEventInfo;
+		
+		execEventSignal: in std_logic; -- TODO: unify with system used for killing in front stages?
+		execCausing: in InstructionState;
+		lockCommand: in std_logic;		
 		
 		newPhysSources: in PhysNameArray(0 to 3*PIPE_WIDTH-1);
 		newPhysDests: in PhysNameArray(0 to PIPE_WIDTH-1);
 		newGprTags: in SmallNumberArray(0 to PIPE_WIDTH-1);
 		newNumberTags: in SmallNumberArray(0 to PIPE_WIDTH-1);
 		
-			newGroupTag: in SmallNumber
+		newGroupTag: in SmallNumber
 	);
 end SubunitRename;
 
@@ -86,12 +88,15 @@ begin
 	takeVec <= 		(others => '1') when ALLOC_REGS_ALWAYS
 				else stageDataIn.fullMask;
 
-	stageData1New <= 	baptizeGroup(
-								renameRegs(baptizeVec(stageDataIn, newNumberTags),
-												takeVec, reserveSelSig, 											
-												newPhysSources, newPhysDests, newGprTags),
-								newGroupTag
-							);
+	stageData1New <= 	
+--							baptizeGroup(
+--								renameRegs(baptizeVec(stageDataIn, newNumberTags),
+--												takeVec, reserveSelSig, 											
+--												newPhysSources, newPhysDests, newGprTags),
+--								newGroupTag
+--							);
+							stageDataIn;	
+								
 										
 	stageData1Next <= stageMultiNext(stageData1Living, stageData1New,
 								flowResponse1.living, flowResponse1.sending, flowDrive1.prevSending);			
@@ -117,7 +122,7 @@ begin
 	flowDrive1.nextAccepting <= nextAccepting;
 	-- CAREFUL! Is it correct?
 	flowDrive1.kill <= execEventSignal; -- Only later stages can kill Rename
-	flowDrive1.lockAccept <= renameLockCommand;
+	flowDrive1.lockAccept <= lockCommand;
 
 	acceptingOut <= flowResponse1.accepting;		
 	sendingOut <= flowResponse1.sending;
