@@ -85,27 +85,37 @@ package body ProcLogicIQ is
 function getDispatchArgValues(ins: InstructionState; vals: MwordArray) return InstructionState is
 	variable res: InstructionState := ins;
 begin
+	-- pragma synthesis off
 		res.argValues.hist0(2) := '-';
 		res.argValues.hist1(2) := '-';
 		res.argValues.hist2(2) := '-';
+	-- pragma synthesis on
 
 	if res.argValues.zero(0) = '1' then
 		res.argValues.arg0 := (others => '0');
+			-- pragma synthesis off		
 			res.argValues.hist0(2) := 'z';
+			-- pragma synthesis on			
 	end if;
 
 	if res.argValues.immediate = '1' then
 		res.argValues.arg1 := res.constantArgs.imm;
-			res.argValues.hist1(2) := 'i';		
+			-- pragma synthesis off		
+			res.argValues.hist1(2) := 'i';
+			-- pragma synthesis on
 	elsif --false and
 			res.argValues.zero(1) = '1' then
 		res.argValues.arg1 := (others => '0');
-			res.argValues.hist1(2) := 'z';		
+			-- pragma synthesis off		
+			res.argValues.hist1(2) := 'z';
+			-- pragma synthesis on
 	end if;
 	
 	if res.argValues.zero(2) = '1' then
 		res.argValues.arg2 := (others => '0');
+			-- pragma synthesis off		
 			res.argValues.hist2(2) := 'z';		
+			-- pragma synthesis on
 	end if;	
 	
 	return res;
@@ -117,9 +127,11 @@ function updateDispatchArgs(ins: InstructionState; vals: MwordArray; regValues: 
 return InstructionState is
 	variable res: InstructionState := ins;
 begin
+	-- pragma synthesis off
 		res.argValues.hist0(3) := '-';
 		res.argValues.hist1(3) := '-';
 		res.argValues.hist2(3) := '-';
+	-- pragma synthesis on
 
 	if 	res.argValues.readyNow(0) = '1' 
 		or res.argValues.zero(0) = '1'
@@ -132,11 +144,15 @@ begin
 		res.argValues.arg0 := vals(slv2u(ins.argValues.nextLocs(0)));
 			res.argValues.missing(0) := '0';
 			res.argValues.missing(0) := not ai.ready(0);
+				-- pragma synthesis off			
 				res.argValues.hist0(3) := 'n';			
+				-- pragma synthesis on
 	else
 		-- Use register value
 		res.argValues.arg0 := regValues(0);
+			-- pragma synthesis off		
 			res.argValues.hist0(3) := 'r';		
+			-- pragma synthesis on
 	end if;
 	
 	
@@ -152,11 +168,15 @@ begin
 		res.argValues.arg1 := vals(slv2u(ins.argValues.nextLocs(1)));
 			res.argValues.missing(1) := '0';
 			res.argValues.missing(1) := not ai.ready(1);
+				-- pragma synthesis off			
 				res.argValues.hist1(3) := 'n';			
+				-- pragma synthesis on
 	else
 		-- Use register value
 		res.argValues.arg1 := regValues(1);
+			-- pragma synthesis off		
 			res.argValues.hist1(3) := 'r';		
+			-- pragma synthesis on
 	end if;	
 	
 	
@@ -170,11 +190,15 @@ begin
 		res.argValues.arg2 := vals(slv2u(ins.argValues.nextLocs(2)));
 			res.argValues.missing(2) := '0';
 			res.argValues.missing(2) := not ai.ready(2);
+				-- pragma synthesis off			
 				res.argValues.hist2(3) := 'n';			
+				-- pragma synthesis on
 	else
 		-- Use register value
 		res.argValues.arg2 := regValues(2);
+			-- pragma synthesis off		
 			res.argValues.hist2(3) := 'r';		
+			-- pragma synthesis on
 	end if;	
 	return res;
 end function;
@@ -361,6 +385,7 @@ begin
 	end if;
 
 	shiftNum := nAfterSending;
+		shiftNum := countOnes(fullMaskSh); -- CAREFUL: this seems to reduce some logic
 		
 	-- CAREFUL, TODO:	solve the issue with HDLCompiler:1827
 	yVec(shiftNum to yVec'length - 1) := yVec(0 to yVec'length - 1 - shiftNum);
@@ -441,28 +466,35 @@ begin
 		rrf := readyRegFlags(3*slv2u(tmp8) to 3*slv2u(tmp8) + 2);
 		res.argValues.missing := res.argValues.missing and not rrf;
 	end if;
-	
+		-- pragma synthesis off	
 			res.argValues.hist0(1) := '-';
 			res.argValues.hist0(2) := '-';
 			res.argValues.hist0(3) := '-';
+		-- pragma synthesis on
 	
 	-- For 'nextReady'
 	if ai.nextReady(0) = '1' then
 		res.argValues.missing(0) := '0';
 		res.argValues.readyNext(0) := '1';
+			-- pragma synthesis off			
 			res.argValues.hist0(1) := 'N';
+			-- pragma synthesis on			
 	end if;		
 
 	if ai.nextReady(1) = '1' then
 		res.argValues.missing(1) := '0';
 		res.argValues.readyNext(1) := '1';
-			res.argValues.hist1(1) := 'N';		
+			-- pragma synthesis off				
+			res.argValues.hist1(1) := 'N';
+			-- pragma synthesis on		
 	end if;
 
 	if ai.nextReady(2) = '1' then
 		res.argValues.missing(2) := '0';
 		res.argValues.readyNext(2) := '1';
+			-- pragma synthesis off				
 			res.argValues.hist2(1) := 'N';
+			-- pragma synthesis on			
 	end if;
 
 	-- For 'ready'
@@ -470,21 +502,27 @@ begin
 		--res.argValues.missing(0) := '0'; -- NOTE: it would increase delay, unneeded with full 'nextReady'
 		res.argValues.readyNow(0) := '1';
 		res.argValues.arg0 := ai.vals(0);
-			res.argValues.hist0(1) := 'u';				
+			-- pragma synthesis off				
+			res.argValues.hist0(1) := 'u';
+			-- pragma synthesis on			
 	end if;		
 
 	if ai.ready(1) = '1' then
 		--res.argValues.missing(1) := '0';
 		res.argValues.readyNow(1) := '1';
-		res.argValues.arg1 := ai.vals(1);			
-			res.argValues.hist1(1) := 'u';		
+		res.argValues.arg1 := ai.vals(1);
+			-- pragma synthesis off				
+			res.argValues.hist1(1) := 'u';
+			-- pragma synthesis on			
 	end if;
 
 	if ai.ready(2) = '1' then
 		--res.argValues.missing(2) := '0';
 		res.argValues.readyNow(2) := '1';
 		res.argValues.arg2 := ai.vals(2);
-			res.argValues.hist2(1) := 'u';				
+			-- pragma synthesis off				
+			res.argValues.hist2(1) := 'u';
+			-- pragma synthesis on			
 	end if;
 		
 	res.argValues.locs := ai.locs;	

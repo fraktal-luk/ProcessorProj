@@ -40,6 +40,8 @@ use work.GeneralPipeDev.all;
 
 use work.ProcComponents.all;
 
+use work.ProcLogicFront.all;
+
 
 entity GenericStageMulti is
 	port(
@@ -73,7 +75,7 @@ architecture Behavioral of GenericStageMulti is
 														StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
 	signal partialKillMask: std_logic_vector(0 to PIPE_WIDTH-1) := (others => '0');
 		
-		use work.ProcLogicFront.stageMultiEvents; -- TODO: func should be in a global package?
+		--use work.ProcLogicFront.stageMultiEvents; -- TODO: func should be in a global package?
 		signal stageEvents: StageMultiEventInfo;
 begin
 	stageDataNew <= stageDataIn;										
@@ -102,7 +104,7 @@ begin
 	);
 	
 		stageEvents <= stageMultiEvents(stageData, flowResponse.isNew);								
-		partialKillMask <= stageEvents.partialKillMask;	
+		partialKillMask <= stageEvents.partialKillMask;
 	
 	flowDrive.prevSending <= prevSending;
 	flowDrive.nextAccepting <= nextAccepting;
@@ -124,6 +126,9 @@ architecture SingleTagged of GenericStageMulti is
 	signal stageData, stageDataLiving, stageDataNext, stageDataNew:
 														StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
 	signal partialKillMask: std_logic_vector(0 to PIPE_WIDTH-1) := (others => '0');
+	
+		use work.ProcLogicFront.stageMultiEvents; -- TODO: func should be in a global package?
+		signal stageEvents: StageMultiEventInfo;	
 begin
 	stageDataNew <= stageDataIn;										
 	stageDataNext <= stageMultiNext(stageDataLiving, stageDataNew,
@@ -154,8 +159,8 @@ begin
 		signal before: std_logic;
 		signal a, b: std_logic_vector(7 downto 0);
 	begin
-		a <= execCausing.numberTag;
-		b <= stageData.data(0).numberTag;	
+		a <= execCausing.groupTag;
+		b <= stageData.data(0).groupTag;	
 
 		IQ_KILLER: entity work.CompareBefore8 port map(
 			inA =>  a,
@@ -169,6 +174,8 @@ begin
 										execCausing.controlInfo.newInterrupt); -- CAREFUL: no separat interrupt signal!
 										-- before and execEventSignal; 	
 	end block;	
+
+		stageEvents <= stageMultiEvents(stageData, flowResponse.isNew);
 	
 	flowDrive.prevSending <= prevSending;
 	flowDrive.nextAccepting <= nextAccepting;
@@ -179,7 +186,7 @@ begin
 	sendingOut <= flowResponse.sending;
 	stageDataOut <= stageDataLiving; -- TODO: clear temp ctrl info?
 	
-	stageEventsOut <= DEFAULT_STAGE_MULTI_EVENT_INFO;
+	stageEventsOut <= stageEvents;
 end SingleTagged;
 
 
@@ -192,3 +199,4 @@ begin
 	
 	stageEventsOut <= DEFAULT_STAGE_MULTI_EVENT_INFO;	
 end Bypassed;
+

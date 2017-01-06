@@ -72,7 +72,8 @@ return StageDataHbuffer;
 function newFromHbuffer(content: InstructionStateArray; fullMask: std_logic_vector)
 return HbuffOutData;
 
-function newPCData(content: InstructionState; fe: FrontEventInfo; pcNext, causingNext: Mword)--;
+function newPCData(content: InstructionState; fe: FrontEventInfo; pcNext, causingNext: Mword;
+						 startCommand: std_logic)--;
 return InstructionState;
 
 function getAnnotatedHwords(--fetchData: InstructionState;
@@ -115,6 +116,13 @@ begin
 			if ins.operation.func = sysUndef then
 				ci.undef := '1';
 			end if;
+
+				-- Which clusters?
+				-- TEMP!
+				ci.mainCluster := '1';
+				if ins.operation = (Memory, store) then
+					ci.secCluster := '1';
+				end if;
 
 			ci.branchAlways := '0';
 			ci.branchCond := '0';
@@ -498,17 +506,25 @@ begin
 end function;
 
 
-function newPCData(content: InstructionState; fe: FrontEventInfo; pcNext, causingNext: Mword)--;
+function newPCData(content: InstructionState; fe: FrontEventInfo; pcNext, causingNext: Mword;
+						 startCommand: std_logic)--;
 return InstructionState is
 	variable res: InstructionState := content;
 	variable newPC: Mword := (others=>'0');
 begin
+
 	if fe.eventOccured = '1' then -- when from exec or front	
 		if --fe.fromInt = '1' then
 			fe.causing.controlInfo.newInterrupt = '1'
 		then
 			res.basicInfo.ip := INT_BASE; -- TEMP!
-			res.basicInfo.intLevel := "00000001";	
+			res.basicInfo.intLevel := "00000001";
+			
+				if startCommand = '1' then -- TEMP!
+					res.basicInfo.ip := (others => '0');
+					res.basicInfo.intLevel := "00000000";
+				end if;
+		
 		elsif fe.causing.controlInfo.newException = '1' then
 			-- TODO, FIX: exceptionCode sliced - shift left by ALIGN_BITS? or leave just base address
 			res.basicInfo.ip := EXC_BASE(MWORD_SIZE-1 downto fe.causing.controlInfo.exceptionCode'length)
@@ -591,12 +607,14 @@ begin
 end function;
 
 
+-- MOVE to General
 function stageMultiEvents(sd: StageDataMulti; isNew: std_logic) return StageMultiEventInfo is
 	variable res: StageMultiEventInfo := (eventOccured => '0', causing => defaultInstructionState,
 														partialKillMask => (others=>'0'));
 	variable t, tp: std_logic := '0';
 	variable eVec: std_logic_vector(0 to PIPE_WIDTH-1) := (others=>'0');
 begin
+	-- TODO: change default res.causing to the value "causing" input of the pipe stage?
 	res.causing := sd.data(PIPE_WIDTH-1);
 	if isNew = '0' then
 		return res;

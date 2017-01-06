@@ -17,8 +17,6 @@ architecture Behavioral5 of NewCore0 is
 		
 	-- for Front
 	signal killVec: std_logic_vector(0 to N_EVENT_AREAS-1) := (others => '0');	
-		
-	signal fetchLockCommand: std_logic := '0';
 
 	signal renamedDataLiving, stageDataCommittedOut: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;				
 	signal renamedSending: std_logic := '0';			
@@ -29,43 +27,27 @@ architecture Behavioral5 of NewCore0 is
 	
 	signal readyRegFlags: std_logic_vector(0 to 3*PIPE_WIDTH-1) := (others => '0');
 	
-	signal dataToA, dataToB, dataToC, dataToD: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;						
+	signal dataToA, dataToB, dataToC, dataToD, dataToE: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;						
 
-	signal acceptingA, prevSendingA: SmallNumber := (others=>'0');									
-	signal acceptingB, prevSendingB: SmallNumber := (others=>'0');	
-	signal acceptingC, prevSendingC: SmallNumber := (others=>'0');	
-	signal acceptingD, prevSendingD: SmallNumber := (others=>'0');	
+	signal acceptingA, acceptingB, acceptingC, acceptingD, acceptingE: SmallNumber := (others=>'0');
+		signal acceptingVecA, acceptingVecB, acceptingVecC, acceptingVecD, acceptingVecE:
+				std_logic_vector(0 to PIPE_WIDTH-1) := (others => '0');
+	signal prevSendingA, prevSendingB, prevSendingC, prevSendingD, prevSendingE: SmallNumber := (others=>'0');
 	
 	signal iqAccepts: std_logic := '0';	
 		
-	signal dataOutIQA: InstructionState := defaultInstructionState;				
-	signal dataOutIQB: InstructionState := defaultInstructionState;
-	signal dataOutIQC: InstructionState := defaultInstructionState;	
-	signal dataOutIQD: InstructionState := defaultInstructionState;		
-	
-	signal sendingSchedA, sendingSchedB, sendingSchedC, sendingSchedD: std_logic := '0';
+	signal dataOutIQA, dataOutIQB, dataOutIQC, dataOutIQD, dataOutIQE: InstructionState
+																	:= defaultInstructionState;	
+	signal sendingSchedA, sendingSchedB, sendingSchedC, sendingSchedD, sendingSchedE: std_logic := '0';
 	
 	-- Physical register interface
-	signal regsSelA, regsSelB, regsSelC, regsSelD: PhysNameArray(0 to 2) := (others => (others => '0'));
-	signal regValsA, regValsB, regValsC, regValsD: MwordArray(0 to 2) := (others => (others => '0'));
-	signal regsAllowA, regsAllowB, regsAllowC, regsAllowD: std_logic := '0';
+	signal regsSelA, regsSelB, regsSelC, regsSelD, regsSelE, regsSelCE: PhysNameArray(0 to 2)
+					:= (others => (others => '0'));
+	signal regValsA, regValsB, regValsC, regValsD, regValsE, regValsCE: MwordArray(0 to 2)
+							:= (others => (others => '0'));
+	signal regsAllowA, regsAllowB, regsAllowC, regsAllowD, regsAllowE, regsAllowCE: std_logic := '0';
 
-	signal execAcceptingA, execAcceptingB, execAcceptingC, execAcceptingD: std_logic := '0'; 
-
-	-- Mem interface
-	signal memAddress, memLoadValue, memStoreValue: Mword := (others => '0');
-	signal memStoreAllow, memLoadAllow, memLoadReady: std_logic := '0';
-		
-	-- Sys reg interface	
-	signal sysRegReadSel: slv5 := (others => '0');
-	signal sysRegValue: Mword := (others => '0');
-	signal sysRegWriteAllow: std_logic := '0';
-	-- CAREFUL: *E names are from temporary register in exec block, without "E" from commiting (alternative)
-	signal sysRegWriteSel, sysRegWriteSelE: slv5 := (others => '0');
-	signal sysRegWriteValue, sysRegWriteValueE: Mword := (others => '0');
-
-	signal execEnds: InstructionStateArray(0 to 3);
-	signal execPreEnds: InstructionStateArray(0 to 3); -- For 'nextResultTags'
+	signal execAcceptingA, execAcceptingB, execAcceptingC, execAcceptingD, execAcceptingE: std_logic := '0'; 
 	
 	-- forw network
 	signal resultTags: PhysNameArray(0 to N_RES_TAGS-1) := (others=>(others=>'0'));
@@ -74,6 +56,19 @@ architecture Behavioral5 of NewCore0 is
 	-- writtenTags indicate registers written to GPR file in last cycle, so they can be read from there
 	--		rather than from forw. network, but readyRegFlags are not available in the 1st cycle after WB.
 	signal writtenTags: PhysNameArray(0 to PIPE_WIDTH-1) := (others => (others => '0'));
+	
+	
+	signal execEnds, execEnds2: InstructionStateArray(0 to 3);
+	signal execPreEnds: InstructionStateArray(0 to 3); -- For 'nextResultTags'
+	signal execSending, execSending2: std_logic_vector(0 to 3);
+	
+	-- Mem interface
+	signal memLoadAddress, memStoreAddress, memLoadValue, memStoreValue: Mword := (others => '0');
+	signal memStoreAllow, memLoadAllow, memLoadReady: std_logic := '0';
+		
+	-- Sys reg interface	
+	signal sysRegReadSel, sysRegWriteSel: slv5 := (others => '0');
+	signal sysRegReadValue, sysRegWriteValue: Mword := (others => '0');
 	
 	-- evt
 	signal execEventSignal, intSig, execOrIntEventSignal: std_logic := '0';						
@@ -90,11 +85,10 @@ architecture Behavioral5 of NewCore0 is
 
 	-- back end interfaces
 	signal selectedToCQ, whichAcceptedCQ: std_logic_vector(0 to 3) := (others=>'0');	
-	signal cqWhichSend: std_logic_vector(0 to 3);
 	signal anySendingFromCQ: std_logic := '0';
 	
 	signal dataCQOut: StageDataCommitQueue
-								:= (fullMask=>(others=>'0'), data=>(others=>defaultInstructionState));	
+										:= (fullMask=>(others=>'0'), data=>(others=>defaultInstructionState));	
 	signal cqDataLivingOut: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
 
 	signal cqPhysDestMask: std_logic_vector(0 to PIPE_WIDTH-1) := (others => '0');
@@ -116,16 +110,18 @@ begin
 	resetSig <= reset and HAS_RESET;
 	enSig <= en or not HAS_EN;
 	
-	intSig <= int0;
+	intSig <= int0
+					 or int1
+					 ;
 	
 	SEQUENCING_PART: entity work.UnitSequencer(Behavioral)
 	port map (
 		clk => clk, reset => resetSig, en => enSig,
 
 		sysRegReadSel => sysRegReadSel,
-		sysRegReadValue => sysRegValue,	
-		sysRegWriteSel => sysRegWriteSelE,
-		sysRegWriteValue => sysRegWriteValueE,
+		sysRegReadValue => sysRegReadValue,	
+		sysRegWriteSel => sysRegWriteSel,
+		sysRegWriteValue => sysRegWriteValue,
 
 		-- Icache interface
 		iadr => iadr,
@@ -140,7 +136,6 @@ begin
 		intSignal => intSig,
 		execEventSignal => execEventSignal,
 		execCausing => execCausing,
-		frontEventSigOut => open, -- frontEventSig,
 		
 			execOrIntEventSignalOut => execOrIntEventSignal,
 			intCausingOut => intCausing,
@@ -156,9 +151,7 @@ begin
 		
 		sendingFromROB => robSending,	
 		robDataLiving => dataOutROB,
-		
-			fetchLockCommandOut => fetchLockCommand, -- This is associated with the front dependency
-		
+				
 		-- Interface with IQ
 				-- CAREFUL: iqAccepts is needed here, but must be faster (based on 'full' instead of 'living')
 		iqAccepts => --iqAccepts and robAccepting,
@@ -167,9 +160,10 @@ begin
 		renamedSending => renamedSending,
 				
 			readyRegFlagsOut => readyRegFlags,
-		commitCtrNextOut => commitCtrNextSig,
 		commitGroupCtrOut => commitGroupCtrSig,
-		commitGroupCtrNextOut => commitGroupCtrNextSig						
+		commitGroupCtrNextOut => commitGroupCtrNextSig,
+
+		start => int1	
 	);
 	
 		
@@ -179,7 +173,6 @@ begin
 		iin => iin,
 			ivalid => ivalid,
 		renameAccepting => renameAccepting,
-		fetchLockCommand => fetchLockCommand,					
 					
 			pcDataLiving => pcDataSig,
 			pcSending => pcSendingSig,
@@ -198,25 +191,38 @@ begin
 	ISSUE_ROUTING: entity work.SubunitIssueRouting(Behavioral)
 	port map(
 		renamedDataLiving => renamedDataLiving,
+		
 		acceptingA => acceptingA,
 		acceptingB => acceptingB,
 		acceptingC => acceptingC,
 		acceptingD => acceptingD,
+		acceptingE => acceptingE, --num2flow(1),		
+		
+			acceptingVecA => acceptingVecA,
+			acceptingVecB => acceptingVecB,
+			acceptingVecC => acceptingVecC,
+			acceptingVecD => acceptingVecD,
+			acceptingVecE => acceptingVecE,
+		
 		renamedSendingIn => renamedSending,
 		
 		renamedSendingOut => open, -- DEPREC??
 		iqAccepts => iqAccepts,
-		prevSendingA => prevSendingA,
-		prevSendingB => prevSendingB,
-		prevSendingC => prevSendingC,
-		prevSendingD => prevSendingD,		
+		
+		sendingA => prevSendingA,
+		sendingB => prevSendingB,
+		sendingC => prevSendingC,
+		sendingD => prevSendingD,
+		sendingE => prevSendingE,		
+		
 		dataOutA => dataToA,
 		dataOutB => dataToB,
 		dataOutC => dataToC,
-		dataOutD => dataToD
+		dataOutD => dataToD,
+		dataOutE => dataToE
 	);
-			
-		
+
+
 	IQ_A: entity work.UnitIQ
 	generic map(
 		IQ_SIZE => IQ_A_SIZE
@@ -248,6 +254,7 @@ begin
 			regValues => regValsA,
 			
 		accepting => acceptingA,
+			acceptingVec => acceptingVecA,
 		dataOutIQ => dataOutIQA,
 			sendingOut => sendingSchedA
 	);
@@ -283,6 +290,7 @@ begin
 			regValues => regValsB,
 			
 		accepting => acceptingB,
+			acceptingVec => acceptingVecB,		
 		dataOutIQ => dataOutIQB,
 			sendingOut => sendingSchedB
 	);
@@ -319,6 +327,7 @@ begin
 			regValues => regValsC,
 			
 		accepting => acceptingC,
+			acceptingVec => acceptingVecC,		
 		dataOutIQ => dataOutIQC,
 			sendingOut => sendingSchedC
 	);					
@@ -354,57 +363,105 @@ begin
 			regValues => regValsD,
 			
 		accepting => acceptingD,
+			acceptingVec => acceptingVecD,		
 		dataOutIQ => dataOutIQD,
 			sendingOut => sendingSchedD
+	);	
+
+
+	IQ_E: entity work.UnitIQ
+	generic map(
+		IQ_SIZE => IQ_E_SIZE
+	)
+	port map(
+		clk => clk, reset => resetSig, en => enSig,
+		
+		writtenTags => writtenTags,
+		resultTags => resultTags,
+		nextResultTags => nextResultTags,
+		resultVals => resultVals,
+				
+		prevSending => prevSendingE,
+		prevSendingOK => renamedSending,
+		
+		nextAccepting => execAcceptingE,
+		
+		newData => dataToE,
+		
+		execCausing => execOrIntCausing,
+		execEventSignal => execOrIntEventSignal,
+		intSignal => intSig,	
+
+			readyRegFlags => readyRegFlags,
+		
+			regsForDispatch => regsSelE,
+			regReadAllow => regsAllowE,
+
+			regValues => regValsE,
+			
+		accepting => acceptingE,
+			acceptingVec => acceptingVecE,		
+		dataOutIQ => dataOutIQE,
+			sendingOut => sendingSchedE
 	);	
 															
 	EXEC_BLOCK: entity work.UnitExec --(Behavioral)
 												(Implem)
 	port map(
 		clk => clk, reset => resetSig, en => enSig,
-			sendingIQA => sendingSchedA,
-			sendingIQB => sendingSchedB,
-			sendingIQC => sendingSchedC,
-			sendingIQD => sendingSchedD,			
+
+		sendingIQA => sendingSchedA,
+		sendingIQB => sendingSchedB,
+		sendingIQC => sendingSchedC,
+		sendingIQD => sendingSchedD,
+		sendingIQE => sendingSchedE,
+
 		whichAcceptedCQ => whichAcceptedCQ,
 		dataIQA => dataOutIQA,
 		dataIQB => dataOutIQB,
 		dataIQC => dataOutIQC,
-		dataIQD => dataOutIQD,			
+		dataIQD => dataOutIQD,
+		dataIQE => dataOutIQE,
+
 		intSig => intSig,
 		intCausingIn => intCausing,
-		
-			memLoadReady => memLoadReady,
-			memLoadValue => memLoadValue,
-		-- Output
-			memAddress => memAddress,
-			memLoadAllow => memLoadAllow,
-			memStoreAllow => memStoreAllow,
-			memStoreValue => memStoreValue,
+
+		memLoadReady => memLoadReady,
+		memLoadValue => memLoadValue,
+
+		memLoadAddress => memLoadAddress,
+		memStoreAddress => memStoreAddress,
+		memLoadAllow => memLoadAllow,
+		memStoreAllow => memStoreAllow,
+		memStoreValue => memStoreValue,
 			
-			sysRegSelect => sysRegReadSel,
-			sysRegIn => sysRegValue,
-				sysRegWriteSelOut => sysRegWriteSelE,
-				sysRegWriteValueOut => sysRegWriteValueE,
+		sysRegSelect => sysRegReadSel,
+		sysRegIn => sysRegReadValue,
+		sysRegWriteSelOut => sysRegWriteSel,
+		sysRegWriteValueOut => sysRegWriteValue,
+
 		execAcceptingA => execAcceptingA,
 		execAcceptingB => execAcceptingB,				
 		execAcceptingC => execAcceptingC,
 		execAcceptingD => execAcceptingD,
+		execAcceptingE => execAcceptingE,
 		
-		selectedToCQ => selectedToCQ,
-		cqWhichSend => cqWhichSend,
+			selectedToCQ => open, --selectedToCQ,
+		execSending => execSending,
+		execSending2 => execSending2,
 		
 		execEvent => execEventSignal,
 		execCausingOut => execCausing,
 				
-			execOrIntEventSignalIn => execOrIntEventSignal,
-			execOrIntCausingIn => execOrIntCausing,
+		execOrIntEventSignalIn => execOrIntEventSignal,
+		execOrIntCausingIn => execOrIntCausing,
 			
 		execPreEnds => execPreEnds,
-		execEnds => execEnds
+		execEnds => execEnds,
+		execEnds2 => execEnds2
 	);	
-	
-	
+
+
 	COMMIT_QUEUE: entity work.TestCQPart0 --(Behavioral)
 														(Implem)
 	port map(
@@ -414,12 +471,10 @@ begin
 		execEventSignal => execOrIntEventSignal,
 		execCausing => execOrIntCausing,
 		
-		commitCtrNext => commitCtrNextSig,
-
 		inputInstructions => execEnds,
 		selectedToCQ => selectedToCQ,
 		whichAcceptedCQ => whichAcceptedCQ,
-		cqWhichSend => cqWhichSend,				
+		cqWhichSend => execSending,				
 		anySending => anySendingFromCQ,
 		cqOut => cqDataLivingOut,
 		dataCQOut => dataCQOut -- CAREFUL: must remain, because used by forwarding network!
@@ -447,6 +502,13 @@ begin
 		cqPhysicalDests <= getPhysicalDests(cqDataLivingOut);
 		cqInstructionResults <= getInstructionResults(cqDataLivingOut);
 		
+			
+			regsSelCE(0 to 1) <= regsSelC(0 to 1);
+			regsSelCE(2) <= regsSelE(2);
+			regsAllowCE <= regsAllowC or regsAllowE;
+			regValsC <= regValsCE;
+			regValsE <= regValsCE;
+		
 		TEMP_REG_FILE_INPUTS: for i in 0 to PIPE_WIDTH-1 generate
 			rfWriteVec(i) <= cqPhysDestMask(i); -- cqDataLivingOut.data(i);
 			rfSelectWrite(i) <= cqPhysicalDests(i); -- anySendingFromCQ and cqDataLivingOut.fullMask(i);
@@ -462,7 +524,7 @@ begin
 
 				readAllowT0 => regsAllowA,
 				readAllowT1 => regsAllowB,
-				readAllowT2 => regsAllowC,
+				readAllowT2 => regsAllowCE,
 				readAllowT3 => regsAllowD,
 				
 			writeAllow => anySendingFromCQ,
@@ -473,31 +535,15 @@ begin
 			
 			selectRead(0 to 2) => regsSelA,
 			selectRead(3 to 5) => regsSelB,
-			selectRead(6 to 8) => regsSelC,
+			selectRead(6 to 8) => regsSelCE,
 			selectRead(9 to 11) => regsSelD,
 			
 			readValues(0 to 2) => regValsA,
 			readValues(3 to 5) => regValsB,
-			readValues(6 to 8) => regValsC,						
+			readValues(6 to 8) => regValsCE,						
 			readValues(9 to 11) => regValsD			
 		);
-
 	
-	process (clk)
-	begin
-		if rising_edge(clk) then
-			if resetSig = '1' then		
-				
-			elsif enSig = '1' then
-
-			end if;
-		end if;
-	end process;
-	
-		--TEMP_COMPLETING: for i in 0 to PIPE_WIDTH-1 generate
-		--	TEMP_results(i) <= cqDataLivingOut.data(i);
-		--	TEMP_completed(i) <= anySendingFromCQ and cqDataLivingOut.fullMask(i);
-		--end generate;	
 	
 	REORDER_BUFFER: entity work.ReorderBuffer --(Behavioral) 
 															(Implem)
@@ -508,11 +554,14 @@ begin
 		execEventSignal => execOrIntEventSignal,
 		execCausing => execOrIntCausing,
 		
-		commitCtrNext => commitCtrNextSig,
 		commitGroupCtr => commitGroupCtrSig,
 		commitGroupCtrNext => commitGroupCtrNextSig,
-			execEnds => execEnds,
-			execReady => cqWhichSend,
+			
+		execEnds => execEnds,
+		execReady => execSending,
+		
+		execEnds2 => execEnds2,
+		execReady2 => execSending2,
 		
 		inputData => renamedDataLiving,
 		prevSending => renamedSending,
@@ -528,10 +577,13 @@ begin
 	nextResultTags <= getNextResultTags(execPreEnds, dataOutIQA, dataOutIQB, dataOutIQC, dataOutIQD);
 	resultVals <= getResultValues(execEnds, dataCQOut, stageDataAfterCQ);
 	
-	dadr <= memAddress;
-	dadrvalid <= memLoadAllow or memStoreAllow;
+	dadr <= memLoadAddress;
+	doutadr <= memStoreAddress;
+		dadrvalid <= memLoadAllow or memStoreAllow; -- DEPREC?
+	dread <= memLoadAllow;
+	dwrite <= memStoreAllow;
 	dout <= memStoreValue;
-	drw <= memStoreAllow;
+		drw <= memStoreAllow; -- DEPREC?
 	memLoadValue <= din;
 	memLoadReady <= dvalid;
 	

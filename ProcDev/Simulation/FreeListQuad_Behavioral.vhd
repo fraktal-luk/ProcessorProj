@@ -5,7 +5,7 @@ architecture Behavioral of FreeListQuad is
 	
 	signal readTakeMW_C, readTagsMW_C: PhysNameArray(0 to MAX_WIDTH-1) := (others=>(others=>'0'));
 
-	constant LIST_SIZE: integer := 64; -- CAREFUL! 
+	constant LIST_SIZE: integer := FREE_LIST_SIZE; --64; -- CAREFUL! 
 	
 	function initList return PhysNameArray;
 
@@ -45,14 +45,7 @@ begin
 			--elsif en = '1' then
 				indTake := slv2u(listPtrTake); 
 				indPut := slv2u(listPtrPut);
-				
---				-- Read
---				for i in 0 to WIDTH-1 loop
---					-- readTakeMW(i) <= 
---					-- indTake 
---				end loop;
-				
-				
+								
 				if rewind = '1' then
 					listPtrTake(5 downto 0) <= writeTag; -- Indexing TMP
 				end if;

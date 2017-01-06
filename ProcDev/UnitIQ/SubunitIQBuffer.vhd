@@ -68,6 +68,7 @@ entity SubunitIQBuffer is
 		readyRegFlags: in std_logic_vector(0 to 3*PIPE_WIDTH-1);
 		
 		accepting: out SmallNumber;
+			acceptingVec: out std_logic_vector(0 to PIPE_WIDTH-1);
 		queueSending: out std_logic;
 		iqDataOut: out InstructionStateArray(0 to IQ_SIZE-1);
 		newDataOut: out InstructionState
@@ -161,8 +162,8 @@ begin
 		signal before: std_logic;
 		signal a, b: std_logic_vector(7 downto 0);
 	begin
-		a <= execCausing.numberTag;
-		b <= queueData(i).numberTag;
+		a <= execCausing.groupTag;
+		b <= queueData(i).groupTag;
 		IQ_KILLER: entity work.CompareBefore8 port map(
 			inA =>  a,
 			inB =>  b,
@@ -174,7 +175,10 @@ begin
 	
 	accepting <= flowResponseQ.accepting;
 					--(0 =>	not livingMask(IQ_SIZE-1), others => '0'); -- NOTE: simpler but worse performance
-						
+					--(0 =>	not fullMask(IQ_SIZE-1), others => '0');
+		acceptingVec <= not livingMask(IQ_SIZE-PIPE_WIDTH to IQ_SIZE-1);
+						    --not fullMask(IQ_SIZE-PIPE_WIDTH to IQ_SIZE-1);
+		
 	queueSending <= flowResponseQ.sending(0);	-- CAREFUL: assumes that flowResponseQ.sending is binary: [0,1]
 	iqDataOut <= queueData;						
 	newDataOut <= dispatchDataNew;

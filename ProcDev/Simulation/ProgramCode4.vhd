@@ -94,6 +94,24 @@ package ProgramCode4 is
 			2 => ins655655(ext0, r3, r1, muls, r2, 0),
 			3 => ins655H(orI, r4, r3, 8),
 			
+			4 => ins6556X(ext1, r4, r0, store, 100),
+			5 => ins6556X(ext1, r4, r0, store, 100),
+			6 => ins6556X(ext1, r4, r0, store, 100),
+			7 => ins6556X(ext1, r4, r0, store, 100),
+			8 => ins6556X(ext1, r4, r0, store, 100),
+			9 => ins6556X(ext1, r4, r0, store, 100),
+			10 => ins6556X(ext1, r4, r0, store, 100),
+			11 => ins6556X(ext1, r4, r0, store, 100),
+			12 => ins6556X(ext1, r4, r0, store, 100),
+			13 => ins655655(ext0, r5, r0, muls, r0, 0), -- delays the jump, some yuger stores bypass it
+			14 => ins65J(jz, r5, 4* (-8)), -- r5 = 0, so jumping and flushing younger stores
+			15 => ins6556X(ext1, r4, r0, store, 100),
+			16 => ins6556X(ext1, r4, r0, store, 100),
+			17 => ins6556X(ext1, r4, r0, store, 100),
+			18 => ins6556X(ext1, r4, r0, store, 100),
+			19 => ins6556X(ext1, r4, r0, store, 100),
+			
+			
 			others => ins655655(ext0, r0, r0, orR, r0, 0)
 		);
 	

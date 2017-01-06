@@ -37,6 +37,8 @@ function getFirstOnePosition(readySlots: std_logic_vector) return integer;
 
 function isNonzero(vec: std_logic_vector) return std_logic;
 
+function invertVec(vec: std_logic_vector) return std_logic_vector;
+
 end Helpers;
 
 
@@ -204,5 +206,17 @@ begin
 	return '0';
 end function;
 
+
+function invertVec(vec: std_logic_vector) return std_logic_vector is
+	variable res: std_logic_vector(vec'range) := (others => '0');
+	constant LEN: integer := vec'length;
+	constant LLIMIT: integer := vec'left;
+	constant RLIMIT: integer := res'right; 
+begin
+	for i in 0 to LEN-1 loop
+		res(RLIMIT - i) := vec(LLIMIT + i);
+	end loop;
+	return res;
+end function;
  
 end Helpers;

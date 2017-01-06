@@ -174,7 +174,8 @@ function stageROBNext(content: StageDataROB; fullMask: std_logic_vector; newCont
 return StageDataROB;
 
 function setCompleted(content: StageDataROB; refTag: SmallNumber;
-							execEnds: InstructionStateArray; execReady: std_logic_vector)
+							execEnds: InstructionStateArray; execReady: std_logic_vector;
+							execEnds2: InstructionStateArray; execReady2: std_logic_vector)							
 return StageDataROB;
 
 function killInROB(content: StageDataROB; refTag: SmallNumber; killTag: SmallNumber;
@@ -190,7 +191,10 @@ package body ProcLogicROB is
 function groupCompleted(insVec: StageDataMulti) return std_logic is
 begin
 	for i in 0 to PIPE_WIDTH-1 loop
-		if insVec.fullMask(i) = '1' and insVec.data(i).controlInfo.completed = '0' then
+		if insVec.fullMask(i) = '1' and 
+				(insVec.data(i).controlInfo.completed = '0'
+			or	 insVec.data(i).controlInfo.completed2 = '0')
+		then
 			return '0'; 
 		end if;
 	end loop;
@@ -261,7 +265,8 @@ end function;
 
 
 function setCompleted(content: StageDataROB; refTag: SmallNumber;
-							execEnds: InstructionStateArray; execReady: std_logic_vector)
+							execEnds: InstructionStateArray; execReady: std_logic_vector;
+							execEnds2: InstructionStateArray; execReady2: std_logic_vector)							
 return StageDataROB is
 	variable res: StageDataROB := content;
 	variable indH, indL, indRef, index: integer;
@@ -288,6 +293,31 @@ begin
 			res.data(index).data(indL).controlInfo.completed := '1';
 		end if;
 	end loop;
+	
+		-- CAREFUL: setting completed2
+		for i in 0 to execEnds2'length-1 loop
+			indH := integer(slv2u(tagHigh(execEnds2(i).groupTag)));
+			indL := integer(slv2u(tagLow(execEnds2(i).groupTag)));
+
+			indRef := integer(slv2u(tagHigh(refTag)));
+			--  -k = (not k) + 1
+			--  a - k = a + (not k) + 1
+			--  a - k - 1 = a + (not k)
+			index := (indH - indRef - 1) mod 2**(SMALL_NUMBER_SIZE - LOG2_PIPE_WIDTH);
+				if index > ROB_SIZE-1 then
+					next;
+				end if;
+			if execReady2(i) = '1' then
+				-- CAREFUL! If the operation caused an exception, it must be noted here too!				
+				-- TODO: remember to add branch info when taken/not taken stats are needed for predictor!
+--				if execEnds(i).controlInfo.hasException = '1' then	
+--					res.data(index).data(indL).controlInfo.hasException := '1';
+--					res.data(index).data(indL).controlInfo.hasEvent := '1';
+--				end if;
+				res.data(index).data(indL).controlInfo.completed2 := '1';
+			end if;
+		end loop;
+	
 	return res;
 end function;
 

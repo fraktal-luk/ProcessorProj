@@ -39,10 +39,11 @@ package NewPipelineData is
 	constant IQ_B_SIZE: natural := PIPE_WIDTH * 2;
 	constant IQ_C_SIZE: natural := PIPE_WIDTH * 2;
 	constant IQ_D_SIZE: natural := PIPE_WIDTH * 2;
+	constant IQ_E_SIZE: natural := PIPE_WIDTH * 2;	
+	
 	constant CQ_SIZE: natural := PIPE_WIDTH * 4;
 	
 		constant ROB_SIZE: natural := 8; -- ??
-
 	
 		-- If true, physical registers are allocated even for empty slots in instruction group
 		--		and later freed from them.
@@ -89,12 +90,9 @@ type ExecFunc is (unknown,
 										
 										jump,
 										
-										--sysRetE, sysRetI,
 										sysMTC, sysMFC, -- move to/from control
 										sysUndef
 							);	
-
---	type FrontStages is (PC, Fetch, Hbuffer, Stage0, Stage1);
 
 	-- CAREFUL: is this needed and correct?
 	type ExecStages is (	ExecA0, 
@@ -117,6 +115,7 @@ end record;
 
 type InstructionControlInfo is record
 	completed: std_logic;
+		completed2: std_logic;
 	-- Momentary data:
 	newEvent: std_logic; -- True if any new event appears
 	newInterrupt: std_logic;
@@ -136,6 +135,8 @@ end record;
 
 type InstructionClassInfo is record
 	short: std_logic;
+		mainCluster: std_logic;
+		secCluster: std_logic;
 	branchAlways: std_logic; -- either taken or not (only constant branches are known at decoding)
 	branchCond: std_logic;
 	branchReg: std_logic;
@@ -193,7 +194,9 @@ type InstructionArgValues is record
 	arg0: Mword;
 	arg1: Mword;
 	arg2: Mword;
+		-- pragma synthesis off
 		hist0, hist1, hist2: string(1 to 3);
+		-- pragma synthesis on
 end record;
 
 type InstructionState is record
@@ -216,6 +219,11 @@ type InstructionState is record
 end record;
 
 type InstructionStateArray is array(integer range <>) of InstructionState;
+	
+	constant INITIAL_GROUP_TAG: SmallNumber := (others => '0');
+															-- i2slv(-PIPE_WIDTH, SMALL_NUMBER_SIZE)
+	constant USE_GPR_TAG: boolean := false;
+	
 	
 -- Number of words proper for fetch group size
 subtype InsGroup is WordArray(0 to PIPE_WIDTH-1);
@@ -337,7 +345,6 @@ constant INITIAL_BASIC_INFO: InstructionBasicInfo := (ip => INITIAL_PC,
 constant DEFAULT_DATA_PC: InstructionState := defaultInstructionState;
 constant INITIAL_DATA_PC: InstructionState := initialPCData;
 
---subtype AnnotatedHword is InstructionState;
 constant DEFAULT_ANNOTATED_HWORD: InstructionState := defaultInstructionState;
 	
 	type StageDataHbuffer is record
@@ -362,7 +369,7 @@ type FrontEventInfo is record
 	fromExec, fromInt: std_logic;	
 end record;
 
--- !! Why another same type? 
+-- TODO: remove? Why another same type? 
 type FrontEventInfo2 is record
 	eventOccured: std_logic;
 	causing: InstructionState;
@@ -413,6 +420,8 @@ type ExecDataTable is array (ExecStages'left to ExecStages'right) of Instruction
 
 			type ArgStatusInfoArray is array(integer range <>) of ArgStatusInfo;
 
+	function defaultLastComitted return InstructionState;
+
 end NewPipelineData;
 
 
@@ -446,6 +455,7 @@ function defaultControlInfo return InstructionControlInfo is
 begin
 	return InstructionControlInfo'(
 												completed => '0',
+													completed2 => '0',
 												newEvent => '0',
 												hasEvent => '0',
 												newInterrupt => '0',
@@ -466,6 +476,8 @@ end function;
 function defaultClassInfo return InstructionClassInfo is
 begin
 	return InstructionClassInfo'( short => '0',
+												mainCluster => '0',
+												secCluster => '0',
 											branchAlways => '0',
 											branchCond => '0',
 											branchReg => '0',
@@ -520,10 +532,13 @@ begin
 			  missing => (others=>'0'),
 			  arg0 => (others=>'0'),
 			  arg1 => (others=>'0'),
-			  arg2 => (others=>'0'),
+			  arg2 => (others=>'0')
+					-- pragma synthesis off
+					,
 					hist0 => "   ",
 					hist1 => "   ",
 					hist2 => "   "
+					-- pragma synthesis on
 			  );
 end function;
 
@@ -556,5 +571,31 @@ begin
 	res.basicInfo := INITIAL_BASIC_INFO;
 	return res;
 end function;
+
+
+	function defaultLastComitted return InstructionState is
+		variable res: InstructionState;
+	begin
+		res.controlInfo := defaultControlInfo;
+		res.basicInfo := defaultBasicInfo;
+		res.bits := (others=>'0');
+		--res.operation := BinomialOp'(unknown, unknown);
+		res.classInfo := defaultClassInfo;
+		res.constantArgs := defaultConstantArgs;
+		res.virtualArgs := defaultVirtualArgs;
+		res.virtualDestArgs := defaultVirtualDestArgs;
+		res.physicalArgs := defaultPhysicalArgs;
+		res.physicalDestArgs := defaultPhysicalDestArgs;
+		res.numberTag := (others => '1');
+		res.gprTag := (others => '0');
+		res.groupTag := --(others => '1');
+							 --(others => '0');
+								INITIAL_GROUP_TAG;
+		res.argValues := defaultArgValues;
+		res.result := (others => '0');
+		res.target := (others => '0');
+		return res;
+	end function;
+
 
 end NewPipelineData;

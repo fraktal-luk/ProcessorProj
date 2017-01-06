@@ -55,9 +55,7 @@ entity TestCQPart0 is
 		intSignal: in std_logic;
 		execEventSignal: in std_logic;
 		execCausing: in InstructionState; -- Redundant cause we have inputs from all Exec ends? 
-		
-		commitCtrNext: in SmallNumber;
-		
+				
 		inputInstructions: in InstructionStateArray(0 to 3);
 		
 		selectedToCQ: in std_logic_vector(0 to 3) := (others=>'0');
@@ -137,7 +135,8 @@ begin
 												binFlowNum(flowDriveCQ.prevSending));	
 
 											
-	whichAcceptedCQSig <= selectedToCQ;	-- Accepting all
+	whichAcceptedCQSig <= --selectedToCQ;	-- Accepting all
+									(others => '1');
 													
 	SLOT_CQ: entity work.BufferPipeLogic(Behavioral)
 	generic map(

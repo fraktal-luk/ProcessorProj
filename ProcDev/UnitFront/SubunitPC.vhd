@@ -70,7 +70,9 @@ entity SubunitPC is
 		sysRegWriteSel: in slv5;
 		sysRegWriteValue: in Mword;
 
-		frontEvents: in FrontEventInfo		
+		frontEvents: in FrontEventInfo;
+
+		start: in std_logic	
 	);
 end SubunitPC;
 
@@ -79,12 +81,13 @@ architecture Implem of SubunitPC is
 	signal flowDrivePC: FlowDriveSimple := (others=>'0');
 	signal flowResponsePC: FlowResponseSimple := (others=>'0');
 	
-	signal targetInfo: InstructionBasicInfo := defaultBasicInfo;
+	signal targetInfo, nextTargetInfo, excLinkInfo, intLinkInfo, newTargetInfo: InstructionBasicInfo
+									:= defaultBasicInfo;
 	signal targetPC: Mword := INITIAL_PC; --(others => '0');
 	
 	signal pcNext: Mword := (others => '0');
 	signal pcBase: Mword := (others => '0'); 
-	constant pcInc: Mword := (ALIGN_BITS => '1', others => '0');
+	signal pcInc: Mword := (others => '0');
 	
 	signal causingNext: Mword := (others => '0');
 	signal causingPC: Mword := (others => '0');
@@ -104,7 +107,16 @@ architecture Implem of SubunitPC is
 	
 	alias currentState is sysRegArray(1);
 		
-	signal stageData, stageDataNext, stageDataNew: InstructionState := DEFAULT_INSTRUCTION_STATE;	
+	signal stageData, stageDataNext, stageDataNew: InstructionState := DEFAULT_INSTRUCTION_STATE;
+	signal stageDataBasic: InstructionState := INITIAL_DATA_PC;
+	--	signal stageDataBasic2: InstructionState := DEFAULT_INSTRUCTION_STATE;
+	
+	signal excInfoUpdate, intInfoUpdate: std_logic := '0';
+	
+	--signal stopped: std_logic := '1';
+	signal pcAccepting, pcSending, pcPrevSending: std_logic := '0';
+		--signal pcAccepting2, pcSending2, prevSendingPc: std_logic := '0';
+	signal startCommand: std_logic := '0';
 begin
 	committingPC <= lastCommittedNextIn.basicInfo.ip;
 	committingInc <= getAddressIncrement(lastCommittedNextIn);
@@ -147,78 +159,118 @@ begin
 			dataOut0Pre => pcNext, carryOutPre => open, exceptionOutPre => open
 		);
 		
-	stageDataNew <= newPCData(stageData, frontEvents, pcNext, causingNext);--, linkInfoExc, linkInfoInt);
-	stageDataNext <= stageSimpleNext(stageData, stageDataNew,
-											flowResponsePC.living, flowResponsePC.sending, flowDrivePC.prevSending);
-											
+		pcInc <= (ALIGN_BITS => '1', others => '0'); -- CAREFUL: incr even if not sending, coz INI_ADR < 0x0 
+		
+		
+	excInfoUpdate <= committingIn and lastCommittedNextIn.controlInfo.hasException;
+	intInfoUpdate <= frontEvents.eventOccured and frontEvents.causing.controlInfo.newInterrupt;
+	
+	excLinkInfo <= getLinkInfoNormal(lastCommittedNextIn, committingNext);
+	intLinkInfo <= getLinkInfoSuper(frontEvents.causing, causingNext);
+		
+	SYS_REGS: block
+	begin
+		CLOCKED: process(clk)
+		begin					
+			if rising_edge(clk) then
+				if reset = '1' then			
+				elsif en = '1' then
+					-- CAREFUL: writing to currentState BEFORE normal sys reg write gives priority to the latter;
+					--				otherwise explicit setting of currentState wouln't work.
+					--				So maybe other sys regs should have it done the same way, not conversely? 
+					--				In any case, the requirement is that younger instructions must take effect later
+					--				and override earlier content.
+
+					-- Write currentState (control flow may be just changing it)					
+					if pcPrevSending = '1' then
+						currentState <= X"0000" & newTargetInfo.systemLevel & newTargetInfo.intLevel;						
+					end if;
+					
+					-- Write from system write instruction
+					if sysRegWriteAllow = '1' then
+						sysRegArray(slv2u(sysRegWriteSel)) <= sysRegWriteValue;
+					end if;
+					
+					-- NOTE: writing to link registers after sys reg writing gives priority to the former,
+					--			but committing a sysMtc shouldn't happen in parallel with any control event
+					-- Writing exc status registers
+					if excInfoUpdate = '1' then
+						linkRegExc <= excLinkInfo.ip;
+						savedStateExc <= X"0000" & excLinkInfo.systemLevel & excLinkInfo.intLevel;							
+					-- Writing int status registers
+					elsif intInfoUpdate = '1' then
+						linkRegInt <= intLinkInfo.ip;
+						savedStateInt <= X"0000" & intLinkInfo.systemLevel & intLinkInfo.intLevel;
+					end if;
+					
+					-- Enforcing content of read-only registers
+					sysRegArray(0) <= PROCESSOR_ID;
+					
+					-- Only some number of system regs exists		
+					for i in 6 to 31 loop
+						sysRegArray(i) <= (others => '0');
+					end loop;
+				
+				end if;
+			end if;	
+		end process;
+	end block;
+	
+		newTargetInfo <= stageDataNew.basicInfo;
+
+		startCommand <= start;
+
 	FRONT_CLOCKED: process(clk)
-		variable linkInfoExcVar, linkInfoIntVar: InstructionBasicInfo := defaultBasicInfo;	
-		variable targetInfoVar: InstructionBasicInfo := defaultBasicInfo;
 	begin					
 		if rising_edge(clk) then
+
 			if reset = '1' then			
 			elsif en = '1' then
-				-- CAREFUL: writing to currentState BEFORE normal sys reg write gives priority to the latter;
-				--				otherwise explicit setting of currentState wouln't work.
-				--				So maybe other sys regs should have it done the same way, not conversely? 
-				--				In any case, the requirement is that younger instructions must take effect later
-				--				and override earlier content. 	
-				targetInfoVar := stageDataNext.basicInfo;
-				targetPC <= targetInfoVar.ip;
-				currentState <= X"0000" & targetInfoVar.systemLevel & targetInfoVar.intLevel;
-				
-				if sysRegWriteAllow = '1' then
-					sysRegArray(slv2u(sysRegWriteSel)) <= sysRegWriteValue;
-				end if;
-				
-				-- NOTE: writing to link registers after sys reg writing gives priority to the former,
-				--			but committing a sysMtc shouldn't happen in parallel with any control event
-				if committingIn = '1' and lastCommittedNextIn.controlInfo.hasException = '1' then
-						linkInfoExcVar := getLinkInfoNormal(lastCommittedNextIn, committingNext);
-						linkRegExc <= linkInfoExcVar.ip;
-						savedStateExc <= X"0000" & linkInfoExcVar.systemLevel & linkInfoExcVar.intLevel;						
-						
-				elsif	(frontEvents.eventOccured and frontEvents.causing.controlInfo.newInterrupt) = '1' then
-					linkInfoIntVar := getLinkInfoSuper(frontEvents.causing, causingNext);
-					linkRegInt <= --getSuperTargetAddress(frontEvents.causing, causingNext);
-										linkInfoIntVar.ip;
-					savedStateInt <= X"0000" & linkInfoIntVar.systemLevel & linkInfoIntVar.intLevel;						
-				end if;
-				
-				sysRegArray(0) <= PROCESSOR_ID;
-				
-				-- Only some number of system regs exists		
-				for i in 6 to 31 loop
-					sysRegArray(i) <= (others => '0');
-				end loop;
-
-				logSimple(stageData, flowResponsePC);
-				checkSimple(stageData, stageDataNext, flowDrivePC, flowResponsePC);
+					
 			end if;					
 		end if;
 	end process;
 
-	SIMPLE_SLOT_LOGIC_PC: SimplePipeLogic port map(
-		clk => clk, reset => reset, en => en,
-		flowDrive => flowDrivePC,
-		flowResponse => flowResponsePC
-	);		
-
+	stageDataOut <= stageData;
+	acceptingOut <= pcAccepting;
+	sendingOut <= pcSending;
 		stageData.basicInfo <= targetInfo; -- To have regular representation as InstructionState
 
-		targetInfo <= (ip => targetPC,
+		targetInfo <= (ip => stageDataBasic.basicInfo.ip,
 							systemLevel => currentState(15 downto 8),
-							intLevel => currentState(7 downto 0));		
+							intLevel => currentState(7 downto 0));
+		
+		TMP: block
+			signal tmpPcIn, tmpPcOut: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
+		begin		
+			tmpPcIn.fullMask(0) <= pcPrevSending;
+			tmpPcIn.data(0) <= stageDataNew;
+			stageDataNew <= newPCData(stageData, frontEvents, pcNext, causingNext, startCommand);			
+						
+			-- CAREFUL: prevSending normally means that 'full' bit inside will be set, but
+			--				when en = '0' this won't happen.
+			--				To be fully correct, prevSending should not be '1' when receiving prevented.			
+			pcPrevSending <= pcAccepting and (pcSending or frontEvents.eventOccured);
+											
+			TEMP_SUBUNIT: entity work.GenericStageMulti(Behavioral) port map(
+				clk => clk, reset => reset, en => en,
+						
+				prevSending => pcPrevSending,
+
+				nextAccepting => nextAccepting and not (lockSendCommand),
+				stageDataIn => tmpPcIn,
 				
-	flowDrivePC.prevSending <= flowResponsePC.accepting; -- CAREFUL! This way it never gets hungry
-	flowDrivePC.nextAccepting <= nextAccepting;	
-
-	flowDrivePC.kill <= frontEvents.affectedVec(0);		
-	flowDrivePC.lockSend <= lockSendCommand;
-
-	stageDataOut <= stageData;
-	acceptingOut <= flowResponsePC.accepting; -- Used anywhere?
-	sendingOut <= flowResponsePC.sending;
+				acceptingOut => pcAccepting,
+				sendingOut => pcSending,
+				stageDataOut => tmpPcOut,
+				
+				execEventSignal => frontEvents.affectedVec(0),
+				execCausing => DEFAULT_INSTRUCTION_STATE,
+				lockCommand => '0'		
+			);			
+			
+			stageDataBasic <= tmpPcOut.data(0);
+		end block;
 		
 	sysRegReadValue <= sysRegArray(slv2u(sysRegReadSel));							
 end Implem;

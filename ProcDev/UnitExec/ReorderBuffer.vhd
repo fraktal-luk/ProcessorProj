@@ -55,11 +55,13 @@ entity ReorderBuffer is
 		execEventSignal: in std_logic;
 		execCausing: in InstructionState; -- Redundant cause we have inputs from all Exec ends? 
 		
-		commitCtrNext: in SmallNumber;  -- UNUSED?
 		commitGroupCtr: in SmallNumber;
 		commitGroupCtrNext: in SmallNumber;
 		execEnds: in InstructionStateArray(0 to 3);
 		execReady: in std_logic_vector(0 to 3);
+		
+			execEnds2: in InstructionStateArray(0 to 3);
+			execReady2:  in std_logic_vector(0 to 3);
 		
 		inputData: in StageDataMulti;
 		prevSending: in std_logic;
@@ -92,8 +94,12 @@ begin
 	enSig <= en or not ROB_HAS_EN;
 	
 	-- This is before shifting!
-	stageDataLiving <= killInROB(stageData, commitGroupCtr, execCausing.groupTag, execEventSignal);	
-	stageDataUpdated <= setCompleted(stageDataLiving, commitGroupCtr, execEnds, execReady);
+	stageDataLiving <= killInROB(stageData, commitGroupCtr, execCausing.groupTag, execEventSignal);
+	
+		-- TODO: add execEnds2, execReady2
+	stageDataUpdated <= setCompleted(stageDataLiving, commitGroupCtr,
+												execEnds, execReady,
+												execEnds2, execReady2);
 	
 	-- CAREFUL! fullMask before kills is used along with fullMask after killing!
 	stageDataNext <= stageROBNext(stageDataUpdated, stageData.fullMask, inputData, 
@@ -134,15 +140,12 @@ begin
 								else  (others => '0');
 	
 	flowDrive.kill <=
-		i2slv((
+				i2slv((
 					slv2s(flowResponse.full)
-				+	--integer(slv2u(commitGroupCtr(SMALL_NUMBER_SIZE-1 downto LOG2_PIPE_WIDTH)))
-						integer(slv2u(tagHigh(commitGroupCtr)))
-				- 	--integer(slv2u(execCausing.groupTag(SMALL_NUMBER_SIZE-1 downto LOG2_PIPE_WIDTH)))
-						integer(slv2u(tagHigh(execCausing.groupTag)))
-				) mod --(256/PIPE_WIDTH),
-							2**(SMALL_NUMBER_SIZE - LOG2_PIPE_WIDTH),
-			SMALL_NUMBER_SIZE)
+					+	integer(slv2u(tagHigh(commitGroupCtr)))
+					- 	integer(slv2u(tagHigh(execCausing.groupTag)))
+						) mod 2**(SMALL_NUMBER_SIZE - LOG2_PIPE_WIDTH), --(256/PIPE_WIDTH
+					SMALL_NUMBER_SIZE)
 				when execEventSignal = '1'
 		else (others => '0');
 		

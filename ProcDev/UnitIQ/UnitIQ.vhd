@@ -78,9 +78,9 @@ entity UnitIQ is
 			regValues: in MwordArray(0 to 2);
 			
 		accepting: out SmallNumber;
+			acceptingVec: out std_logic_vector(0 to PIPE_WIDTH-1);		
 		dataOutIQ: out InstructionState;
-			sendingOut: out std_logic --;
-		--flowResponseOutIQ: out flowResponseSimple		
+			sendingOut: out std_logic
 	);
 
 end UnitIQ;
@@ -140,6 +140,7 @@ begin
 			aiNew => aiNew,
 		readyRegFlags => readyRegFlags,
 		accepting => accepting,
+			acceptingVec => acceptingVec,
 		queueSending => queueSending,
 		iqDataOut => iqData,
 		newDataOut => toDispatch

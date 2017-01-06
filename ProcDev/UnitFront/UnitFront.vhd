@@ -67,9 +67,9 @@ entity UnitFront is
 		dataLastLiving: out StageDataMulti; 
 		lastSending: out std_logic;
 		-------
-		killVector: in std_logic_vector(0 to N_EVENT_AREAS-1);
+		killVector: in std_logic_vector(0 to N_EVENT_AREAS-1)
 
-		fetchLockCommand: in std_logic
+		--fetchLockCommand: in std_logic
 	);
 end UnitFront;
 
@@ -138,7 +138,7 @@ begin
 			
 			execEventSignal => killVector(1),
 			execCausing => DEFAULT_INSTRUCTION_STATE,
-			lockCommand => fetchLockCommand		
+			lockCommand => '0' --fetchLockCommand		
 		);	
 		
 		stageDataOutFetch <= f0output.data(0);
@@ -262,6 +262,7 @@ begin
 	lastSending <= sendingOut0;
 	
 	frontAccepting <= acceptingOutFetch;
-	stage0EventsOut <= stage0Events;
+	stage0EventsOut <= stage0Events; -- TODO: change this awkward construct to a general one
+												-- 		(probably chain through stages backwards to find oldest)
 end Behavioral;
 

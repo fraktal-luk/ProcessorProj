@@ -45,18 +45,13 @@ function renameRegs(insVec: StageDataMulti; takeVec, destMask: std_logic_vector;
 								psVec, pdVec: PhysNameArray; gprTags: SmallNumberArray) 		
 return StageDataMulti;
 	
+function prepareForAGU(insVec: StageDataMulti) return StageDataMulti;
+function prepareForStoreData(insVec: StageDataMulti) return StageDataMulti;
+
 
 function getStableDestsParallel(insVec: StageDataMulti; pdVec: PhysNameArray) return PhysNameArray;
 
-	
--- Not used yet (and wrong!)
-function renameAndBaptize(insVec: StageDataMulti; psVec, pdVec: PhysNameArray;
-									gprTags: SmallNumberArray;
-									baseNum: integer) 
-return StageDataMulti; 
-
 function baptizeGroup(insVec: StageDataMulti; newGroupTag: SmallNumber) return StageDataMulti;
-
 
 function fetchLockCommitting(sd: StageDataMulti) return std_logic;
 function getSysRegWriteAllow(sd: StageDataMulti) return std_logic;
@@ -133,15 +128,7 @@ begin
 			res.data(i).physicalDestArgs.d0 := pdVec(k);
 			k := k + 1;
 		end if;	
-		
-		-- CAREFUL! Set 'missing' flags for register args and fill immediate if relevant
---		res.data(i).argValues.missing(0) := 	res.data(i).physicalArgs.sel(0) 
---														and isNonzero(res.data(i).virtualArgs.s0);
---		res.data(i).argValues.missing(1) := 	res.data(i).physicalArgs.sel(1) 
---														and isNonzero(res.data(i).virtualArgs.s1);
---		res.data(i).argValues.missing(2) := 	res.data(i).physicalArgs.sel(2) 
---														and isNonzero(res.data(i).virtualArgs.s2);
-														
+															
 			if isNonzero(res.data(i).virtualArgs.s0) = '0' then
 				res.data(i).argValues.zero(0) := '1';
 			end if;
@@ -154,6 +141,7 @@ begin
 				res.data(i).argValues.zero(2) := '1';
 			end if;		
 			
+			-- Set 'missing' flags for non-const arguments
 			res.data(i).argValues.missing := res.data(i).physicalArgs.sel and not res.data(i).argValues.zero;
 		
 		if res.data(i).constantArgs.immSel = '1' then
@@ -163,11 +151,46 @@ begin
 			res.data(i).argValues.arg1 := res.data(i).constantArgs.imm;					
 		end if;
 		
-			res.data(i).argValues.readyBefore := not res.data(i).argValues.missing;		
+			res.data(i).argValues.readyBefore := not res.data(i).argValues.missing;
+
+			-- TODO: now handle 'completed' flags. If only main Exec cluster, 'completed2' = '1'.
+			--													If only secondary Exec cl, 'completed'  = '1'.
+			--													If both clusters,				both				'0'.
+				-- Set completed2 to false if it does need to be performed by the instruction
+				res.data(i).controlInfo.completed2 := not res.data(i).classInfo.secCluster;
+				
 	end loop;			
 
 	return res;
 end function;
+
+
+function prepareForAGU(insVec: StageDataMulti) return StageDataMulti is
+	variable res: StageDataMulti := insVec;
+begin
+	for i in 0 to PIPE_WIDTH-1 loop
+		res.data(i).virtualArgs.sel(2) := '0';
+		res.data(i).physicalArgs.sel(2) := '0';
+		res.data(i).argValues.missing(2) := '0';
+	end loop;
+	return res;
+end function;
+
+function prepareForStoreData(insVec: StageDataMulti) return StageDataMulti is
+	variable res: StageDataMulti := insVec;
+begin
+	for i in 0 to PIPE_WIDTH-1 loop
+		res.data(i).virtualArgs.sel(0) := '0';
+		res.data(i).virtualArgs.sel(1) := '0';		
+		res.data(i).physicalArgs.sel(0) := '0';
+		res.data(i).physicalArgs.sel(1) := '0';		
+		res.data(i).constantArgs.immSel := '0';
+		res.data(i).virtualDestArgs.sel(0) := '0';
+		res.data(i).physicalDestArgs.sel(0) := '0';
+	end loop;
+	return res;
+end function;
+
 
 
 function getStableDestsParallel(insVec: StageDataMulti; pdVec: PhysNameArray) return PhysNameArray is
@@ -188,69 +211,6 @@ begin
 	return res;
 end function;
 
-
--- CAREFUL: probably invalid (confirmed!)
-function renameAndBaptize(insVec: StageDataMulti; psVec, pdVec: PhysNameArray;
-									gprTags: SmallNumberArray;
-									baseNum: integer) 
-return StageDataMulti is
-	variable res: StageDataMulti := insVec;
-	variable k: natural := 0;	
-begin
-				
-	for i in insVec.fullMask'range loop	
-		-- Baptizing
-			--if res.fullMask(i) = '1' then -- NOTE: if renaming ignores fullMask, maybe here also? 
-				res.data(i).numberTag := i2slv(baseNum + i + 1, SMALL_NUMBER_SIZE);
-			--end if;				
-	
-		-- Renaming (CAREFUL: shouldn't it also depend on fullMask?)
-			res.data(i).gprTag := gprTags(i); -- ???
-		res.data(i).physicalArgs.sel := res.data(i).virtualArgs.sel;
-		res.data(i).physicalArgs.s0 := psVec(3*i+0);	
-		res.data(i).physicalArgs.s1 := psVec(3*i+1);			
-		res.data(i).physicalArgs.s2 := psVec(3*i+2);							
-		for j in insVec.fullMask'range loop	
-			-- Is s0 equal to prev instruction's dest?				
-			if j = i then exit; end if;				
-			if insVec.data(i).virtualArgs.s0 = insVec.data(j).virtualDestArgs.d0 then
-				res.data(i).physicalArgs.s0 := pdVec(j);
-			end if;		
-			if insVec.data(i).virtualArgs.s1 = insVec.data(j).virtualDestArgs.d0 then
-				res.data(i).physicalArgs.s1 := pdVec(j);
-			end if;	
-			if insVec.data(i).virtualArgs.s2 = insVec.data(j).virtualDestArgs.d0 then
-				res.data(i).physicalArgs.s2 := pdVec(j);
-			end if;						
-		end loop;
-		res.data(i).physicalDestArgs.sel(0) := res.data(i).virtualDestArgs.sel(0)
-							-- CAREFUL: maybe just flag writing to r0 as no output, like this?
-												and isNonzero(res.data(i).virtualDestArgs.d0);				
-		-- CAREFUL! Here we don't assign PR's for r0
-		if (res.data(i).virtualDestArgs.sel(0) and isNonzero(res.data(i).virtualDestArgs.d0)) = '1' then
-			res.data(i).physicalDestArgs.d0 := pdVec(k);
-			k := k + 1;
-		end if;	
-		
-		-- CAREFUL! Set 'missing' flags for register args and fill immediate if relevant
-		res.data(i).argValues.missing(0) := 	res.data(i).physicalArgs.sel(0) 
-														and isNonzero(res.data(i).virtualArgs.s0);
-		res.data(i).argValues.missing(1) := 	res.data(i).physicalArgs.sel(1) 
-														and isNonzero(res.data(i).virtualArgs.s1);
-		res.data(i).argValues.missing(2) := 	res.data(i).physicalArgs.sel(2) 
-														and isNonzero(res.data(i).virtualArgs.s2);
-		if res.data(i).constantArgs.immSel = '1' then
-			res.data(i).argValues.missing(1) := '0';
-			res.data(i).argValues.immediate := '1';
-			res.data(i).argValues.zero(1) := '0';
-			res.data(i).argValues.arg1 := res.data(i).constantArgs.imm;					
-		end if;
-		
-			res.data(i).argValues.readyBefore := not res.data(i).argValues.missing;
-	end loop;			
-		
-	return res;
-end function;
 
 function baptizeGroup(insVec: StageDataMulti; newGroupTag: SmallNumber) return StageDataMulti is
 	variable res: StageDataMulti := insVec;

@@ -57,9 +57,12 @@ entity NewCore0 is
 			  ivalid: in std_logic;
            iin : in  InsGroup;
 			  
+					dread: out std_logic;
+					dwrite: out std_logic;
 			  dadrvalid: out std_logic;
 			  drw: out std_logic; -- read or write
            dadr : out  Mword;
+					doutadr: out Mword;
 			  dvalid: in std_logic;
            din : in  Mword;
            dout : out  Mword;

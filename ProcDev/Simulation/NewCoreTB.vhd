@@ -62,9 +62,12 @@ ARCHITECTURE behavior OF NewCoreTB IS
          ivalid : IN  std_logic;
          iin : IN  InsGroup;
 			
+					dread: out std_logic;
+					dwrite: out std_logic;
 			  dadrvalid: out std_logic;
 			  drw: out std_logic; -- read or write
            dadr : out  Mword;
+					doutadr: out Mword;
 			  dvalid: in std_logic;
            din : in  Mword;
            dout : out  Mword;			
@@ -87,9 +90,12 @@ ARCHITECTURE behavior OF NewCoreTB IS
    signal int1 : std_logic := '0';
    signal iaux : std_logic_vector(31 downto 0) := (others => '0');
 
+			signal dread: std_logic;
+			signal dwrite: std_logic;
 		signal	  dadrvalid: std_logic;
 		signal	  drw: std_logic; -- read or write
       signal     dadr : Mword;
+			signal	doutadr: Mword;
 		signal	  dvalid: std_logic;
       signal     din :  Mword;
       signal     dout : Mword;
@@ -108,6 +114,7 @@ ARCHITECTURE behavior OF NewCoreTB IS
 
 		signal dataMem: WordArray(0 to 255) := (
 					72 => X"00000064",
+						250 => X"00000055",
 					others => (others => '0'));
 
    -- Clock period definitions
@@ -126,9 +133,12 @@ BEGIN
           ivalid => ivalid,
           iin => iin,
 			 
+					dread => dread,
+					dwrite => dwrite,
 				dadrvalid => dadrvalid,
 				drw => drw,
 				dadr => dadr,
+					doutadr => doutadr,
 				dvalid => dvalid,
 				din => din,
 				dout => dout,			 
@@ -150,9 +160,10 @@ BEGIN
 		wait for clk_period/2;
    end process;
  
-	reset <= '1' after 65 ns, '0' after 75 ns; 
+	--reset <= '1' after 65 ns, '0' after 75 ns; 
 	
 	en <= '1' after 105 ns;
+	
    -- Stimulus process
    stim_proc: process
    begin		
@@ -177,6 +188,17 @@ BEGIN
 		
 	end process;	
 	
+	-- Reset interrupt
+	INT1_ASSERT: process
+	begin		
+		wait for 100 ns;
+		wait until rising_edge(clk);
+		int1 <= '1';
+		wait until rising_edge(clk);
+		int1 <= '0';
+		wait;
+		
+	end process;
 
 	PROGRAM_MEM: process (clk)
 		--variable alignedPC: mword := (others=>'0');
@@ -215,17 +237,20 @@ BEGIN
 		if rising_edge(clk) then
 			if en = '1' then
 				-- Reading
-				memReadDone <= dadrvalid and not drw;
+				memReadDone <= --dadrvalid and not drw;
+									dread;
 				memReadDonePrev <= memReadDone;
-				memReadValue <= dataMem(slv2u(dadr(9 downto 2))); 
+				memReadValue <= dataMem(slv2u(dadr)) ;--(9 downto 2))); 
 				memReadValuePrev <= memReadValue;	
 				
 				-- Writing
-				memWriteDone <= dadrvalid and drw;
+				memWriteDone <= --dadrvalid and drw;
+										dwrite;
 				memWriteValue <= dout;
 				memWriteAddress <= dadr;
 				if memWriteDone = '1' then
-					dataMem(slv2u(memWriteAddress(9 downto 2))) <= memWriteValue;
+					dataMem(slv2u(memWriteAddress)) -- (9 downto 2)))
+											<= memWriteValue;
 				end if;
 				
 			end if;

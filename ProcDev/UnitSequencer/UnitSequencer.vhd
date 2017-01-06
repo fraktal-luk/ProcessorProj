@@ -56,37 +56,32 @@ entity UnitSequencer is
 		iadr: out Mword;	-- Probably can be extracted from pcDataLiving
 		iadrvalid: out std_logic; -- Seems redundant - equal to pcSending
 		
-		-- Interface with front pipe
-		frontAccepting: in std_logic;
-		pcDataLiving: out InstructionState; --StageDataPC;
-			
-		pcSending: out std_logic;
-
 		-- System reg interface
 		sysRegReadSel: in slv5;
 		sysRegReadValue: out Mword;
 	
 		sysRegWriteSel: in slv5;
 		sysRegWriteValue: in Mword;		
-		------------
-
-			execOrIntEventSignalOut: out std_logic;
-			intCausingOut: out InstructionState;
-			execOrIntCausingOut: out InstructionState;
-			
-
+	
 		-- Event/state interface						
 		intSignal: in std_logic;
 		execEventSignal: in std_logic;
 		execCausing: in InstructionState;		
-			frontEventSigOut: out std_logic;
 		stage0EventInfo: in StageMultiEventInfo;
+		
+		
+		execOrIntEventSignalOut: out std_logic;
+		intCausingOut: out InstructionState;
+		execOrIntCausingOut: out InstructionState;
 		
 		killVecOut: out std_logic_vector(0 to N_EVENT_AREAS-1);
 
----------------------
-
-		-- Interface with Front 	
+		-- Interface PC <-> front pipe
+		frontAccepting: in std_logic;
+		pcSending: out std_logic;		
+		pcDataLiving: out InstructionState;
+		
+		-- Interface Rename <-> Front 	
 		frontDataLastLiving: in StageDataMulti;
 		frontLastSending: in std_logic;		
 		renameAccepting: out std_logic;		
@@ -95,28 +90,24 @@ entity UnitSequencer is
 		iqAccepts: in std_logic;
 		renamedDataLiving: out StageDataMulti;
 		renamedSending: out std_logic;
-		
-		
+			
 		-- Interface to Commit with CQ
 		cqDataLiving: in StageDataMulti;
 		anySendingFromCQ: in std_logic;
 		-- 'accepting' signal missing, because assumed always true
 		
-		-- Interface with ROB - to replace CQ
+		-- Interface with ROB
 		robDataLiving: in StageDataMulti;
 		sendingFromROB: in std_logic;
-		-- ...
-		
-			fetchLockCommandOut: out std_logic;
-									
-		-- CAREFUL: readyRegs are read instantly, without cycle delay. But reg file needs a cycle to be read
-		--readyRegs: out std_logic_vector(0 to N_PHYSICAL_REGS-1);
-			readyRegFlagsOut: out std_logic_vector(0 to 3*PIPE_WIDTH-1);
+											
+		readyRegFlagsOut: out std_logic_vector(0 to 3*PIPE_WIDTH-1);
 		
 		-- Counter outputs
-		commitCtrNextOut: out SmallNumber;
-			commitGroupCtrOut: out SmallNumber;
-			commitGroupCtrNextOut: out SmallNumber
+		--	commitCtrNextOut: out SmallNumber;
+		commitGroupCtrOut: out SmallNumber;
+		commitGroupCtrNextOut: out SmallNumber;
+		
+		start: in std_logic	
 	);
 end UnitSequencer;
 
@@ -128,21 +119,16 @@ architecture Behavioral of UnitSequencer is
 	signal stageDataOutPC: InstructionState := DEFAULT_INSTRUCTION_STATE;
 	signal sendingOutPC: std_logic := '0';
 	signal acceptingOutPC: std_logic := '0';
-	
-	signal fetchLockRequest: std_logic := '0';
-	
+		
 	signal frontEvents: FrontEventInfo;
-	
-	constant HAS_RESET_SEQ: std_logic := '1';
-	constant HAS_EN_SEQ: std_logic := '1';	
-	
-					signal frontEventSig: std_logic := '0';
-					signal sysRegWriteAllow: std_logic := '0';
+		
+		signal frontEventSig: std_logic := '0';
+		signal sysRegWriteAllow: std_logic := '0';
 
 		signal execOrIntEventSignal: std_logic := '0';
 		signal execOrIntCausing, intCausing: InstructionState := defaultInstructionState;
 -------------------------------
-				signal committing: std_logic := '0';
+		signal committing: std_logic := '0';
 	
 
 		signal stageDataRenameIn: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
@@ -173,21 +159,22 @@ architecture Behavioral of UnitSequencer is
 	signal renameCtr, renameCtrNext, commitCtr, commitCtrNext: SmallNumber := --(others=>'0');
 																										(others => '1');
 	signal renameGroupCtr, renameGroupCtrNext, commitGroupCtr, commitGroupCtrNext: SmallNumber :=
-																						i2slv(-PIPE_WIDTH, SMALL_NUMBER_SIZE);
+																						INITIAL_GROUP_TAG;
 	
 	signal stableUpdateSel, stableUpdateSelDelayed:
 									std_logic_vector(0 to PIPE_WIDTH-1) := (others => '0');
 
 	-- CAREFUL, CHECK: to enable restoring from last committed
-	signal lastCommitted, lastCommittedNext: InstructionState := defaultInstructionState;
-		signal fetchLockCommit: std_logic := '0';
-		signal fetchLockState: std_logic := '0';
+	signal lastCommitted, lastCommittedNext: InstructionState := defaultLastComitted;
+	
+	signal fetchLockRequest, fetchLockCommit, fetchLockState: std_logic := '0';
 	signal renameLockCommand, renameLockRelease, renameLockState: std_logic := '0';	
 	
-		signal readyRegsSig: std_logic_vector(0 to N_PHYSICAL_REGS-1) := (0 to 31 => '1', others=>'0');
+	signal readyRegsSig: std_logic_vector(0 to N_PHYSICAL_REGS-1) := (0 to 31 => '1', others=>'0');
 	signal readyRegFlags, readyRegFlagsNext: std_logic_vector(0 to 3*PIPE_WIDTH-1) := (others => '0');
-	
-			signal dataPCOut: InstructionState := DEFAULT_DATA_PC;
+				
+	constant HAS_RESET_SEQ: std_logic := '1';
+	constant HAS_EN_SEQ: std_logic := '1';			
 begin	 
 	resetSig <= reset and HAS_RESET_SEQ;
 	enSig <= en or not HAS_EN_SEQ;
@@ -199,10 +186,10 @@ begin
 		clk => clk, reset => resetSig, en => enSig,
 		
 		-- Committed/being committed
-			lastCommittedNextIn => lastCommittedNext,
-			committingIn => committing,
+		lastCommittedNextIn => lastCommittedNext,
+		committingIn => committing,
 			
-			lockSendCommand => fetchLockState,
+		lockSendCommand => fetchLockState,
 		-- Interface with hypothetical previous stage
 		acceptingOut => acceptingOutPC,
 		
@@ -210,7 +197,6 @@ begin
 		nextAccepting => frontAccepting,	
 		sendingOut => sendingOutPC,
 		stageDataOut => stageDataOutPC,
-		--	dataPCOut => dataPCOut,
 			
 		-- Sys reg interface
 		sysRegWriteAllow => sysRegWriteAllow,
@@ -221,7 +207,9 @@ begin
 		sysRegReadValue => sysRegReadValue,
 		
 		-- Event interface
-		frontEvents =>	frontEvents		
+		frontEvents =>	frontEvents,
+
+		start => start
 	);
 
 
@@ -250,7 +238,6 @@ begin
 	end block;
 
 	frontEventSig <= frontEvents.eventOccured;
-	frontEventSigOut <= frontEventSig;
 		
 	fetchLockRequest <= frontEvents.eventOccured and frontEvents.causing.controlInfo.newFetchLock;
 				
@@ -267,16 +254,10 @@ begin
 
 	anySendingFromCQSig <= anySendingFromCQ;
 		
-
 	-- Rename stage
-	RENAMING: block
-		use work.ProcLogicRenaming.all;
-		
-		signal stageDataRenameIn_C: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
+	RENAMING: block		
 		signal reserveSelSig, takeVec: std_logic_vector(0 to PIPE_WIDTH-1) := (others => '0' );															
-	begin
-		stageDataRenameIn_C <= frontDataLastLiving;
-	
+	begin	
 		reserveSelSig <= getDestMask(frontDataLastLiving);
 		takeVec <= (others => '1') when ALLOC_REGS_ALWAYS
 				else frontDataLastLiving.fullMask;		
@@ -316,7 +297,6 @@ begin
 
 
 	GPR_MAP_BL: block
-	-- GPR map signals
 		signal virtDests, virtCommitDests: RegNameArray(0 to PIPE_WIDTH-1) := (others=>(others=>'0'));
 		signal virtSources: RegNameArray(0 to 3*PIPE_WIDTH-1) := (others=>(others=>'0'));
 	
@@ -326,16 +306,14 @@ begin
 		signal gprCommitAllow: std_logic := '0';
 		signal gprReserveAllow: std_logic := '0';
 	begin	
-		gprRewind <= renameLockRelease;  -- for GPR map
+		gprRewind <= renameLockRelease and renameLockState;  -- for GPR map
 		gprReserveAllow <= frontLastSending; -- for GPR map
 		gprCommitAllow <= sendingToCommit;	-- for GPR map
 		
 		virtSources <= getVirtualArgs(frontDataLastLiving);-- for GPR map
 		virtDests <= getVirtualDests(frontDataLastLiving); -- for GPR map // UNUSED?
-		--reserveSel <= getDestMask(frontDataLastLiving);
 			
-		gprReserveReq <= getRegMapRequest(frontDataLastLiving, newPhysDests); -- for GPR map
-		
+		gprReserveReq <= getRegMapRequest(frontDataLastLiving, newPhysDests); -- for GPR map	
 		gprCommitReq <= getRegMapRequest(stageDataToCommit, physCommitDests); -- for GPR map
 
 		virtCommitDests <= getVirtualDests(stageDataToCommit); -- for GPR map
@@ -376,17 +354,17 @@ begin
 	end block;
 	
 
-
 	FREE_LIST_BL: block
 		-- GPR free list signals
 		signal freeListTakeAllow: std_logic := '0';
 		signal freeListTakeSel: std_logic_vector(0 to PIPE_WIDTH-1) := (others => '0');
 		-- Don't remove, it is used by newPhysDestPointer!
 		signal freeListTakeNumTags: PhysNameArray(0 to PIPE_WIDTH-1) := (others => (others => '0'));
-			signal newPhysDestPointer: SmallNumber := (others => '0');
+		signal newPhysDestPointer: SmallNumber := (others => '0');
 		signal freeListPutAllow: std_logic := '0';
 		signal freeListPutSel: std_logic_vector(0 to PIPE_WIDTH-1) := (others => '0');
-		signal freeListRewind: std_logic := '0';	
+		signal freeListRewind: std_logic := '0';
+		signal freeListWriteTag: slv6 := (others => '0');
 	begin
 
 		FREED_DELAYED_SELECTION: for i in 0 to PIPE_WIDTH-1 generate	-- for free list
@@ -405,8 +383,7 @@ begin
 		--				Rewinding has 2 specific moemnts: the event signal, and renameLockRelease,
 		--				so on the former the rewinded pointer is written, and on the latter incremented and read.
 		--				We also need to do that before the first instruction is executed (that's why resetSig here).
-		freeListTakeAllow <= frontLastSending  -- for free list
-				or (renameLockRelease and renameLockState) or resetSig; -- CAREFUL, in future reset may be longer!
+		freeListTakeAllow <= frontLastSending or (renameLockRelease and renameLockState); 
 		
 		freeListTakeSel <= (others => '1') when ALLOC_REGS_ALWAYS
 						 else frontDataLastLiving.fullMask; -- Taking a reg for every instruction, sometimes dummy		
@@ -415,6 +392,11 @@ begin
 		freeListPutSel <= (others => '1') when ALLOC_REGS_ALWAYS 
 						else stageDataOutCommit.fullMask;		
 		freeListRewind <= execOrIntEventSignal;
+		
+		
+		 freeListWriteTag <= execOrIntCausing.gprTag(5 downto 0) when USE_GPR_TAG
+							else  execOrIntCausing.groupTag(5 downto 0);
+									-- TODO: clear low bits for superscalar (when groups work!)
 		
 		GPR_FREE_LIST: entity work.FreeListQuad (Behavioral)
 															--	(Implem)
@@ -427,8 +409,7 @@ begin
 			
 			-- Interface for setting list to previous state
 			rewind => freeListRewind,		
-			writeTag => execOrIntCausing.gprTag(5 downto 0),
-									-- TODO: clear low bits for superscalar (when groups work!)
+			writeTag => freeListWriteTag,
 			
 			-- Reading values from list
 			enableTake => freeListTakeAllow,
@@ -445,8 +426,7 @@ begin
 		newPhysDestPointer(5 downto 0) <= freeListTakeNumTags(0);
 			
 		GEN_GPR_TAGS: for i in 0 to PIPE_WIDTH-1 generate												
-			newGprTags(i) <= i2slv((slv2u(newPhysDestPointer) + i) mod 64, SMALL_NUMBER_SIZE);
-					-- CAREFUL, stack size 64?
+			newGprTags(i) <= i2slv((slv2u(newPhysDestPointer) + i) mod FREE_LIST_SIZE, SMALL_NUMBER_SIZE);
 		end generate;			
 	end block;
 
@@ -521,8 +501,7 @@ begin
 						else commitGroupCtr;	
 			
 		-- Re-allow renaming when everything from rename/exec is committed - reg map will be well defined now
-		renameLockRelease <= '1' when --commitCtr = renameCtr else '0'; -- CAREFUL! when all committed
-												commitGroupCtr = renameGroupCtr else '0';
+		renameLockRelease <= '1' when commitGroupCtr = renameGroupCtr else '0';
 			-- CAREFUL, CHECK: when the counters are equal, renaming can be resumed, but renameLockRelease
 			-- 					 takes effect in next cycle, so before tha cycle renaming is still stopped.
 			--						 Should compare to commitCtrNext instead?
@@ -551,7 +530,7 @@ begin
 					if fetchLockRequest = '1' then
 						fetchLockState <= '1';
 					elsif (fetchLockCommit or frontEventSig) = '1' then -- CAREFUL! frontEventSig may be not
-																						--				from front?
+																						 --			 from front?
 						fetchLockState <= '0';
 					end if;	
 					
@@ -592,7 +571,6 @@ begin
 		lastCommittedNext <= getLastFull(stageDataToCommit) when sendingToCommit = '1'				
 								else	lastCommitted;
 
-		
 		committing <= sendingToCommit;
 		
 		fetchLockCommit <= fetchLockCommitting(stageDataToCommit);
@@ -600,17 +578,14 @@ begin
 		sysRegWriteAllow <= getSysRegWriteAllow(stageDataToCommit);
 
 	renameLockCommand <= renameLockState;
-	fetchLockCommandOut <= '0'; --fetchLockState;
-
 			
 	renameAccepting <= acceptingOutRename;
 	renamedDataLiving <= stageDataOutRename;
 	renamedSending <= sendingOutRename;
 	
-	commitCtrNextOut <= commitCtrNext;	
 	commitGroupCtrOut <= commitGroupCtr;
 	commitGroupCtrNextOut <= commitGroupCtrNext;
 
-		readyRegFlagsOut <= readyRegFlags;
+	readyRegFlagsOut <= readyRegFlags;
 end Behavioral;
 

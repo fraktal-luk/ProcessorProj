@@ -116,8 +116,8 @@ begin
 		signal before: std_logic;
 		signal a, b: std_logic_vector(7 downto 0);
 	begin
-		a <= execCausing.numberTag;
-		b <= dispatchData.numberTag;	
+		a <= execCausing.groupTag;
+		b <= dispatchData.groupTag;	
 
 		IQ_KILLER: entity work.CompareBefore8 port map(
 			inA =>  a,
