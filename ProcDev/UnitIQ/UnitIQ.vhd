@@ -67,7 +67,7 @@ entity UnitIQ is
 		
 		execCausing: in InstructionState;
 		execEventSignal: in std_logic;		
-		intSignal: in std_logic;	
+		--intSignal: in std_logic;	
 			
 			readyRegFlags: in std_logic_vector(0 to 3*PIPE_WIDTH-1);
 			
@@ -134,7 +134,7 @@ begin
 	 	newData => newData,
 	 	nextAccepting => dispatchAccepting,
 		execEventSignal => execEventSignal,
-		intSignal => intSignal,
+		--intSignal => intSignal,
 		execCausing => execCausing,
 		aiArray => aiArray,
 			aiNew => aiNew,
@@ -175,7 +175,7 @@ begin
 	 	prevSending => queueSending,
 	 	nextAccepting => nextAccepting,
 		execEventSignal => execEventSignal,
-		intSignal => intSignal,
+		--intSignal => intSignal,
 		execCausing => execCausing,
 		ai => aiDispatch,
 			resultVals => resultVals,

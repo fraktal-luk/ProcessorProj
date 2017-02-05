@@ -38,10 +38,7 @@ use work.NewPipelineData.all;
 
 use work.GeneralPipeDev.all;
 
---use work.CommonRouting.all;
 use work.TEMP_DEV.all;
-
-use work.ProcLogicCQ.all;
 
 use work.ProcComponents.all;
 
@@ -52,7 +49,6 @@ entity TestCQPart0 is
 		reset: in std_logic;
 		en: in std_logic;
 		
-		intSignal: in std_logic;
 		execEventSignal: in std_logic;
 		execCausing: in InstructionState; -- Redundant cause we have inputs from all Exec ends? 
 				
@@ -77,24 +73,13 @@ architecture Implem of TestCQPart0 is
 																others=>(others=>'0'));
 	signal flowResponseCQ: FlowResponseBuffer := (others => (others=> '0'));				
 		
-	signal cqRoutes: IntArray(0 to 3) := (others=>0);		
 	signal stageDataCQNew: InstructionStateArray(0 to 3) := (others => defaultInstructionState);
-	-- NOTE: emptyMask means vector of 0s
-	signal emptyMaskCQ, killMaskCQ, fullMaskCQ, fullMaskCQNew, livingMaskRaw, livingMaskCQ: 
-							std_logic_vector(0 to CQ_SIZE-1) := (others=>'0');
-	signal killMaskRaw, killMaskNeutralize: std_logic_vector(0 to CQ_SIZE-1) := (others=>'0');					
+
+	signal livingMaskRaw, livingMaskCQ: std_logic_vector(0 to CQ_SIZE-1) := (others=>'0');
 	signal stageDataCQ, stageDataCQLiving, stageDataCQNext: StageDataCommitQueue 
 									:= (fullMask=>(others=>'0'), data=>(others=>defaultInstructionState));
-									
-		signal stageDataCQ_N, stageDataCQLiving_N, stageDataCQNext_N: StageDataCommitQueue 
-										:= (fullMask=>(others=>'0'), data=>(others=>defaultInstructionState));
-									
+			
 	signal whichSendingFromCQ: std_logic_vector(0 to PIPE_WIDTH-1) := (others=>'0'); 
-
-	signal 
-		killVec, takeAVec, takeBVec, takeCVec, takeDVec: std_logic_vector(0 to CQ_SIZE-1) := (others=>'0');
-	signal tagA, tagB, tagC, tagD, tagKill: SmallNumber := (others=>'0');
-
 	signal whichAcceptedCQSig: std_logic_vector(0 to 3) := (others=>'0');
 
 	constant HAS_RESET_CQ: std_logic := '1';
@@ -125,7 +110,7 @@ begin
 	stageDataCQLiving.fullMask <= livingMaskCQ;
 	stageDataCQNew <= inputInstructions;
 												
-		stageDataCQNext <= stageCQNext3(stageDataCQ,
+		stageDataCQNext <= stageCQNext(stageDataCQ,
 													compactData(stageDataCQNew, cqWhichSend),
 												livingMaskCQ,
 													compactMask(stageDataCQNew, cqWhichSend),
@@ -135,8 +120,7 @@ begin
 												binFlowNum(flowDriveCQ.prevSending));	
 
 											
-	whichAcceptedCQSig <= --selectedToCQ;	-- Accepting all
-									(others => '1');
+	whichAcceptedCQSig <= (others => '1');
 													
 	SLOT_CQ: entity work.BufferPipeLogic(Behavioral)
 	generic map(
@@ -150,20 +134,13 @@ begin
 		flowResponse => flowResponseCQ
 	);			
 											
-	killMaskRaw <= (others=>'0');
-
-	livingMaskRaw <= stageDataCQ.fullMask; -- and not killMaskRaw;	
-	livingMaskCQ <= stageDataCQ.fullMask; -- and not killMaskCQ;	
+	livingMaskRaw <= stageDataCQ.fullMask;	
+	livingMaskCQ <= stageDataCQ.fullMask;	
 	
 	whichSendingFromCQ <= getSendingFromCQ(livingMaskRaw);
 	
 	flowDriveCQ.nextAccepting <= num2flow(countOnes(whichSendingFromCQ));
-	
-	-- CAREFUL: using "raw" living mask, cause it prevents a comb. loop when implementing
-	--				the feature: Spare "almost committed".
-	--				Otherwise loop would happen: whichSending depends on livingMask, and livingMask
-	--				on next commitCtr, and commitCtr OFC depends on whichSending! 
-	
+
 	cqOut.fullMask <= whichSendingFromCQ;
 	cqOut.data <= stageDataCQLiving.data(0 to PIPE_WIDTH-1); -- ??(some may be killed? careful)			
 	

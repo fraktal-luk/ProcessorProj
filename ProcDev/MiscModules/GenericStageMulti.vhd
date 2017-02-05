@@ -190,6 +190,58 @@ begin
 end SingleTagged;
 
 
+architecture LastEffective of GenericStageMulti is
+	signal flowDrive: FlowDriveSimple := (others=>'0');
+	signal flowResponse: FlowResponseSimple := (others=>'0');		
+	signal stageData, stageDataLiving, stageDataNext, stageDataNew:
+														StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
+	signal partialKillMask: std_logic_vector(0 to PIPE_WIDTH-1) := (others => '0');
+	
+		use work.TEMP_DEV.setException; -- TODO: func should be in a global package?
+		signal stageEvents: StageMultiEventInfo;	
+begin
+	stageDataNew <= stageDataIn;										
+	stageDataNext <= stageMultiNext(stageDataLiving, stageDataNew,
+								flowResponse.living, flowResponse.sending, flowDrive.prevSending);			
+	stageDataLiving <= stageMultiHandleKill(stageData, flowDrive.kill, partialKillMask);
+
+	PIPE_CLOCKED: process(clk) 	
+	begin
+		if rising_edge(clk) then
+			if reset = '1' then
+				
+			elsif en = '1' then	
+				stageData <= stageDataNext;
+
+				logMulti(stageData.data, stageData.fullMask, stageDataLiving.fullMask, flowResponse);
+				checkMulti(stageData, stageDataNext, flowDrive, flowResponse);
+			end if;
+		end if;
+	end process;
+
+	SIMPLE_SLOT_LOGIC: SimplePipeLogic port map(
+		clk => clk, reset => reset, en => en,
+		flowDrive => flowDrive,
+		flowResponse => flowResponse
+	);
+	
+		stageEvents.causing <= setException(stageData.data(0),
+					execCausing.controlInfo.hasInterrupt, execCausing.controlInfo.hasReset, flowResponse.isNew);
+		stageEvents.eventOccured <= stageEvents.causing.controlInfo.newEvent;
+		
+	flowDrive.prevSending <= prevSending;
+	flowDrive.nextAccepting <= nextAccepting;
+	--flowDrive.kill <= execEventSignal;
+	flowDrive.lockAccept <= lockCommand;
+
+	acceptingOut <= flowResponse.accepting;		
+	sendingOut <= flowResponse.sending;
+	stageDataOut <= stageDataLiving; -- TODO: clear temp ctrl info?
+	
+	stageEventsOut <= stageEvents;
+end LastEffective;
+
+
 architecture Bypassed of GenericStageMulti is
 
 begin

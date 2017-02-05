@@ -1,5 +1,5 @@
 
-architecture Behavioral of FreeListQuad is
+architecture Behavioral_C of FreeListQuad is
 	signal takeMW, putMW: std_logic_vector(0 to MAX_WIDTH-1) := (others=>'0');
 	signal readTakeMW, writePutMW, readTagsMW: PhysNameArray(0 to MAX_WIDTH-1) := (others=>(others=>'0'));
 	
@@ -75,5 +75,5 @@ begin
 		end if;
 	end process;
 
-end Behavioral;
+end Behavioral_C;
 

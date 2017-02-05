@@ -63,7 +63,7 @@ entity SubunitDispatch is
 		
 		execEventSignal: in std_logic;
 		execCausing: in InstructionState;
-		intSignal: in std_logic;
+		--intSignal: in std_logic;
 		
 		ai: in ArgStatusInfo;
 		resultVals: in MwordArray(0 to N_RES_TAGS-1);
@@ -72,72 +72,6 @@ entity SubunitDispatch is
 		dispatchDataOut: out InstructionState
 	);
 end SubunitDispatch;
-
-
-architecture Behavioral of SubunitDispatch is
-	signal dispatchData, dispatchDataNext, dispatchDataUpdated,
-				inputDataWithArgs: InstructionState := defaultInstructionState;
-	signal flowDriveDispatch: FlowDriveSimple := (others=>'0');											
-	signal flowResponseDispatch: FlowResponseSimple := (others=>'0');		
-begin	
-	acceptingOut <= flowResponseDispatch.accepting;
-	flowDriveDispatch.prevSending <= prevSending;
-										
-	DISPATCH_SYNCHRONOUS: process(clk)
-	begin
-		if rising_edge(clk) then
-			if en = '1' then
-				dispatchData <= dispatchDataNext;
-			end if;				
-		end if;
-	end process;
-	
-	inputDataWithArgs <= getDispatchArgValues(stageDataIn, resultVals);
-	dispatchDataNext <= stageSimpleNext(dispatchData, --Updated, 
-														inputDataWithArgs,
-													flowResponseDispatch.living,
-													flowResponseDispatch.sending, 
-													--flowDriveDispatch.prevSending);
-														flowResponseDispatch.accepting);
-	dispatchDataUpdated <= updateDispatchArgs(dispatchData, resultVals, regValues, ai); 
-		
-	-- Don't allow exec if args somehow are not actualy ready!		
-	flowDriveDispatch.lockSend <= --not asDispatch.readyAll;
-							BLOCK_ISSUE_WHEN_MISSING and isNonzero(dispatchDataUpdated.argValues.missing);
-	
-	-- Dispatch pipe logic
-	SIMPLE_SLOT_LOGIC_DISPATCH_A: SimplePipeLogic port map(
-		clk => clk, reset => reset, en => en,
-		flowDrive => flowDriveDispatch,
-		flowResponse => flowResponseDispatch
-	);	
-		
-	DISPATCH_A_KILL: block
-		signal before: std_logic;
-		signal a, b: std_logic_vector(7 downto 0);
-	begin
-		a <= execCausing.groupTag;
-		b <= dispatchData.groupTag;	
-
-		IQ_KILLER: entity work.CompareBefore8 port map(
-			inA =>  a,
-			inB =>  b,
-			outC => before
-		);
-		
-		--before <= '0'; --
-					--tagBefore(a, b);			
-		flowDriveDispatch.kill <= killByTag(before, execEventSignal, intSignal);
-										-- before and execEventSignal; 	
-	end block;			
-				
-	stageDataOut <= dispatchDataUpdated;
-	sendingOut <= flowResponseDispatch.sending;
-
-	flowDriveDispatch.nextAccepting <= nextAccepting;
-	
-	dispatchDataOut <= dispatchData;
-end Behavioral;
 
 
 architecture Alternative of SubunitDispatch is

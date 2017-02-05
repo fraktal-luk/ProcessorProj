@@ -72,20 +72,35 @@ return StageDataHbuffer;
 function newFromHbuffer(content: InstructionStateArray; fullMask: std_logic_vector)
 return HbuffOutData;
 
-function newPCData(content: InstructionState; fe: FrontEventInfo; pcNext, causingNext: Mword;
-						 startCommand: std_logic)--;
+function newPCData(content: InstructionState; ge: GeneralEventInfo; pcNext, causingNext: Mword)--;
 return InstructionState;
+
+function newPCData2(content: InstructionState;
+						  commitEvent: std_logic; commitCausing: InstructionState;
+						  execEvent: std_logic; execCausing: InstructionState;	
+						  decodeEvent: std_logic; decodeCausing: InstructionState;
+						  pcNext, causingNext: Mword)
+						--					excTarget: InstructionBasicInfo
+return InstructionState;
+
+	function NEW_generalEvents(pcData: InstructionState;
+										commitEvent: std_logic; commitCausing: InstructionState;
+										execEvent: std_logic; execCausing: InstructionState;	
+										decodeEvent: std_logic; decodeCausing: InstructionState;
+										pcNext, causingNext: Mword)
+										--	excTarget: InstructionBasicInfo)
+	return GeneralEventInfo;
 
 function getAnnotatedHwords(--fetchData: InstructionState;
 									 fetchBasicInfo: InstructionBasicInfo; 
 									 fetchBlock: HwordArray)
 return InstructionStateArray;
 
--- TODO, CHECK: use this instead of getFrontEvents?
+-- TODO, CHECK: use this instead of getGeneralEvents?
 function detectEventsMulti(sd: StageDataMulti; receiving: std_logic) return InstructionSlot;
 
-function getFrontEvents(eventArr: InstructionSlotArray)
-return FrontEventInfo;
+function getGeneralEvents(eventArr: InstructionSlotArray)
+return GeneralEventInfo;
 
 function stageMultiEvents(sd: StageDataMulti; isNew: std_logic) return StageMultiEventInfo;
 
@@ -506,52 +521,120 @@ begin
 end function;
 
 
-function newPCData(content: InstructionState; fe: FrontEventInfo; pcNext, causingNext: Mword;
-						 startCommand: std_logic)--;
+function newPCData(content: InstructionState; ge: GeneralEventInfo; pcNext, causingNext: Mword)--;
 return InstructionState is
 	variable res: InstructionState := content;
 	variable newPC: Mword := (others=>'0');
 begin
-
-	if fe.eventOccured = '1' then -- when from exec or front	
-		if --fe.fromInt = '1' then
-			fe.causing.controlInfo.newInterrupt = '1'
-		then
+	if ge.eventOccured = '1' then -- when from exec or front		
+		if ge.causing.controlInfo.newReset = '1' then -- TEMP!
+			res.basicInfo.ip := (others => '0');
+			res.basicInfo.intLevel := "00000000";		
+		elsif ge.causing.controlInfo.newInterrupt = '1' then
 			res.basicInfo.ip := INT_BASE; -- TEMP!
-			res.basicInfo.intLevel := "00000001";
-			
-				if startCommand = '1' then -- TEMP!
-					res.basicInfo.ip := (others => '0');
-					res.basicInfo.intLevel := "00000000";
-				end if;
-		
-		elsif fe.causing.controlInfo.newException = '1' then
+			res.basicInfo.intLevel := "00000001";		
+		elsif ge.causing.controlInfo.newException = '1' then
 			-- TODO, FIX: exceptionCode sliced - shift left by ALIGN_BITS? or leave just base address
-			res.basicInfo.ip := EXC_BASE(MWORD_SIZE-1 downto fe.causing.controlInfo.exceptionCode'length)
-									& fe.causing.controlInfo.exceptionCode(
-															fe.causing.controlInfo.exceptionCode'length-1 downto ALIGN_BITS)
+			res.basicInfo.ip := EXC_BASE(MWORD_SIZE-1 downto ge.causing.controlInfo.exceptionCode'length)
+									& ge.causing.controlInfo.exceptionCode(
+															ge.causing.controlInfo.exceptionCode'length-1 downto ALIGN_BITS)
 									& EXC_BASE(ALIGN_BITS-1 downto 0);			
-			res.basicInfo.systemLevel := "00000001";
-			
-		-- ?????
-		elsif fe.causing.controlInfo.newFetchLock = '1' then	
-			res.basicInfo.ip := --getNextInstructionAddress(fe.causing);
-										causingNext;
-		elsif fe.causing.controlInfo.newBranch = '1' then
-			res.basicInfo.ip := fe.causing.target;
-		elsif fe.causing.controlInfo.newReturn = '1' then
-			res.basicInfo.ip := fe.causing.result;
+			res.basicInfo.systemLevel := "00000001";			
+		elsif ge.causing.controlInfo.newFetchLock = '1' then	
+			res.basicInfo.ip := causingNext;
+		elsif ge.causing.controlInfo.newBranch = '1' then
+			res.basicInfo.ip := ge.causing.target;
+		elsif ge.causing.controlInfo.newReturn = '1' then
+			res.basicInfo.ip := ge.causing.result;
 		end if;				
 	else	-- Increment by the width of fetch group
-		-- CAREFUL: using Verilog adder for this seems to make things worse, not better
-		res.basicInfo.ip := 
-				--i2slv(slv2u(content.pcBase(MWORD_SIZE-1 downto ALIGN_BITS)) + 1, MWORD_SIZE - ALIGN_BITS)
-				--& i2slv(0, ALIGN_BITS);		
-				pcNext;
+		res.basicInfo.ip := pcNext;
 	end if;	
 
 	return res;
 end function;
+
+
+function newPCData2(content: InstructionState;
+						  commitEvent: std_logic; commitCausing: InstructionState;
+						  execEvent: std_logic; execCausing: InstructionState;	
+						  decodeEvent: std_logic; decodeCausing: InstructionState;
+						  pcNext, causingNext: Mword)
+							--	excTarget: InstructionBasicInfo)
+return InstructionState is
+	variable res: InstructionState := content;
+	variable newPC: Mword := (others=>'0');
+begin
+	if commitEvent = '1' then -- when from exec or front	
+		if commitCausing.controlInfo.newReset = '1' then -- TEMP!
+			res.basicInfo.ip := (others => '0');
+			res.basicInfo.intLevel := "00000000";				
+		elsif commitCausing.controlInfo.newInterrupt = '1' then
+			res.basicInfo.ip := INT_BASE; -- TEMP!
+			res.basicInfo.intLevel := "00000001";		
+		else -- if commitCausing.controlInfo.newException = '1' then
+			-- TODO, FIX: exceptionCode sliced - shift left by ALIGN_BITS? or leave just base address
+			res.basicInfo.ip := EXC_BASE(MWORD_SIZE-1 downto commitCausing.controlInfo.exceptionCode'length)
+									& commitCausing.controlInfo.exceptionCode(
+													commitCausing.controlInfo.exceptionCode'length-1 downto ALIGN_BITS)
+									& EXC_BASE(ALIGN_BITS-1 downto 0);	
+									--		INT_BASE;
+			res.basicInfo.systemLevel := "00000001";
+		end if;	
+	elsif execEvent = '1' then		
+		if execCausing.controlInfo.newBranch = '1' then
+			res.basicInfo.ip := execCausing.target;
+		else -- if execCausing.controlInfo.newReturn = '1'
+			res.basicInfo.ip := execCausing.result;
+														--target;
+		end if;	
+	elsif decodeEvent = '1' then		
+		if decodeCausing.controlInfo.newFetchLock = '1' then	
+			res.basicInfo.ip := causingNext;
+		end if;
+	else	-- Increment by the width of fetch group
+		res.basicInfo.ip := pcNext;
+	end if;	
+
+	return res;
+end function;
+
+
+	function NEW_generalEvents(pcData: InstructionState;
+										commitEvent: std_logic; commitCausing: InstructionState;
+										execEvent: std_logic; execCausing: InstructionState;	
+										decodeEvent: std_logic; decodeCausing: InstructionState;
+										pcNext, causingNext: Mword)
+											--excTarget: InstructionBasicInfo
+	return GeneralEventInfo is
+		variable res: GeneralEventInfo;
+	begin
+		res.affectedVec := (others => '0');
+		res.eventOccured := '1';
+		res.causing := decodeCausing;
+	
+		if commitEvent = '1' then 
+			res.causing := commitCausing;
+			res.affectedVec(0 to 4) := (others => '1');
+		elsif execEvent = '1' then
+			res.causing := execCausing;
+			res.affectedVec(0 to 4) := (others => '1');
+		elsif decodeEvent = '1' then
+			res.causing := decodeCausing;
+			res.affectedVec(0 to 3) := (others => '1');
+		else
+			res.eventOccured := '0';
+		end if;
+		
+		res.newStagePC := newPCData2( pcData,
+												commitEvent, commitCausing,
+												execEvent, execCausing,
+												decodeEvent, decodeCausing,
+												pcNext, causingNext);
+												--	excTarget);
+		
+		return res;
+	end function;
 
 
 function getAnnotatedHwords(--fetchData: InstructionState;
@@ -588,13 +671,13 @@ begin
 end function;
 
 
-function getFrontEvents(eventArr: InstructionSlotArray)
-return FrontEventInfo is	
-	variable res: FrontEventInfo;
+function getGeneralEvents(eventArr: InstructionSlotArray)
+return GeneralEventInfo is	
+	variable res: GeneralEventInfo;
 begin
 	res.eventOccured := eventArr(0).full;
 	--res.fromExec := eventArr(6).data.controlInfo.newEvent;
-	res.fromInt := eventArr(0).ins.controlInfo.newInterrupt;
+	--res.fromInt := eventArr(0).ins.controlInfo.newInterrupt;
 	res.causing := eventArr(0).ins;
 			
 		-- CAREFUL! Must have matching indices to work correctly!	
@@ -607,7 +690,6 @@ begin
 end function;
 
 
--- MOVE to General
 function stageMultiEvents(sd: StageDataMulti; isNew: std_logic) return StageMultiEventInfo is
 	variable res: StageMultiEventInfo := (eventOccured => '0', causing => defaultInstructionState,
 														partialKillMask => (others=>'0'));

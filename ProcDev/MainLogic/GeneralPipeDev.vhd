@@ -68,6 +68,15 @@ procedure checkIQ(bufferData: InstructionStateArray; fullMask: std_logic_vector;
 -- End of logging and checking
 ---------
 
+		-- group:  revTag = causing.groupTag and i2slv(-PIPE_WIDTH, SMALL_NUMBER_SIZE), mask = all ones
+		-- sequential: revTag = causing.numberTag, mask = new group's fullMask		
+		function nextCtr(ctr: SmallNumber; rewind: std_logic; revTag: SmallNumber;
+									 allow: std_logic; mask: std_logic_vector) 
+		return SmallNumber;
+		
+		constant ALL_FULL: std_logic_vector(0 to PIPE_WIDTH-1) := (others => '1');
+
+
 function makeSlotArray(insVec: InstructionStateArray; mask: std_logic_vector) return InstructionSlotArray;
 
 function extractFullMask(queueContent: InstructionSlotArray) return std_logic_vector;
@@ -107,7 +116,16 @@ function findOverriddenDests(insVec: StageDataMulti) return std_logic_vector;
 function getPhysicalDestMask(insVec: StageDataMulti) return std_logic_vector;
 	
 function getExceptionMask(insVec: StageDataMulti) return std_logic_vector;
-		
+
+
+function getSendingFromCQ(livingMask: std_logic_vector) return std_logic_vector;
+
+function stageCQNext(content: StageDataCommitQueue; newContent: InstructionStateArray;
+		livingMask: std_logic_vector;
+		ready: std_logic_vector;
+		outWidth: integer;
+		nFull, nOut, nIn: integer)
+return StageDataCommitQueue;
 
 	
 -- FORWARDING NETWORK ------------
@@ -130,7 +148,16 @@ return MwordArray;
 			
 	function getLastFull(newContent: StageDataMulti) return InstructionState;
 
+	function getLastEffective(newContent: StageDataMulti) return InstructionState;
+	function getEffectiveMask(newContent: StageDataMulti) return std_logic_vector;
+
+		function groupHasException(newContent: StageDataMulti) return std_logic;
+
 	function killByTag(before, ei, int: std_logic) return std_logic;
+
+
+function compactData(data: InstructionStateArray; mask: std_logic_vector) return InstructionStateArray;
+function compactMask(data: InstructionStateArray; mask: std_logic_vector) return std_logic_vector;
 	
 end GeneralPipeDev;
 
@@ -138,6 +165,21 @@ end GeneralPipeDev;
 
 package body GeneralPipeDev is
 
+
+		-- group:  revTag = causing.groupTag and i2slv(-PIPE_WIDTH, SMALL_NUMBER_SIZE), mask = all ones
+		-- sequential: revTag = causing.numberTag, mask = new group's fullMask		
+		function nextCtr(ctr: SmallNumber; rewind: std_logic; revTag: SmallNumber;
+									 allow: std_logic; mask: std_logic_vector) 
+		return SmallNumber is			
+		begin
+			if rewind = '1' then
+				return revTag;
+			elsif allow = '1' then
+				return i2slv(slv2u(ctr) + countOnes(mask), SMALL_NUMBER_SIZE);
+			else
+				return ctr;
+			end if;
+		end function;
 
 function makeSlotArray(insVec: InstructionStateArray; mask: std_logic_vector) return InstructionSlotArray is
 	variable res: InstructionSlotArray(0 to insVec'length-1) := (others => DEFAULT_INSTRUCTION_SLOT);
@@ -521,6 +563,67 @@ end function;
 		end loop;
 		return res;
 	end function;			
+
+
+	function getLastEffective(newContent: StageDataMulti) return InstructionState is
+		variable res: InstructionState := newContent.data(0);
+	begin
+		-- Seeking from right side cause we need the last one 
+		for i in newContent.fullMask'range loop
+			-- Count only full instructions
+			if newContent.fullMask(i) = '1' then
+				res := newContent.data(i);
+			else
+				exit;
+			end if;
+			
+			-- If this one has an event, following ones don't count
+			if newContent.data(i).controlInfo.hasException = '1' then
+				res.controlInfo.newEvent := '1'; -- Announce that event is to happen now!
+				exit;
+			end if;
+			
+		end loop;
+		return res;
+	end function;
+
+	function getEffectiveMask(newContent: StageDataMulti) return std_logic_vector is
+		variable res: std_logic_vector(0 to PIPE_WIDTH-1) := (others => '0');
+	begin
+		-- Seeking from right side cause we need the last one 
+		for i in newContent.fullMask'range loop
+			-- Count only full instructions
+			if newContent.fullMask(i) = '1' then
+				res(i) := '1';
+			else
+				exit;
+			end if;
+			
+			-- If this one has an event, following ones don't count
+			if 	newContent.data(i).controlInfo.hasEvent = '1' --??
+			then
+				exit;
+			end if;
+			
+		end loop;
+		return res;
+	end function;
+
+		function groupHasException(newContent: StageDataMulti) return std_logic is
+		begin			
+			for i in newContent.fullMask'range loop
+				-- Count only full instructions
+				if newContent.fullMask(i) = '1' then
+					if newContent.data(i).controlInfo.hasException = '1' then
+						return '1';
+					end if;
+				else 	
+					exit;
+				end if;
+				
+			end loop;			
+			return '0';
+		end function;
 	
 	function killByTag(before, ei, int: std_logic) return std_logic is
 	begin
@@ -786,6 +889,161 @@ begin
 	
 	-- pragma synthesis on	
 end procedure;
+
+
+function compactData(data: InstructionStateArray; mask: std_logic_vector) return InstructionStateArray is
+	variable res: InstructionStateArray(0 to 3) := --data(0 to 3);
+														(data(1), data(2), data(0), data(3));
+	variable k: integer := 0;
+begin
+	res(k) := data(1);
+	if mask(1) = '1' then
+		k := k + 1;
+	end if;
+	
+	res(k) := data(2);
+	if mask(2) = '1' then
+		k := k + 1;
+	end if;
+
+	res(k) := data(0);	
+	if mask(0) = '1' then
+		k := k + 1;
+	end if;	
+
+	res(k) := data(3);	
+	if mask(3) = '1' then
+		k := k + 1;
+	end if;
+	
+	return res;
+end function;
+
+
+function compactMask(data: InstructionStateArray; mask: std_logic_vector) return std_logic_vector is
+	variable res: std_logic_vector(0 to 3) := (others => '0');
+	variable k: integer := 0;
+begin
+	res(k) := mask(1);
+	if mask(1) = '1' then
+		k := k + 1;
+	end if;
+	
+	res(k) := mask(2);
+	if mask(2) = '1' then
+		k := k + 1;
+	end if;
+
+	res(k) := mask(0);	
+	if mask(0) = '1' then
+		k := k + 1;
+	end if;	
+	
+	res(k) := mask(3);	
+	if mask(3) = '1' then
+		k := k + 1;
+	end if;
+	
+	return res;
+end function;
+
+
+
+function getSendingFromCQ(livingMask: std_logic_vector) return std_logic_vector is
+	variable res: std_logic_vector(0 to PIPE_WIDTH-1) := (others=>'0');
+begin
+	for i in 0 to PIPE_WIDTH-1 loop
+		if livingMask(i) = '1' then
+			res(i) := '1';
+		else
+			exit;
+		end if;
+	end loop;	
+	return res;
+end function;
+
+
+function stageCQNext(content: StageDataCommitQueue; newContent: InstructionStateArray;
+		livingMask: std_logic_vector;
+		ready: std_logic_vector;
+		outWidth: integer;
+		nFull, nOut, nIn: integer)
+return StageDataCommitQueue is
+	variable res: StageDataCommitQueue := (fullMask => (others=>'0'), 
+														data => (others=>defaultInstructionState));
+	variable contentExtended: InstructionStateArray(0 to CQ_SIZE+4-1) := 
+								content.data & newContent;
+	variable dataTemp: InstructionStateArray(0 to CQ_SIZE+4-1) := (others => defaultInstructionState);
+	variable fullMaskTemp: std_logic_vector(0 to CQ_SIZE+4-1) := (others => '0');
+		
+	variable j: integer;
+	variable k: integer := 0;
+	variable newFullMask: std_logic_vector(0 to content.fullMask'length-1) := (others => '0');
+		constant CLEAR_EMPTY_SLOTS_CQ: boolean := false;
+		
+	variable newCompactedData: InstructionStateArray(0 to 3);
+	variable newCompactedMask: std_logic_vector(0 to 3);
+begin
+	newCompactedData := newContent; --compactData(newContent, ready);
+	newCompactedMask := ready; --compactMask(newContent, ready);
+	-- CAREFUL: even when not clearing empty slots, result tags probably should be cleared!
+	--				It's to prevent reading of fake results from empty slots
+	if not CLEAR_EMPTY_SLOTS_CQ then
+		dataTemp := contentExtended; -- content.data & newCompactedData;
+	end if;	
+
+--			for i in 0 to content.data'length-1 loop -- to livingContent'length - nOut - 1 loop
+--				if i < nFull - nOut then
+--					dataTemp(i) := content.data(i + nOut);		
+--					fullMaskTemp(i) := '1'; -- content.fullMask(i + nOut);
+--				elsif i < nFull - nOut + 4 then
+--					dataTemp(i) := newCompactedData(k);
+--					fullMaskTemp(i) := newCompactedMask(k);
+--					k := k + 1;
+--				else
+--					--fullMaskTemp(i) := '0';
+--				end if;
+--			end loop;	
+		
+		for i in 0 to contentExtended'length - 1 - outWidth loop
+			contentExtended(i) := contentExtended(i + outWidth);
+		end loop;
+		
+		for i in 0 to content.data'length-1 loop -- to livingContent'length - nOut - 1 loop
+			if i < nFull - nOut then
+				dataTemp(i) := contentExtended(i);		
+				fullMaskTemp(i) := '1'; -- content.fullMask(i + nOut);
+			elsif i < nFull - nOut + 4 then
+				dataTemp(i) := newCompactedData(k);
+				fullMaskTemp(i) := newCompactedMask(k);
+				k := k + 1;
+			else
+				dataTemp(i) := contentExtended(i);
+				--fullMaskTemp(i) := '0';
+			end if;
+		end loop;		
+		
+		
+	res.data := dataTemp(0 to CQ_SIZE-1);
+	res.fullMask := fullMaskTemp(0 to CQ_SIZE-1);
+		
+	-- CAREFUL! Clearing tags in empty slots, to avoid incorrect info about available results!
+	for i in 0 to res.fullMask'length-1 loop
+		if res.fullMask(i) = '0' then
+			res.data(i).physicalDestArgs.d0 := (others => '0');
+		end if;
+		
+		-- TEMP: also clear unneeded data for all instructions
+		res.data(i).virtualArgs := defaultVirtualArgs;
+		--	res.data(i).virtualDestArgs := defaultVirtualDestArgs;
+		res.data(i).constantArgs := defaultConstantArgs; -- c0 needed for sysMtc if not using temp reg in Exec
+		res.data(i).argValues := defaultArgValues;
+		res.data(i).basicInfo := defaultBasicInfo;
+		res.data(i).bits := (others => '0');
+	end loop;
+	
+	return res;		
+end function;
 
 
 end GeneralPipeDev;

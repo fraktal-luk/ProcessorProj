@@ -73,6 +73,9 @@ return InstructionStateArray;
 function extractReadyRegBits(bits: std_logic_vector; data: InstructionStateArray)
 return std_logic_vector;
 
+function extractReadyRegBitsV(bits: std_logic_vector; data: InstructionStateArray)
+return std_logic_vector;
+
 -- Next address, even if after a taken branch
 function getIncrementedAddress(ins: InstructionState) return Mword;
 
@@ -99,6 +102,10 @@ function getLinkInfoSuper(ins: InstructionState; --linkInfoExc: InstructionBasic
 								causingNext: Mword)
 return InstructionBasicInfo;
 
+function getLinkInfoSuper2(ins: InstructionState; normalTarget, excTarget: InstructionBasicInfo)
+return InstructionBasicInfo;
+
+
 function pcDataFromBasicInfo(bi: InstructionBasicInfo) return InstructionState;
 
 function clearTempControlInfoSimple(ins: InstructionState) return InstructionState;
@@ -107,18 +114,8 @@ function clearTempControlInfoMulti(sd: StageDataMulti) return StageDataMulti;
 function setInterrupt(ins: InstructionState; intSignal: std_logic; intCode: SmallNumber)
 return InstructionState;
 
-	
-function extractPhysSources(data: InstructionStateArray) return PhysNameArray;
-
-function extractPhysS0(data: InstructionStateArray) return PhysNameArray;
-function extractPhysS1(data: InstructionStateArray) return PhysNameArray;
-function extractPhysS2(data: InstructionStateArray) return PhysNameArray;
-
-function extractMissing(data: InstructionStateArray) return std_logic_vector;		
-
-function extractMissing0(data: InstructionStateArray) return std_logic_vector;		
-function extractMissing1(data: InstructionStateArray) return std_logic_vector;		
-function extractMissing2(data: InstructionStateArray) return std_logic_vector;		
+	function setException(ins: InstructionState; intSignal, resetSignal, isNew: std_logic)
+	return InstructionState;
 
 function clearEmptyResultTags(insVec: InstructionStateArray; fullMask: std_logic_vector)
 return InstructionStateArray;
@@ -393,6 +390,16 @@ begin
 	return res;
 end function;		
 
+function extractReadyRegBitsV(bits: std_logic_vector; data: InstructionStateArray) return std_logic_vector is
+	variable res: std_logic_vector(0 to 3*data'length-1) := (others => '0'); -- 31) := (others=>'0');
+begin
+	for i in 0 to data'length-1 loop
+		res(3*i + 0) := bits(slv2u(data(i).virtualArgs.s0));
+		res(3*i + 1) := bits(slv2u(data(i).virtualArgs.s1));
+		res(3*i + 2) := bits(slv2u(data(i).virtualArgs.s2));					
+	end loop;		
+	return res;
+end function;
 
 function getIncrementedAddress(ins: InstructionState) return Mword is
 	variable nBytes: natural;
@@ -489,13 +496,27 @@ end function;
 function getLinkInfoSuper(ins: InstructionState; causingNext: Mword) return InstructionBasicInfo is
 	variable res: InstructionBasicInfo := ins.basicInfo;
 begin
-	if ins.controlInfo.newException = '1' then 
+	if ins.controlInfo.hasException = '1' then 
 		return getExceptionTarget(ins, causingNext);
 	-- > NOTE, TODO: Interupt chaining can be implemented in a simple way: when another interrupt appears, 
 	--		jump to handler directly from currently running handler, but don't set ILR.
 	--		ILR will remain from the first interrupt in chain, just like in tail function call
 	else
 		return getLinkInfoNormal(ins, causingNext);
+	end if;
+end function;
+
+function getLinkInfoSuper2(ins: InstructionState; normalTarget, excTarget: InstructionBasicInfo)
+return InstructionBasicInfo is
+	variable res: InstructionBasicInfo := ins.basicInfo;
+begin
+	if ins.controlInfo.hasException = '1' then 
+		return excTarget;
+	-- > NOTE, TODO: Interupt chaining can be implemented in a simple way: when another interrupt appears, 
+	--		jump to handler directly from currently running handler, but don't set ILR.
+	--		ILR will remain from the first interrupt in chain, just like in tail function call
+	else
+		return normalTarget;
 	end if;
 end function;
 
@@ -540,91 +561,42 @@ end function;
 	return InstructionState is
 		variable res: InstructionState := ins;
 	begin
-		res.controlInfo.newEvent := intSignal;
-		res.controlInfo.hasEvent := intSignal;
+		res.controlInfo.newEvent := res.controlInfo.hasException or intSignal;
+		res.controlInfo.hasEvent := res.controlInfo.hasEvent or intSignal;
 		res.controlInfo.newInterrupt := intSignal;
 		res.controlInfo.hasInterrupt := intSignal;
+		-- ^ Interrupts delayed by 1 cycle if exception being committed!
+		
+			-- TEMP!	
+			--if intCode(0) = '1' then
+				res.controlInfo.newReset := intCode(0);
+				res.controlInfo.hasReset := intCode(0);
+			--end if;
+			
 		-- ...?	
 		return res;
 	end function;	
 	
-function extractPhysSources(data: InstructionStateArray) return PhysNameArray is
-	variable res: PhysNameArray(0 to 3*data'length-1) := (others => (others => '0'));
-begin
-	for i in data'range loop
-		res(3*i + 0) := data(i).physicalArgs.s0;
-		res(3*i + 1) := data(i).physicalArgs.s1;
-		res(3*i + 2) := data(i).physicalArgs.s2;		
-	end loop;
-	return res;
-end function;	
 	
-function extractPhysS0(data: InstructionStateArray) return PhysNameArray is
-	variable res: PhysNameArray(0 to data'length-1) := (others => (others => '0'));
-begin
-	for i in data'range loop
-		res(i) := data(i).physicalArgs.s0;		
-	end loop;
-	return res;
-end function;		
+	function setException(ins: InstructionState; intSignal, resetSignal, isNew: std_logic)
+	return InstructionState is
+		variable res: InstructionState := ins;
+	begin
+		res.controlInfo.newEvent := (res.controlInfo.hasException and isNew) or intSignal or resetSignal;
+		res.controlInfo.hasEvent := res.controlInfo.hasEvent or res.controlInfo.newEvent;
 
-function extractPhysS1(data: InstructionStateArray) return PhysNameArray is
-	variable res: PhysNameArray(0 to data'length-1) := (others => (others => '0'));
-begin
-	for i in data'range loop
-		res(i) := data(i).physicalArgs.s1;		
-	end loop;
-	return res;
-end function;		
+		res.controlInfo.newException := res.controlInfo.hasException and isNew; 
 
-function extractPhysS2(data: InstructionStateArray) return PhysNameArray is
-	variable res: PhysNameArray(0 to data'length-1) := (others => (others => '0'));
-begin
-	for i in data'range loop
-		res(i) := data(i).physicalArgs.s2;		
-	end loop;
-	return res;
-end function;		
-
-
-	
-function extractMissing(data: InstructionStateArray) return std_logic_vector is
-	variable res: std_logic_vector(0 to 3*data'length-1) := (others => '0');
-begin
-	for i in data'range loop
-		res(3*i + 0) := data(i).argValues.missing(0);
-		res(3*i + 1) := data(i).argValues.missing(1);
-		res(3*i + 2) := data(i).argValues.missing(2);		
-	end loop;
-	return res;
-end function;	
-
-function extractMissing0(data: InstructionStateArray) return std_logic_vector is
-	variable res: std_logic_vector(0 to data'length-1) := (others => '0');
-begin
-	for i in data'range loop
-		res(i) := data(i).argValues.missing(0);
-	end loop;
-	return res;
-end function;
-
-function extractMissing1(data: InstructionStateArray) return std_logic_vector is
-	variable res: std_logic_vector(0 to data'length-1) := (others => '0');
-begin
-	for i in data'range loop
-		res(i) := data(i).argValues.missing(1);
-	end loop;
-	return res;
-end function;
-	
-function extractMissing2(data: InstructionStateArray) return std_logic_vector is
-	variable res: std_logic_vector(0 to data'length-1) := (others => '0');
-begin
-	for i in data'range loop
-		res(i) := data(i).argValues.missing(2);
-	end loop;
-	return res;
-end function;
+		res.controlInfo.newInterrupt := intSignal;
+		res.controlInfo.hasInterrupt := intSignal;
+		-- ^ Interrupts delayed by 1 cycle if exception being committed!
+		
+		res.controlInfo.newReset := resetSignal;
+		res.controlInfo.hasReset := resetSignal;
+			
+		-- ...?	
+		return res;
+	end function;	
 
 
 function clearEmptyResultTags(insVec: InstructionStateArray; fullMask: std_logic_vector)

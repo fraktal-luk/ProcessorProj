@@ -63,7 +63,7 @@ entity RegisterMap0 is
 end RegisterMap0;
 
 
-architecture Implem of RegisterMap0 is
+architecture Behavioral of RegisterMap0 is
 	signal reserveMW, commitMW: std_logic_vector(0 to MAX_WIDTH-1) := (others=>'0');
 	signal selectReserveMW, selectCommitMW, selectStableMW: RegNameArray(0 to MAX_WIDTH-1) 
 				:= (others=>(others=>'0'));
@@ -72,6 +72,21 @@ architecture Implem of RegisterMap0 is
 	signal writeReserveMW, writeCommitMW, readStableMW: PhysNameArray(0 to 3*MAX_WIDTH-1)
 				:= (others=>(others=>'0'));	
 	signal readNewestMW: PhysNameArray(0 to 3*MAX_WIDTH-1) := (others=>(others=>'0'));
+	
+	
+	function initMap return PhysNameArray;
+	
+	signal newestMap, stableMap: PhysNameArray(0 to 31) := initMap;
+
+	function initMap return PhysNameArray is
+		variable res: PhysNameArray(0 to 31) := (others => (others=> '0'));
+	begin
+		for i in 0 to 31 loop
+			res(i) := i2slv(i, PhysName'length);
+		end loop;
+		return res;
+	end function;
+	
 begin
 	reserveMW(0 to WIDTH-1) <= reserve;
 	commitMW(0 to WIDTH-1) <= commit;
@@ -86,45 +101,47 @@ begin
 	readNewest <= readNewestMW(0 to 3*WIDTH-1);
 	readStable <= readStableMW(0 to WIDTH-1);
 	
-			IMPL: entity work.TempVerilogRegMap port map(
-				clk=>clk, reset=>reset, en=>en,
-				rewind => rewind,
-				
-				commit => commitMW,
-				commitAllow => commitAllow,
-				reserve => reserveMW,
-				reserveAllow => reserveAllow,
-				
-				selectReserve => selectReserveMW(0), selectReserveN => selectReserveMW(1), 
-				selectReserve2 => selectReserveMW(2), selectReserve3 => selectReserveMW(3),
-				selectCommit => selectCommitMW(0), selectCommitN => selectCommitMW(1), 
-				selectCommit2 => selectCommitMW(2), selectCommit3 => selectCommitMW(3),
-				
-				writeReserve => writeReserveMW(0), writeReserveN => writeReserveMW(1), 
-				writeReserve2 => writeReserveMW(2), writeReserve3 => writeReserveMW(3),
-				writeCommit => writeCommitMW(0), writeCommitN => writeCommitMW(1), 
-				writeCommit2 => writeCommitMW(2), writeCommit3 => writeCommitMW(3),
-				
-				select0 => selectNewestMW(0), select1 => selectNewestMW(1), select2 => selectNewestMW(2), 
-				select3 => selectNewestMW(3), select4 => selectNewestMW(4), select5 => selectNewestMW(5), 
-				select6 => selectNewestMW(6), select7 => selectNewestMW(7), select8 => selectNewestMW(8), 
-				select9 => selectNewestMW(9), select10 => selectNewestMW(10), select11 => selectNewestMW(11), 
-				
-				read0 => readNewestMW(0), read1 => readNewestMW(1), read2 => readNewestMW(2), 
-				read3 => readNewestMW(3), read4 => readNewestMW(4), read5 => readNewestMW(5), 
-				read6 => readNewestMW(6), read7 => readNewestMW(7), read8 => readNewestMW(8), 
-				read9 => readNewestMW(9), read10 => readNewestMW(10), read11 => readNewestMW(11),
-				
-				selectStable => selectStableMW(0), 
-				selectStableN => selectStableMW(1),
-				selectStable2 => selectStableMW(2),
-				selectStable3 => selectStableMW(3),
-				
-				readStable => readStableMW(0), -- physCommitFreed(0)		
-				readStableN => readStableMW(1),
-				readStable2 => readStableMW(2),
-				readStable3 => readStableMW(3)
-			);	
 	
-end Implem;
+	-- Read
+	READ_NEWEST: for i in 0 to selectNewestMW'length-1 generate
+		readNewestMW(i) <= newestMap(slv2u(selectNewestMW(i)));
+	end generate;
+
+	READ_STABLE: for i in 0 to selectStableMW'length-1 generate
+		readStableMW(i) <= stableMap(slv2u(selectStableMW(i)));
+	end generate;
+			
+	SYNCHRONOUS: process(clk)
+	begin
+		if rising_edge(clk) then
+			if reset = '1' then
+			
+			elsif en = '1' then
+				-- Rewind if commanded
+				if rewind = '1' then
+					newestMap <= stableMap;
+				end if;
+				
+				-- Write
+				if reserveAllow = '1' and rewind = '0' then
+					for i in 0 to reserveMW'length-1 loop
+						if reserveMW(i) = '1' then
+							newestMap(slv2u(selectReserveMW(i))) <= writeReserveMW(i);
+						end if;
+					end loop;	
+				end if;
+
+				if commitAllow = '1' then -- and rewind = '0' then -- block when rewinding??
+					for i in 0 to commitMW'length-1 loop
+						if commitMW(i) = '1' then
+							stableMap(slv2u(selectCommitMW(i))) <= writeCommitMW(i);
+						end if;
+					end loop;	
+				end if;
+				
+			end if;
+		end if;
+	end process;
+	
+end Behavioral;
 

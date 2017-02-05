@@ -158,6 +158,20 @@ function frontEvents_OLD2(pcData: StageDataPC; fetchData: StageDataPC;
 									backCausing: InstructionState)									
 return FrontEventInfo;
 
+function extractPhysSources(data: InstructionStateArray) return PhysNameArray;
+
+function extractPhysS0(data: InstructionStateArray) return PhysNameArray;
+function extractPhysS1(data: InstructionStateArray) return PhysNameArray;
+function extractPhysS2(data: InstructionStateArray) return PhysNameArray;
+
+function extractMissing(data: InstructionStateArray) return std_logic_vector;		
+
+function extractMissing0(data: InstructionStateArray) return std_logic_vector;		
+function extractMissing1(data: InstructionStateArray) return std_logic_vector;		
+function extractMissing2(data: InstructionStateArray) return std_logic_vector;		
+
+
+
 end OLD_FUNCTIONS;
 
 
@@ -1023,6 +1037,85 @@ end function;
 --	
 --	return res;
 --end function;
+
+	
+function extractPhysSources(data: InstructionStateArray) return PhysNameArray is
+	variable res: PhysNameArray(0 to 3*data'length-1) := (others => (others => '0'));
+begin
+	for i in data'range loop
+		res(3*i + 0) := data(i).physicalArgs.s0;
+		res(3*i + 1) := data(i).physicalArgs.s1;
+		res(3*i + 2) := data(i).physicalArgs.s2;		
+	end loop;
+	return res;
+end function;	
+	
+function extractPhysS0(data: InstructionStateArray) return PhysNameArray is
+	variable res: PhysNameArray(0 to data'length-1) := (others => (others => '0'));
+begin
+	for i in data'range loop
+		res(i) := data(i).physicalArgs.s0;		
+	end loop;
+	return res;
+end function;		
+
+function extractPhysS1(data: InstructionStateArray) return PhysNameArray is
+	variable res: PhysNameArray(0 to data'length-1) := (others => (others => '0'));
+begin
+	for i in data'range loop
+		res(i) := data(i).physicalArgs.s1;		
+	end loop;
+	return res;
+end function;		
+
+function extractPhysS2(data: InstructionStateArray) return PhysNameArray is
+	variable res: PhysNameArray(0 to data'length-1) := (others => (others => '0'));
+begin
+	for i in data'range loop
+		res(i) := data(i).physicalArgs.s2;		
+	end loop;
+	return res;
+end function;		
+
+
+	
+function extractMissing(data: InstructionStateArray) return std_logic_vector is
+	variable res: std_logic_vector(0 to 3*data'length-1) := (others => '0');
+begin
+	for i in data'range loop
+		res(3*i + 0) := data(i).argValues.missing(0);
+		res(3*i + 1) := data(i).argValues.missing(1);
+		res(3*i + 2) := data(i).argValues.missing(2);		
+	end loop;
+	return res;
+end function;	
+
+function extractMissing0(data: InstructionStateArray) return std_logic_vector is
+	variable res: std_logic_vector(0 to data'length-1) := (others => '0');
+begin
+	for i in data'range loop
+		res(i) := data(i).argValues.missing(0);
+	end loop;
+	return res;
+end function;
+
+function extractMissing1(data: InstructionStateArray) return std_logic_vector is
+	variable res: std_logic_vector(0 to data'length-1) := (others => '0');
+begin
+	for i in data'range loop
+		res(i) := data(i).argValues.missing(1);
+	end loop;
+	return res;
+end function;
+	
+function extractMissing2(data: InstructionStateArray) return std_logic_vector is
+	variable res: std_logic_vector(0 to data'length-1) := (others => '0');
+begin
+	for i in data'range loop
+		res(i) := data(i).argValues.missing(2);
+	end loop;
+	return res;
+end function;
 
  
 end OLD_FUNCTIONS;

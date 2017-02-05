@@ -94,11 +94,11 @@ type ExecFunc is (unknown,
 										sysUndef
 							);	
 
-	-- CAREFUL: is this needed and correct?
-	type ExecStages is (	ExecA0, 
-								ExecB0, ExecB1, ExecB2,
-								ExecC0, ExecC1, ExecC2,
-								ExecD0);
+--	-- CAREFUL: is this needed and correct?
+--	type ExecStages is (	ExecA0, 
+--								ExecB0, ExecB1, ExecB2,
+--								ExecC0, ExecC1, ExecC2,
+--								ExecD0);
 							
 type BinomialOp is record
 	unit: ExecUnit;
@@ -118,13 +118,15 @@ type InstructionControlInfo is record
 		completed2: std_logic;
 	-- Momentary data:
 	newEvent: std_logic; -- True if any new event appears
+		newReset: std_logic;
 	newInterrupt: std_logic;
 	newException: std_logic;
 	newBranch: std_logic;
 	newReturn: std_logic; -- going to normal next, as in cancelling a branch
 	newFetchLock: std_logic;
 	-- Persistent data:
-	hasEvent: std_logic; -- Persistent 
+	hasEvent: std_logic; -- Persistent
+		hasReset: std_logic;
 	hasInterrupt: std_logic;
 	hasException: std_logic;
 	hasBranch: std_logic;
@@ -362,22 +364,20 @@ type HbuffOutData is record
 end record;
 
 
-type FrontEventInfo is record
+type GeneralEventInfo is record
 	eventOccured: std_logic;
 	causing: InstructionState;
-	affectedVec, causingVec: std_logic_vector(0 to 4);	
-	fromExec, fromInt: std_logic;	
+	affectedVec --, causingVec
+		: std_logic_vector(0 to 4);	
+	--fromExec, fromInt: std_logic;	
+	
+	-- New style:
+	-- lateEvent, execEvent, [events from respective front stages]: std_logic  ??
+	-- lateCausing, execCausing, [causing instuctions from front stages]: InstructionState
+	newStagePC: InstructionState;	
 end record;
 
--- TODO: remove? Why another same type? 
-type FrontEventInfo2 is record
-	eventOccured: std_logic;
-	causing: InstructionState;
-	affectedVec, causingVec: std_logic_vector(0 to 4);	
-	fromExec, fromInt: std_logic;	
-end record;
-
--- 
+ 
 type StageMultiEventInfo is record
 	eventOccured: std_logic;
 	causing: InstructionState;
@@ -389,15 +389,7 @@ constant DEFAULT_STAGE_MULTI_EVENT_INFO: StageMultiEventInfo
 														  causing => defaultInstructionState,
 														  partialKillMask => (others => '0'));
 
-
-type ExecRelTable is array (ExecStages'left to ExecStages'right) of ExecStages; 
-
-type ExecDriveTable is array (ExecStages'left to ExecStages'right) of FlowDriveSimple;							
-type ExecResponseTable is array (ExecStages'left to ExecStages'right) of FlowResponseSimple;
-	
-type ExecDataTable is array (ExecStages'left to ExecStages'right) of InstructionState;
-	
-
+	-- UNUSED?
 	type InstructionResult is record
 		full: std_logic;
 		tag: SmallNumber;
@@ -420,7 +412,7 @@ type ExecDataTable is array (ExecStages'left to ExecStages'right) of Instruction
 
 			type ArgStatusInfoArray is array(integer range <>) of ArgStatusInfo;
 
-	function defaultLastComitted return InstructionState;
+	function defaultLastCommitted return InstructionState;
 
 end NewPipelineData;
 
@@ -457,9 +449,11 @@ begin
 												completed => '0',
 													completed2 => '0',
 												newEvent => '0',
+													newReset => '0',
 												hasEvent => '0',
 												newInterrupt => '0',
 												hasInterrupt => '0',
+													hasReset => '0',
 												newException => '0',
 												hasException => '0',
 												newBranch => '0',
@@ -573,7 +567,7 @@ begin
 end function;
 
 
-	function defaultLastComitted return InstructionState is
+	function defaultLastCommitted return InstructionState is
 		variable res: InstructionState;
 	begin
 		res.controlInfo := defaultControlInfo;

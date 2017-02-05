@@ -80,10 +80,6 @@ entity UnitExec is
 		execEnds: out InstructionStateArray(0 to 3);
 		execEnds2: out InstructionStateArray(0 to 3);
 		
-
-		intSig: in std_logic;
-		intCausingIn: in InstructionState;
-
 		memLoadReady: in std_logic;
 		memLoadValue: in Mword;
 		memLoadAddress: out Mword;
@@ -94,10 +90,10 @@ entity UnitExec is
 			
 		sysRegSelect: out slv5;
 		sysRegIn: in Mword;
-			sysRegWriteSelOut: out slv5;
-			sysRegWriteValueOut: out Mword;
+		sysRegWriteSelOut: out slv5;
+		sysRegWriteValueOut: out Mword;
 				
-				selectedToCQ: out std_logic_vector(0 to 3); -- DEPREC?
+		selectedToCQ: out std_logic_vector(0 to 3); -- DEPREC?
 
 		execEvent: out std_logic;
 		execCausingOut: out InstructionState;
@@ -342,7 +338,6 @@ begin
 
 				execSendingE <= sendingIQE;
 				execAcceptingESig <= acceptingOutSQ;
-
 				
 				memStoreAllowSig <= sendingOutSQ;
 				memStoreAddress <= dataOutSQ.argValues.arg1;
@@ -368,26 +363,15 @@ begin
 				
 				execEventSignal => eventSignal,
 				execCausing => activeCausing,
-				
-				intSignal => intSig,
-				
+								
 				acceptingOutSQ => acceptingOutSQ,
 				sendingOutSQ => sendingOutSQ,
 				dataOutSQ => dataOutSQ
 			);
-			
-							
-------------------------------------------
+										
 
-
-	-- Event selection
 
 		execEventSignal <= eventsD.eventOccured;
-
-		-- NOTE: alternatively,here would be lastCommittedNext, and instructions in CQ certain 
-		--			to be committed innearest cycle would be spared from killing 
-		--			(CAREFUL: needed collaboration from CQ killer)
-		intCausing <= intCausingIn;
 		execCausing <= eventsD.causing;
 
 		eventSignal <= execOrIntEventSignalIn;	

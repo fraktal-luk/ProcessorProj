@@ -180,6 +180,11 @@ BEGIN
 	INT0_ASSERT: process
 	begin
 		wait for 3000 ns;
+						--	510 ns  -- at undefined instruction
+							--	- 10 ns;  -- just before committing the exception
+							--	+ 10 ns;  -- after exception takes effect, but overriding it
+							--	+ 20 ns;  -- 
+							--	+ 100 ns; -- after excpetion handler commits first instruction
 		wait until rising_edge(clk);
 		int0 <= '1';
 		wait until rising_edge(clk);

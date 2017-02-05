@@ -1,5 +1,5 @@
 
-architecture Behavioral of RegisterFile0 is
+architecture Behavioral_C of RegisterFile0 is
 	signal resetSig, enSig: std_logic := '0';
 
 	signal writeVecMW: std_logic_vector(0 to MAX_WIDTH-1) := (others => '0');
@@ -69,5 +69,5 @@ begin
 		end if;
 	end process;
 	
-end Behavioral;
+end Behavioral_C;
 

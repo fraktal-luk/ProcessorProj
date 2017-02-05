@@ -1,5 +1,5 @@
 
-architecture Behavioral of RegisterMap0 is
+architecture Behavioral_C of RegisterMap0 is
 	signal reserveMW, commitMW: std_logic_vector(0 to MAX_WIDTH-1) := (others=>'0');
 	signal selectReserveMW, selectCommitMW, selectStableMW: RegNameArray(0 to MAX_WIDTH-1) 
 				:= (others=>(others=>'0'));
@@ -79,4 +79,4 @@ begin
 		end if;
 	end process;
 	
-end Behavioral;
+end Behavioral_C;

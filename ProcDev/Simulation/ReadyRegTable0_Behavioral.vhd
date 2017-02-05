@@ -44,7 +44,7 @@ use work.TEMP_DEV.all;
 
 --use work.FrontPipeDevViewing.all;
 
-architecture Behavioral of TestReadyRegTable0 is
+architecture Behavioral_C of TestReadyRegTable0 is
 	signal setVecMW, clearVecMW: std_logic_vector(0 to MAX_WIDTH-1) := (others=>'0'); 
 	signal selectSetMW, selectClearMW: PhysNameArray(0 to MAX_WIDTH-1) := (others=>(others=>'0'));
 	
@@ -79,5 +79,5 @@ begin
 		end if;
 	end process;
 	
-end Behavioral;
+end Behavioral_C;
 

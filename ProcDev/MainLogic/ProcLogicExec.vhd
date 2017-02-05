@@ -23,18 +23,7 @@ use work.GeneralPipeDev.all;
 
 
 package ProcLogicExec is
-	
-	function getExecPrevResponses(				
-		execResponses: ExecResponseTable; 
-		frDispatchA, frDispatchB, frDispatchC, frDispatchD: FlowResponseSimple)
-	return execResponseTable;
 
-	function getExecNextResponses(				
-		execResponses: ExecResponseTable; 
-		flowResponseAPost, flowResponseBPost, 
-		flowResponseCPost, flowResponseDPost: FlowResponseSimple)
-	return execResponseTable;	
-	
 	-- DUMMY: This performs some siple operation to obtain a result
 	function passArg0(ins: InstructionState) return InstructionState;
 	function passArg1(ins: InstructionState) return InstructionState;
@@ -58,37 +47,6 @@ end ProcLogicExec;
 
 
 package body ProcLogicExec is
-		
-	function getExecPrevResponses(execResponses: ExecResponseTable; 
-											frDispatchA, frDispatchB, frDispatchC, frDispatchD: FlowResponseSimple)
-	return execResponseTable is
-		variable execPrevResponses: ExecResponseTable;
-	begin	
-		execPrevResponses := (
-			ExecA0 => frDispatchA,
-			ExecB0 => frDispatchB, ExecB1 => execResponses(ExecB0), ExecB2 => execResponses(ExecB1),
-			ExecC0 => frDispatchC, ExecC1 => execResponses(ExecC0), ExecC2 => execResponses(ExecC1),
-			ExecD0 => frDispatchD,
-			others => (others=>'0'));
-		return execPrevResponses;	
-	end function;
-
-	function getExecNextResponses(				
-		execResponses: ExecResponseTable; 
-		flowResponseAPost, flowResponseBPost, 
-		flowResponseCPost, flowResponseDPost: FlowResponseSimple)
-	return execResponseTable is
-		variable execNextResponses: ExecResponseTable;
-	begin		
-		execNextResponses := (
-			ExecA0 => flowResponseAPost,
-			ExecB0 => execResponses(ExecB1), ExecB1 => execResponses(ExecB2),ExecB2 => flowResponseBPost,
-			ExecC0 => execResponses(ExecC1), ExecC1 => execResponses(ExecC2),	ExecC2 => flowResponseCPost,
-			ExecD0 => flowResponseDPost,
-			others => (others=>'0'));	
-		return execNextResponses;	
-	end function;
-
 
 	function passArg0(ins: InstructionState) return InstructionState is
 		variable res: InstructionState := ins;
@@ -170,9 +128,9 @@ package body ProcLogicExec is
 				elsif ins.operation.func = sysMtc then
 					res.result := ins.argValues.arg0;
 				elsif ins.operation.func = sysUndef then
-					res.controlInfo.newException := '1';
+					--res.controlInfo.newException := '1';
 					res.controlInfo.hasException := '1';				
-					res.controlInfo.newEvent := '1';
+					--res.controlInfo.newEvent := '1';
 					res.controlInfo.hasEvent := '1';					
 				else
 						

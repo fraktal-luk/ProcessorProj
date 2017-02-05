@@ -53,17 +53,15 @@ entity MemoryUnit is
 		clk: in std_logic;
 		reset: in std_logic;
 		en: in std_logic;
-		
+
 		storeAddressWr: in std_logic;
 		storeValueWr: in std_logic;
 
 		storeAddressDataIn: in InstructionState;
 		storeValueDataIn: in InstructionState;
-		
+
 		execEventSignal: in std_logic;
 		execCausing: in InstructionState;
-		
-		intSignal: in std_logic;
 		
 		acceptingOutSQ: out std_logic;
 		sendingOutSQ: out std_logic;
@@ -393,7 +391,7 @@ architecture Behavioral of MemoryUnit is
 							inB =>  b,
 							outC => before
 						);		
-						killMask(i) <= killByTag(before, execEventSignal, intSignal) -- before and execEventSignal
+						killMask(i) <= killByTag(before, execEventSignal, '0') -- before and execEventSignal
 												and fullMask(i);									
 					end generate;
 					

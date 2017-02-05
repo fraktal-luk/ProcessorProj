@@ -70,42 +70,40 @@ entity TestReadyRegTable0 is
 end TestReadyRegTable0;
 
 
-architecture Implem of TestReadyRegTable0 is
+architecture Behavioral of TestReadyRegTable0 is
 	signal setVecMW, clearVecMW: std_logic_vector(0 to MAX_WIDTH-1) := (others=>'0'); 
 	signal selectSetMW, selectClearMW: PhysNameArray(0 to MAX_WIDTH-1) := (others=>(others=>'0'));
+	
+	signal content: std_logic_vector(0 to N_PHYSICAL_REGS-1) := (0 to 31 => '1', others => '0');
 begin
 	setVecMW(0 to WIDTH-1) <= setVec when enSet = '1' else (others => '0');
 	clearVecMW(0 to WIDTH-1) <= clearVec when enClear = '1' else (others => '0');
 	selectSetMW(0 to WIDTH-1) <= selectSet;
 	selectClearMW(0 to WIDTH-1) <= selectClear;
 
-		IMPL: entity work.TestVerilogReadyRegTable64 port map(
-						clk => clk, reset => reset, en => en, 
-						-- Setting inputs
-						-- TEMP: setting 'ready' on commit, but later make reg writing before commit if possible
-						writeEnL(0) => setVecMW(0),							
-						writeEnL(1) => setVecMW(1),							
-						writeEnL(2) => setVecMW(2),							
-						writeEnL(3) => setVecMW(3),							
-						
-						writeSelect0 => selectSetMW(0), --newPhysDests(0), --iaux(31 downto 26),
-						writeSelect1 => selectSetMW(1), --iaux(25 downto 20),
-						writeSelect2 => selectSetMW(2), --iaux(19 downto 14),
-						writeSelect3 => selectSetMW(3), --iaux(13 downto 8) or "001100",
-						
-						-- Clearing inputs
-						writeEnH(0) => clearVecMW(0),							
-						writeEnH(1) => clearVecMW(0),							
-						writeEnH(2) => clearVecMW(0),							
-						writeEnH(3) => clearVecMW(0),							
-
-						writeSelect4 => selectClearMW(0),  --"000000",
-						writeSelect5 => selectClearMW(1),
-						writeSelect6 => selectClearMW(2),
-						writeSelect7 => selectClearMW(3),
-
-						outputData => outputData
-			);						
-		
-end Implem;
+	
+	outputData <= content;
+	
+	SYNCHRONOUS: process(clk)
+	begin
+		if rising_edge(clk) then
+			if reset = '1' then
+				
+			elsif en = '1' then
+				for i in 0 to WIDTH-1 loop
+					if setVecMW(i) = '1' then
+						-- set 
+						content(slv2u(selectSetMW(i))) <= '1';
+					end if;
+					
+					if clearVecMW(i) = '1' then
+						-- clear
+						content(slv2u(selectClearMW(i))) <= '0';						
+					end if;
+				end loop;
+			end if;
+		end if;
+	end process;
+	
+end Behavioral;
 

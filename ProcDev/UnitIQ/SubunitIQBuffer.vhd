@@ -61,7 +61,7 @@ entity SubunitIQBuffer is
 		newData: in StageDataMulti;
 		nextAccepting: in std_logic;
 		execEventSignal: in std_logic;
-		intSignal: in std_logic;
+		--intSignal: in std_logic;
 		execCausing: in InstructionState;
 		aiArray: in ArgStatusInfoArray(0 to IQ_SIZE-1);
 		aiNew: in ArgStatusInfoArray(0 to PIPE_WIDTH-1);
@@ -169,7 +169,7 @@ begin
 			inB =>  b,
 			outC => before
 		);		
-		killMask(i) <= killByTag(before, execEventSignal, intSignal) -- before and execEventSignal
+		killMask(i) <= killByTag(before, execEventSignal, '0') -- before and execEventSignal
 								and fullMask(i); 			
 	end generate;	
 	

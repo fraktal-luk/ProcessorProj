@@ -62,7 +62,8 @@ entity RegisterFile0 is
 			  );
 end RegisterFile0;
 
-architecture Implem of RegisterFile0 is
+
+architecture Behavioral of RegisterFile0 is
 	signal resetSig, enSig: std_logic := '0';
 
 	signal writeVecMW: std_logic_vector(0 to MAX_WIDTH-1) := (others => '0');
@@ -70,6 +71,10 @@ architecture Implem of RegisterFile0 is
 	signal writeValuesMW: MwordArray(0 to MAX_WIDTH-1) := (others => (others => '0'));
 	signal selectReadMW: PhysNameArray(0 to 3*MAX_WIDTH-1) := (others => (others => '0'));	
 	signal readValuesMW: MwordArray(0 to 3*MAX_WIDTH-1) := (others => (others => '0'));	
+
+			signal readValuesMW_C: MwordArray(0 to 3*MAX_WIDTH-1) := (others => (others => '0'));	
+
+		signal content: MwordArray(0 to N_PHYSICAL_REGS-1) := (others => (others => '0'));
 
 	constant HAS_RESET_REGFILE: std_logic := '1';
 	constant HAS_EN_REGFILE: std_logic := '1';
@@ -84,56 +89,49 @@ begin
 	
 	selectReadMW(0 to 3*WIDTH-1) <= selectRead;
 	readValues <= readValuesMW(0 to 3*WIDTH-1);
-	
-	IMPL: entity work.TestVerilogRegfile6P
-	generic map(
-		N_WRITE => WRITE_WIDTH
-	)
-	port map(
-		clk => clk, reset => resetSig, en => enSig,
-		
-		commitAllow => writeAllow,
-		commitVec => writeVecMW,
-		writeSelect0 => selectWriteMW(0),
-		writeSelect1 => selectWriteMW(1),
-		writeSelect2 => selectWriteMW(2),
-		writeSelect3 => selectWriteMW(3),
-		writeData0 => writeValuesMW(0),
-		writeData1 => writeValuesMW(1),
-		writeData2 => writeValuesMW(2),
-		writeData3 => writeValuesMW(3),
+
+
+	SYNCHRONOUS: process(clk)
+	begin
+		if rising_edge(clk) then
+			-- Reading
+			--for i in 0 to readValuesMW'length - 1 loop
+				if readAllowT0 = '1' then
+					readValuesMW(0) <= content(slv2u(selectReadMW(0)));
+					readValuesMW(1) <= content(slv2u(selectReadMW(1)));
+					readValuesMW(2) <= content(slv2u(selectReadMW(2)));					
+				end if;
+				
+				if readAllowT1 = '1' then
+					readValuesMW(3) <= content(slv2u(selectReadMW(3)));
+					readValuesMW(4) <= content(slv2u(selectReadMW(4)));
+					readValuesMW(5) <= content(slv2u(selectReadMW(5)));
+				end if;
+
+				if readAllowT2 = '1' then
+					readValuesMW(6) <= content(slv2u(selectReadMW(6)));
+					readValuesMW(7) <= content(slv2u(selectReadMW(7)));
+					readValuesMW(8) <= content(slv2u(selectReadMW(8)));					
+				end if;
+
+				if readAllowT3 = '1' then
+					readValuesMW(9) <= content(slv2u(selectReadMW(9)));
+					readValuesMW(10) <= content(slv2u(selectReadMW(10)));
+					readValuesMW(11) <= content(slv2u(selectReadMW(11)));					
+				end if;				
+			--end loop;
 			
-			readAllowT0 => readAllowT0,
-			readAllowT1 => readAllowT1,
-			readAllowT2 => readAllowT2,
-			readAllowT3 => readAllowT3,
-		
-		readSelect0 => selectReadMW(0),
-		readSelect1 => selectReadMW(1),
-		readSelect2 => selectReadMW(2),
-		readSelect3 => selectReadMW(3),
-		readSelect4 => selectReadMW(4),
-		readSelect5 => selectReadMW(5),
-		readSelect6 => selectReadMW(6),
-		readSelect7 => selectReadMW(7),
-		readSelect8 => selectReadMW(8),
-		readSelect9 => selectReadMW(9),
-		readSelect10 => selectReadMW(10),
-		readSelect11 => selectReadMW(11),
-		
-		readData0 => readValuesMW(0),
-		readData1 => readValuesMW(1),
-		readData2 => readValuesMW(2),
-		readData3 => readValuesMW(3),
-		readData4 => readValuesMW(4),
-		readData5 => readValuesMW(5),
-		readData6 => readValuesMW(6),
-		readData7 => readValuesMW(7),
-		readData8 => readValuesMW(8),
-		readData9 => readValuesMW(9),
-		readData10 => readValuesMW(10),
-		readData11 => readValuesMW(11)		
-	);
+			-- Writing
+			if writeAllow = '1' then
+				for i in 0 to --writeVecMW'length - 1 loop
+									WRITE_WIDTH-1 loop
+					if writeVecMW(i) = '1' then
+						content(slv2u(selectWriteMW(i))) <= writeValuesMW(i);
+					end if;
+				end loop;
+			end if;
+		end if;
+	end process;
 	
-end Implem;
+end Behavioral;
 
