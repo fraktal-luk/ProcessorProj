@@ -93,6 +93,9 @@ type ProcOpcont is ( -- ALU functions
 							-- mem
 							store,
 							load,
+								
+								storeFP,
+								loadFP,
 							--
 							jzR, -- jumping with adr in register
 							jnzR,	

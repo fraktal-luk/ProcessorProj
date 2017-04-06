@@ -54,44 +54,51 @@ entity UnitExec is
 	  
 		sendingIQA: in std_logic;
 		sendingIQB: in std_logic;
-		sendingIQC: in std_logic;
+			sendingIQC: in std_logic;
 		sendingIQD: in std_logic;
-		sendingIQE: in std_logic;
+			sendingIQE: in std_logic; -- Store data
 	  
 		whichAcceptedCQ: in std_logic_vector(0 to 3);
 
 		dataIQA: in InstructionState;
 		dataIQB: in InstructionState;
-		dataIQC: in InstructionState;
+			dataIQC: in InstructionState;
 		dataIQD: in InstructionState;				
-		dataIQE: in InstructionState;				
+			dataIQE: in InstructionState;	-- Store data			
 
 
 		execAcceptingA: out std_logic;
 		execAcceptingB: out std_logic;
-		execAcceptingC: out std_logic;
+			execAcceptingC: out std_logic;
 		execAcceptingD: out std_logic;
-		execAcceptingE: out std_logic;
-
-		execSending: out std_logic_vector(0 to 3);
-		execSending2: out std_logic_vector(0 to 3);
+			execAcceptingE: out std_logic; -- Store data
 
 		execPreEnds: out InstructionStateArray(0 to 3);
 		execEnds: out InstructionStateArray(0 to 3);
-		execEnds2: out InstructionStateArray(0 to 3);
+		execSending: out std_logic_vector(0 to 3);
 		
-		memLoadReady: in std_logic;
-		memLoadValue: in Mword;
-		memLoadAddress: out Mword;
-		memStoreAddress: out Mword;
-		memLoadAllow: out std_logic;
-		memStoreAllow: out std_logic;
-		memStoreValue: out Mword;
+			sendingQueueE: in std_logic;
+		-------------
+			acceptingLoadUnit: in std_logic;
+			acceptingStoreUnit: in std_logic;
+
+			loadUnitNextAcceptingOut: out std_logic;
+	
+			loadUnitSending: in std_logic;
+			loadDataPre: in InstructionState;
+			loadData: in InstructionState;
+		
+		-- Ends related to store data unit
+			execEnds2: out InstructionStateArray(0 to 3);
+			execSending2: out std_logic_vector(0 to 3);
 			
 		sysRegSelect: out slv5;
 		sysRegIn: in Mword;
 		sysRegWriteSelOut: out slv5;
 		sysRegWriteValueOut: out Mword;
+				
+			sysRegDataOut: out InstructionState;
+			sysRegSending: out std_logic;
 				
 		selectedToCQ: out std_logic_vector(0 to 3); -- DEPREC?
 
@@ -110,11 +117,6 @@ architecture Implem of UnitExec is
 	signal execEventSignal, eventSignal: std_logic := '0';
 	signal execCausing, intCausing: InstructionState := defaultInstructionState;
 	signal activeCausing: InstructionState := defaultInstructionState;
-
-	signal dataToCache: InstructionState := DEFAULT_INSTRUCTION_STATE;
-	signal sendingToCache: std_logic := '0';
-	
-	signal memLoadAllowSig, memStoreAllowSig, sendingDataToSQ: std_logic := '0';
 	
 	signal sysRegValue: Mword := (others => '0');
 	signal sysRegReadSel, sysRegWriteSel: slv5 := (others => '0');
@@ -129,7 +131,8 @@ architecture Implem of UnitExec is
 	signal dataA0, dataB0, dataB1, dataB2, dataC0, dataC1, dataC2, dataD0: InstructionState
 					:= DEFAULT_INSTRUCTION_STATE;
 
-	signal execSendingA, execSendingB, execSendingC, execSendingD, execSendingE: std_logic := '0';
+	signal execSendingA, execSendingB, execSendingC, execSendingD, execSendingE,
+			execSendingEffectiveD: std_logic := '0';
 	signal execAcceptingASig, execAcceptingBSig, execAcceptingCSig, execAcceptingDSig, execAcceptingESig:
 											std_logic := '0';
 
@@ -137,14 +140,30 @@ architecture Implem of UnitExec is
 
 		signal inputDataA, outputDataA: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
 
-		signal inputDataC, outputDataC: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
 		signal inputDataD, outputDataD: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
 
-						signal sendingOutSQ, acceptingOutSQ: std_logic := '0';
-						signal dataOutSQ: InstructionState := DEFAULT_INSTRUCTION_STATE;
+	---------------------------
+	---------------------------
+		signal inputDataC, outputDataC: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
 
-						signal storeAddressWr, storeValueWr: std_logic := '0';
-						signal storeAddressDataIn, storeValueDataIn: InstructionState := DEFAULT_INSTRUCTION_STATE;
+	signal addressingData: InstructionState := DEFAULT_INSTRUCTION_STATE;
+	signal sendingAddressing: std_logic := '0';
+	
+	signal sendingAddressToLoadUnit, memStoreAllowSig, sendingAddressToSQ: std_logic := '0';
+	
+		signal sendingOutSQ, acceptingOutSQ: std_logic := '0';
+		signal dataOutSQ: InstructionState := DEFAULT_INSTRUCTION_STATE;
+
+		signal storeAddressWr, storeValueWr: std_logic := '0';
+		signal storeAddressData, storeValueData: InstructionState := DEFAULT_INSTRUCTION_STATE;
+
+	signal dataOutLoadUnit, dataOutPreLoadUnit: InstructionState := DEFAULT_INSTRUCTION_STATE;
+				
+		signal acceptingLS, acceptingLU: std_logic := '0';
+	---------------------------
+	---------------------------
+
+			signal ch0, ch1: std_logic := '0';
 
 	constant HAS_RESET_EXEC: std_logic := '1';
 	constant HAS_EN_EXEC: std_logic := '1';	
@@ -195,109 +214,12 @@ begin
 					execCausing => activeCausing,
 					lockCommand => '0'					
 				);
-----------------------------------------------------------
-
-			inputDataC.data(0) <= dataIQC;
-			inputDataC.fullMask(0) <= sendingIQC;
-					
-			NEW_SUBPIPE_C: block
-				signal inputData, outputData: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
-			
-				signal dataM: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;				
-				signal stageDataAfterCache: InstructionState := defaultInstructionState;
 				
-				signal stageDataOutAGU: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
-				signal sendingAGU: std_logic := '0';
-					
-				signal stageDataOutMem0, stageDataOutMem1: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
-				signal acceptingMem0, acceptingMem1,
-						 sendingMem0, sendingMem1: std_logic := '0';
-			begin
-					STAGE_AGU: entity work.SimpleAlu(BehavioralAGU)
-					port map(
-						clk => clk, reset => resetSig, en => enSig,
-						
-						prevSending => sendingIQC,
-						nextAccepting => acceptingMem0,
-						
-						stageDataIn => inputDataC, 
-						acceptingOut => execAcceptingCSig,
-						sendingOut => sendingAGU,
-						stageDataOut => stageDataOutAGU,
-						
-						execEventSignal => eventSignal,
-						execCausing => activeCausing,
-						lockCommand => '0',
-						
-						stageEventsOut => open
-					);
-				
-				STAGE_MEM0: entity work.GenericStageMulti(SingleTagged)
-				port map(
-					clk => clk, reset => resetSig, en => enSig,
-					
-					prevSending => sendingAGU,
-					nextAccepting => acceptingMem1,
-					
-					stageDataIn => stageDataOutAGU,
-					acceptingOut => acceptingMem0,
-					sendingOut => sendingMem0,
-					stageDataOut => stageDataOutMem0,
-					
-					execEventSignal => eventSignal,
-					execCausing => activeCausing,
-					lockCommand => '0',
-					
-					stageEventsOut => open					
-				);
-				
-				 dataM.data(0) <= stageDataAfterCache;
-				 dataM.fullMask(0) <= sendingMem0;
-				
-				STAGE_MEM1: entity work.GenericStageMulti(SingleTagged)
-				port map(
-					clk => clk, reset => resetSig, en => enSig,
-					
-					prevSending => sendingMem0,
-					nextAccepting => whichAcceptedCQ(2),
-					
-					stageDataIn => dataM, 
-					acceptingOut => acceptingMem1,
-					sendingOut => execSendingC,
-					stageDataOut => outputData,
-					
-					execEventSignal => eventSignal,
-					execCausing => activeCausing,
-					lockCommand => '0',
-					
-					stageEventsOut => open					
-				);	
-				
-				dataToCache <= stageDataOutAGU.data(0);
-				sendingToCache <= sendingAGU;
-
-				stageDataAfterCache <= setExecState(stageDataOutMem0.data(0), memLoadValue, '0', "0000");
-				
-				dataC0 <= stageDataOutAGU.data(0);
-				dataC1 <= stageDataOutMem0.data(0);
-				dataC2 <= outputData.data(0);				
-			end block;		
-
-		memLoadAllowSig <= sendingToCache when dataToCache.operation.func = load else '0';
-		sendingDataToSQ <= sendingToCache when dataToCache.operation.func = store else '0';
-		
-		memLoadAddress <= dataToCache.result;
-		
-		memLoadAllow <= memLoadAllowSig;
-		memStoreAllow <= memStoreAllowSig;
-		
-
 ------------------------------------------------
+-- Branch/System
+					sysRegSelect <= sysRegReadSel;
+					sysRegValue <= sysRegIn;
 
-				sysRegSelect <= sysRegReadSel;
-				sysRegValue <= sysRegIn;
-	
-	
 					inputDataD.data(0) <= dataIQD;
 					inputDataD.fullMask(0) <= sendingIQD;
 					
@@ -327,49 +249,24 @@ begin
 						sysRegWriteSel => sysRegWriteSelStore,
 						sysRegWriteValue => sysRegWriteValueStore
 					);	
--------------------------------------------------------------------------------------------------
-			-- Store data unit.
-			NEW_SUBPIPE_E: block
-				signal inputData, outputData: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
-			begin
-				inputData.data(0) <= dataIQE;
-				inputData.fullMask(0) <= sendingIQE;
-			end block;
 
-				execSendingE <= sendingIQE;
-				execAcceptingESig <= acceptingOutSQ;
-				
-				memStoreAllowSig <= sendingOutSQ;
-				memStoreAddress <= dataOutSQ.argValues.arg1;
-				memStoreValue <= dataOutSQ.argValues.arg2;				
 
-				storeAddressWr <= sendingDataToSQ;
-				storeValueWr <= sendingIQE;
-			
-				storeAddressDataIn <= dataToCache;
-				storeValueDataIn <= dataIQE;	
+				dataC1 <= loadDataPre;
+				dataC2 <= loadData;		
+		
+				loadUnitNextAcceptingOut <= whichAcceptedCQ(2);		
+				execSendingC <= loadUnitSending;			
 
-			STORE_UNIT: entity work.MemoryUnit(Behavioral)
-			port map(
-				clk => clk,
-				reset => resetSig,
-				en => enSig,
-				
-				storeAddressWr => storeAddressWr,
-				storeValueWr => storeValueWr,
-
-				storeAddressDataIn => storeAddressDataIn,
-				storeValueDataIn => storeValueDataIn,
-				
-				execEventSignal => eventSignal,
-				execCausing => activeCausing,
-								
-				acceptingOutSQ => acceptingOutSQ,
-				sendingOutSQ => sendingOutSQ,
-				dataOutSQ => dataOutSQ
-			);
-										
-
+				execSendingE <= --sendingIQE; -- Sending data to SQ is considered as finishing this uop
+										sendingQueueE;
+		
+		-- Data from sysreg reads goes to load pipe
+		sysRegDataOut <= dataD0;
+		sysRegSending <= execSendingD when dataD0.operation = (System, sysMfc) else '0';
+		-- CAREFUL: Don't send the same thing from both subpipes:
+		execSendingEffectiveD <= execSendingD when dataD0.operation /= (System, sysMfc) else '0';
+		
+		--------------------------------------------
 
 		execEventSignal <= eventsD.eventOccured;
 		execCausing <= eventsD.causing;
@@ -379,29 +276,33 @@ begin
 
 				execAcceptingA <= execAcceptingASig;
 				execAcceptingB <= execAcceptingBSig;
-				execAcceptingC <= execAcceptingCSig;
+				--execAcceptingC <= execAcceptingCSig;
 				execAcceptingD <= execAcceptingDSig;
-				execAcceptingE <= execAcceptingESig;
+				--execAcceptingE <= execAcceptingESig;
 		
 		execSending <= 
-				(0 => execSendingA, 1 => execSendingB, 2 => execSendingC, 3 => execSendingD, others => '0');				
+				(0 => execSendingA, 1 => execSendingB, 2 => execSendingC, 3 => execSendingD,
+													others => '0');				
 						
-			execSending2Sig <= (2 => execSendingE, others => '0');
+			execSending2Sig <= (2 => execSendingE, 3 => --execSendingD,
+																		execSendingEffectiveD,
+										others => '0');
 			execSending2 <= execSending2Sig;
 						
 		execEndsSig <= (	
 							0=> clearTempControlInfoSimple(dataA0),
 							1=> clearTempControlInfoSimple(dataB2),
-							2=> clearTempControlInfoSimple(dataC2),
+							2=> clearTempControlInfoSimple(dataC2), -- CAREFUL: dataC2 is from load unit
 							3=> clearTempControlInfoSimple(dataD0),
 						others=> defaultInstructionState);
-			execEnds2Sig <= (2 => dataIQE, others => DEFAULT_INSTRUCTION_STATE);
+			execEnds2Sig <= (2 => dataIQE, 3=> clearTempControlInfoSimple(dataD0),
+									others => DEFAULT_INSTRUCTION_STATE);
 		
 		execEnds <= execEndsSig;				
 			execEnds2 <= execEnds2Sig;
 
 		execPreEnds <= (
-						1 => dataB1, 2 => dataC1,
+						1 => dataB1, 2 => dataC1, -- CAREFUL: dataC1 is fomr load unit (and UNUSED?)
 						others=> defaultInstructionState);											
 				
 	execEvent <= execEventSignal;

@@ -15,6 +15,14 @@ use work.ProcBasicDefs.all;
 
 package Helpers is
 
+	function addWordE(a, b: word) return std_logic_vector;
+	function addWord(a, b: word) return word;
+	function addDword(a, b: dword) return dword;
+
+
+-- Get '1' bits for remaining slots, pushed to left
+function pushToLeft(fullSlots, freedSlots: std_logic_vector) return std_logic_vector;
+
 function countOnes(vec: std_logic_vector) return natural;
 function setToOnes(vec: std_logic_vector; n: natural) return std_logic_vector;
 
@@ -43,6 +51,75 @@ end Helpers;
 
 
 package body Helpers is
+		
+		function addWordE(a, b: word) return std_logic_vector is
+			variable res: std_logic_vector(32 downto 0) := (others => '0');
+			variable al, ah, bl, bh, cl, ch: integer := 0;
+			variable ta, tb: hword := (others => '0'); 
+		begin
+			ta := a(31 downto 16);
+			ah := slv2u(ta);
+			al := slv2u(a(15 downto 0));
+			tb := b(31 downto 16);
+			bh := slv2u(tb);
+			bl := slv2u(b(15 downto 0));
+			
+			cl := bl + al;
+			ch := ah + bh;
+			
+			if cl >= 2**16 then
+				ch := ch + 1;
+			end if;
+			
+			res(31 downto 16) := i2slv(ch, 16);
+			res(15 downto 0) := i2slv(cl, 16);
+
+			if ch >= 2**16 then
+				res(32) := '1';
+			end if;
+			
+			return res;
+		end function;
+
+
+		function addWord(a, b: word) return word is
+			variable res: word := (others => '0');
+			variable tmp: std_logic_vector(32 downto 0) := (others => '0');
+		begin
+			tmp := addWordE(a, b);
+			res := tmp(31 downto 0); 
+			return res;
+		end function;
+
+		function addDword(a, b: dword) return dword is
+			variable res: dword := (others => '0');
+			variable tmp: std_logic_vector(32 downto 0) := (others => '0');
+			variable aw, bw, cw: word := (others => '0');
+		begin
+			tmp := addWordE(a(31 downto 0), b(31 downto 0));
+			res(32 downto 0) := tmp; -- Includes carry form lower word! 
+			cw := res(63 downto 32);
+			aw := a(63 downto 32);
+			bw := b(63 downto 32);
+			tmp := addWordE(aw, bw);
+			res(63 downto 32) := addWord(tmp(31 downto 0), cw);
+			return res;
+		end function;
+
+
+function pushToLeft(fullSlots, freedSlots: std_logic_vector) return std_logic_vector is
+	variable res: std_logic_vector(fullSlots'range) := (others => '0');
+	variable remaining: std_logic_vector(fullSlots'range) := fullSlots and not freedSlots;
+	variable k: integer := 0;
+begin
+	for i in remaining'range loop	
+		if remaining(i) = '1' then
+			res(k) := '1';
+			k := k+1;
+		end if;
+	end loop;
+	return res;
+end function;
 
 function countOnes(vec: std_logic_vector) return natural is
 	variable sum: natural := 0;

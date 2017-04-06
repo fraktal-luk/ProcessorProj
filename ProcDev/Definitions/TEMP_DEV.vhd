@@ -22,10 +22,6 @@ use work.NewPipelineData.all;
 
 package TEMP_DEV is
 
--- MOVE somewhere more general?
--- Get '1' bits for remaining slots, pushed to left
-function pushToLeft(fullSlots, freedSlots: std_logic_vector) return std_logic_vector;
-
 -- Type for table: ExecUnit -> exec subpipe number
 type ExecUnitToNaturalTable is array(ExecUnit'left to ExecUnit'right) of integer;
 
@@ -44,10 +40,13 @@ constant ISSUE_ROUTING_TABLE: ExecUnitToNaturalTable := (
 		Memory => 2,
 		System => 3);
 
-function setInstructionTarget(ins: InstructionState; target: Mword) return InstructionState;
+	-- TODO: automatically handle 32/64b config
+	function TEMP_addMword(a, b: Mword) return Mword;
 
--- TEMP?
-function TEMP_branchPredict(ins: InstructionState) return InstructionState;
+	function addMword(a, b: Mword) return Mword;
+
+
+function setInstructionTarget(ins: InstructionState; target: Mword) return InstructionState;
 
 -- Gives queue number based on functional unit
 function unit2queue(unit: ExecUnit) return natural;
@@ -61,14 +60,6 @@ function routeToIQ(sd: StageDataMulti; srcVec: std_logic_vector) return StageDat
 	
 	-- Tells if 'a' is older than 'b'
 	function tagBefore(a, b: SmallNumber) return std_logic;
-	
-	-- To determine which subpipe result directs control flow
-	function findOldestSignal(ready: std_logic_vector; tags: SmallNumberArray) return std_logic_vector;
-		
--- General, UNUSED?
-function selectInstructions(content: InstructionStateArray; numbers: IntArray; nI: integer)
-return InstructionStateArray;
-
 
 function extractReadyRegBits(bits: std_logic_vector; data: InstructionStateArray)
 return std_logic_vector;
@@ -106,8 +97,6 @@ function getLinkInfoSuper2(ins: InstructionState; normalTarget, excTarget: Instr
 return InstructionBasicInfo;
 
 
-function pcDataFromBasicInfo(bi: InstructionBasicInfo) return InstructionState;
-
 function clearTempControlInfoSimple(ins: InstructionState) return InstructionState;
 function clearTempControlInfoMulti(sd: StageDataMulti) return StageDataMulti;
 
@@ -120,14 +109,12 @@ return InstructionState;
 function clearEmptyResultTags(insVec: InstructionStateArray; fullMask: std_logic_vector)
 return InstructionStateArray;
 
-	-- TODO: automatically handle 32/64b config
-	function TEMP_addMword(a, b: Mword) return Mword;
 
-	function addMword(a, b: Mword) return Mword;
 
-	function addWordE(a, b: word) return std_logic_vector;
-	function addWord(a, b: word) return word;
-	function addDword(a, b: dword) return dword;
+
+function findBranchLink(insv: StageDataMulti) return std_logic_vector;
+function findStores(insv: StageDataMulti) return std_logic_vector;
+function findLoads(insv: StageDataMulti) return std_logic_vector;
 
 end TEMP_DEV;
 
@@ -135,22 +122,35 @@ end TEMP_DEV;
 
 package body TEMP_DEV is
 
+		function TEMP_addMword(a, b: Mword) return Mword is
+			variable res: Mword := (others => '0');
+			variable al, ah, bl, bh, cl, ch: integer := 0;
+			variable ta, tb: hword := (others => '0'); 
+		begin
+			ta := a(31 downto 16);
+			ah := slv2u(ta);
+			al := slv2u(a(15 downto 0));
+			tb := b(31 downto 16);
+			bh := slv2u(tb);
+			bl := slv2u(b(15 downto 0));
+			
+			cl := bl + al;
+			ch := ah + bh;
+			
+			if cl >= 2**16 then
+				ch := ch + 1;
+			end if;
+			
+			res(31 downto 16) := i2slv(ch, 16);
+			res(15 downto 0) := i2slv(cl, 16);			
+			return res;
+		end function;
 
-function pushToLeft(fullSlots, freedSlots: std_logic_vector) return std_logic_vector is
-	variable res: std_logic_vector(fullSlots'range) := (others => '0');
-	variable remaining: std_logic_vector(fullSlots'range) := fullSlots and not freedSlots;
-	variable k: integer := 0;
-begin
-	for i in remaining'range loop	
-		if remaining(i) = '1' then
-			res(k) := '1';
-			k := k+1;
-		end if;
-	end loop;
-	return res;
-end function;
------------------------------------------------------------
-
+		function addMword(a, b: Mword) return Mword is
+		begin
+			-- TODO: handle 64b config
+			return addWord(a, b);
+		end function;
 
 	function setInstructionTarget(ins: InstructionState; target: Mword) return InstructionState is
 		variable res: InstructionState := ins;
@@ -158,37 +158,6 @@ end function;
 		res.target := target;
 		return res;
 	end function;
-
-
-function TEMP_branchPredict(ins: InstructionState) return InstructionState is
-	variable res: InstructionState := ins;
-begin
-	if res.classInfo.branchCond = '1' then
-		--res.controlInfo.unseen := '1';	
-	
-		if res.constantArgs.c1 = COND_NONE then -- 'none'; CAREFUL! Use correct codes!
-			-- Jump
-				--res.controlInfo.s0Event := '1';
-			--res.controlInfo.branchSpeculated := '1'; -- ??
-			--res.controlInfo.branchConfirmed := '1'; -- ??
-		elsif res.constantArgs.c1 = COND_Z and res.virtualArgs.s0 = "00000" then -- 'zero'; CAREFUL! ...
-			-- Jump
-				--res.controlInfo.s0Event := '1';
-			--res.controlInfo.branchSpeculated := '1'; -- ??
-			--res.controlInfo.branchConfirmed := '1'; -- ??
-		elsif res.constantArgs.c1 = COND_NZ and res.virtualArgs.s0 /= "00000" then -- 'one'; CAREFUL!...
-			-- No jump!
-		else
-			-- Need to speculate...
-			-- ! src0 should be register other than r0
-			-- Check	if displacement is negative
-			--		TODO	
-		end if;
-	end if;
-	
-	return res;
-end function;
-
 
 
 function unit2queue(unit: ExecUnit) return natural is
@@ -342,41 +311,6 @@ end function;
 		c := i2slv(ci, SMALL_NUMBER_SIZE);
 		return c(c'high);
 	end function;
-
-	function findOldestSignal(ready: std_logic_vector; tags: SmallNumberArray) return std_logic_vector is
-		variable res: std_logic_vector(ready'range) := (others=>'0');
-		variable k: integer := 0;
-	begin
-		for i in 1 to ready'length-1 loop
-			if ready(i) = '1' and tagBefore(tags(i), tags(k)) = '1' then
-				k := i;
-			end if;
-		end loop;
-		res(k) := '1';
-		return res;
-	end function;
-	
-function selectInstructions(content: InstructionStateArray; numbers: IntArray; nI: integer)
-return InstructionStateArray is
-	variable res: InstructionStateArray(content'range) := (others=>defaultInstructionState);
-	variable ind: integer;
-begin
-	if nI < 0 or nI > numbers'length or nI > res'length
-	then
-		return res;
-	end if;	
-		for i in content'range loop
-			if i >= nI or i >= numbers'length then
-				exit;
-			end if;
-				if numbers(i) < 0 or numbers(i) >= content'length then
-					return res;
-				end if;	
-					ind := numbers(i);	
-					res(i) := content(ind); -- content(numbers(i));
-		end loop;
-	return res; 
-end function;
 	
 	
 function extractReadyRegBits(bits: std_logic_vector; data: InstructionStateArray) return std_logic_vector is
@@ -521,17 +455,6 @@ begin
 end function;
 
 
-function pcDataFromBasicInfo(bi: InstructionBasicInfo) return InstructionState is
-	variable res: InstructionState := DEFAULT_DATA_PC;
-begin
-	res.basicInfo := bi;
-	--res.pc := bi.ip;
-	--res.pcBase := bi.ip(MWORD_SIZE-1 downto ALIGN_BITS)	& i2slv(0, ALIGN_BITS);
-	--res.nH := i2slv(FETCH_BLOCK_SIZE - (slv2u(bi.ip(ALIGN_BITS-1 downto 1))), SMALL_NUMBER_SIZE);
-	return res;
-end function;
-
-
 function clearTempControlInfoSimple(ins: InstructionState) return InstructionState is
 	variable res: InstructionState := ins;
 begin
@@ -612,88 +535,124 @@ begin
 end function;
 
 
-		function TEMP_addMword(a, b: Mword) return Mword is
-			variable res: Mword := (others => '0');
-			variable al, ah, bl, bh, cl, ch: integer := 0;
-			variable ta, tb: hword := (others => '0'); 
-		begin
-			ta := a(31 downto 16);
-			ah := slv2u(ta);
-			al := slv2u(a(15 downto 0));
-			tb := b(31 downto 16);
-			bh := slv2u(tb);
-			bl := slv2u(b(15 downto 0));
-			
-			cl := bl + al;
-			ch := ah + bh;
-			
-			if cl >= 2**16 then
-				ch := ch + 1;
-			end if;
-			
-			res(31 downto 16) := i2slv(ch, 16);
-			res(15 downto 0) := i2slv(cl, 16);			
-			return res;
-		end function;
 
-		function addMword(a, b: Mword) return Mword is
-		begin
-			-- TODO: handle 64b config
-			return addWord(a, b);
-		end function;		
+function isolateArgSubset(ins: InstructionState; destSel: std_logic; srcSel: std_logic_vector(0 to 2))
+return InstructionState is
+	variable res: InstructionState := ins;
+begin
+	res.virtualDestArgs.sel(0) := res.virtualDestArgs.sel(0) and destSel;
+	res.virtualArgs.sel := res.virtualArgs.sel and srcSel;	
+	return res;
+end function;
 
-		function addWordE(a, b: word) return std_logic_vector is
-			variable res: std_logic_vector(32 downto 0) := (others => '0');
-			variable al, ah, bl, bh, cl, ch: integer := 0;
-			variable ta, tb: hword := (others => '0'); 
-		begin
-			ta := a(31 downto 16);
-			ah := slv2u(ta);
-			al := slv2u(a(15 downto 0));
-			tb := b(31 downto 16);
-			bh := slv2u(tb);
-			bl := slv2u(b(15 downto 0));
-			
-			cl := bl + al;
-			ch := ah + bh;
-			
-			if cl >= 2**16 then
-				ch := ch + 1;
-			end if;
-			
-			res(31 downto 16) := i2slv(ch, 16);
-			res(15 downto 0) := i2slv(cl, 16);
+	-- float load: dest FP
+	-- float store: src(2) FP
+	-- float op: all FP
+	-- f2i: src FP
+	-- i2f: dest FP
+	-- others: no FP
+	
+	-- from the above it seems such possibilities for FP: none, dest, src(2), src, dest & src
+	-- More than 4 options, so 3 bits needed. It means [dest, src(2), src(0:1)] are quit independent
+	--	and can be explicitly stated separately.
+	-- There can be also mem and system signature:
+	--	mem dest, mem src(2)
+	-- sys dest, sys src(?)
+	-- To sum up, there are 7 bits for selection, with by far most combinations illegal.
+	-- This doesn't include the int selection! It may have to be introduced.
+	
+	-- Another distinction is: which cluster it belongs to? 
+	--	Int/StoreData/FP
+	-- Those clusters seem to approximately mean destination type.
+	-- What about branches? They use integer regs, but change program flow instead of writing regs (which 
+	--	they can too). So destination could be yet another category (link address delegated to Int cluster
+	-- or injected into mem/cross exchange),
+	--	with Int sources. But what about system regs? They probably belong to a category
+	-- together with branches.
+	
+function getStoreAddressPart(ins: InstructionState)
+return InstructionState is
+	variable res: InstructionState := ins;
+	constant srcs: std_logic_vector(0 to 2) := ('1', '1', '0');
+begin
+	res := isolateArgSubset(res, '1', srcs);
+	return res;
+end function;
 
-			if ch >= 2**16 then
-				res(32) := '1';
-			end if;
-			
-			return res;
-		end function;
+function getLoadAddressPart(ins: InstructionState)
+return InstructionState is
+	variable res: InstructionState := ins;
+	constant srcs: std_logic_vector(0 to 2) := ('1', '1', '0');
+begin
+	res := isolateArgSubset(res, '0', srcs);
+	return res;
+end function;
+
+function getStoreDataPart(ins: InstructionState)
+return InstructionState is
+	variable res: InstructionState := ins;
+	constant srcs: std_logic_vector(0 to 2) := ('0', '0', '1');
+begin
+	res := isolateArgSubset(res, '1', srcs);
+	return res;
+end function;
+
+function getResultPart(ins: InstructionState)
+return InstructionState is
+	variable res: InstructionState := ins;
+	constant srcs: std_logic_vector(0 to 2) := ('0', '0', '0');
+begin
+	res := isolateArgSubset(res, '1', srcs);
+	return res;
+end function;
+
+function getSourcePart(ins: InstructionState)
+return InstructionState is
+	variable res: InstructionState := ins;
+	constant srcs: std_logic_vector(0 to 2) := ('1', '1', '1');
+begin
+	res := isolateArgSubset(res, '0', srcs);
+	return res;
+end function;
 
 
-		function addWord(a, b: word) return word is
-			variable res: word := (others => '0');
-			variable tmp: std_logic_vector(32 downto 0) := (others => '0');
-		begin
-			tmp := addWordE(a, b);
-			res := tmp(31 downto 0); 
-			return res;
-		end function;
+function findBranchLink(insv: StageDataMulti) return std_logic_vector is
+	variable res: std_logic_vector(0 to PIPE_WIDTH-1) := (others => '0');
+begin
+	for i in 0 to PIPE_WIDTH-1 loop
+		if 	 insv.data(i).operation = (Jump, jump)
+			and isNonzero(insv.data(i).virtualDestArgs.d0) = '1'
+			and insv.data(i).virtualDestArgs.sel(0) = '1'
+		then
+			res(i) := '1';
+		end if;
+	end loop;
+	return res;
+end function;
 
-		function addDword(a, b: dword) return dword is
-			variable res: dword := (others => '0');
-			variable tmp: std_logic_vector(32 downto 0) := (others => '0');
-			variable aw, bw, cw: word := (others => '0');
-		begin
-			tmp := addWordE(a(31 downto 0), b(31 downto 0));
-			res(32 downto 0) := tmp; -- Includes carry form lower word! 
-			cw := res(63 downto 32);
-			aw := a(63 downto 32);
-			bw := b(63 downto 32);
-			tmp := addWordE(aw, bw);
-			res(63 downto 32) := addWord(tmp(31 downto 0), cw);
-			return res;
-		end function;
+function findStores(insv: StageDataMulti) return std_logic_vector is
+	variable res: std_logic_vector(0 to PIPE_WIDTH-1) := (others => '0');
+begin
+	for i in 0 to PIPE_WIDTH-1 loop
+		if insv.data(i).operation = (Memory, store) then
+			res(i) := '1';
+		end if;
+	end loop;
+	return res;
+end function;
+
+function findLoads(insv: StageDataMulti) return std_logic_vector is
+	variable res: std_logic_vector(0 to PIPE_WIDTH-1) := (others => '0');
+begin
+	for i in 0 to PIPE_WIDTH-1 loop
+		if insv.data(i).operation = (Memory, load) then
+			res(i) := '1';
+		end if;
+	end loop;
+	return res;
+end function;
+
+
 
 end TEMP_DEV;
+

@@ -218,19 +218,32 @@ begin
 	STAGE_DECODE: block
 		signal newDecoded, newDecodedWithTargets, stageDataDecodeNew, stageDataDecodeOut: StageDataMulti
 				:= DEFAULT_STAGE_DATA_MULTI;
-		signal targets: MwordArray(0 to PIPE_WIDTH-1) := (others => (others => '0'));	
+		signal targets, links: MwordArray(0 to PIPE_WIDTH-1) := (others => (others => '0'));	
 				
-		constant EARLY_TARGET_ENABLE: boolean := false;
+		constant EARLY_TARGET_ENABLE: boolean := true;
 	begin	
 		newDecoded <= decodeMulti(stageDataOutHbuffer);
 
 		newDecodedWithTargets.fullMask <= newDecoded.fullMask;
 		
 		CALC_TARGETS: for i in 0 to PIPE_WIDTH-1 generate
-			--signal aai0, aai1, aai2: Mword := (others => '0');
 		begin	
-			targets(i) <= addWord(newDecoded.data(i).basicInfo.ip, newDecoded.data(i).constantArgs.imm);
-			newDecodedWithTargets.data(i) <= setInstructionTarget(newDecoded.data(i), targets(i));
+			newDecodedWithTargets.data(i) <= -- TODO: remove usage of Exec package
+				work.ProcLogicExec.setResult(setInstructionTarget(newDecoded.data(i), targets(i)), links(i));
+					
+			NEW_TARGET_ADDER: entity work.IntegerAdder
+			port map(
+				inA => newDecoded.data(0).basicInfo.ip,
+				inB => newDecoded.data(0).constantArgs.imm,
+				output => targets(i)
+			);
+			
+			NEW_LINK_ADDER: entity work.IntegerAdder
+			port map(
+				inA => newDecoded.data(0).basicInfo.ip,
+				inB => getAddressIncrement(newDecoded.data(0)),
+				output => links(i)
+			);			
 		end generate;
 		
 		stageDataDecodeNew <= newDecodedWithTargets when EARLY_TARGET_ENABLE

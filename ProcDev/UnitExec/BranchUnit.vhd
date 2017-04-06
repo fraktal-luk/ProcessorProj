@@ -127,19 +127,20 @@ begin
 		end if;
 	end process;
 
-	branchResolved <= basicBranch(setInstructionTarget(stageDataIn.data(0), branchTarget),
-											sysRegValue, branchLink);
+	branchResolved <= basicBranch(setInstructionTarget(stageDataIn.data(0),
+			stageDataIn.data(0).constantArgs.imm),--branchTarget),
+											sysRegValue, stageDataIn.data(0).result);
 
 	NEW_TARGET_ADDER: entity work.IntegerAdder
 	port map(
-		inA => stageDataIn.data(0).basicInfo.ip,
+		inA => (others => '0'),--stageDataIn.data(0).basicInfo.ip,
 		inB => stageDataIn.data(0).constantArgs.imm,
 		output => branchTarget
 	);
 	
 	NEW_LINK_ADDER: entity work.IntegerAdder
 	port map(
-		inA => stageDataIn.data(0).basicInfo.ip,
+		inA => (others => '0'),--stageDataIn.data(0).basicInfo.ip,
 		inB => getAddressIncrement(stageDataIn.data(0)),
 		output => branchLink
 	);

@@ -24,50 +24,6 @@ use work.TEMP_DEV.all;
 
 package GeneralPipeDev is
 
-
--- TODO: move logging and checking to another file
-------------
--- Logging and checking
----------
-
-function makeLogPath(str: string) return string;
-
--- CAREFUL: synthesis is turned of in this case because including std.textio.all somehow
---				causes additional 3% logic utilization
--- pragma synthesis off
-procedure logArrayImplem(insArr: InstructionStateArray; full, living: std_logic_vector;
-								 filename: string; desc: string);
--- pragma synthesis on
-
-procedure logArray(insArr: InstructionStateArray; full, living: std_logic_vector;
-						 filename: string; desc: string);
-
-procedure logSimple(signal stageData: in InstructionState; fr: FlowResponseSimple);
-
-procedure logBuffer(signal data: InstructionStateArray; fullMask, livingMask: std_logic_vector;
-							flowResponse: FlowResponseBuffer);
-
-procedure logMulti(signal data: InstructionStateArray; fullMask, livingMask: std_logic_vector;
-							flowResponse: FlowResponseSimple);
-
-procedure checkBuffer(bufferData: InstructionStateArray; fullMask: std_logic_vector;
-							 bufferDataNext: InstructionStateArray; fullMaskNext: std_logic_vector;
-							 bufferDrive: FlowDriveBuffer; bufferResponse: FlowResponseBuffer);
-
-procedure checkSimple(ins, insNext: InstructionState;
-							 flowDrive: FlowDriveSimple; flowResponse: FlowResponseSimple);
-
-procedure checkMulti(stageData, stageDataNext: StageDataMulti;
-							flowDrive: FlowDriveSimple; flowResponse: FlowResponseSimple);
-
-procedure checkIQ(bufferData: InstructionStateArray; fullMask: std_logic_vector; 
-						bufferDataNext: InstructionStateArray; fullMaskNext: std_logic_vector;
-						insSending: InstructionState; sending: std_logic;
-						bufferDrive: FlowDriveBuffer; bufferResponse: FlowResponseBuffer);
--------------------------------
--- End of logging and checking
----------
-
 		-- group:  revTag = causing.groupTag and i2slv(-PIPE_WIDTH, SMALL_NUMBER_SIZE), mask = all ones
 		-- sequential: revTag = causing.numberTag, mask = new group's fullMask		
 		function nextCtr(ctr: SmallNumber; rewind: std_logic; revTag: SmallNumber;
@@ -89,6 +45,18 @@ function selectFromQueue(content: InstructionSlotArray; index: integer) return I
 
 function removeFromQueue(content: InstructionSlotArray; index: integer) return InstructionSlotArray;
 
+-- CAREFUL! This is not a general function, only a special type of compacting
+function compactData(data: InstructionStateArray; mask: std_logic_vector) return InstructionStateArray;
+function compactMask(data: InstructionStateArray; mask: std_logic_vector) return std_logic_vector;
+
+function findMatching(content: InstructionSlotArray; ins: InstructionState)
+return std_logic_vector;
+
+function queueMaskNext(livingMask: std_logic_vector;
+					  newMask: std_logic_vector;
+					  nLivingIn: integer;
+					  sending: integer;
+					  receiving: std_logic) return std_logic_vector;
 
 function stageSimpleNext(content, newContent: InstructionState; full, sending, receiving: std_logic)
 return InstructionState;
@@ -99,10 +67,17 @@ return StageDataMulti;
 function stageMultiHandleKill(content: StageDataMulti; 
 										killAll: std_logic; killVec: std_logic_vector) 
 										return StageDataMulti;
+
+function stageCQNext(content: StageDataCommitQueue; newContent: InstructionStateArray;
+		livingMask: std_logic_vector;
+		ready: std_logic_vector;
+		outWidth: integer;
+		nFull, nOut, nIn: integer)
+return StageDataCommitQueue;
+
 -----------------------									
 				
 function getInstructionResults(insVec: StageDataMulti) return MwordArray;
-
 function getVirtualArgs(insVec: StageDataMulti) return RegNameArray;
 function getPhysicalArgs(insVec: StageDataMulti) return PhysNameArray;
 function getVirtualDests(insVec: StageDataMulti) return RegNameArray;
@@ -114,18 +89,19 @@ function findOverriddenDests(insVec: StageDataMulti) return std_logic_vector;
 
 -- This works on physical arg selection bits, assuming that checking for r0/p0 was done earlier. 
 function getPhysicalDestMask(insVec: StageDataMulti) return std_logic_vector;
-	
+
 function getExceptionMask(insVec: StageDataMulti) return std_logic_vector;
+
+function getLastFull(newContent: StageDataMulti) return InstructionState;
+function getEffectiveMask(newContent: StageDataMulti) return std_logic_vector;
+function getLastEffective(newContent: StageDataMulti) return InstructionState;
+function groupHasException(newContent: StageDataMulti) return std_logic;
 
 
 function getSendingFromCQ(livingMask: std_logic_vector) return std_logic_vector;
 
-function stageCQNext(content: StageDataCommitQueue; newContent: InstructionStateArray;
-		livingMask: std_logic_vector;
-		ready: std_logic_vector;
-		outWidth: integer;
-		nFull, nOut, nIn: integer)
-return StageDataCommitQueue;
+
+function killByTag(before, ei, int: std_logic) return std_logic;
 
 	
 -- FORWARDING NETWORK ------------
@@ -145,19 +121,6 @@ function getResultValues(execEnds: InstructionStateArray;
 										stageDataCQ: StageDataCommitQueue;
 										lastCommitted: StageDataMulti)
 return MwordArray;	
-			
-	function getLastFull(newContent: StageDataMulti) return InstructionState;
-
-	function getLastEffective(newContent: StageDataMulti) return InstructionState;
-	function getEffectiveMask(newContent: StageDataMulti) return std_logic_vector;
-
-		function groupHasException(newContent: StageDataMulti) return std_logic;
-
-	function killByTag(before, ei, int: std_logic) return std_logic;
-
-
-function compactData(data: InstructionStateArray; mask: std_logic_vector) return InstructionStateArray;
-function compactMask(data: InstructionStateArray; mask: std_logic_vector) return std_logic_vector;
 	
 end GeneralPipeDev;
 
@@ -282,6 +245,49 @@ begin
 	end loop;
 	
 	return res;
+end function;
+
+
+function findMatching(content: InstructionSlotArray; ins: InstructionState)
+return std_logic_vector is
+	variable res: std_logic_vector(content'range) := (others => '0');
+begin
+	-- Find where to put addressData
+	for i in 0 to content'length-1 loop							
+		if ins.groupTag = content(i).ins.groupTag and content(i).full = '1' then
+			res(i) := '1';
+		end if;
+	end loop;							
+	return res;
+end function;
+
+
+function queueMaskNext(livingMask: std_logic_vector;
+					  newMask: std_logic_vector;
+					  nLivingIn: integer;
+					  sending: integer;
+					  receiving: std_logic) return std_logic_vector is
+	variable nLiving: integer := nLivingIn;
+	constant LEN: integer := livingMask'length;
+	variable tempMask: std_logic_vector(0 to LEN + PIPE_WIDTH-1) := (others => '0');
+	variable outMask: std_logic_vector(0 to LEN-1) := (others => '0');
+begin
+	if nLiving < 0  or nLiving > LEN then
+		nLiving := 0;
+	end if;
+								
+	tempMask(0 to LEN-1) := livingMask;
+
+	-- Append new data
+	if receiving = '1' then
+		tempMask(nLiving to nLiving + PIPE_WIDTH-1) := newMask;
+	end if;
+
+	-- Shift by n of sending
+	-- CAREFUL: tempMask must have enough zeros at the end to clear outdated 'ones'!
+	outMask(0 to LEN-1) := tempMask(sending to sending + LEN-1); 
+
+	return outMask;
 end function;
 
 
@@ -493,11 +499,11 @@ begin
 	resultTags(0) := execEnds(0).physicalDestArgs.d0;
 	resultTags(1) := execEnds(1).physicalDestArgs.d0;
 	resultTags(2) := execEnds(2).physicalDestArgs.d0;
-	resultTags(3) := execEnds(3).physicalDestArgs.d0;			
+	--resultTags(3) := execEnds(3).physicalDestArgs.d0;			
 	
 	-- CQ slots
 	for i in 0 to CQ_SIZE-1 loop 
-		resultTags(4 + i) := stageDataCQ.data(i).physicalDestArgs.d0;  	
+		resultTags(4-1 + i) := stageDataCQ.data(i).physicalDestArgs.d0;  	
 	end loop;
 
 	return resultTags;
@@ -518,9 +524,9 @@ begin
 	nextResultTags(0) := dispatchDataA.physicalDestArgs.d0;
 	
 	nextResultTags(1) := execPreEnds(1).physicalDestArgs.d0;
-	nextResultTags(2) := execPreEnds(2).physicalDestArgs.d0;
+	--nextResultTags(2) := execPreEnds(2).physicalDestArgs.d0;
 	
-	nextResultTags(3) := dispatchDataD.physicalDestArgs.d0;	
+	--nextResultTags(3) := dispatchDataD.physicalDestArgs.d0;	
 	return nextResultTags;
 end function;
 
@@ -534,11 +540,11 @@ begin
 	resultVals(0) := execEnds(0).result;
 	resultVals(1) := execEnds(1).result;
 	resultVals(2) := execEnds(2).result;
-	resultVals(3) := execEnds(3).result;			
+	--resultVals(3) := execEnds(3).result;			
 			
 	-- CQ slots
 	for i in 0 to CQ_SIZE-1 loop 
-		resultVals(4 + i) := stageDataCQ.data(i).result;  	
+		resultVals(4-1 + i) := stageDataCQ.data(i).result;  	
 	end loop;
 	
 	return resultVals;
@@ -634,263 +640,6 @@ end function;
 	end function;
 
 
-
--- TODO: move those below to another file
----------------------------------------------------------
--- Logging and checking
-----------------------------------------
-
-function makeLogPath(str: string) return string is
-	variable res: string(1 to str'length) := str;
-begin
-	for i in res'range loop
-		if res(i) = ':' then
-			res(i) := '#';
-		end if;
-	end loop;
-	
-	return res & ".txt";
-end function;
-
--- CAREFUL: synthesis is turned of in this case because including std.textio.all somehow
---				causes additional 3% logic utilization
--- pragma synthesis off
-procedure logArrayImplem(insArr: InstructionStateArray; full, living: std_logic_vector;
-								 filename: string; desc: string) is
-   use std.textio.all;
-
-	file outFile: text open append_mode is filename;
-	variable fline: line;
-begin
-	write(fline, time'image(now) & ", " & desc);
-	writeline(outFile, fline);
-	
-	for i in 0 to insArr'length-1 loop
-		if full(i) = '0' then
-			write(fline, "(-)");
-		else
-			if living(i) = '0' then
-				write(fline, "x");
-			end if;
-			write(fline,
-						  integer'image(slv2u(insArr(i).numberTag))
-				& "@" & integer'image(slv2u(insArr(i).basicInfo.ip)));
-		end if;
-		write(fline, ", ");
-		
-	end loop;
-	writeline(outFile, fline);
-end procedure;
--- pragma synthesis on
-
-
-procedure logArray(insArr: InstructionStateArray; full, living: std_logic_vector;
-						 filename: string; desc: string) is
-begin
-	if LOG_PIPELINE then
-		-- pragma synthesis off
-		logArrayImplem(insArr, full, living, filename, desc);
-		-- pragma synthesis on
-	end if;
-end procedure;
-
-
-procedure logSimple(signal stageData: in InstructionState; fr: FlowResponseSimple) is	
-	variable data: InstructionStateArray(0 to 0) := (0 => stageData);
-	variable fullMask: std_logic_vector(0 to 0) := (0 => fr.full);
-	variable livingMask: std_logic_vector(0 to 0) := (0 => fr.living);	
-begin
-	if fr.full = '0' then
-		return;
-	end if;
-	logArray(data, fullMask, livingMask, --now, 
-														makeLogPath(stageData'path_name), "");
-		return;
-end procedure;
-
-
-procedure logBuffer(signal data: InstructionStateArray; fullMask, livingMask: std_logic_vector;
-							flowResponse: FlowResponseBuffer) is
-begin	
-	if isNonzero(flowResponse.full) = '0' then
-		return;
-	end if;
-	logArray(data, fullMask, livingMask, --now,
-														makeLogPath(data'path_name), "");
-end procedure;
-
-procedure logMulti(signal data: InstructionStateArray; fullMask, livingMask: std_logic_vector;
-							flowResponse: FlowResponseSimple) is	
-begin	
-	if flowResponse.full = '0' then
-		return;
-	end if;
-	logArray(data, fullMask, livingMask, --now,
-														makeLogPath(data'path_name), "");
-end procedure;
-
-
-
-procedure checkBuffer(bufferData: InstructionStateArray; fullMask: std_logic_vector;
-							 bufferDataNext: InstructionStateArray; fullMaskNext: std_logic_vector;
-							 bufferDrive: FlowDriveBuffer; bufferResponse: FlowResponseBuffer) is
-	variable commonPart1, commonPart2: InstructionStateArray(bufferData'range)
-		:= (others => DEFAULT_INSTRUCTION_STATE);
-	variable nFull, nLiving, nFullNext, nSending, nReceiving: integer := 0;
-	variable nCommon: integer := 0;
-begin
-	-- pragma synthesis off
-
-	if not BASIC_CHECKS then
-		return;
-	end if;
-
-	nFull := integer(slv2u(bufferResponse.full));
-	nLiving := integer(slv2u(bufferResponse.living));
-	nSending := integer(slv2u(bufferResponse.sending));
-	nReceiving := integer(slv2u(bufferDrive.prevSending));
-	
-	nFullNext := nLiving + nReceiving - nSending;
-	-- full, fullMask - agree?
-	assert countOnes(fullMask) = nFull;
-		assert countOnes(fullMask(0 to nFull-1)) = nFull; -- checking continuity	
-	-- next full, fullMaskNext - agree?
-	assert countOnes(fullMaskNext) = nFullNext;
-		assert countOnes(fullMaskNext(0 to nFullNext-1)) = nFullNext; -- checking continuity	
-	-- number of killed agrees?
-		--??
-	-- number of new agrees?
-		-- ??
-	-- ??
-	
-	-- Check if content is matching. Which one correspond in the 2 arrays?
-		-- Get those that are living. Some of them will be shifted out (nSending),
-		--	some remain. [nSending to nLiving-1] should be found in [0 to nLiving-nSending-1] in new array.
-		-- 
-	nCommon := nLiving - nSending;	
-	for i in 0 to nCommon - 1 loop
-		commonPart1(i) := bufferData(i + nSending);
-		commonPart2(i) := bufferDataNext(i);
-	end loop;
-	
-	-- CHECK: does it make sense to examine this? Should other kinds of data be compared?
-	for i in 0 to nCommon-1 loop
-		assert commonPart1(i).numberTag = commonPart2(i).numberTag; -- TODO: is this the right tag field?
-		assert commonPart1(i).basicInfo.ip = commonPart2(i).basicInfo.ip;
-	end loop;
-	
-	-- pragma synthesis on	
-end procedure;
-
-
-procedure checkSimple(ins, insNext: InstructionState;
-							 flowDrive: FlowDriveSimple; flowResponse: FlowResponseSimple) is
-begin
-	-- pragma synthesis off
-
-	if not BASIC_CHECKS then
-		return;
-	end if;
-
-	-- pragma synthesis on
-end procedure;
-
-procedure checkMulti(stageData, stageDataNext: StageDataMulti;
-							flowDrive: FlowDriveSimple; flowResponse: FlowResponseSimple) is
-	variable nFull: integer := 0;
-begin
-	-- pragma synthesis off
-
-	if not BASIC_CHECKS then
-		return;
-	end if;
-
-	-- If flowResponse shows full, the mask can't be empty?
-
-	-- If stalled, new content must match the old? (Already guaranteed by stageMultiNext?),
-	--					...
-	
-	nFull:= countOnes(stageData.fullMask);
-	if flowResponse.full = '1' then
-		assert countOnes(stageData.fullMask(0 to nFull-1)) = nFull; -- check continuity of mask?
-	end if;
-	-- pragma synthesis on	
-end procedure;
-
-procedure checkIQ(bufferData: InstructionStateArray; fullMask: std_logic_vector; 
-						bufferDataNext: InstructionStateArray; fullMaskNext: std_logic_vector;
-						insSending: InstructionState; sending: std_logic;
-						bufferDrive: FlowDriveBuffer; bufferResponse: FlowResponseBuffer) is
-	variable commonPart1, commonPart2: InstructionStateArray(bufferData'range)
-		:= (others => DEFAULT_INSTRUCTION_STATE);
-	variable nFull, nLiving, nFullNext, nSending, nReceiving: integer := 0;
-	variable nCommon: integer := 0;
-	variable move: integer:= 0;
-	variable insSendingMatch: InstructionState := DEFAULT_INSTRUCTION_STATE;
-begin
-	-- pragma synthesis off
-
-	if not BASIC_CHECKS then
-		return;
-	end if;
-
-	nFull := integer(slv2u(bufferResponse.full));
-	nLiving := integer(slv2u(bufferResponse.living));
-	nSending := integer(slv2u(bufferResponse.sending));
-	nReceiving := integer(slv2u(bufferDrive.prevSending));
-	
-	nFullNext := nLiving + nReceiving - nSending;
-	-- full, fullMask - agree?
-	assert countOnes(fullMask) = nFull;
-		assert countOnes(fullMask(0 to nFull-1)) = nFull; -- checking continuity		
-	-- next full, fullMaskNext - agree?
-	assert countOnes(fullMaskNext) = nFullNext;
-		assert countOnes(fullMaskNext(0 to nFullNext-1)) = nFullNext; -- checking continuity	
-	-- number of killed agrees?
-		--??
-	-- number of new agrees?
-		-- ??
-	-- ??
-	
-	
-	-- CAREFUL: in IQ sending is from any living slot, not just the first. Deal with this here!
-	-- Check if content is matching. Which one correspond in the 2 arrays?
-		-- Get those that are living. Some of them will be shifted out (nSending),
-		--	some remain. [nSending to nLiving-1] should be found in [0 to nLiving-nSending-1] in new array.
-		-- 
-	nCommon := nLiving - nSending;	
-	for i in 0 to nLiving - 1 loop
-		-- In old array we have to skip the op that is being sent
-		if sending = '1' and bufferData(i).numberTag = insSending.numberTag 
-			then -- CAREFUL: is this the right tag field?
-			move := 1;
-					--report "rtttt";
-			insSendingMatch := bufferData(i);
-			-- Check the op that is sent?
-			assert insSendingMatch.numberTag = insSending.numberTag; -- TODO: is this the right tag field?
-			assert insSendingMatch.basicInfo.ip = insSending.basicInfo.ip;		
-		end if;
-		
-		-- If we have visited all living instructions in old array, we break, because 
-		--		it one less is copied to commonPart1, not all of them. Otherwise we could go out of array!
-		if i + move >= nLiving - 1 then
-			exit;
-		end if;
-				
-		commonPart1(i) := bufferData(i + move);
-		commonPart2(i) := bufferDataNext(i);		
-	end loop;
-	
-	-- CHECK: does it make sense to examine this? Should other kinds of data be compared?
-	for i in 0 to nCommon-1 loop
-		assert commonPart1(i).numberTag = commonPart2(i).numberTag; -- TODO: is this the right tag field?
-		assert commonPart1(i).basicInfo.ip = commonPart2(i).basicInfo.ip;
-	end loop;
-	
-	-- pragma synthesis on	
-end procedure;
-
-
 function compactData(data: InstructionStateArray; mask: std_logic_vector) return InstructionStateArray is
 	variable res: InstructionStateArray(0 to 3) := --data(0 to 3);
 														(data(1), data(2), data(0), data(3));
@@ -911,10 +660,11 @@ begin
 		k := k + 1;
 	end if;	
 
-	res(k) := data(3);	
-	if mask(3) = '1' then
-		k := k + 1;
-	end if;
+-- CAREFUL: not using the 4th one because branch has no register write				
+--	res(k) := data(3);	
+--	if mask(3) = '1' then
+--		k := k + 1;
+--	end if;
 	
 	return res;
 end function;
@@ -937,12 +687,13 @@ begin
 	res(k) := mask(0);	
 	if mask(0) = '1' then
 		k := k + 1;
-	end if;	
-	
-	res(k) := mask(3);	
-	if mask(3) = '1' then
-		k := k + 1;
 	end if;
+		
+-- CAREFUL: not using the 4th one because branch has no register write		
+--	res(k) := mask(3);	
+--	if mask(3) = '1' then
+--		k := k + 1;
+--	end if;
 	
 	return res;
 end function;

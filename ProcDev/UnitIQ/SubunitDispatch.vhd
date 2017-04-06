@@ -55,7 +55,6 @@ entity SubunitDispatch is
 	 	prevSending: in std_logic;
 	 	nextAccepting: in std_logic;
 		
-
 	 	stageDataIn: in InstructionState;		
 		acceptingOut: out std_logic;
 		sendingOut: out std_logic;
@@ -63,26 +62,23 @@ entity SubunitDispatch is
 		
 		execEventSignal: in std_logic;
 		execCausing: in InstructionState;
-		--intSignal: in std_logic;
 		
-		ai: in ArgStatusInfo;
+		resultTags: in PhysNameArray(0 to N_RES_TAGS-1);
 		resultVals: in MwordArray(0 to N_RES_TAGS-1);
-		regValues: in MwordArray(0 to 2);
-		
-		dispatchDataOut: out InstructionState
+		regValues: in MwordArray(0 to 2)		
 	);
 end SubunitDispatch;
 
 
 architecture Alternative of SubunitDispatch is
 	signal stageDataM, stageDataStored: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
-	signal inputDataWithArgs, dispatchDataUpdated:
-					InstructionState := defaultInstructionState;
-		signal lockSend: std_logic := '0';
+	signal inputDataWithArgs, dispatchDataUpdated: InstructionState := defaultInstructionState;
+	signal lockSend: std_logic := '0';
+	signal nextResultTags: PhysNameArray(0 to N_NEXT_RES_TAGS-1) := (others => (others => '0'));
+	signal writtenTags: PhysNameArray(0 to PIPE_WIDTH-1) := (others => (others => '0'));
 begin
 
 	inputDataWithArgs <= getDispatchArgValues(stageDataIn, resultVals);
-
 	stageDataM.fullMask(0) <= prevSending;
 	stageDataM.data(0) <= inputDataWithArgs;
 	
@@ -103,11 +99,12 @@ begin
 		lockCommand => '0'
 	);
 
-	dispatchDataUpdated <= updateDispatchArgs(stageDataStored.data(0), resultVals, regValues, ai); 
+	dispatchDataUpdated <= updateDispatchArgs(stageDataStored.data(0), resultVals(0 to N_NEXT_RES_TAGS-1),
+															regValues);
 
-		-- CAREFUL: this does nothing. To make it work:
-		--											nextAcceptingEffective <= nextAccepting and not lockSend
-		lockSend <= BLOCK_ISSUE_WHEN_MISSING and isNonzero(dispatchDataUpdated.argValues.missing);
+	-- CAREFUL: this does nothing. To make it work:
+	--											nextAcceptingEffective <= nextAccepting and not lockSend
+	lockSend <= BLOCK_ISSUE_WHEN_MISSING and isNonzero(dispatchDataUpdated.argValues.missing);
 	
 	stageDataOut <= dispatchDataUpdated;
 	

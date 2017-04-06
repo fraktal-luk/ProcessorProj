@@ -170,7 +170,70 @@ function extractMissing0(data: InstructionStateArray) return std_logic_vector;
 function extractMissing1(data: InstructionStateArray) return std_logic_vector;		
 function extractMissing2(data: InstructionStateArray) return std_logic_vector;		
 
+function selectInstructions(content: InstructionStateArray; numbers: IntArray; nI: integer)
+return InstructionStateArray is
+	variable res: InstructionStateArray(content'range) := (others=>defaultInstructionState);
+	variable ind: integer;
+begin
+	if nI < 0 or nI > numbers'length or nI > res'length
+	then
+		return res;
+	end if;	
+		for i in content'range loop
+			if i >= nI or i >= numbers'length then
+				exit;
+			end if;
+				if numbers(i) < 0 or numbers(i) >= content'length then
+					return res;
+				end if;	
+					ind := numbers(i);	
+					res(i) := content(ind); -- content(numbers(i));
+		end loop;
+	return res; 
+end function;
 
+
+function TEMP_branchPredict(ins: InstructionState) return InstructionState is
+	variable res: InstructionState := ins;
+begin
+	if res.classInfo.branchCond = '1' then
+		--res.controlInfo.unseen := '1';	
+	
+		if res.constantArgs.c1 = COND_NONE then -- 'none'; CAREFUL! Use correct codes!
+			-- Jump
+				--res.controlInfo.s0Event := '1';
+			--res.controlInfo.branchSpeculated := '1'; -- ??
+			--res.controlInfo.branchConfirmed := '1'; -- ??
+		elsif res.constantArgs.c1 = COND_Z and res.virtualArgs.s0 = "00000" then -- 'zero'; CAREFUL! ...
+			-- Jump
+				--res.controlInfo.s0Event := '1';
+			--res.controlInfo.branchSpeculated := '1'; -- ??
+			--res.controlInfo.branchConfirmed := '1'; -- ??
+		elsif res.constantArgs.c1 = COND_NZ and res.virtualArgs.s0 /= "00000" then -- 'one'; CAREFUL!...
+			-- No jump!
+		else
+			-- Need to speculate...
+			-- ! src0 should be register other than r0
+			-- Check	if displacement is negative
+			--		TODO	
+		end if;
+	end if;
+	
+	return res;
+end function;
+
+	function findOldestSignal(ready: std_logic_vector; tags: SmallNumberArray) return std_logic_vector is
+		variable res: std_logic_vector(ready'range) := (others=>'0');
+		variable k: integer := 0;
+	begin
+		for i in 1 to ready'length-1 loop
+			if ready(i) = '1' and tagBefore(tags(i), tags(k)) = '1' then
+				k := i;
+			end if;
+		end loop;
+		res(k) := '1';
+		return res;
+	end function;
 
 end OLD_FUNCTIONS;
 

@@ -20,6 +20,8 @@ use work.NewPipelineData.all;
 use work.TEMP_DEV.all;
 use work.GeneralPipeDev.all;
 
+use work.BasicCheck.all;
+
 use std.textio.all;
 
 

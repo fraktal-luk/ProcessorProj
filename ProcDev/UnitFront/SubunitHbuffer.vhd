@@ -45,6 +45,8 @@ use work.ProcComponents.all;
 
 use work.ProcLogicFront.all;
 
+use work.BasicCheck.all;
+
 
 entity SubunitHbuffer is
 	port(

@@ -29,6 +29,8 @@ package NewPipelineData is
 	constant FETCH_BLOCK_SIZE: natural := PIPE_WIDTH * 2;
 	constant HBUFFER_SIZE: natural := PIPE_WIDTH * 4;
 	
+	constant PROPAGATE_MODE: boolean := true;
+	
 	-- TODO: eliminate, change to chained implementation
 	constant N_EVENT_AREAS: natural := 8;-- How many distinct stages or groups of stages have own event signals
 	-- PC, Fetch0, Fetch1, Hbuffer, Decode, Rename, OOO, Committed
@@ -41,7 +43,11 @@ package NewPipelineData is
 	constant IQ_D_SIZE: natural := PIPE_WIDTH * 2;
 	constant IQ_E_SIZE: natural := PIPE_WIDTH * 2;	
 	
-	constant CQ_SIZE: natural := PIPE_WIDTH * 4;
+	constant SQ_SIZE: natural := 4;
+	constant LQ_SIZE: natural := 4;
+	constant LMQ_SIZE: natural := 4; -- !!!
+	
+	constant CQ_SIZE: natural := PIPE_WIDTH * 3;
 	
 		constant ROB_SIZE: natural := 8; -- ??
 	
@@ -53,9 +59,9 @@ package NewPipelineData is
 		--	doesn't show in 'ready'	when expected	
 		constant BLOCK_ISSUE_WHEN_MISSING: std_logic := '0';
 		
-	constant N_RES_TAGS: natural := 4 + CQ_SIZE; -- + PIPE_WIDTH; -- + 3*PIPE_WIDTH; 
+	constant N_RES_TAGS: natural := 4-1 + CQ_SIZE; -- + PIPE_WIDTH; -- + 3*PIPE_WIDTH; 
 						-- Above: num subpipe results + CQ slots + max commited slots + pre-IQ red ports
-	constant N_NEXT_RES_TAGS: natural := 4; 
+	constant N_NEXT_RES_TAGS: natural := 2; 
 	
 	constant zerosPW: std_logic_vector(0 to PIPE_WIDTH-1) := (others=>'0');	
 	------
@@ -405,7 +411,7 @@ constant DEFAULT_STAGE_MULTI_EVENT_INFO: StageMultiEventInfo
 				written: std_logic_vector(0 to 2);
 				ready: std_logic_vector(0 to 2);
 				locs: SmallNumberArray(0 to 2);
-				vals: MwordArray(0 to 2);
+				--vals: MwordArray(0 to 2);
 				nextReady: std_logic_vector(0 to 2);
 				nextLocs: SmallNumberArray(0 to 2);
 			end record;
