@@ -138,6 +138,17 @@ begin
 				if ins.operation = (Memory, store) then
 					ci.secCluster := '1';
 				end if;
+				
+				-- TODO: branch with link should also contain main cluster because link goes there!
+				if ins.operation.unit = Jump then
+					ci.secCluster := '1';
+					if isNonzero(ins.virtualDestArgs.d0) = '0' then
+						ci.mainCluster := '0';
+					end if;
+				elsif	(ins.operation.unit = System and ins.operation.func /= sysMfc) then
+					ci.mainCluster := '0';
+					ci.secCluster := '1';
+				end if;
 
 			ci.branchAlways := '0';
 			ci.branchCond := '0';

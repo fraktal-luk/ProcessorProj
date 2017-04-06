@@ -42,6 +42,8 @@ use work.TEMP_DEV.all;
 
 use work.ProcComponents.all;
 
+use work.BasicCheck.all;
+
 
 entity TestCQPart0 is
 	port(
@@ -108,7 +110,7 @@ begin
 	
 	stageDataCQLiving.data <= stageDataCQ.data;
 	stageDataCQLiving.fullMask <= livingMaskCQ;
-	stageDataCQNew <= inputInstructions;
+	stageDataCQNew(0 to 3) <= inputInstructions; --(0 to 2); -- Don't use branch result
 												
 		stageDataCQNext <= stageCQNext(stageDataCQ,
 													compactData(stageDataCQNew, cqWhichSend),

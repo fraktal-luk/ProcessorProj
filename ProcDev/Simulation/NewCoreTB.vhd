@@ -207,7 +207,7 @@ BEGIN
 
 	PROGRAM_MEM: process (clk)
 		--variable alignedPC: mword := (others=>'0');
-		constant PM_SIZE: natural := programMem'length; 	
+		constant PM_SIZE: natural := WordMem'length; --programMem'length; 	
 	begin
 		if rising_edge(clk) then
 			if en = '1' then -- TEMP! It shouldn't exist here
@@ -219,8 +219,10 @@ BEGIN
 						--				So we can't get new instruction bits when Fetch stalls, cause they'd destroy
 						--				stalled content in fetch buffer!
 						for i in 0 to PIPE_WIDTH-1 loop
-							iin(i) <= programMem
+							iin(i) <= --mainProgram --programMem
 										 --prog0 -- CAREFUL! if using prog0, PM_SIZE may be wrong
+										 --prog1
+										 testProg0
 										(slv2u(iadr(9 downto 2)) + i); -- CAREFUL! 2 low bits unused (32b memory) 									
 						end loop;
 					end if;
@@ -252,7 +254,7 @@ BEGIN
 				memWriteDone <= --dadrvalid and drw;
 										dwrite;
 				memWriteValue <= dout;
-				memWriteAddress <= dadr;
+				memWriteAddress <= doutadr;
 				if memWriteDone = '1' then
 					dataMem(slv2u(memWriteAddress)) -- (9 downto 2)))
 											<= memWriteValue;

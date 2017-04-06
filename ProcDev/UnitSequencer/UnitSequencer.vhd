@@ -93,6 +93,8 @@ entity UnitSequencer is
 		robDataLiving: in StageDataMulti;
 		sendingFromROB: in std_logic;
 		
+			committing: out std_logic;
+		
 		-- Counter outputs
 		commitGroupCtrOut: out SmallNumber;
 		commitGroupCtrNextOut: out SmallNumber;
@@ -117,17 +119,12 @@ end UnitSequencer;
 architecture Behavioral of UnitSequencer is
 	signal resetSig, enSig: std_logic := '0';							
 
-	signal sendingToPC: std_logic := '0';
-
 	constant PC_INC: Mword := (ALIGN_BITS => '1', others => '0');	
-	signal pcBase: Mword := (others => '0');
-	signal pcNext: Mword := (others => '0');	
-	signal causingNext: Mword := (others => '0');
+	signal pcBase, pcNext, causingNext: Mword := (others => '0');
 
-	signal stageDataToPC, stageDataToPC_C: InstructionState := DEFAULT_INSTRUCTION_STATE;
+	signal stageDataToPC, stageDataOutPC, stageDataToPC_C: InstructionState := DEFAULT_INSTRUCTION_STATE;
 
-	signal stageDataOutPC: InstructionState := DEFAULT_INSTRUCTION_STATE;
-	signal sendingOutPC, acceptingOutPC: std_logic := '0';
+	signal sendingToPC, sendingOutPC, acceptingOutPC: std_logic := '0';
 		
 	signal generalEvents, newGeneralEvents: GeneralEventInfo;
 
@@ -143,32 +140,26 @@ architecture Behavioral of UnitSequencer is
 	signal stageDataOutRename: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
 	signal sendingOutRename, acceptingOutRename: std_logic:= '0';
 
-	signal stageDataOutCommit: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
-	signal sendingOutCommit, acceptingOutCommit: std_logic:= '0';
-
-	signal sendingToCommit: std_logic := '0';
-	signal stageDataToCommit: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;						
+	signal sendingToCommit, sendingOutCommit, acceptingOutCommit: std_logic := '0';
+	signal stageDataToCommit, stageDataOutCommit: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;						
 
 	signal newPhysDests: PhysNameArray(0 to PIPE_WIDTH-1) := (others=>(others=>'0'));
-	signal newPhysDestPointer, newPhysDestPointer_C: SmallNumber := (others => '0');
+	signal newPhysDestPointer: SmallNumber := (others => '0');
 
 	signal newPhysSources: PhysNameArray(0 to 3*PIPE_WIDTH-1) := (others=>(others=>'0'));							
 	signal newGprTags: SmallNumberArray(0 to PIPE_WIDTH-1) := (others=>(others=>'0'));	
 
 	signal newNumberTags: SmallNumberArray(0 to PIPE_WIDTH-1) := (others=>(others=>'0'));
-	signal renameCtr, renameCtrNext, commitCtr, commitCtrNext: SmallNumber := --(others=>'0');
-																										(others => '1');
+	signal renameCtr, renameCtrNext, commitCtr, commitCtrNext: SmallNumber := (others => '1');
 	signal renameGroupCtr, renameGroupCtrNext, commitGroupCtr, commitGroupCtrNext: SmallNumber :=
 																						INITIAL_GROUP_TAG;
 	
 	signal effectiveMask: std_logic_vector(0 to PIPE_WIDTH-1) := (others => '0');
-
-	signal lastEffective, lastEffectiveNext: InstructionState := defaultLastCommitted; -- ?
 	
 	signal fetchLockRequest, fetchLockCommit, fetchLockState: std_logic := '0';
 	signal renameLockCommand, renameLockRelease, renameLockState, renameLockEnd: std_logic := '0';	
 				
-		signal TMPpre_lastEffective, TMP_lastEffective: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;	
+	signal dataToLastEffective, dataFromLastEffective: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;	
 			
 	signal eiEvents: StageMultiEventInfo;
 			
@@ -198,13 +189,11 @@ begin
 		output => pcNext
 	);
 
-
 	EVENTS: block
 		-- $INPUT: 
 		--		stage0EventInfo, execEventSignal, execCausing, eiEvents
 		-- $OUTPUT:
 		-- 	execOrIntCausing, execOrIntEventSignal, killVecOut, generalEvents, 
-		--		
 		
 		signal eventInsArray: InstructionSlotArray(0 to N_EVENT_AREAS-1) 
 							:= (others => DEFAULT_INSTRUCTION_SLOT);
@@ -252,8 +241,6 @@ begin
 											pcNext, causingNext
 										);
 									--newGeneralEvents.newStagePC;					
-										
-				--	ch0 <= '1' when stageDataToPC_C = stageDataToPC else '0';
 
 	stageDataToPC_C <= newPCData(stageDataOutPC, generalEvents, pcNext, causingNext);			
 
@@ -262,7 +249,6 @@ begin
 	--				To be fully correct, prevSending should not be '1' when receiving prevented.			
 	sendingToPC <= acceptingOutPC and (sendingOutPC or generalEvents.eventOccured);
 
-	
 	newTargetInfo <= stageDataToPC.basicInfo;
 
 	excInfoUpdate <= eiEvents.eventOccured and eiEvents.causing.controlInfo.newException;
@@ -273,6 +259,7 @@ begin
 
 	PC_STAGE: block
 		signal tmpPcIn, tmpPcOut: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
+		signal newSysLevel, newIntLevel: SmallNumber := (others => '0');
 	begin		
 		tmpPcIn.fullMask(0) <= sendingToPC;
 		tmpPcIn.data(0) <= stageDataToPC;
@@ -294,10 +281,13 @@ begin
 			lockCommand => '0'		
 		);			
 		
+		newSysLevel <= currentStateSig(15 downto 8) when PROPAGATE_MODE else (others => '0');
+		newIntLevel <= currentStateSig(7 downto 0) when PROPAGATE_MODE else (others => '0');
+		
 		stageDataOutPC.basicInfo <=
-											(ip => tmpPcOut.data(0).basicInfo.ip,
-											systemLevel => currentStateSig(15 downto 8),
-											intLevel => currentStateSig(7 downto 0));			
+						  (ip => tmpPcOut.data(0).basicInfo.ip,
+							systemLevel => newSysLevel,
+							intLevel => newIntLevel);
 	end block;
 
 
@@ -382,14 +372,12 @@ begin
 
 	fetchLockCommit <= fetchLockCommitting(stageDataToCommit, effectiveMask);
 
-
 	iadr <= stageDataOutPC.basicInfo.ip and i2slv(-PIPE_WIDTH*4, MWORD_SIZE); -- Clearing low bits				
 	iadrvalid <= sendingOutPC;
 	
 	pcDataLiving <= stageDataOutPC;
 	pcSending <= sendingOutPC;	
 
-		
 	-- Rename stage
 	RENAMING: block
 		-- INPUT: newPhysSources, newPhysDests
@@ -434,8 +422,7 @@ begin
 			
 			-- Interface with front
 			prevSending => frontLastSending,	
-			stageDataIn => --TMP_setReadyRegFlags(
-									stageDataRenameIn, --readyRegFlagsV),
+			stageDataIn => stageDataRenameIn, --readyRegFlagsV),
 			acceptingOut => acceptingOutRename,
 			
 			-- Interface with IQ
@@ -483,15 +470,10 @@ begin
 		renameCtrNext <= nextCtr(renameCtr, execOrIntEventSignal, execOrIntCausing.numberTag,
 										 frontLastSending, frontDataLastLiving.fullMask);
 
-		commitGroupCtrNext <= nextCtr(commitGroupCtr, '0', (others => '0'), -- dont care
-												sendingToCommit, ALL_FULL);
-		commitCtrNext <= nextCtr(commitCtr, '0', (others => '0'), -- dont care
-										 sendingToCommit, effectiveMask);
+		commitGroupCtrNext <= nextCtr(commitGroupCtr, '0', (others => '0'), sendingToCommit, ALL_FULL);
+		commitCtrNext <= nextCtr(commitCtr, '0', (others => '0'), sendingToCommit, effectiveMask);
 
-			effectiveMask <= getEffectiveMask(stageDataToCommit);
-
-		--	 ch0 <= '1' when renameCtrNext = nsr else '0';
-		--	 ch1 <= '1' when (renameGroupCtrNext = ngr) and (commitGroupCtrNext = ngc) else '0';
+		effectiveMask <= getEffectiveMask(stageDataToCommit);
 			
 		PIPE_SYNCHRONOUS: process(clk) 	
 		begin
@@ -511,6 +493,8 @@ begin
 	sendingToCommit <= sendingFromROB;	
 	stageDataToCommit <= robDataLiving;
 
+		committing <= sendingFromROB;
+	
 	-- Commit stage: in order again				
 	SUBUNIT_COMMIT: entity work.GenericStageMulti(Behavioral)
 	port map(
@@ -536,8 +520,8 @@ begin
 			interruptCause.controlInfo.hasInterrupt <= intSignal;
 			interruptCause.controlInfo.hasReset <= start;
 
-			TMPpre_lastEffective.fullMask(0) <= sendingToCommit;
-			TMPpre_lastEffective.data(0) <= getLastEffective(stageDataToCommit);
+			dataToLastEffective.fullMask(0) <= sendingToCommit;
+			dataToLastEffective.data(0) <= getLastEffective(stageDataToCommit);
 
 			LAST_EFFECTIVE_SLOT: entity work.GenericStageMulti(LastEffective)
 			port map(
@@ -545,13 +529,13 @@ begin
 				
 				-- Interface with CQ
 				prevSending => sendingToCommit,
-				stageDataIn => TMPpre_lastEffective,
+				stageDataIn => dataToLastEffective,-- TMPpre_lastEffective,
 				acceptingOut => open, -- unused but don't remove
 				
 				-- Interface with hypothetical further stage
 				nextAccepting => '1',
 				sendingOut => open,
-				stageDataOut => TMP_lastEffective,
+				stageDataOut => dataFromLastEffective,--TMP_lastEffective,
 				
 				-- Event interface
 				execEventSignal => '0', -- CAREFUL: committed cannot be killed!

@@ -65,6 +65,8 @@ end ReadyRegisterTable;
 
 
 architecture Behavioral of ReadyRegisterTable is
+		constant WIDTH: natural := PIPE_WIDTH;
+
 		signal readyTableClearAllow: std_logic := '0';
 		signal readyTableClearSel: std_logic_vector(0 to PIPE_WIDTH-1) := (others => '0');
 		signal readyTableSetAllow: std_logic := '0';
@@ -84,32 +86,42 @@ begin
 		readyTableClearSel <= getDestMask(stageDataToReserve);	-- for ready table		
 		
 		--newPhysDests <= getPhysicalDests(stageDataToReserve);
+
 		
-		REG_READY_TABLE: entity work.TestReadyRegTable0 (Behavioral)
-																			 --(Implem)
-		generic map(
-			WIDTH => PIPE_WIDTH,
-			MAX_WIDTH => MW
-		)			
-		port map(
-			clk => clk, reset => reset, en => en, 
-			
-			-- Interface for clearing 'ready' bits
-			enClear => readyTableClearAllow,	-- when renaming
-			clearVec => readyTableClearSel,	-- clearing for all newly assigned physical regs 
-			selectClear => newPhysDests, -- readyTableClearTags, -- newly assigned physical regs
-			
-			-- Setting inputs
-			-- NOTE: setting 'ready' on commit, but later reg writing maybe before commit if possible?
-			-- Interface for setting 'ready' bits
-			enSet => readyTableSetAllow,	-- when committing (properly should be at writeback)
-			setVec => readyTableSetSel,	-- at writeback of individual results (enSet above must be '1'!) 
-			selectSet => readyTableSetTags,
-			
-			outputData => readyRegsSig -- readyRegs	
-		);	
+		IMPL: block
+			signal content: std_logic_vector(0 to N_PHYSICAL_REGS-1) := (0 to 31 => '1', others => '0');
+		begin
+				SYNCHRONOUS: process(clk)
+				begin
+					if rising_edge(clk) then
+						--if reset = '1' then
+						--elsif en = '1' then
+							if readyTableSetAllow = '1' then
+								for i in 0 to WIDTH-1 loop
+									if readyTableSetSel(i) = '1' then
+										-- set 
+										content(slv2u(readyTableSetTags(i))) <= '1';
+									end if;
+								end loop;
+							end if;
+
+							if readyTableClearAllow = '1' then							
+								for i in 0 to WIDTH-1 loop								
+									if readyTableClearSel(i) = '1' then
+										-- clear
+										content(slv2u(newPhysDests(i))) <= '0';						
+									end if;
+								end loop;
+							end if;
+							
+						--end if;
+					end if;
+				end process;
+				
+			readyRegFlagsNext <= extractReadyRegBits(content, stageDataReserved.data);				
+		end block;
 		
-		readyRegFlagsNext <= extractReadyRegBits(readyRegsSig, stageDataReserved.data);
+		--readyRegFlagsNext <= extractReadyRegBits(readyRegsSig, stageDataReserved.data);
 
 end Behavioral;
 

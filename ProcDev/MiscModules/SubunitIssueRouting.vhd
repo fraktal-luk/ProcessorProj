@@ -44,11 +44,11 @@ use work.TEMP_DEV.all;
 entity SubunitIssueRouting is
 	port(
 		renamedDataLiving: in StageDataMulti;
-		acceptingA: in PipeFlow;
-		acceptingB: in PipeFlow;
-		acceptingC: in PipeFlow;
-		acceptingD: in PipeFlow;
-		acceptingE: in PipeFlow;
+		--acceptingA: in PipeFlow;
+		--acceptingB: in PipeFlow;
+		--acceptingC: in PipeFlow;
+		--acceptingD: in PipeFlow;
+		--acceptingE: in PipeFlow;
 		
 			acceptingVecA: in std_logic_vector(0 to PIPE_WIDTH-1);
 			acceptingVecB: in std_logic_vector(0 to PIPE_WIDTH-1);
@@ -69,19 +69,22 @@ entity SubunitIssueRouting is
 		dataOutB: out StageDataMulti;
 		dataOutC: out StageDataMulti;
 		dataOutD: out StageDataMulti;
-				dataOutE: out StageDataMulti
+				dataOutE: out StageDataMulti;
+			dataOutSQ: out StageDataMulti;
+			dataOutLQ: out StageDataMulti	
 	);
 end SubunitIssueRouting;
 
 
 architecture Behavioral of SubunitIssueRouting is	
-	signal srcVecA, srcVecB, srcVecC, srcVecD, srcVecE: std_logic_vector(0 to PIPE_WIDTH-1);
-	signal issueRouteVec: IntArray(0 to PIPE_WIDTH-1);
+	signal srcVecA, srcVecB, srcVecC, srcVecD, srcVecE: std_logic_vector(0 to PIPE_WIDTH-1) := (others => '0');
+	signal storeVec: std_logic_vector(0 to PIPE_WIDTH-1) := (others => '0');
+	signal issueRouteVec: IntArray(0 to PIPE_WIDTH-1) := (others => 0);
 	signal nToA, nToB, nToC, nToD, nToE: natural := 0;	
 	signal iqAcceptingA: std_logic := '0';						
 	signal iqAcceptingB, iqAcceptingC, iqAcceptingD, iqAcceptingE: std_logic := '0';
 
-	signal dataToA, dataToB, dataToC, dataToD, dataToE: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
+	signal dataToA, dataToB, dataToC, dataToD, dataToE, dataToSQ: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
 
 	signal renamedSending: std_logic := '0';
 	
@@ -89,31 +92,41 @@ architecture Behavioral of SubunitIssueRouting is
 begin	
 	renamedSending <= renamedSendingIn;
 
+		storeVec <= findStores(renamedDataLiving);
+
 		-- Routing to queues
 		ROUTE_VEC_GEN: for i in 0 to PIPE_WIDTH-1 generate
 			issueRouteVec(i) <= unit2queue(renamedDataLiving.data(i).operation.unit);
-				srcVecE(i) <= '1' when renamedDataLiving.data(i).operation.unit = Memory
-										 and renamedDataLiving.data(i).operation.func = store
-										 and renamedDataLiving.fullMask(i) = '1'
-							else '0';			 
+				--srcVecE(i) <= '1' when renamedDataLiving.data(i).operation.unit = Memory
+				--						 and renamedDataLiving.data(i).operation.func = store
+				--						 and renamedDataLiving.fullMask(i) = '1'
+				--			else '0';			 
 		end generate;
+		
+		srcVecE <= storeVec and renamedDataLiving.fullMask;
 		
 	-- New concept for IQ routing.  {renamedData, srcVec*} -> (StageDataMulti){A,B,C,D}
 	-- Based on "push left" of each destination type, generating "New" StageDataMulti data for each one
 	-- dataToA <= [func](stageData1Living, srcVecA); -- s.d.1.l includes fullMask!	
 	
 	-- Selection of flow into IQ's
-		srcVecA <= findByNumber(issueRouteVec, 0) and renamedDataLiving.fullMask;
+		srcVecA <= (findByNumber(issueRouteVec, 0) or findBranchLink(renamedDataLiving))
+								and renamedDataLiving.fullMask;
 		srcVecB <= findByNumber(issueRouteVec, 1) and renamedDataLiving.fullMask;
 		srcVecC <= findByNumber(issueRouteVec, 2) and renamedDataLiving.fullMask;
 		srcVecD <= findByNumber(issueRouteVec, 3) and renamedDataLiving.fullMask;
 			--srcVecE <= findByNumber(issueRouteVec, 3) and renamedDataLiving.fullMask;
 
-		dataToA <= routeToIQ2(renamedDataLiving, srcVecA);
+		dataToA <= routeToIQ2(prepareForAlu(renamedDataLiving), srcVecA);
 		dataToB <= routeToIQ2(renamedDataLiving, srcVecB);
 		dataToC <= routeToIQ2(prepareForAGU(renamedDataLiving), srcVecC);
-		dataToD <= routeToIQ2(renamedDataLiving, srcVecD);
-		dataToE <= routeToIQ2(prepareForStoreData(renamedDataLiving), srcVecE);
+		dataToD <= routeToIQ2(prepareForBranch(renamedDataLiving), srcVecD);
+		dataToE <= --routeToIQ2(prepareForStoreData(renamedDataLiving), srcVecE);
+						prepareForStoreData(dataToSQ);
+	
+		dataOutSQ <= dataToSQ;
+		dataToSQ <= routeToIQ(renamedDataLiving, storeVec);
+		dataOutLQ <= routeToIQ(renamedDataLiving, findLoads(renamedDataLiving));	
 	
 				invA <= invertVec(acceptingVecA);
 				invB <= invertVec(acceptingVecB);

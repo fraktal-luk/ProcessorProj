@@ -13,7 +13,6 @@ use work.ProcInstructionsNew.all;
 use work.NewPipelineData.all;
 
 package Decoding2 is
-
 	
 		type InsFieldNew is (opcode, opcont, none,  qa, qb, qc, qd, zero, one, 
 									leftImm, imm10, imm16, imm21, imm26
@@ -94,15 +93,7 @@ package Decoding2 is
 		
 		type InsDefArrayNewW is array (natural range <>) of InsDefNewW;		
 		
-		
---		function parseWordNew(w: word) return InsFieldTableNew;
 		function parseWordNewW(w: word) return InsFieldTableNewW;
-		
---		function getOpFieldStruct(tab: InsFieldTableNew; fmt: ArgFormatStruct) return OpFieldStruct;
---		function getOpFieldStruct2(unit: ExecUnit; func: ExecFunc;
---											tab: InsFieldTableNew; fmt: ArgFormatStruct) return OpFieldStruct;		
---		
---		function getOpFieldStruct3(tab: InsFieldTableNew; idef: InsDefNew) return OpFieldStruct;
 
 			constant fmtUndef: ArgFormatStruct :=
 					((others=>none), none, '0','0','0');
@@ -148,9 +139,7 @@ package Decoding2 is
 		constant undefInsDef: InsDefNewW := (opcode2slv(ext2), opcont2slv(ext2, undef),
 																				System, sysUndef, fmtUndef);
 		
-		constant decodeTableNew: InsDefArrayNew(0 to 24) :=
-			(--0=> (andI, none, alu, logicAnd, 
-			 --	((d0=>qa, d1=>none, s0=>qb, s1=>none, s2=>none, c0=>none, c1=>none), imm16, '0', '0', '0'))
+		constant decodeTableNew: InsDefArrayNew(0 to 25) := (
 				0 => (andI, none, Alu, logicAnd, fmtImm),
 				1 => (orI,  none, Alu, logicOr,  fmtImm),
 				2 => (addI, none, Alu, arithAdd, fmtImm),
@@ -181,6 +170,9 @@ package Decoding2 is
 					
 				21=> (ext1, jzR,  Jump, jump, fmtJumpRZ),
 				22=> (ext1, jnzR, Jump, jump, fmtJumpRNZ),
+
+					23 => (ext1, loadFP,		Memory,load,	fmtLoadImm),
+					24 => (ext1, storeFP,	Memory,store,	fmtStoreImm),
 				
 				others => (ext2, undef, System, sysUndef, fmtUndef)
 				);
@@ -194,9 +186,7 @@ package Decoding2 is
 		constant TEMP_largeTable: InsDefArrayNewW(0 to 4095) := TEMP_getLargeTable(decodeTableNewW);
 		
 		function TEMP_find(opcd, opct: slv6) return InsDefNewW;
-	
-	
---			function decodeNew(w: word) return InternalCommand;
+		
 			function getOpFields(w: word) return OpFieldStruct;
 
 			-- WARNING: classInfo may be actually created at later part, here being just a placeholder 
@@ -283,15 +273,15 @@ package body Decoding2 is
 		
 
 
-		function getOpFieldStructW(tab: InsFieldTableNewW; fmt: ArgFormatStruct) return OpFieldStruct is
+		function getOpFieldStructW(tab: InsFieldTableNewW;-- fmt: ArgFormatStruct; 
+											idef: InsDefNewW)
+		return OpFieldStruct is
 			variable res: OpFieldStruct;
-			variable iw: word;
+			variable fmt: ArgFormatStruct := idef.fmt;
+			variable iw: word := tab(imm26);
 		begin
-					--	report "Quintets done u";
-				--	report integer'image(slv2u(tab(opcode)(5 downto 0)));	
 			res.opcode := slv2opcode(tab(opcode)(5 downto 0));
 			res.opcont := slv2opcont(tab(opcode)(5 downto 0), tab(opcont)(5 downto 0));
-					--	report "Quintets done w";
 
 			-- Dispatch quintets
 			for i in d0 to c1 loop
@@ -310,9 +300,7 @@ package body Decoding2 is
 				end if;	
 			end loop;
 			
-			-- Handle imm value (and leftImm)
-			
-			iw := tab(imm26);
+			-- Handle imm value (and leftImm)		
 			res.imm := iw;
 			case fmt.immSize is
 				when none =>
@@ -320,28 +308,16 @@ package body Decoding2 is
 					res.imm := (others => '0');
 				when imm10 =>
 					res.hasImm := '1';
-					--iw := tab(imm26);					
-					--res.imm := iw; --i2slv(tab.imm10, 32);
 					res.imm(31 downto 10) := (others => iw(9) and fmt.immSign);	
 				when imm16 =>
-					res.hasImm := '1';	
-					--res.imm(15 downto 0) := tab.imm16;
-					--iw := i2slv(tab(imm16), 32);	
-					--res.imm := iw;	
+					res.hasImm := '1';		
 					res.imm(31 downto 16) := (others => iw(15) and fmt.immSign);
 				when imm21 =>
 					res.hasImm := '1';	
-					--res.imm(20 downto 0) := tab.imm21;
-					--iw := i2slv(tab(imm21), 32);															
-					--res.imm := iw;
 					res.imm(31 downto 21) := (others => iw(20) and fmt.immSign);
 				when imm26 =>
 					res.hasImm := '1';	
-					--res.imm(25 downto 0) := tab.imm26;
-					--iw := i2slv(tab(imm26), 32);															
-					--res.imm := iw;
 					res.imm(31 downto 26) := (others => iw(25) and fmt.immSign);					
-					
 				when others =>
 					report "bad imm format specification" severity error;
 			end case;
@@ -356,30 +332,18 @@ package body Decoding2 is
 				res.leftImm := (others => '0');
 			end if;
 			
+			res.unit := idef.unit;
+			res.func := idef.func;
+			
 			return res;
-		end function;
-
-		function getOpFieldStruct2W(unit: ExecUnit; func: ExecFunc; 
-											tab: InsFieldTableNewW; fmt: ArgFormatStruct) return OpFieldStruct is
-			variable res: OpFieldStruct;
-		begin
-			res := getOpFieldStructW(tab, fmt);
-
-			res.unit := unit;
-			res.func := func;			
-			return res;
-		end function;
-
-		function getOpFieldStruct3W(tab: InsFieldTableNewW; idef: InsDefNewW) return OpFieldStruct is
-		begin	
-			return getOpFieldStruct2W(idef.unit, idef.func, tab, idef.fmt);
 		end function;
 
 		
 		function findInstructionNewW(opcode, opcont: slv6) return integer is
 			variable tempInt: integer;
 		begin
-			tempInt := -1;					
+			tempInt := -- -1;
+							decodeTableNewW'right;
 			for i in decodeTableNewW'range loop
 				if 		decodeTableNewW(i).opcd = opcode 
 					and (not hasOpcont(slv2opcode(opcode)) or (decodeTableNewW(i).opct = opcont))
@@ -421,27 +385,17 @@ package body Decoding2 is
 			parts := parseWordNewW(w);
 			opcd := parts(opcode)(5 downto 0);
 			opct := parts(opcont)(5 downto 0);	
-			
-			num := findInstructionNewW(opcd, opct);
-			
+						
+			if false then
 				-- This activates "large table" decoding
 				match := TEMP_find(opcd, opct);
-				ofs := getOpFieldStruct3W(parts, match);
-				return ofs;
-					
-			if num = -1 then
-				report "[new] Instruction not found!" severity warning;
-				match := undefInsDef;
-				--parts(opcode) := e32(match.opcd);
-				--parts(opcont) := e32(match.opct);				
-				ofs := getOpFieldStruct3W(parts, undefInsDef); -- undefinedOpFieldStruct;
+				ofs := getOpFieldStructW(parts, match);
 			else
+				num := findInstructionNewW(opcd, opct);
 				match := decodeTableNewW(num);
-				--	parts(opcode) := e32(match.opcd);
-				--	parts(opcont) := e32(match.opct);				
-				ofs := getOpFieldStruct3W(parts, decodeTableNewW(num));						
-			end if;	
-			--ofs := getOpFieldStruct3W(parts, match);	
+				ofs := getOpFieldStructW(parts, decodeTableNewW(num));						
+			end if;
+
 			return ofs;
 		end function;
 
@@ -455,29 +409,6 @@ package body Decoding2 is
 			end loop;		
 			return res;
 		end function;
-
-
-
-
-function opcodeShort(opcode: slv6) return std_logic is
-	variable res: std_logic := '0';
-begin
-
-	return res;
-end function;
-
-
-function opcodeExtended(opcode: slv6) return std_logic is
-	variable res: std_logic := '0';
-begin
-	
-	return res;
-end function;
-
-
---procedure putInstructionSimple(opcode: slv6; )
-
---procedure putInstruction(opcode, opcont: slv6; )
 
 
 function TEMP_getLargeTable(decodeTableNewW: InsDefArrayNewW) return InsDefArrayNewW is

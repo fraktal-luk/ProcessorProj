@@ -46,6 +46,8 @@ use work.ProcLogicIQ.all;
 
 use work.ProcComponents.all;
 
+use work.BasicCheck.all;
+
 
 entity SubunitIQBuffer is
 	generic(
@@ -56,7 +58,7 @@ entity SubunitIQBuffer is
 		reset: in std_logic;
 		en: in std_logic;
 		
-		prevSending: in SmallNumber;
+		--prevSending: in SmallNumber;
 		prevSendingOK: in std_logic;
 		newData: in StageDataMulti;
 		nextAccepting: in std_logic;
@@ -67,7 +69,7 @@ entity SubunitIQBuffer is
 		aiNew: in ArgStatusInfoArray(0 to PIPE_WIDTH-1);
 		readyRegFlags: in std_logic_vector(0 to 3*PIPE_WIDTH-1);
 		
-		accepting: out SmallNumber;
+		--accepting: out SmallNumber;
 			acceptingVec: out std_logic_vector(0 to PIPE_WIDTH-1);
 		queueSending: out std_logic;
 		iqDataOut: out InstructionStateArray(0 to IQ_SIZE-1);
@@ -96,21 +98,23 @@ architecture Implem of SubunitIQBuffer is
 	signal sends: std_logic := '0';
 	signal dispatchDataNew: InstructionState := defaultInstructionState;
 begin
-	flowDriveQ.prevSending <= prevSending;		
+	flowDriveQ.prevSending <= --prevSending;		
+										num2flow(countOnes(newData.fullMask)) when prevSendingOK = '1'
+										else (others => '0');
 	
 	QUEUE_SYNCHRONOUS: process(clk) 	
 	begin
 		if rising_edge(clk) then
-			if reset = '1' then
+			--if reset = '1' then
 				
-			elsif en = '1' then	
+			--elsif en = '1' then	
 				queueData <= queueDataNext;
 				fullMask <= fullMaskNext;
 				
 				logBuffer(queueData, fullMask, livingMask, flowResponseQ);
 				checkIQ(queueData, fullMask, queueDataNext, fullMaskNext, dispatchDataNew, sends,
 						  flowDriveQ, flowResponseQ);
-			end if;	
+			--end if;	
 		end if;
 	end process;	
 		
@@ -173,11 +177,11 @@ begin
 								and fullMask(i); 			
 	end generate;	
 	
-	accepting <= flowResponseQ.accepting;
+	--accepting <= flowResponseQ.accepting;
 					--(0 =>	not livingMask(IQ_SIZE-1), others => '0'); -- NOTE: simpler but worse performance
 					--(0 =>	not fullMask(IQ_SIZE-1), others => '0');
-		acceptingVec <= not livingMask(IQ_SIZE-PIPE_WIDTH to IQ_SIZE-1);
-						    --not fullMask(IQ_SIZE-PIPE_WIDTH to IQ_SIZE-1);
+		acceptingVec <= --not livingMask(IQ_SIZE-PIPE_WIDTH to IQ_SIZE-1);
+						    not fullMask(IQ_SIZE-PIPE_WIDTH to IQ_SIZE-1);
 		
 	queueSending <= flowResponseQ.sending(0);	-- CAREFUL: assumes that flowResponseQ.sending is binary: [0,1]
 	iqDataOut <= queueData;						

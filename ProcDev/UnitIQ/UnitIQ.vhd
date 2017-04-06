@@ -55,29 +55,28 @@ entity UnitIQ is
 		reset: in std_logic;
 		en: in std_logic;		
 
-		writtenTags: PhysNameArray(0 to PIPE_WIDTH-1);		
-		resultTags: in PhysNameArray(0 to N_RES_TAGS-1);
-		nextResultTags: in PhysNameArray(0 to N_NEXT_RES_TAGS-1);
-		resultVals: in MwordArray(0 to N_RES_TAGS-1);
-
-		prevSending: in SmallNumber;
+		--prevSending: in SmallNumber;
 		prevSendingOK: in std_logic;		
 		nextAccepting: in std_logic; -- from exec			
 		newData: in StageDataMulti;			
 		
 		execCausing: in InstructionState;
 		execEventSignal: in std_logic;		
-		--intSignal: in std_logic;	
 			
-			readyRegFlags: in std_logic_vector(0 to 3*PIPE_WIDTH-1);
+		
+		writtenTags: PhysNameArray(0 to PIPE_WIDTH-1);		
+		resultTags: in PhysNameArray(0 to N_RES_TAGS-1);
+		nextResultTags: in PhysNameArray(0 to N_NEXT_RES_TAGS-1);
+		resultVals: in MwordArray(0 to N_RES_TAGS-1);
 			
-			-- Phys regs to read - only for "full read ports" configuration 
-			regsForDispatch: out PhysNameArray(0 to 2);
-			regReadAllow: out std_logic;			
+		-- Phys regs to read - only for "full read ports" configuration 
+		regsForDispatch: out PhysNameArray(0 to 2);
+		regReadAllow: out std_logic;			
+
+		readyRegFlags: in std_logic_vector(0 to 3*PIPE_WIDTH-1);			
+		regValues: in MwordArray(0 to 2);
 			
-			regValues: in MwordArray(0 to 2);
-			
-		accepting: out SmallNumber;
+		--accepting: out SmallNumber;
 			acceptingVec: out std_logic_vector(0 to PIPE_WIDTH-1);		
 		dataOutIQ: out InstructionState;
 			sendingOut: out std_logic
@@ -85,35 +84,22 @@ entity UnitIQ is
 
 end UnitIQ;
 
-architecture Behavioral of UnitIQ is
-	signal raSig: std_logic_vector(0 to 3*IQ_SIZE-1) := (others => '0');
 
-	signal resetSig: std_logic := '0';
-	signal enSig: std_logic := '0'; 
+architecture Behavioral of UnitIQ is
+	signal resetSig, enSig: std_logic := '0';
 												
 	signal aiDispatch: ArgStatusInfo;
-	--signal asDispatch: ArgStatusStruct;	-- UNUSED
 	
 	signal aiArray: ArgStatusInfoArray(0 to IQ_SIZE-1);
 	signal aiNew: ArgStatusInfoArray(0 to PIPE_WIDTH-1);
-	--signal asArray: ArgStatusStructArray(0 to IQ_SIZE-1); -- UNUSED
 			
 	-- Interface between queue and dispatch
-	signal dispatchAccepting: std_logic := '0';		
-	signal queueSending: std_logic := '0';
-	
-	-- UNUSED, but prob. useful in future
-	signal physSourcesQ: PhysNameArray(0 to 3*IQ_SIZE-1) := (others => (others => '0'));
-	signal missingQ: std_logic_vector(0 to 3*IQ_SIZE-1) := (others => '0');
-	signal physSourcesDispatch: PhysNameArray(0 to 2) := (others => (others => '0'));
-	signal missingDispatch: std_logic_vector(0 to 2) := (others => '0');	
-	--------------------
-	
+	signal dispatchAccepting, queueSending: std_logic := '0';		
+
 	signal iqData: InstructionStateArray(0 to IQ_SIZE-1) := (others => defaultInstructionState);
-	
-	signal dispatchDataSig: InstructionState := defaultInstructionState;	
-	
-	signal toDispatch: InstructionState := defaultInstructionState;
+	signal dispatchDataSig, toDispatch: InstructionState := defaultInstructionState;
+
+		signal writtenTagsZ: PhysNameArray(0 to PIPE_WIDTH-1) := (others => (others => '0'));		
 
 	constant HAS_RESET_IQ: std_logic := '0'; --'1';
 	constant HAS_EN_IQ: std_logic := '0'; --'1';	
@@ -129,17 +115,16 @@ begin
 	)
 	port map(
 	 	clk => clk, reset => resetSig, en => enSig,
-	 	prevSending => prevSending,
+	 	--prevSending => prevSending,
 	 	prevSendingOK => prevSendingOK,
 	 	newData => newData,
 	 	nextAccepting => dispatchAccepting,
 		execEventSignal => execEventSignal,
-		--intSignal => intSignal,
 		execCausing => execCausing,
 		aiArray => aiArray,
 			aiNew => aiNew,
 		readyRegFlags => readyRegFlags,
-		accepting => accepting,
+		--accepting => accepting,
 			acceptingVec => acceptingVec,
 		queueSending => queueSending,
 		iqDataOut => iqData,
@@ -162,47 +147,25 @@ begin
 		queueData => iqData,
 		resultTags => resultTags,
 		nextResultTags => nextResultTags,
-		writtenTags => writtenTags,
+		writtenTags => writtenTagsZ,
 		aiArray => aiArray
 	);
-	
 
 	-- Dispatch stage			
-	DISPATCH_MAIN_LOGIC: entity work.SubunitDispatch(--Behavioral)
-																		Alternative)	
+	DISPATCH_MAIN_LOGIC: entity work.SubunitDispatch(Alternative)	
 	port map(
 	 	clk => clk, reset => resetSig, en => enSig,
 	 	prevSending => queueSending,
 	 	nextAccepting => nextAccepting,
 		execEventSignal => execEventSignal,
-		--intSignal => intSignal,
 		execCausing => execCausing,
-		ai => aiDispatch,
-			resultVals => resultVals,
-			regValues => regValues,
+		resultTags => resultTags,
+		resultVals => resultVals,
+		regValues => regValues,
 	 	stageDataIn => toDispatch,		
 		acceptingOut => dispatchAccepting,
-		--flowResponseOut => open, --flowResponseOutIQ,
-			sendingOut => sendingOut,
-		dispatchDataOut => dispatchDataSig, -- before arg updating
+		sendingOut => sendingOut,
 		stageDataOut => dataOutIQ
-	);
-		
-				--	updateInstructionArgValues2(dataOutIQ, aiPreDispatch, readyRegFlags);
-		
---			PRE_DISPATCH_TAG_MATCHER: entity work.DispatchTagMatcher(Behavioral)
---			port map(
---				dispatchData => toDispatch,
---				resultTags => resultTags,
---				ai => aiPreDispatch
---			);
-		
-		
-	DISPATCH_TAG_MATCHER: entity work.DispatchTagMatcher(Behavioral)
-	port map(
-		dispatchData => dispatchDataSig,
-		resultTags => resultTags,
-		ai => aiDispatch
 	);
 	
 	regsForDispatch <=

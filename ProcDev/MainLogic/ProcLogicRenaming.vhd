@@ -54,6 +54,8 @@ return StageDataMulti;
 
 	
 function prepareForAGU(insVec: StageDataMulti) return StageDataMulti;
+function prepareForBranch(insVec: StageDataMulti) return StageDataMulti;
+function prepareForAlu(insVec: StageDataMulti) return StageDataMulti;
 function prepareForStoreData(insVec: StageDataMulti) return StageDataMulti;
 
 
@@ -188,6 +190,8 @@ begin
 			--													If only secondary Exec cl, 'completed'  = '1'.
 			--													If both clusters,				both				'0'.
 				-- Set completed2 to false if it does need to be performed by the instruction
+				
+			res.data(i).controlInfo.completed := not res.data(i).classInfo.mainCluster;
 			res.data(i).controlInfo.completed2 := not res.data(i).classInfo.secCluster;
 				
 	end loop;			
@@ -341,6 +345,40 @@ begin
 		res.data(i).virtualArgs.sel(2) := '0';
 		res.data(i).physicalArgs.sel(2) := '0';
 		res.data(i).argValues.missing(2) := '0';
+	end loop;
+	return res;
+end function;
+
+function prepareForBranch(insVec: StageDataMulti) return StageDataMulti is
+	variable res: StageDataMulti := insVec;
+begin
+	for i in 0 to PIPE_WIDTH-1 loop
+		if res.data(i).operation /= (System, sysMfc) then
+			res.data(i).virtualDestArgs.sel := (others => '0');		
+			res.data(i).virtualDestArgs.d0 := (others => '0');
+			res.data(i).physicalDestArgs.sel := (others => '0');			
+			res.data(i).physicalDestArgs.d0 := (others => '0');
+		end if;
+		res.data(i).constantArgs.imm := res.data(i).target;
+	end loop;
+	return res;
+end function;
+
+function prepareForAlu(insVec: StageDataMulti) return StageDataMulti is
+	variable res: StageDataMulti := insVec;
+begin
+	for i in 0 to PIPE_WIDTH-1 loop
+		if 	 res.data(i).operation = (Jump, jump) and isNonzero(res.data(i).virtualDestArgs.d0) = '1'
+			and res.data(i).virtualDestArgs.sel(0) = '1'
+		then
+			res.data(i).operation := (Alu, arithAdd);
+		
+			res.data(i).physicalArgs.s0 := (others => '0');
+			res.data(i).argValues.zero(0) := '1';
+			res.data(i).argValues.missing(0) := '0';
+			
+			res.data(i).constantArgs.imm := res.data(i).result;
+		end if;
 	end loop;
 	return res;
 end function;

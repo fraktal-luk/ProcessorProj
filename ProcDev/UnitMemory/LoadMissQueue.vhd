@@ -2,9 +2,9 @@
 -- Company: 
 -- Engineer: 
 -- 
--- Create Date:    23:57:56 12/11/2016 
+-- Create Date:    22:39:00 03/19/2017 
 -- Design Name: 
--- Module Name:    MemoryUnit - Behavioral 
+-- Module Name:    LoadMissQueue - Behavioral 
 -- Project Name: 
 -- Target Devices: 
 -- Tool versions: 
@@ -29,7 +29,6 @@ use IEEE.STD_LOGIC_1164.ALL;
 --library UNISIM;
 --use UNISIM.VComponents.all;
 
-
 use work.ProcBasicDefs.all;
 use work.Helpers.all;
 
@@ -50,8 +49,8 @@ use work.ProcLogicMemory.all;
 
 use work.BasicCheck.all;
 
-
-entity MemoryUnit is
+ 
+entity LoadMissQueue is -- TODO: this is copy-paste from MemoryUnit - should be done by parameters or so!
 	generic(
 		QUEUE_SIZE: integer := 4;
 		CLEAR_COMPLETED: boolean := true
@@ -83,11 +82,10 @@ entity MemoryUnit is
 		sendingSQOut: out std_logic;
 		dataOutSQ: out InstructionState
 	);
-end MemoryUnit;
+end LoadMissQueue;
 
 
-
-architecture Behavioral of MemoryUnit is
+architecture Behavioral of LoadMissQueue is
 	constant zeroMask: std_logic_vector(0 to PIPE_WIDTH-1) := (others => '0');
 
 	signal wrAddress, wrData, sendingSQ: std_logic := '0';
@@ -98,17 +96,36 @@ architecture Behavioral of MemoryUnit is
 	signal content, contentNext, contentUpdated:
 					InstructionSlotArray(0 to QUEUE_SIZE-1) := (others => DEFAULT_INSTRUCTION_SLOT);
 	signal contentData: InstructionStateArray(0 to QUEUE_SIZE-1)
-																			:= (others => DEFAULT_INSTRUCTION_STATE);
+																			:= (others => DEFAULT_INSTRUCTION_STATE);					
 	signal contentDataNext: InstructionStateArray(0 to QUEUE_SIZE-1)
 																			:= (others => DEFAULT_INSTRUCTION_STATE);
 	signal contentMaskNext, matchingA, matchingD,
-								matchingShA, matchingShD: std_logic_vector(0 to QUEUE_SIZE-1) := (others => '0'); 
+				matchingShA, matchingShD, firstReadyVec, sendingVec
+				: std_logic_vector(0 to QUEUE_SIZE-1) := (others => '0'); 
 	signal sqOutData, sqOutData_2: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
 
 
 	signal bufferDrive: FlowDriveBuffer := (killAll => '0', lockAccept => '0', lockSend => '0',
 																others=>(others=>'0'));
 	signal bufferResponse: FlowResponseBuffer := (others=>(others=>'0'));
+	
+	
+	
+	function selectReady(content: InstructionStateArray; firstReadyVec: std_logic_vector)
+	return StageDataMulti is
+		variable res: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
+	begin
+		for i in 0 to firstReadyVec'length-1 loop
+			res.data(0) := content(i);		
+			if firstReadyVec(i) = '1' then
+				res.fullMask(0) := '1';
+				exit;
+			end if;
+		end loop;
+		
+		return res;
+	end function;
+	
 begin				
 		fullMask <= extractFullMask(content);
 		livingMask <= fullMask and not killMask;
@@ -116,38 +133,45 @@ begin
 		matchingA <= findMatching(content, dataA);
 		matchingD <= findMatching(content, dataD);
 							
-		matchingShA <= queueMaskNext(matchingA, zeroMask,
+		sendingVec <= firstReadyVec when nextAccepting = '1' else (others => '0');					
+							
+		-- TODO!
+		matchingShA <= lmMaskNext(matchingA, zeroMask,
 																 binFlowNum(bufferResponse.living),
 																 --binFlowNum(bufferResponse.sending),
-																	countOnes(sqOutData.fullMask),
+																 sendingVec,
 																 prevSending);																
-
-		matchingShD <= queueMaskNext(matchingD, zeroMask,
+		matchingShD <= lmMaskNext(matchingD, zeroMask,
 																 binFlowNum(bufferResponse.living),
 																 --binFlowNum(bufferResponse.sending),
-																	countOnes(sqOutData.fullMask),
+																 sendingVec,
 																 prevSending);
-			
-		contentDataNext <= storeQueueNext(extractData(content), livingMask,
+		
+		-- TODO: enable sending from any slot! And preserve mem address (when enqueueing, don't clear it!)
+		--			Add vector with position of first ready
+		contentDataNext <= lmQueueNext(extractData(content), livingMask,
 																 dataIn.data, dataIn.fullMask,
 																 binFlowNum(bufferResponse.living),
 																 --binFlowNum(bufferResponse.sending),
-																	countOnes(sqOutData.fullMask),
+																	sendingVec,
 																 prevSending,
 																 dataA, dataD, wrAddress, wrData,
 																 matchingShA, matchingShD,
 																 CLEAR_COMPLETED);
-
-		contentMaskNext <= queueMaskNext(livingMask, dataIn.fullMask,
+		-- TODO: enable sending from any slot!
+		contentMaskNext <= lmMaskNext(livingMask, dataIn.fullMask,
 																 binFlowNum(bufferResponse.living),
 																 --binFlowNum(bufferResponse.sending),
-																	countOnes(sqOutData.fullMask),
+																 sendingVec,
 																 prevSending);
 		contentUpdated <= makeSlotArray(contentDataNext, contentMaskNext);		
 		contentNext <= contentUpdated;
 		
-		--sqOutData_2 <= findReadySQ(extractData(content), livingMask, nextAccepting);
-		sqOutData	<= findCommittingSQ(extractData(content), livingMask, groupCtrNext);
+			firstReadyVec <= findFirstFilled(extractData(content), livingMask, nextAccepting);
+		
+		-- TODO: use firstReadyVec to select!
+		sqOutData	<= --findCommittingSQ(extractData(content), livingMask, groupCtrNext);
+							selectReady(extractData(content), firstReadyVec); -- like this!
 				
 			wrAddress <= storeAddressWr;
 			wrData <= storeValueWr;
@@ -160,9 +184,9 @@ begin
 			dataOutSQ <= sqOutData.data(0); -- CAREFUL, TEMP!
 							
 			--fullMask <= extractFullMask(content); -- DUPLICATE!
-			
+
 			contentData <= extractData(content);
-			
+								
 			process (clk)
 			begin
 				if rising_edge(clk) then			
@@ -173,7 +197,7 @@ begin
 					--			flow numbers, while the validity of those numbers is checked by slot logic
 					checkBuffer(extractData(content), fullMask, extractData(contentNext),
 																				extractFullMask(contentNext),
-										bufferDrive, bufferResponse);
+										bufferDrive, bufferResponse);					
 				end if;
 			end process;
 					

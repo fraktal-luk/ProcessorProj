@@ -22,10 +22,12 @@ use work.GeneralPipeDev.all;
 
 package ProcLogicIQ is				
 
-function getDispatchArgValues(ins: InstructionState; vals: MwordArray) return InstructionState;
+function getDispatchArgValues(ins: InstructionState;-- ai: ArgStatusInfo;
+										vals: MwordArray)
+return InstructionState;
 
-function updateDispatchArgs(ins: InstructionState; vals: MwordArray; regValues: MwordArray;
-										ai: ArgStatusInfo)
+function updateDispatchArgs(ins: InstructionState; vals: MwordArray; regValues: MwordArray) --;
+										--ai: ArgStatusInfo)
 return InstructionState;
 
 
@@ -82,124 +84,197 @@ end ProcLogicIQ;
 
 package body ProcLogicIQ is
 
-function getDispatchArgValues(ins: InstructionState; vals: MwordArray) return InstructionState is
-	variable res: InstructionState := ins;
+-- pragma synthesis off
+function dispatchArgHistory(avs: InstructionArgValues) return InstructionArgValues is
+	variable res: InstructionArgValues := avs;
 begin
-	-- pragma synthesis off
-		res.argValues.hist0(2) := '-';
-		res.argValues.hist1(2) := '-';
-		res.argValues.hist2(2) := '-';
-	-- pragma synthesis on
-
-	if res.argValues.zero(0) = '1' then
-		res.argValues.arg0 := (others => '0');
-			-- pragma synthesis off		
-			res.argValues.hist0(2) := 'z';
-			-- pragma synthesis on			
-	end if;
-
-	if res.argValues.immediate = '1' then
-		res.argValues.arg1 := res.constantArgs.imm;
-			-- pragma synthesis off		
-			res.argValues.hist1(2) := 'i';
-			-- pragma synthesis on
-	elsif --false and
-			res.argValues.zero(1) = '1' then
-		res.argValues.arg1 := (others => '0');
-			-- pragma synthesis off		
-			res.argValues.hist1(2) := 'z';
-			-- pragma synthesis on
+	res.hist0(2) := '-';
+	res.hist1(2) := '-';
+	res.hist2(2) := '-';	
+	
+	if avs.zero(0) = '1' then
+		res.hist0(2) := 'z';	
 	end if;
 	
-	if res.argValues.zero(2) = '1' then
-		res.argValues.arg2 := (others => '0');
-			-- pragma synthesis off		
-			res.argValues.hist2(2) := 'z';		
-			-- pragma synthesis on
-	end if;	
+	if avs.immediate = '1' then
+		res.hist1(2) := 'i';		
+	elsif avs.zero(1) = '1' then
+		res.hist1(2) := 'z';	
+	end if;
+	
+	if avs.zero(2) = '1' then
+		res.hist2(2) := 'z';	
+	end if;		
+	
+	return res;
+end function;
+
+function updateArgHistory(avs: InstructionArgValues) return InstructionArgValues is
+	variable res: InstructionArgValues := avs;
+begin
+	res.hist0(3) := '-';
+	res.hist1(3) := '-';
+	res.hist2(3) := '-';
+	
+	if (avs.readyNext(0) and not avs.zero(0)) = '1' then
+		res.hist0(3) := 'n';	
+	elsif (avs.readyNow(0) and not avs.zero(0)) = '1' then
+	else
+		res.hist0(3) := 'r';	
+	end if;
+
+	if	(avs.readyNext(1) and not avs.zero(1) and not avs.immediate) = '1' then
+		res.hist1(3) := 'n';	
+	elsif (avs.immediate or (avs.readyNow(1) and not avs.zero(2))) = '1' then
+	else
+		res.hist1(3) := 'r';		
+	end if;
+
+	if (avs.readyNext(2) and not avs.zero(2)) = '1' then
+		res.hist2(3) := 'n';
+	elsif (avs.readyNow(2) and not avs.zero(2)) = '1' then	
+	else
+		res.hist2(3) := 'r';
+	end if;		
+		
+	return res;
+end function;
+-- pragma synthesis on
+
+
+function selectUpdatedArg(avs: InstructionArgValues; ind: integer; immed: std_logic; def: Mword;
+								  vals: MwordArray; regValues: MwordArray)
+return Mword is
+	variable res: Mword := def;
+	variable selector: std_logic_vector(1 downto 0) := "00";
+	variable tbl: MwordArray(0 to 3) := (others => (others => '0'));
+begin
+	
+	if	(avs.readyNext(ind) and not avs.zero(ind) and not immed) = '1' then
+		-- Use new value from Exec
+		res := vals(slv2u(avs.nextLocs(ind)));		
+			selector := avs.nextLocs(ind)(1 downto 0);
+	elsif (avs.readyNow(ind) and not avs.zero(ind)) = '1' then
+		res := def;
+			selector := "10";
+	else -- Use register value
+		res := regValues(ind);
+			selector := "11";
+	end if;
+		
+	tbl(0) := vals(0);
+	tbl(1) := vals(1);
+	tbl(2) := def;
+	tbl(3) := regValues(ind);
+	
+	case selector is
+		when "00" => 
+			res := tbl(0);
+		when "01" => 
+			res := tbl(1);
+		when "10" => 
+			res := tbl(2);
+		when others => 
+			res := tbl(3);
+	end case;
 	
 	return res;
 end function;
 
 
-function updateDispatchArgs(ins: InstructionState; vals: MwordArray; regValues: MwordArray;
-										ai: ArgStatusInfo)
+function getDispatchArgValues(ins: InstructionState;-- ai: ArgStatusInfo;
+										vals: MwordArray)
 return InstructionState is
 	variable res: InstructionState := ins;
-begin
-	-- pragma synthesis off
-		res.argValues.hist0(3) := '-';
-		res.argValues.hist1(3) := '-';
-		res.argValues.hist2(3) := '-';
-	-- pragma synthesis on
-
-	if 	res.argValues.readyNow(0) = '1' 
-		or res.argValues.zero(0) = '1'
-		then
-		-- Use what is already saved from FN
-		null;
-	elsif
-		res.argValues.readyNext(0) = '1' then
-		-- Use new value from Exec
-		res.argValues.arg0 := vals(slv2u(ins.argValues.nextLocs(0)));
-			res.argValues.missing(0) := '0';
-			res.argValues.missing(0) := not ai.ready(0);
-				-- pragma synthesis off			
-				res.argValues.hist0(3) := 'n';			
-				-- pragma synthesis on
+		variable v0, v1: std_logic_vector(1 downto 0) := "00";
+		variable selected0, selected1: Mword := (others => '0');
+begin			
+	res.argValues.arg0 := vals(slv2u(res.argValues.locs(0)));
+	
+	if res.argValues.immediate = '1' then
+		res.argValues.arg1 := res.constantArgs.imm;
 	else
-		-- Use register value
-		res.argValues.arg0 := regValues(0);
-			-- pragma synthesis off		
-			res.argValues.hist0(3) := 'r';		
-			-- pragma synthesis on
+		res.argValues.arg1 := vals(slv2u(res.argValues.locs(1)));
 	end if;
 	
+------ Different formulation for arg1 to use 2 LUTs rather than 3 per bit.
+--		 Doesn't work as expected, probably need to be directly forced in lower level.
+---------------------------------------
+--	v0 := res.argValues.locs(1)(1 downto 0);
+--	
+--	if res.argValues.immediate = '1' then
+--		v1 := "11";
+--	elsif res.argValues.locs(1)(2 downto 0) = "100" then
+--		v1 := "01";
+--	elsif res.argValues.locs(1)(2 downto 0) = "101" then
+--		v1 := "10";
+--	else
+--		v1 := "00";
+--	end if;
+--	
+--	case v0 is
+--		when "00" =>
+--			selected0 := vals(0);
+--		when "01" => 
+--			selected0 := vals(1);
+--		when "10" => 
+--			selected0 := vals(2);
+--		when others => 
+--			selected0 := vals(3);
+--	end case;		
+--	
+--	case v1 is
+--		when "00" =>
+--			selected1 := selected0;
+--		when "01" => 
+--			selected1 := vals(4);
+--		when "10" => 
+--			selected1 := vals(5);
+--		when others => 
+--			selected1 := res.constantArgs.imm;
+--	end case;
+--	
+--	res.argValues.arg1 := selected1;
+----------------------------------
 	
-	if 	res.argValues.readyNow(1) = '1'
-		or res.argValues.zero(1) = '1'
-		or res.argValues.immediate = '1'
-		then
-		-- Use what is already saved from FN
-		null;
-	elsif	
-		res.argValues.readyNext(1) = '1' then
-		-- Use new value from Exec
-		res.argValues.arg1 := vals(slv2u(ins.argValues.nextLocs(1)));
-			res.argValues.missing(1) := '0';
-			res.argValues.missing(1) := not ai.ready(1);
-				-- pragma synthesis off			
-				res.argValues.hist1(3) := 'n';			
-				-- pragma synthesis on
-	else
-		-- Use register value
-		res.argValues.arg1 := regValues(1);
-			-- pragma synthesis off		
-			res.argValues.hist1(3) := 'r';		
-			-- pragma synthesis on
-	end if;	
+	res.argValues.arg2 := vals(slv2u(res.argValues.locs(2)));
+
+	-- pragma synthesis off
+	res.argValues := dispatchArgHistory(res.argValues);
+	-- pragma synthesis on
 	
-	
-	if 	res.argValues.readyNow(2) = '1'
-		or res.argValues.zero(2) = '1'
-		then
-		-- Use what is already saved from FN
-		null;
-	elsif res.argValues.readyNext(2) = '1' then
-		-- Use new value from Exec
-		res.argValues.arg2 := vals(slv2u(ins.argValues.nextLocs(2)));
-			res.argValues.missing(2) := '0';
-			res.argValues.missing(2) := not ai.ready(2);
-				-- pragma synthesis off			
-				res.argValues.hist2(3) := 'n';			
-				-- pragma synthesis on
-	else
-		-- Use register value
-		res.argValues.arg2 := regValues(2);
-			-- pragma synthesis off		
-			res.argValues.hist2(3) := 'r';		
-			-- pragma synthesis on
-	end if;	
+	return res;
+end function;
+
+
+function updateDispatchArgs(ins: InstructionState; vals: MwordArray; regValues: MwordArray) --;
+										--ai: ArgStatusInfo)
+return InstructionState is
+	variable res: InstructionState := ins;
+	variable aa: MwordArray(0 to 5) := (others => (others => '0'));
+	variable ind: integer := 0;
+		variable selector: std_logic_vector(0 to 1) := "00";
+		variable tbl: MwordArray(0 to 3) := (others => (others => '0'));
+		variable carg0, carg1, carg2: Mword;
+begin
+	-- pragma synthesis off
+	res.argValues := updateArgHistory(res.argValues);
+	-- pragma synthesis on
+
+-- readyNext && not zero -> next val, readyNow && not zero -> keep, else -> reg
+
+	-- Clear 'missing' flag where readyNext indicates.
+	res.argValues.missing := res.argValues.missing and 
+								not (res.argValues.readyNext and not res.argValues.zero);
+
+	carg0 := selectUpdatedArg(res.argValues, 0, '0', res.argValues.arg0, vals, regValues);	
+	carg1 := selectUpdatedArg(res.argValues, 1, res.argValues.immediate, res.argValues.arg1, vals, regValues);	
+	carg2 := selectUpdatedArg(res.argValues, 2, '0', res.argValues.arg2, vals, regValues);	
+
+	res.argValues.arg0 := carg0;
+	res.argValues.arg1 := carg1;
+	res.argValues.arg2 := carg2;
+
 	return res;
 end function;
 
@@ -210,7 +285,7 @@ function getForwardingStatusInfoD2(av: in InstructionArgValues; pa: in Instructi
 is		
 	variable stored, ready, nextReady, written: std_logic_vector(0 to 2) := (others=>'0');
 	variable locs, nextLocs: SmallNumberArray(0 to 2) := (others=>(others=>'0'));
-	variable vals: MwordArray(0 to 2) := (others=>(others=>'0'));
+	--variable vals: MwordArray(0 to 2) := (others=>(others=>'0'));
 	variable res: ArgStatusInfo;
 begin
 	stored := not av.missing;	
@@ -271,7 +346,7 @@ begin
 		res.written := written;
 	res.ready := ready;
 	res.locs := locs;
-	res.vals := vals;
+	--res.vals := vals;
 	res.nextReady := nextReady;
 	res.nextLocs := nextLocs;
 	
@@ -443,6 +518,8 @@ begin
 	-- CAREFUL! DEPREC statement?
 	res.argValues.newInQueue := isNew;
 	
+		res.basicInfo := DEFAULT_BASIC_INFO;	
+	
 	return res;
 end function;
 
@@ -466,81 +543,52 @@ begin
 		rrf := readyRegFlags(3*slv2u(tmp8) to 3*slv2u(tmp8) + 2);
 		res.argValues.missing := res.argValues.missing and not rrf;
 	end if;
-		-- pragma synthesis off	
-			res.argValues.hist0(1) := '-';
-			res.argValues.hist0(2) := '-';
-			res.argValues.hist0(3) := '-';
-		-- pragma synthesis on
+
+	-- pragma synthesis off	
+	res.argValues.hist0(1) := '-';
+	res.argValues.hist0(2) := '-';
+	res.argValues.hist0(3) := '-';
 	
-	-- For 'nextReady'
 	if ai.nextReady(0) = '1' then
-		res.argValues.missing(0) := '0';
-		res.argValues.readyNext(0) := '1';
-			-- pragma synthesis off			
-			res.argValues.hist0(1) := 'N';
-			-- pragma synthesis on			
+		res.argValues.hist0(1) := 'N';
 	end if;		
 
-	if ai.nextReady(1) = '1' then
-		res.argValues.missing(1) := '0';
-		res.argValues.readyNext(1) := '1';
-			-- pragma synthesis off				
-			res.argValues.hist1(1) := 'N';
-			-- pragma synthesis on		
+	if ai.nextReady(1) = '1' then			
+		res.argValues.hist1(1) := 'N';
 	end if;
 
-	if ai.nextReady(2) = '1' then
-		res.argValues.missing(2) := '0';
-		res.argValues.readyNext(2) := '1';
-			-- pragma synthesis off				
-			res.argValues.hist2(1) := 'N';
-			-- pragma synthesis on			
-	end if;
-
-	-- For 'ready'
+	if ai.nextReady(2) = '1' then				
+		res.argValues.hist2(1) := 'N';
+	end if;			
+	
 	if ai.ready(0) = '1' then
-		--res.argValues.missing(0) := '0'; -- NOTE: it would increase delay, unneeded with full 'nextReady'
-		res.argValues.readyNow(0) := '1';
-		res.argValues.arg0 := ai.vals(0);
-			-- pragma synthesis off				
-			res.argValues.hist0(1) := 'u';
-			-- pragma synthesis on			
+		res.argValues.hist0(1) := 'u';
 	end if;		
 
 	if ai.ready(1) = '1' then
-		--res.argValues.missing(1) := '0';
-		res.argValues.readyNow(1) := '1';
-		res.argValues.arg1 := ai.vals(1);
-			-- pragma synthesis off				
-			res.argValues.hist1(1) := 'u';
-			-- pragma synthesis on			
+		res.argValues.hist1(1) := 'u';
 	end if;
 
 	if ai.ready(2) = '1' then
-		--res.argValues.missing(2) := '0';
-		res.argValues.readyNow(2) := '1';
-		res.argValues.arg2 := ai.vals(2);
-			-- pragma synthesis off				
-			res.argValues.hist2(1) := 'u';
-			-- pragma synthesis on			
-	end if;
-		
+		res.argValues.hist2(1) := 'u';
+	end if;			
+	-- pragma synthesis on
+
+
+	res.argValues.missing := res.argValues.missing and not ai.nextReady;
+	res.argValues.readyNext := ai.nextReady;
+	-- CAREFUL, NOTE: updating 'missing' with ai.ready would increase delay, unneeded with full 'nextReady'	
+	res.argValues.readyNow := ai.ready;	
+
 	res.argValues.locs := ai.locs;	
 	res.argValues.nextLocs := ai.nextLocs;
-	
-	res.argValues.arg0 := ai.vals(0);
-	res.argValues.arg1 := ai.vals(1);
-	res.argValues.arg2 := ai.vals(2);
-	
-		--	res.virtualArgs := defaultVirtualArgs;
-		--	res.virtualDestArgs := defaultVirtualDestArgs;
 
 		res.bits := (others => '0');
 		res.result := (others => '0');
 		res.target := (others => '0');		
 --		
 		res.controlInfo.completed := '0';
-		
+			res.basicInfo := DEFAULT_BASIC_INFO;
 		res.controlInfo.newEvent := '0';
 		res.controlInfo.newInterrupt := '0';
 		res.controlInfo.newException := '0';
