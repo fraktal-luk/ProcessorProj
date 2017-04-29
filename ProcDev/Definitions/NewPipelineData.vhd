@@ -46,6 +46,7 @@ package NewPipelineData is
 	constant SQ_SIZE: natural := 4;
 	constant LQ_SIZE: natural := 4;
 	constant LMQ_SIZE: natural := 4; -- !!!
+	constant BQ_SIZE: natural := 4;
 	
 	constant CQ_SIZE: natural := PIPE_WIDTH * 3;
 	
@@ -148,6 +149,7 @@ type InstructionClassInfo is record
 	branchAlways: std_logic; -- either taken or not (only constant branches are known at decoding)
 	branchCond: std_logic;
 	branchReg: std_logic;
+		branchLink: std_logic;
 	system: std_logic; -- ??
 	--memory: std_logic; -- ??
 	fetchLock: std_logic;
@@ -481,6 +483,7 @@ begin
 											branchAlways => '0',
 											branchCond => '0',
 											branchReg => '0',
+												branchLink => '0',
 											system => '0',
 											--memory: std_logic; -- ??
 												-- ?? load => '0',

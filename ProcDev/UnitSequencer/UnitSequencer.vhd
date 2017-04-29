@@ -93,11 +93,16 @@ entity UnitSequencer is
 		robDataLiving: in StageDataMulti;
 		sendingFromROB: in std_logic;
 		
+			sendingFromBQ: in std_logic;
+			dataFromBQ: in InstructionState;
+		
 			committing: out std_logic;
 		
 		-- Counter outputs
 		commitGroupCtrOut: out SmallNumber;
 		commitGroupCtrNextOut: out SmallNumber;
+		
+		commitGroupCtrIncOut: out SmallNumber;
 		
 			committedSending: out std_logic;
 			committedDataOut: out StageDataMulti;
@@ -153,6 +158,7 @@ architecture Behavioral of UnitSequencer is
 	signal renameCtr, renameCtrNext, commitCtr, commitCtrNext: SmallNumber := (others => '1');
 	signal renameGroupCtr, renameGroupCtrNext, commitGroupCtr, commitGroupCtrNext: SmallNumber :=
 																						INITIAL_GROUP_TAG;
+		signal commitGroupCtrInc: SmallNumber := (others => '0');
 	
 	signal effectiveMask: std_logic_vector(0 to PIPE_WIDTH-1) := (others => '0');
 	
@@ -162,6 +168,8 @@ architecture Behavioral of UnitSequencer is
 	signal dataToLastEffective, dataFromLastEffective: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;	
 			
 	signal eiEvents: StageMultiEventInfo;
+			
+		signal newEffectiveTarget: Mword := (others => '0');
 			
 			signal ch0, ch1: std_logic := '0';
 				
@@ -194,25 +202,13 @@ begin
 		--		stage0EventInfo, execEventSignal, execCausing, eiEvents
 		-- $OUTPUT:
 		-- 	execOrIntCausing, execOrIntEventSignal, killVecOut, generalEvents, 
-		
-		signal eventInsArray: InstructionSlotArray(0 to N_EVENT_AREAS-1) 
-							:= (others => DEFAULT_INSTRUCTION_SLOT);
-		signal eventCauseArrayS: InstructionSlotArray(0 to N_EVENT_AREAS-1)
-							:= (others => DEFAULT_INSTRUCTION_SLOT);							
+						
 	begin	
-		eventCauseArrayS(4) <= (stage0EventInfo.eventOccured, stage0EventInfo.causing);
-
-		eventCauseArrayS(6) <= (execEventSignal, execCausing);
-		eventCauseArrayS(7) <= (eiEvents.eventOccured, eiEvents.causing);
+			killVecOut(6) <= eiEvents.eventOccured;
+			killVecOut(5) <= execOrIntEventSignal;
+			killVecOut(0 to 4) <= newGeneralEvents.affectedVec;
 		
-		eventInsArray <= TEMP_events(eventCauseArrayS);	-- internal
-		killVecOut <= extractFullMask(eventInsArray);	-- $MODULE_OUT	
-		--	killVecOut(6) <= eiEvents.eventOccured;
-		--	killVecOut(5) <= execOrIntEventSignal;
-		--	killVecOut(0 to 4) <= newGeneralEvents.affectedVec;
-		
-		generalEvents <= getGeneralEvents(eventInsArray);	-- generalEvents: only this module
-			--					newGeneralEvents;
+		generalEvents <= newGeneralEvents;
 			newGeneralEvents <= NEW_generalEvents(
 											stageDataOutPC,
 											eiEvents.eventOccured, eiEvents.causing,
@@ -233,7 +229,7 @@ begin
 		execOrIntCausingOut <= execOrIntCausing; -- $MODULE_OUT
 	end block;
 
-			stageDataToPC <= newPCData2(
+			stageDataToPC <= newPCData(
 											stageDataOutPC,
 											eiEvents.eventOccured, eiEvents.causing,
 											execEventSignal, execCausing,
@@ -241,8 +237,6 @@ begin
 											pcNext, causingNext
 										);
 									--newGeneralEvents.newStagePC;					
-
-	stageDataToPC_C <= newPCData(stageDataOutPC, generalEvents, pcNext, causingNext);			
 
 	-- CAREFUL: prevSending normally means that 'full' bit inside will be set, but
 	--				when en = '0' this won't happen.
@@ -416,7 +410,7 @@ begin
 				readyRegFlagsNextV
 			);
 	
-		SUBUNIT_RENAME: entity work.GenericStageMulti(Behavioral)
+		SUBUNIT_RENAME: entity work.GenericStageMulti(Renaming)
 		port map(
 			clk => clk, reset => resetSig, en => enSig,
 			
@@ -461,6 +455,8 @@ begin
 			--						 renaming can't be done! So this delay may be caused by this problem.
 
 		renameLockEnd <= renameLockState and renameLockRelease;
+
+		commitGroupCtrInc <= i2slv(slv2u(commitGroupCtr) + PIPE_WIDTH, SMALL_NUMBER_SIZE);
 
 	COMMON_STATE: block
 	begin
@@ -517,11 +513,60 @@ begin
 		lockCommand => '0'
 	);
 		
+			-- Tracking of target:
+			--			'target' field of last effective will hold the address of next instruction
+			--			to commit after lastEffective; it will be known with certainty because lastEffective is 
+			--			already committed. 
+			--			When committing a taken branch -> fill with target from BQ output
+			--			When committing normal op -> increment by length of the op 
+			--			When committing 1st op after expception/int -> fill with content of tempBuffer*
+			--			*tempBuffer will be set to handler address of exception/int when it's signaled
+			--			
+			--			The 'target' field will be used to update return address for exc/int
+			NEW_TARGET: block
+				signal lastEffectiveData: InstructionState := DEFAULT_INSTRUCTION_STATE;
+				signal committingTakenBranch, tempBuffWaiting: std_logic := '0';
+				signal tempBuffValue, normalIncTarget, incTarget, incArg: Mword := (others => '0');
+			begin
+				
+				SYNCH: process(clk)
+				begin
+					if rising_edge(clk) then
+						if eiEvents.eventOccured = '1' then 
+							tempBuffWaiting <= '1';
+							tempBuffValue <= stageDataToPC.basicInfo.ip;
+						elsif sendingFromROB = '1' then -- when committing
+							tempBuffWaiting <= '0';
+						end if;
+					end if;
+				end process;
+				
+				committingTakenBranch <= sendingFromROB and dataToLastEffective.data(0).controlInfo.hasBranch;
+				
+				TRG_ADDER: entity work.IntegerAdder
+				port map(
+					inA => incArg, -- dataFromLastEffective.data(0).target,
+					inB => getAddressIncrement(dataFromLastEffective.data(0)),
+					output => incTarget
+				);
+				
+				incArg <= tempBuffValue when tempBuffWaiting = '1' else dataFromLastEffective.data(0).target;
+				
+				newEffectiveTarget <= --tempBuffValue when tempBuffWaiting = '1' 
+											 dataFromBQ.argValues.arg1 when committingTakenBranch = '1'		 
+									else	 incTarget;
+			end block;
+		
 			interruptCause.controlInfo.hasInterrupt <= intSignal;
 			interruptCause.controlInfo.hasReset <= start;
 
 			dataToLastEffective.fullMask(0) <= sendingToCommit;
-			dataToLastEffective.data(0) <= getLastEffective(stageDataToCommit);
+			dataToLastEffective.data(0) <= 
+										setInstructionTarget(
+											getLastEffective(stageDataToCommit)--,--,
+											, newEffectiveTarget)
+										--)
+										;
 
 			LAST_EFFECTIVE_SLOT: entity work.GenericStageMulti(LastEffective)
 			port map(
@@ -552,6 +597,8 @@ begin
 	
 	commitGroupCtrOut <= commitGroupCtr;
 	commitGroupCtrNextOut <= commitGroupCtrNext;
+
+	commitGroupCtrIncOut <= commitGroupCtrInc;
 
 		newPhysDests <= newPhysDestsIn;
 		newPhysDestPointer <= newPhysDestPointerIn;

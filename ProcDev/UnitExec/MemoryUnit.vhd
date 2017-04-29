@@ -61,9 +61,9 @@ entity MemoryUnit is
 		reset: in std_logic;
 		en: in std_logic;
 
-			acceptingOut: out std_logic;
-			prevSending: in std_logic;
-			dataIn: in StageDataMulti;
+		acceptingOut: out std_logic;
+		prevSending: in std_logic;
+		dataIn: in StageDataMulti;
 
 		storeAddressWr: in std_logic;
 		storeValueWr: in std_logic;
@@ -71,40 +71,32 @@ entity MemoryUnit is
 		storeAddressDataIn: in InstructionState;
 		storeValueDataIn: in InstructionState;
 
-			committing: in std_logic;
-			groupCtrNext: in SmallNumber;
+		committing: in std_logic;
+		groupCtrNext: in SmallNumber;
+		groupCtrInc: in SmallNumber;
 
 		execEventSignal: in std_logic;
 		execCausing: in InstructionState;
 		
-		nextAccepting: in std_logic;
-		
-		acceptingOutSQ: out std_logic;
+		nextAccepting: in std_logic;		
 		sendingSQOut: out std_logic;
 		dataOutSQ: out InstructionState
 	);
 end MemoryUnit;
 
 
-
 architecture Behavioral of MemoryUnit is
 	constant zeroMask: std_logic_vector(0 to PIPE_WIDTH-1) := (others => '0');
 
-	signal wrAddress, wrData, sendingSQ: std_logic := '0';
-	signal dataA, dataD: InstructionState := DEFAULT_INSTRUCTION_STATE;
-							
-	signal fullMask, livingMask, killMask: std_logic_vector(0 to QUEUE_SIZE-1) := (others => '0');
+	signal sendingSQ: std_logic := '0';							
 
 	signal content, contentNext, contentUpdated:
 					InstructionSlotArray(0 to QUEUE_SIZE-1) := (others => DEFAULT_INSTRUCTION_SLOT);
-	signal contentData: InstructionStateArray(0 to QUEUE_SIZE-1)
+	signal contentData, contentDataNext: InstructionStateArray(0 to QUEUE_SIZE-1)
 																			:= (others => DEFAULT_INSTRUCTION_STATE);
-	signal contentDataNext: InstructionStateArray(0 to QUEUE_SIZE-1)
-																			:= (others => DEFAULT_INSTRUCTION_STATE);
-	signal contentMaskNext, matchingA, matchingD,
+	signal fullMask, livingMask, killMask, contentMaskNext, matchingA, matchingD,
 								matchingShA, matchingShD: std_logic_vector(0 to QUEUE_SIZE-1) := (others => '0'); 
-	signal sqOutData, sqOutData_2: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
-
+	signal sqOutData: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
 
 	signal bufferDrive: FlowDriveBuffer := (killAll => '0', lockAccept => '0', lockSend => '0',
 																others=>(others=>'0'));
@@ -113,53 +105,41 @@ begin
 		fullMask <= extractFullMask(content);
 		livingMask <= fullMask and not killMask;
 							
-		matchingA <= findMatching(content, dataA);
-		matchingD <= findMatching(content, dataD);
+		matchingA <= findMatching(content, storeAddressDataIn); --dataA);
+		matchingD <= findMatching(content, storeValueDataIn); -- dataD);
 							
 		matchingShA <= queueMaskNext(matchingA, zeroMask,
-																 binFlowNum(bufferResponse.living),
-																 --binFlowNum(bufferResponse.sending),
-																	countOnes(sqOutData.fullMask),
+																 binFlowNum(bufferResponse.full),
+																 countOnes(sqOutData.fullMask),
 																 prevSending);																
 
 		matchingShD <= queueMaskNext(matchingD, zeroMask,
-																 binFlowNum(bufferResponse.living),
-																 --binFlowNum(bufferResponse.sending),
-																	countOnes(sqOutData.fullMask),
+																 binFlowNum(bufferResponse.full),
+																 countOnes(sqOutData.fullMask),
 																 prevSending);
 			
-		contentDataNext <= storeQueueNext(extractData(content), livingMask,
+		contentDataNext <= storeQueueNext(extractData(content), fullMask,
 																 dataIn.data, dataIn.fullMask,
-																 binFlowNum(bufferResponse.living),
-																 --binFlowNum(bufferResponse.sending),
-																	countOnes(sqOutData.fullMask),
+																 binFlowNum(bufferResponse.full),
+																 countOnes(sqOutData.fullMask),
 																 prevSending,
-																 dataA, dataD, wrAddress, wrData,
+																 storeAddressDataIn, --dataA
+																 storeValueDataIn,--dataD,
+																 storeAddressWr, storeValueWr,
 																 matchingShA, matchingShD,
 																 CLEAR_COMPLETED);
 
 		contentMaskNext <= queueMaskNext(livingMask, dataIn.fullMask,
 																 binFlowNum(bufferResponse.living),
-																 --binFlowNum(bufferResponse.sending),
-																	countOnes(sqOutData.fullMask),
+																 countOnes(sqOutData.fullMask),
 																 prevSending);
 		contentUpdated <= makeSlotArray(contentDataNext, contentMaskNext);		
 		contentNext <= contentUpdated;
 		
-		--sqOutData_2 <= findReadySQ(extractData(content), livingMask, nextAccepting);
-		sqOutData	<= findCommittingSQ(extractData(content), livingMask, groupCtrNext);
-				
-			wrAddress <= storeAddressWr;
-			wrData <= storeValueWr;
-		
-			dataA <= storeAddressDataIn;
-			dataD <= storeValueDataIn;
+			sqOutData <= findCommittingSQ(extractData(content), livingMask, groupCtrInc, committing);
 					
-			acceptingOutSQ <= '1'; -- TEMP!						
 			sendingSQ <= isNonzero(sqOutData.fullMask);
 			dataOutSQ <= sqOutData.data(0); -- CAREFUL, TEMP!
-							
-			--fullMask <= extractFullMask(content); -- DUPLICATE!
 			
 			contentData <= extractData(content);
 			
@@ -177,8 +157,7 @@ begin
 				end if;
 			end process;
 					
-			SLOT_HBUFF: entity work.BufferPipeLogic(Behavioral)
-																	--BehavioralDirect)
+			SLOT_BUFF: entity work.BufferPipeLogic(Behavioral)
 			generic map(
 				CAPACITY => QUEUE_SIZE, -- PIPE_WIDTH*2*2
 				MAX_OUTPUT => PIPE_WIDTH,
@@ -190,13 +169,9 @@ begin
 				flowResponse => bufferResponse
 			);						
 
-			bufferDrive.prevSending <= 
-							num2flow(countOnes(dataIn.fullMask)) when prevSending = '1' else (others => '0');
-			bufferDrive.kill <= num2flow(countOnes(killMask));
-			bufferDrive.nextAccepting <= num2flow(countOnes(sqOutData.fullMask));
-			acceptingOut <= --'1' when binFlowNum(bufferResponse.living) >= PIPE_WIDTH else '0';
-								 --not isNonzero(livingMask(QUEUE_SIZE-PIPE_WIDTH to QUEUE_SIZE-1));		
-								 not livingMask(QUEUE_SIZE-PIPE_WIDTH);
+	bufferDrive.prevSending <=num2flow(countOnes(dataIn.fullMask)) when prevSending = '1' else (others => '0');
+	bufferDrive.kill <= num2flow(countOnes(killMask));
+	bufferDrive.nextAccepting <= num2flow(countOnes(sqOutData.fullMask));
 					
 					KILLERS: for i in 0 to QUEUE_SIZE-1 generate
 						signal before: std_logic;
@@ -212,6 +187,8 @@ begin
 						killMask(i) <= killByTag(before, execEventSignal, '0') -- before and execEventSignal
 												and fullMask(i);									
 					end generate;
+					
+	acceptingOut <= not fullMask(QUEUE_SIZE-PIPE_WIDTH); -- when last slot free					
 	sendingSQOut <= sendingSQ;
 end Behavioral;
 

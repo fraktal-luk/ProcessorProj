@@ -181,7 +181,7 @@ function setCompleted(content: StageDataROB; refTag: SmallNumber;
 return StageDataROB;
 
 function killInROB(content: StageDataROB; refTag: SmallNumber; killTag: SmallNumber;
-						killSignal: std_logic)
+						killSignal: std_logic; fromCommitted: std_logic)
 return StageDataROB;
 
 end ProcLogicROB;
@@ -312,11 +312,20 @@ begin
 			if execReady2(i) = '1' then
 				-- CAREFUL! If the operation caused an exception, it must be noted here too!				
 				-- TODO: remember to add branch info when taken/not taken stats are needed for predictor!
---				if execEnds(i).controlInfo.hasException = '1' then	
---					res.data(index).data(indL).controlInfo.hasException := '1';
---					res.data(index).data(indL).controlInfo.hasEvent := '1';
---				end if;
+				if execEnds2(i).controlInfo.hasException = '1' then	
+					res.data(index).data(indL).controlInfo.hasException := '1';
+					res.data(index).data(indL).controlInfo.hasEvent := '1';
+				end if;
 				res.data(index).data(indL).controlInfo.completed2 := '1';
+				
+					if execEnds2(i).controlInfo.hasBranch = '1' then
+						res.data(index).data(indL).controlInfo.hasBranch := '1';
+					end if;
+					
+				
+					if i = 3 then
+					--	res.data(index).data(indL).target := execEnds2(i).target;
+					end if;
 			end if;
 		end loop;
 	
@@ -325,12 +334,13 @@ end function;
 
 
 function killInROB(content: StageDataROB; refTag: SmallNumber; killTag: SmallNumber;
-						killSignal: std_logic)
+						killSignal: std_logic; fromCommitted: std_logic)
 return StageDataROB is
 	variable res: StageDataROB := content;
 	variable indH, indL, indRef, index, indexP1: integer;
 	
 	constant CLEAR_EMPTY_SLOTS_ROB: boolean := false;
+	variable matched: boolean := false;
 begin
 	if killSignal = '0' then
 		return res;
@@ -346,7 +356,19 @@ begin
 		-- just index+1
 		indexP1 := (indH - indRef) mod 2**(SMALL_NUMBER_SIZE - LOG2_PIPE_WIDTH);
 	
+	if fromCommitted = '1' then
+		matched := true;
+	end if;
+	
 	for i in 0 to ROB_SIZE-1 loop
+			-- For slots after the affected one
+			if matched then
+				res.fullMask(i) := '0';
+				if CLEAR_EMPTY_SLOTS_ROB then
+					res.data(i) := DEFAULT_STAGE_DATA_MULTI;
+				end if;				
+			end if;
+			
 		if i + 1 = indexP1 then
 			for j in 0 to PIPE_WIDTH-1 loop
 				if j > indL then
@@ -356,12 +378,15 @@ begin
 					end if;	
 				end if;
 			end loop;
-		elsif i + 1 > indexP1 then
-			res.fullMask(i) := '0';
-			if CLEAR_EMPTY_SLOTS_ROB then
-				res.data(i) := DEFAULT_STAGE_DATA_MULTI;
-			end if;	
+			
+			matched := true;
+--		elsif i + 1 > indexP1 then
+--			res.fullMask(i) := '0';
+--			if CLEAR_EMPTY_SLOTS_ROB then
+--				res.data(i) := DEFAULT_STAGE_DATA_MULTI;
+--			end if;	
 		end if;
+				
 	end loop;
 	return res;
 end function;						

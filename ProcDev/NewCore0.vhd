@@ -59,8 +59,8 @@ entity NewCore0 is
 			  
 					dread: out std_logic;
 					dwrite: out std_logic;
-			  dadrvalid: out std_logic;
-			  drw: out std_logic; -- read or write
+			  dadrvalid: out std_logic; -- DEPREC
+			  drw: out std_logic; -- DEPREC
            dadr : out  Mword;
 					doutadr: out Mword;
 			  dvalid: in std_logic;

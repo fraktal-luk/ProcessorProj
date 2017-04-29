@@ -56,7 +56,7 @@ entity TestCQPart0 is
 				
 		inputInstructions: in InstructionStateArray(0 to 3);
 		
-		selectedToCQ: in std_logic_vector(0 to 3) := (others=>'0');
+		--selectedToCQ: in std_logic_vector(0 to 3) := (others=>'0');
 		whichAcceptedCQ: out std_logic_vector(0 to 3) := (others=>'0');	
 		cqWhichSend: in std_logic_vector(0 to 3);
 		anySending: out std_logic; 

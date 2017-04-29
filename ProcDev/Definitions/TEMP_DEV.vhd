@@ -113,6 +113,10 @@ return InstructionStateArray;
 
 
 function findBranchLink(insv: StageDataMulti) return std_logic_vector;
+
+function whichBranchLink(insv: StageDataMulti) return std_logic_vector;
+function setBranchLink(insv: StageDataMulti) return StageDataMulti;
+
 function findStores(insv: StageDataMulti) return std_logic_vector;
 function findLoads(insv: StageDataMulti) return std_logic_vector;
 
@@ -370,12 +374,15 @@ end function;
 --			any instruction from being fetched before the change is committed. Or otherwise it would be allowed
 --			normally, with an exception occuring in writing makes younger ops in the pipeline invalid,
 --			but this would be very complex.
+
+-- "Normal target" is sequential/branch, without exceptions
 function getNormalTargetAddress(ins: InstructionState; causingNext: Mword) return Mword is
 begin
 	if ins.controlInfo.hasBranch = '1' then
 		return ins.target;
 	else 
-		return causingNext;
+		return --causingNext;
+					ins.target; -- CAREFUL: designed to be the same when non-branch!
 	end if;
 end function;
 
@@ -629,6 +636,30 @@ begin
 	end loop;
 	return res;
 end function;
+
+
+function whichBranchLink(insv: StageDataMulti) return std_logic_vector is
+	variable res: std_logic_vector(0 to PIPE_WIDTH-1) := (others => '0');
+begin
+	for i in 0 to PIPE_WIDTH-1 loop
+		res(i) := insv.data(i).classInfo.branchLink;
+	end loop;
+	
+	return res;
+end function;
+
+function setBranchLink(insv: StageDataMulti) return StageDataMulti is
+	variable res: StageDataMulti := insv;
+	variable bl: std_logic_vector(0 to PIPE_WIDTH-1) := (others => '0');
+begin
+	bl := findBranchLink(insv);
+	for i in 0 to PIPE_WIDTH-1 loop
+		res.data(i).classInfo.branchLink := bl(i);
+	end loop;
+	
+	return res;
+end function;
+
 
 function findStores(insv: StageDataMulti) return std_logic_vector is
 	variable res: std_logic_vector(0 to PIPE_WIDTH-1) := (others => '0');

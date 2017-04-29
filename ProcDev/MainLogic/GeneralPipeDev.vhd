@@ -64,6 +64,11 @@ return InstructionState;
 function stageMultiNext(livingContent, newContent: StageDataMulti; full, sending, receiving: std_logic)
 return StageDataMulti;
 
+	function stageMultiNextCl(livingContent, newContent: StageDataMulti; full, sending, receiving: std_logic;
+										clearEmptySlots: boolean)
+	return StageDataMulti;
+
+
 function stageMultiHandleKill(content: StageDataMulti; 
 										killAll: std_logic; killVec: std_logic_vector) 
 										return StageDataMulti;
@@ -121,6 +126,13 @@ function getResultValues(execEnds: InstructionStateArray;
 										stageDataCQ: StageDataCommitQueue;
 										lastCommitted: StageDataMulti)
 return MwordArray;	
+
+function getExecEnds(oA, oB, oC, oD, oE: InstructionSlot) return InstructionStateArray;
+function getExecEnds2(oA, oB, oC, oD, oE: InstructionSlot) return InstructionStateArray;
+function getExecSending(oA, oB, oC, oD, oE: InstructionSlot) return std_logic_vector;
+function getExecSending2(oA, oB, oC, oD, oE: InstructionSlot) return std_logic_vector;
+function getExecPreEnds(opB, opC: InstructionState) return InstructionStateArray;
+
 	
 end GeneralPipeDev;
 
@@ -318,37 +330,48 @@ return StageDataMulti is
 	variable res: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
 		constant CLEAR_VACATED_SLOTS_GENERAL: boolean := false; 
 begin
-	if not CLEAR_VACATED_SLOTS_GENERAL then
-		res := livingContent;
-	end if;
-	
-	-- CAREFUL, TODO: implement selective clearing of result tags when partial kill happens!
-	
-	if receiving = '1' then -- take full
-		res := newContent;
-	elsif sending = '1' then -- take empty
-		if CLEAR_VACATED_SLOTS_GENERAL then
-			res := DEFAULT_STAGE_DATA_MULTI;
-		end if;	
+	return stageMultiNextCl(livingContent, newContent, full, sending, receiving, false);
+end function;
 
-		-- CAREFUL: clearing result tags for empty slots
-		for i in 0 to PIPE_WIDTH-1 loop
-			res.data(i).physicalDestArgs.d0 := (others => '0');
-		end loop;
-	else -- stall or killed (kill can be partial)
-		if full = '0' then
-			-- Do nothing
+
+	function stageMultiNextCl(livingContent, newContent: StageDataMulti; full, sending, receiving: std_logic;
+										clearEmptySlots: boolean)
+	return StageDataMulti is 
+		variable res: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
+			constant CLEAR_VACATED_SLOTS_GENERAL: boolean := clearEmptySlots; 
+	begin
+		if not CLEAR_VACATED_SLOTS_GENERAL then
+			res := livingContent;
+		end if;
+		
+		-- CAREFUL, TODO: implement selective clearing of result tags when partial kill happens!
+		
+		if receiving = '1' then -- take full
+			res := newContent;
+		elsif sending = '1' then -- take empty
+			if CLEAR_VACATED_SLOTS_GENERAL then
+				res := DEFAULT_STAGE_DATA_MULTI;
+			end if;	
+
+			-- CAREFUL: clearing result tags for empty slots
 			for i in 0 to PIPE_WIDTH-1 loop
 				res.data(i).physicalDestArgs.d0 := (others => '0');
 			end loop;
-		else
-			res := livingContent;
+		else -- stall or killed (kill can be partial)
+			if full = '0' then
+				-- Do nothing
+				for i in 0 to PIPE_WIDTH-1 loop
+					res.data(i).physicalDestArgs.d0 := (others => '0');
+				end loop;
+			else
+				res := livingContent;
+			end if;
 		end if;
-	end if;
+				
 			
-		
-	return res;
-end function;
+		return res;
+	end function;
+
 
 function stageMultiHandleKill(content: StageDataMulti; 
 										killAll: std_logic; killVec: std_logic_vector) 
@@ -555,7 +578,55 @@ begin
 	--	
 	--return resultVals;
 end function;	
+
 			
+function getExecEnds(oA, oB, oC, oD, oE: InstructionSlot) return InstructionStateArray is
+	variable res: InstructionStateArray(0 to 3) := (others => DEFAULT_INSTRUCTION_STATE);
+begin
+	res(0) := oA.ins;
+	res(1) := oB.ins;
+	res(2) := oC.ins;
+	
+	return res;
+end function;
+
+function getExecEnds2(oA, oB, oC, oD, oE: InstructionSlot) return InstructionStateArray is
+	variable res: InstructionStateArray(0 to 3) := (others => DEFAULT_INSTRUCTION_STATE);
+begin
+	res(2) := oE.ins;
+	res(3) := oD.ins;
+	
+	return res;
+end function;
+
+function getExecSending(oA, oB, oC, oD, oE: InstructionSlot) return std_logic_vector is
+	variable res: std_logic_vector(0 to 3) := (others => '0');
+begin
+	res(0) := oA.full;
+	res(1) := oB.full;
+	res(2) := oC.full;
+	
+	return res;
+end function;
+
+function getExecSending2(oA, oB, oC, oD, oE: InstructionSlot) return std_logic_vector is
+	variable res: std_logic_vector(0 to 3) := (others => '0');
+begin
+	res(2) := oE.full;
+	res(3) := oD.full;
+	
+	return res;
+end function;
+
+function getExecPreEnds(opB, opC: InstructionState) return InstructionStateArray is
+	variable res: InstructionStateArray(0 to 3) := (others => DEFAULT_INSTRUCTION_STATE);
+begin
+	res(1) := opB;
+	res(2) := opC;
+	
+	return res;
+end function;
+
 			
 	function getLastFull(newContent: StageDataMulti) return InstructionState is
 		variable res: InstructionState := defaultInstructionState;

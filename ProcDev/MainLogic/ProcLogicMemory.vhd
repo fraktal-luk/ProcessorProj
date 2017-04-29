@@ -33,7 +33,7 @@ package ProcLogicMemory is
 	return std_logic_vector;
 
 function findCommittingSQ(content: InstructionStateArray; livingMask: std_logic_vector;
-								  committingTag: SmallNumber) return StageDataMulti;							
+								  committingTag: SmallNumber; send: std_logic) return StageDataMulti;							
 
 function storeQueueNext(content: InstructionStateArray;
 									  livingMask: std_logic_vector;
@@ -115,15 +115,15 @@ package body ProcLogicMemory is
 				return res;
 			end function;
 							
-						function findCommittingSQ(content: InstructionStateArray; livingMask: std_logic_vector;
-														  committingTag: SmallNumber) return StageDataMulti is
+					function findCommittingSQ(content: InstructionStateArray; livingMask: std_logic_vector;
+													  committingTag: SmallNumber; send: std_logic) return StageDataMulti is
 							variable res: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
 						begin
 							res.data := content(0 to PIPE_WIDTH-1);
 							for i in 0 to PIPE_WIDTH-1 loop
 								if (content(i).groupTag(SMALL_NUMBER_SIZE-1 downto LOG2_PIPE_WIDTH)
 									= committingTag(SMALL_NUMBER_SIZE-1 downto LOG2_PIPE_WIDTH))
-									and (livingMask(i) = '1')
+									and (livingMask(i) = '1') and (send = '1')
 								then	
 									res.fullMask(i) := '1';
 								end if;	
@@ -176,7 +176,6 @@ package body ProcLogicMemory is
 							res(i).controlInfo.completed := c1;
 							res(i).controlInfo.completed2 := c2;
 						res(i).bits := (others => '0');
-							res(i).operation := (Memory, store);
 						res(i).classInfo := DEFAULT_CLASS_INFO;
 						res(i).constantArgs := DEFAULT_CONSTANT_ARGS;
 						res(i).virtualArgs := DEFAULT_VIRTUAL_ARGS;
@@ -194,8 +193,10 @@ package body ProcLogicMemory is
 						
 						if outMask(i) = '1' then									
 							res(i).groupTag := tempContent(i).groupTag;
+							res(i).operation := tempContent(i).operation; --(Memory, store);														
 						else
-							res(i).groupTag := tempNewContent(i).groupTag;										
+							res(i).groupTag := tempNewContent(i).groupTag;
+							res(i).operation := tempNewContent(i).operation; --(Memory, store);							
 						end if;
 															
 						if (wrA and mA(i)) = '1' then

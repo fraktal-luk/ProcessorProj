@@ -89,7 +89,7 @@ begin
 	inputData.data(0) <= branchResolved;
 	inputData.fullMask <= stageDataIn.fullMask;
 	
-	STAGE_0: entity work.GenericStageMulti(SingleTagged)
+	STAGE_0: entity work.GenericStageMulti(Branch)
 	port map(
 		clk => clk, reset => reset, en => en,
 		

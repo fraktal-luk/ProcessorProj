@@ -87,6 +87,8 @@ architecture Implem of ReorderBuffer is
 	
 	signal isSending: std_logic := '0';
 	
+		signal fromCommitted: std_logic := '0';
+	
 	constant ROB_HAS_RESET: std_logic := '0';
 	constant ROB_HAS_EN: std_logic := '0';
 begin
@@ -94,7 +96,8 @@ begin
 	enSig <= en or not ROB_HAS_EN;
 	
 	-- This is before shifting!
-	stageDataLiving <= killInROB(stageData, commitGroupCtr, execCausing.groupTag, execEventSignal);
+	stageDataLiving <= killInROB(stageData, commitGroupCtr, execCausing.groupTag,
+												execEventSignal, fromCommitted);
 	
 		-- TODO: add execEnds2, execReady2
 	stageDataUpdated <= setCompleted(stageDataLiving, commitGroupCtr,
@@ -107,7 +110,7 @@ begin
 											isSending,
 											prevSending);
 											
-	ROB_SYNCHONOUS: process (clk)
+	ROB_SYNCHRONOUS: process (clk)
 	begin
 		if rising_edge(clk) then
 			if resetSig = '1' then
@@ -149,7 +152,14 @@ begin
 				when execEventSignal = '1'
 		else (others => '0');
 		
-	isSending <= stageDataLiving.fullMask(0) and groupCompleted(stageDataLiving.data(0));
+	isSending <= --stageDataLiving.fullMask(0) and groupCompleted(stageDataLiving.data(0));
+					 stageData.fullMask(0) and 
+						groupCompleted(stageData.data(0)) and --not intSignal;
+											 not fromCommitted;
+											 
+	fromCommitted <= (execEventSignal and 	
+							(execCausing.controlInfo.newInterrupt or execCausing.controlInfo.newException));
+						
 	-- TODO: allow accepting also when queue full but sending, that is freeing a place.
 	acceptingOut <= --'1' when binFlowNum(flowResponse.full) < ROB_SIZE else '0';
 							not stageData.fullMask(ROB_SIZE-1);

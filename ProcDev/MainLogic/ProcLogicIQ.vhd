@@ -85,6 +85,50 @@ end ProcLogicIQ;
 package body ProcLogicIQ is
 
 -- pragma synthesis off
+
+function beginHistory(avs: InstructionArgValues; ready: std_logic_vector; nextReady: std_logic_vector)
+return InstructionArgValues is
+	variable res: InstructionArgValues := avs;
+begin
+	res.hist0(1) := '-';
+	res.hist0(2) := '-';
+	res.hist0(3) := '-';
+	
+	res.hist1(1) := '-';
+	res.hist1(2) := '-';
+	res.hist1(3) := '-';
+
+	res.hist2(1) := '-';
+	res.hist2(2) := '-';
+	res.hist2(3) := '-';	
+	
+	if nextReady(0) = '1' then
+		res.hist0(1) := 'N';
+	end if;		
+
+	if nextReady(1) = '1' then			
+		res.hist1(1) := 'N';
+	end if;
+
+	if nextReady(2) = '1' then				
+		res.hist2(1) := 'N';
+	end if;			
+	
+	if ready(0) = '1' then
+		res.hist0(1) := 'u';
+	end if;		
+
+	if ready(1) = '1' then
+		res.hist1(1) := 'u';
+	end if;
+
+	if ready(2) = '1' then
+		res.hist2(1) := 'u';
+	end if;		
+	
+	return res;
+end function;
+
 function dispatchArgHistory(avs: InstructionArgValues) return InstructionArgValues is
 	variable res: InstructionArgValues := avs;
 begin
@@ -544,36 +588,9 @@ begin
 		res.argValues.missing := res.argValues.missing and not rrf;
 	end if;
 
-	-- pragma synthesis off	
-	res.argValues.hist0(1) := '-';
-	res.argValues.hist0(2) := '-';
-	res.argValues.hist0(3) := '-';
-	
-	if ai.nextReady(0) = '1' then
-		res.argValues.hist0(1) := 'N';
-	end if;		
-
-	if ai.nextReady(1) = '1' then			
-		res.argValues.hist1(1) := 'N';
-	end if;
-
-	if ai.nextReady(2) = '1' then				
-		res.argValues.hist2(1) := 'N';
-	end if;			
-	
-	if ai.ready(0) = '1' then
-		res.argValues.hist0(1) := 'u';
-	end if;		
-
-	if ai.ready(1) = '1' then
-		res.argValues.hist1(1) := 'u';
-	end if;
-
-	if ai.ready(2) = '1' then
-		res.argValues.hist2(1) := 'u';
-	end if;			
+	-- pragma synthesis off				
+	res.argValues := beginHistory(res.argValues, ai.ready, ai.nextReady);
 	-- pragma synthesis on
-
 
 	res.argValues.missing := res.argValues.missing and not ai.nextReady;
 	res.argValues.readyNext := ai.nextReady;
@@ -588,6 +605,7 @@ begin
 		res.target := (others => '0');		
 --		
 		res.controlInfo.completed := '0';
+		res.controlInfo.completed2 := '0';
 			res.basicInfo := DEFAULT_BASIC_INFO;
 		res.controlInfo.newEvent := '0';
 		res.controlInfo.newInterrupt := '0';

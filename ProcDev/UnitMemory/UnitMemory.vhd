@@ -50,31 +50,28 @@ entity UnitMemory is
 		reset : in  STD_LOGIC;
 		en : in  STD_LOGIC;	
 
-			sendingIQC: in std_logic;
-			sendingIQE: in std_logic; -- Store data
+		sendingIQC: in std_logic;
+		sendingIQE: in std_logic; -- Store data
 
-			dataIQC: in InstructionState;
-			dataIQE: in InstructionState;	-- Store data			
+		dataIQC: in InstructionState;
+		dataIQE: in InstructionState;	-- Store data			
 
-			execAcceptingC: out std_logic;
-			execAcceptingE: out std_logic; -- Store data
-		-----------
+		execAcceptingC: out std_logic;
+		execAcceptingE: out std_logic; -- Store data
 			
-			acceptingNewSQ: out std_logic;
-				acceptingNewLQ: out std_logic;
-			prevSendingToSQ: in std_logic;
-				prevSendingToLQ: in std_logic;
-			dataNewToSQ: in StageDataMulti;
-				dataNewToLQ: in StageDataMulti;			
-		
-			acceptingLoadUnitOut: out std_logic;
-			acceptingStoreUnitOut: out std_logic;
+		acceptingNewSQ: out std_logic;
+		acceptingNewLQ: out std_logic;
+		prevSendingToSQ: in std_logic;
+		prevSendingToLQ: in std_logic;
+		dataNewToSQ: in StageDataMulti;
+		dataNewToLQ: in StageDataMulti;			
 
-			loadUnitNextAccepting: in std_logic;
-			loadUnitSending: out std_logic;
-			loadDataPreOut: out InstructionState;
-			loadDataOut: out InstructionState;
-				
+		outputC: out InstructionSlot;
+		outputE: out InstructionSlot;
+		outputOpPreC: out InstructionState;
+
+		whichAcceptedCQ: in std_logic_vector(0 to 3);
+
 			memLoadReady: in std_logic;
 			memLoadValue: in Mword;
 			memLoadAddress: out Mword;
@@ -83,13 +80,12 @@ entity UnitMemory is
 			memStoreAllow: out std_logic;
 			memStoreValue: out Mword;
 			
-			sendingQueueE: out std_logic;
-			
-				sysRegDataIn: in InstructionState;
-				sysRegSendingIn: in std_logic;
+			sysRegDataIn: in InstructionState;
+			sysRegSendingIn: in std_logic;
 			
 			committing: in std_logic;
 			groupCtrNext: in SmallNumber;
+			groupCtrInc: in SmallNumber;
 			
 		execOrIntEventSignalIn: in std_logic;
 		execOrIntCausingIn: in InstructionState			
@@ -101,6 +97,8 @@ architecture Behavioral of UnitMemory is
 	signal inputDataLoadUnit, outputDataLoadUnit: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;	
 	signal eventSignal: std_logic := '0';	
 	signal activeCausing: InstructionState := defaultInstructionState;
+	
+	signal loadUnitSendingSig: std_logic := '0';
 	
 	signal sendingOutSQ: std_logic  := '0';
 	signal dataOutSQ: InstructionState := DEFAULT_INSTRUCTION_STATE;
@@ -117,7 +115,6 @@ architecture Behavioral of UnitMemory is
 	
 	signal dlqAccepting: std_logic := '1';
 	
-	
 		signal inputDataC, outputDataC: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
 		signal acceptingLS, acceptingLU: std_logic := '0';
 
@@ -126,7 +123,6 @@ architecture Behavioral of UnitMemory is
 	signal addressingData: InstructionState := DEFAULT_INSTRUCTION_STATE;
 	signal sendingAddressingSig: std_logic := '0';	
 	
-----------------
 		signal sendingToLoadUnitSig, sendingAddressToSQSig,
 				 storeAddressWrSig, storeValueWrSig: std_logic := '0';
 		signal dataToLoadUnitSig, storeAddressDataSig, storeValueDataSig: InstructionState
@@ -136,7 +132,6 @@ architecture Behavioral of UnitMemory is
 begin
 		eventSignal <= execOrIntEventSignalIn;	
 		activeCausing <= execOrIntCausingIn;
-
 
 			inputDataC.data(0) <= dataIQC;
 			inputDataC.fullMask(0) <= sendingIQC;
@@ -182,11 +177,12 @@ begin
 				inputData.fullMask(0) <= sendingIQE;
 			end block;
 
-			sendingQueueE <= sendingIQE;	-- CAREFUL!
-
 			inputDataLoadUnit.data(0) <= dataToLoadUnitSig;
 			inputDataLoadUnit.fullMask(0) <= sendingAddressingSig;
 			
+					outputE.ins <= dataIQE;
+					outputE.full <= sendingIQE;
+						
 			SUBPIPE_LOAD_UNIT: block
 				signal inputData, outputData: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
 			
@@ -222,11 +218,11 @@ begin
 					clk => clk, reset => reset, en => en,
 					
 					prevSending => loadResultSending,--sendingMem0,
-					nextAccepting => loadUnitNextAccepting,
+					nextAccepting => whichAcceptedCQ(2),
 					
 					stageDataIn => dataM, 
 					acceptingOut => acceptingMem1,
-					sendingOut => loadUnitSending,
+					sendingOut => loadUnitSendingSig,
 					stageDataOut => outputData,
 					
 					execEventSignal => eventSignal,
@@ -237,14 +233,13 @@ begin
 				);
 
 				stageDataAfterCache <= setExecState(stageDataOutMem0.data(0), memLoadValue, '0', "0000");
-				
-				loadDataPreOut <= stageDataOutMem0.data(0);
-				loadDataOut <= outputData.data(0);
+
+					outputC.ins <= clearTempControlInfoSimple(outputData.data(0));
+					outputC.full <= loadUnitSendingSig;
+					
+					outputOpPreC <= stageDataOutMem0.data(0);
 			end block;		
 		
-		acceptingLoadUnitOut <= acceptingLS;
-				 
-
 		sendingToLoadUnitSig <= sendingAddressingSig when addressingData.operation.func = load else '0';
 		sendingAddressToSQSig <= sendingAddressingSig when addressingData.operation.func = store else '0';
 				
@@ -279,18 +274,17 @@ begin
 				
 					committing => committing,
 					groupCtrNext => groupCtrNext,
-				
+						groupCtrInc => groupCtrInc,
+						
 				execEventSignal => eventSignal,
 				execCausing => activeCausing,
 				
 				nextAccepting => '1',
 				
-				acceptingOutSQ => execAcceptingESig,
+				--acceptingOutSQ => execAcceptingESig,
 				sendingSQOut => sendingOutSQ, -- OUTPUT
 				dataOutSQ => dataOutSQ -- OUTPUT
 			);
-
-		acceptingStoreUnitOut <= execAcceptingESig;
 
 			MEM_LOAD_QUEUE: entity --work.LoadQueue(Behavioral)
 											work.MemoryUnit(Behavioral)
@@ -314,13 +308,14 @@ begin
 
 					committing => committing,
 					groupCtrNext => groupCtrNext,
+						groupCtrInc => groupCtrInc,
 
 				execEventSignal => eventSignal,
 				execCausing => activeCausing,
 
 				nextAccepting => '1',
 
-				acceptingOutSQ => open,--acceptingLoadUnitOut, -- ! dont do multiple drivers!
+				--acceptingOutSQ => open,--acceptingLoadUnitOut, -- ! dont do multiple drivers!
 				sendingSQOut => open,--sendingOutLQ, --??
 				dataOutSQ => open--dataOutLQ--?? 
 			);
@@ -371,7 +366,7 @@ begin
 
 
 				execAcceptingC <= execAcceptingCSig;
-				execAcceptingE <= execAcceptingESig;
+				execAcceptingE <= '1'; --???  -- execAcceptingESig;
 
 			loadResultSending <= sendingFromSysReg or sendingFromDLQ 
 						or (sendingMem0);-- and memLoadReady);

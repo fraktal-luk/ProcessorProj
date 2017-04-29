@@ -72,10 +72,7 @@ return StageDataHbuffer;
 function newFromHbuffer(content: InstructionStateArray; fullMask: std_logic_vector)
 return HbuffOutData;
 
-function newPCData(content: InstructionState; ge: GeneralEventInfo; pcNext, causingNext: Mword)--;
-return InstructionState;
-
-function newPCData2(content: InstructionState;
+function newPCData(content: InstructionState;
 						  commitEvent: std_logic; commitCausing: InstructionState;
 						  execEvent: std_logic; execCausing: InstructionState;	
 						  decodeEvent: std_logic; decodeCausing: InstructionState;
@@ -96,15 +93,10 @@ function getAnnotatedHwords(--fetchData: InstructionState;
 									 fetchBlock: HwordArray)
 return InstructionStateArray;
 
--- TODO, CHECK: use this instead of getGeneralEvents?
-function detectEventsMulti(sd: StageDataMulti; receiving: std_logic) return InstructionSlot;
-
 function getGeneralEvents(eventArr: InstructionSlotArray)
 return GeneralEventInfo;
 
 function stageMultiEvents(sd: StageDataMulti; isNew: std_logic) return StageMultiEventInfo;
-
-function TEMP_events(inputs: InstructionSlotArray) return InstructionSlotArray;
 
 end ProcLogicFront;
 
@@ -498,7 +490,8 @@ return HbuffOutData is
 	variable nOut: integer;
 begin
 	for i in 0 to PIPE_WIDTH-1 loop
-		res.data(i).bits := content(i).bits(15 downto 0) & X"0000"; --content(i+1).bits;
+		--res.data(i).bits := content(i).bits(15 downto 0) & X"0000"; --content(i+1).bits;
+		res.data(i).bits := content(i).bits(15 downto 0) & content(i+1).bits(15 downto 0);		
 		res.data(i).basicInfo := content(i).basicInfo;
 	end loop;
 
@@ -507,7 +500,8 @@ begin
 		if (fullMask(j) and --content(j).shortIns) = '1' then
 									content(j).classInfo.short) = '1' then
 			res.fullMask(i) := '1';
-			res.data(i).bits(31 downto 16) := content(j).bits(15 downto 0); -- & content(j+1).bits; --X"0000";
+			--res.data(i).bits(31 downto 16) := content(j).bits(15 downto 0); -- & content(j+1).bits; --X"0000";
+			res.data(i).bits := content(j).bits(15 downto 0) & content(j+1).bits(15 downto 0);			
 			res.data(i).basicInfo := content(j).basicInfo;
 				--res.data(i).basicInfo.intLevel(7 downto 2) := "000000";
 				--res.data(i).basicInfo.systemLevel(7 downto 2) := "000000";				
@@ -532,41 +526,7 @@ begin
 end function;
 
 
-function newPCData(content: InstructionState; ge: GeneralEventInfo; pcNext, causingNext: Mword)--;
-return InstructionState is
-	variable res: InstructionState := content;
-	variable newPC: Mword := (others=>'0');
-begin
-	if ge.eventOccured = '1' then -- when from exec or front		
-		if ge.causing.controlInfo.newReset = '1' then -- TEMP!
-			res.basicInfo.ip := (others => '0');
-			res.basicInfo.intLevel := "00000000";		
-		elsif ge.causing.controlInfo.newInterrupt = '1' then
-			res.basicInfo.ip := INT_BASE; -- TEMP!
-			res.basicInfo.intLevel := "00000001";		
-		elsif ge.causing.controlInfo.newException = '1' then
-			-- TODO, FIX: exceptionCode sliced - shift left by ALIGN_BITS? or leave just base address
-			res.basicInfo.ip := EXC_BASE(MWORD_SIZE-1 downto ge.causing.controlInfo.exceptionCode'length)
-									& ge.causing.controlInfo.exceptionCode(
-															ge.causing.controlInfo.exceptionCode'length-1 downto ALIGN_BITS)
-									& EXC_BASE(ALIGN_BITS-1 downto 0);			
-			res.basicInfo.systemLevel := "00000001";			
-		elsif ge.causing.controlInfo.newFetchLock = '1' then	
-			res.basicInfo.ip := causingNext;
-		elsif ge.causing.controlInfo.newBranch = '1' then
-			res.basicInfo.ip := ge.causing.target;
-		elsif ge.causing.controlInfo.newReturn = '1' then
-			res.basicInfo.ip := ge.causing.result;
-		end if;				
-	else	-- Increment by the width of fetch group
-		res.basicInfo.ip := pcNext;
-	end if;	
-
-	return res;
-end function;
-
-
-function newPCData2(content: InstructionState;
+function newPCData(content: InstructionState;
 						  commitEvent: std_logic; commitCausing: InstructionState;
 						  execEvent: std_logic; execCausing: InstructionState;	
 						  decodeEvent: std_logic; decodeCausing: InstructionState;
@@ -637,7 +597,7 @@ end function;
 			res.eventOccured := '0';
 		end if;
 		
-		res.newStagePC := newPCData2( pcData,
+		res.newStagePC := newPCData( pcData,
 												commitEvent, commitCausing,
 												execEvent, execCausing,
 												decodeEvent, decodeCausing,
@@ -665,18 +625,6 @@ begin
 		res(i).bits := tempWord;
 		res(i).basicInfo := hwordBasicInfo;
 		res(i).classInfo.short := '0'; -- TEMP!	
-	end loop;
-	return res;
-end function;
-
-
-function detectEventsMulti(sd: StageDataMulti; receiving: std_logic) return InstructionSlot is
-	variable res: InstructionSlot := ('0', sd.data(PIPE_WIDTH-1)); 
-begin
-	for i in sd.fullMask'range loop
-		if sd.fullMask(i) = '1' and sd.data(i).controlInfo.newEvent = '1' then
-			res := ('1', sd.data(i));
-		end if;
 	end loop;
 	return res;
 end function;
@@ -732,33 +680,5 @@ begin
 	
 	return res;
 end function;
-
-
-function TEMP_events(inputs: InstructionSlotArray) return InstructionSlotArray is
-	variable res: InstructionSlotArray(0 to inputs'length-1) := inputs;
-	variable found: std_logic := '0';
-	variable causing: InstructionState := defaultInstructionState;
-	variable j: integer;
-begin
-	--		report integer'image(inputs'left);
-	--		report integer'image(inputs'right);
-	-- Search from latest stages until we find an event, then propagate it to the front
-	for i in res'reverse_range loop
-		j := i + inputs'left; -- correct for possible strange indexing of input array
-		if found = '1' then
-			res(i).ins := causing;
-			res(i).full := '1';
-		elsif inputs(j).full = '1' and inputs(j).ins.controlInfo.newEvent = '1' then
-			found := '1';
-			causing := inputs(j).ins;
-			res(i).full := '0';
-		else
-			res(i).full := '0';
-		end if;
-	end loop;
-	
-	return res;
-end function;
-
  
 end ProcLogicFront;

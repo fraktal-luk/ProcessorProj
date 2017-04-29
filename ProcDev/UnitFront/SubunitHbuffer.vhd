@@ -38,7 +38,6 @@ use work.NewPipelineData.all;
 
 use work.GeneralPipeDev.all;
 
---use work.CommonRouting.all;
 use work.TEMP_DEV.all;
 
 use work.ProcComponents.all;
@@ -75,42 +74,37 @@ architecture Implem of SubunitHbuffer is
 	signal hbufferDataANew: InstructionStateArray(0 to 2*PIPE_WIDTH-1)	
 			:= (others => DEFAULT_ANNOTATED_HWORD);	
 	
-		signal stageData, stageDataNext: StageDataHbuffer := DEFAULT_STAGE_DATA_HBUFFER;
+	signal stageData, stageDataNext: StageDataHbuffer := DEFAULT_STAGE_DATA_HBUFFER;
 	
 	signal hbufferDrive: FlowDriveBuffer := (killAll => '0', lockAccept => '0', lockSend => '0',
 																others=>(others=>'0'));
 	signal hbufferResponse: FlowResponseBuffer := (others=>(others=>'0'));
-	-- Below: state visible to further (downstream) stages, compatible with their interface.
-	--			CAREFUL! Not guaranteed to contain more than needed by next stage
-	signal hbufferDriveDown: FlowDriveBuffer := (killAll => '0', lockAccept => '0', lockSend => '0',
-																others=>(others=>'0'));
-	signal hbufferResponseDown: FlowResponseBuffer := (others=>(others=>'0'));		
 
 	signal shortOpcodes: std_logic_vector(0 to HBUFFER_SIZE-1) := (others=>'0');-- DEPREC but used as dummy
 	signal fullMaskHbuffer, livingMaskHbuffer: std_logic_vector(0 to HBUFFER_SIZE-1) := (others=>'0');
 		signal fullMask2, fullMask2Next, livingMask2: std_logic_vector(0 to HBUFFER_SIZE-1) := (others=>'0');
 	signal hbuffOut: HbuffOutData 
 				:= (sd => DEFAULT_STAGE_DATA_MULTI, nOut=>(others=>'0'), nHOut=>(others=>'0'));
-				
-	signal flowDriveHBuff: FlowDriveSimple := (others=>'0');
-	signal flowResponseHbuff: FlowResponseSimple := (others=>'0');	
 
 	signal partialKillMaskHbuffer: std_logic_vector(0 to HBUFFER_SIZE-1) := (others=>'0');
 	signal nHIn: SmallNumber := (others => '0');
+	signal sendingSig: SmallNumber := (others => '0');
 begin
 	nHIn <= i2slv(FETCH_BLOCK_SIZE - (slv2u(stageDataIn.basicInfo.ip(ALIGN_BITS-1 downto 1))),
 					  SMALL_NUMBER_SIZE);
 
 	hbufferDataANew <= getAnnotatedHwords(stageDataIn.basicInfo, fetchBlock);
 	hbufferDataANext <= bufferAHNext(hbufferDataA,
-											--fullMask2, -- NOTE: if flushing, no receiving so can be fullMask
-											livingMask2,
+										--livingMask2,
+											fullMask2, -- NOTE: if flushing, no receiving so can be fullMask										
 										hbufferDataANew,	
-											DEFAULT_DATA_PC,
+										DEFAULT_DATA_PC,
 										stageDataIn.basicInfo,	
-											binFlowNum(hbufferResponse.living), 
-											--binFlowNum(hbufferResponse.full),
-										binFlowNum(hbufferResponse.sending), binFlowNum(hbufferDrive.prevSending));						
+										--binFlowNum(hbufferResponse.living), 
+											binFlowNum(hbufferResponse.full),
+										--binFlowNum(hbufferResponse.sending),
+											binFlowNum(hbufferDrive.nextAccepting),
+										binFlowNum(hbufferDrive.prevSending));						
 	fullMaskHbuffer <= setToOnes(shortOpcodes, binFlowNum(hbufferResponse.full));
 		fullMask2Next <= TEMP_hbufferFullMaskNext(hbufferDataA,
 											livingMask2,	
@@ -122,8 +116,8 @@ begin
 										binFlowNum(hbufferResponse.sending), binFlowNum(hbufferDrive.prevSending));
 		
 		-- TODO: handle possibility of partial killing by partialKillMask!
-		livingMask2 <= fullMask2 when flowDriveHbuff.kill = '0' else (others => '0');
-		
+		livingMask2 <= fullMask2 when --flowDriveHbuff.kill = '0' else (others => '0');
+												execEventSignal = '0' else (others => '0');
 -- CAREFUL:	alternative integrated version. Slower but smaller
 --				stageDataNext <= TEMP_hbufferStageDataNext(
 --										hbufferDataA,
@@ -137,14 +131,15 @@ begin
 --										binFlowNum(hbufferResponse.sending), binFlowNum(hbufferDrive.prevSending));		
 		
 	livingMaskHbuffer <= setToOnes(shortOpcodes, binFlowNum(hbufferResponse.living)); -- TEMP?
-	hbuffOut <= newFromHbuffer(hbufferDataA, livingMaskHbuffer); -- TODO: change to livingMask2!
+	hbuffOut <= newFromHbuffer(hbufferDataA, --livingMaskHbuffer);
+															livingMask2);
 	
 	FRONT_CLOCKED: process(clk)
 	begin					
 		if rising_edge(clk) then
-			if reset = '1' then
+			--if reset = '1' then
 				
-			elsif en = '1' then
+			--elsif en = '1' then
 				hbufferDataA <= hbufferDataANext;
 									--	stageDataNext.data;
 					fullMask2 <= fullMask2Next;
@@ -154,7 +149,7 @@ begin
 				--			flow numbers, while the validity of those numbers is checked by slot logic
 				checkBuffer(hbufferDataA, fullMask2, hbufferDataANext, fullMask2Next,
 									hbufferDrive, hbufferResponse);								
-			end if;					
+			--end if;					
 		end if;
 	end process;	
 
@@ -176,26 +171,17 @@ begin
 	hbufferDrive.nextAccepting <= hbuffOut.nHOut when nextAccepting = '1'
 									else (others=>'0');			
 							
-	hbufferDriveDown.nextAccepting <= num2flow(PIPE_WIDTH) when nextAccepting = '1'
-										else 	(others=>'0');	
 	-- CAREFUL! If in future using lockSend for Hbuff, it must be used also here, giving 0 for sending!								
-	hbufferResponseDown.sending <= hbuffOut.nOut when nextAccepting = '1'
+	sendingSig <= hbuffOut.nOut when nextAccepting = '1'
 									 else (others=>'0');
-	hbufferDrive.killAll <= flowDriveHbuff.kill;
-
-	flowResponseHbuff.accepting <= 
-					'1' when binFlowNum(hbufferResponse.accepting) >= binFlowNum(nHIn) else '0';
-	flowResponseHbuff.sending <= isNonzero(hbufferResponseDown.sending);	
+	hbufferDrive.killAll <= execEventSignal;
 
 	hbufferDrive.kill <=	num2flow(countOnes(fullMaskHbuffer and partialKillMaskHbuffer));
 
-	flowDriveHbuff.kill <= execEventSignal; --frontEvents.affectedVec(3);
-
 	stageDataOut <= hbuffOut.sd;				
-	acceptingOut <= --flowResponseHbuff.accepting;	
-							not isNonzero(fullMask2(HBUFFER_SIZE - FETCH_BLOCK_SIZE to HBUFFER_SIZE-1));
+	acceptingOut <= not isNonzero(fullMask2(HBUFFER_SIZE - FETCH_BLOCK_SIZE to HBUFFER_SIZE-1));
 							
-	sendingOut <= flowResponseHbuff.sending;
+	sendingOut <= isNonzero(sendingSig);	
 
 end Implem;
 

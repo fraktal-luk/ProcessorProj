@@ -201,7 +201,7 @@ begin
 				end if;
 			end process;
 					
-			SLOT_HBUFF: entity work.BufferPipeLogic(Behavioral)
+			SLOT_BUFF: entity work.BufferPipeLogic(Behavioral)
 																	--BehavioralDirect)
 			generic map(
 				CAPACITY => QUEUE_SIZE, -- PIPE_WIDTH*2*2
@@ -220,7 +220,8 @@ begin
 			bufferDrive.nextAccepting <= num2flow(countOnes(sqOutData.fullMask));
 			acceptingOut <= --'1' when binFlowNum(bufferResponse.living) >= PIPE_WIDTH else '0';
 								 --not isNonzero(livingMask(QUEUE_SIZE-PIPE_WIDTH to QUEUE_SIZE-1));		
-								 not livingMask(QUEUE_SIZE-PIPE_WIDTH);
+								 --not livingMask(QUEUE_SIZE-PIPE_WIDTH);
+								 not fullMask(QUEUE_SIZE-PIPE_WIDTH);
 					
 					KILLERS: for i in 0 to QUEUE_SIZE-1 generate
 						signal before: std_logic;

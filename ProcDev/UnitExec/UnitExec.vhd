@@ -54,53 +54,42 @@ entity UnitExec is
 	  
 		sendingIQA: in std_logic;
 		sendingIQB: in std_logic;
-			sendingIQC: in std_logic;
 		sendingIQD: in std_logic;
-			sendingIQE: in std_logic; -- Store data
 	  
 		whichAcceptedCQ: in std_logic_vector(0 to 3);
 
 		dataIQA: in InstructionState;
 		dataIQB: in InstructionState;
-			dataIQC: in InstructionState;
-		dataIQD: in InstructionState;				
-			dataIQE: in InstructionState;	-- Store data			
-
+		dataIQD: in InstructionState;		
 
 		execAcceptingA: out std_logic;
 		execAcceptingB: out std_logic;
-			execAcceptingC: out std_logic;
 		execAcceptingD: out std_logic;
-			execAcceptingE: out std_logic; -- Store data
-
-		execPreEnds: out InstructionStateArray(0 to 3);
-		execEnds: out InstructionStateArray(0 to 3);
-		execSending: out std_logic_vector(0 to 3);
-		
-			sendingQueueE: in std_logic;
-		-------------
-			acceptingLoadUnit: in std_logic;
-			acceptingStoreUnit: in std_logic;
-
-			loadUnitNextAcceptingOut: out std_logic;
-	
-			loadUnitSending: in std_logic;
-			loadDataPre: in InstructionState;
-			loadData: in InstructionState;
-		
-		-- Ends related to store data unit
-			execEnds2: out InstructionStateArray(0 to 3);
-			execSending2: out std_logic_vector(0 to 3);
+			
+			acceptingNewBQ: out std_logic;
+			sendingOutBQ: out std_logic;
+			dataOutBQ: out InstructionState;
+			prevSendingToBQ: in std_logic;
+			dataNewToBQ: in StageDataMulti;
+			
+			committing: in std_logic;
+			
+			groupCtrNext: in SmallNumber;
+			groupCtrInc: in SmallNumber;
+			
+		outputA: out InstructionSlot;
+		outputB: out InstructionSlot;
+		outputD: out InstructionSlot;
+			
+		outputOpPreB: out InstructionState;
 			
 		sysRegSelect: out slv5;
 		sysRegIn: in Mword;
 		sysRegWriteSelOut: out slv5;
 		sysRegWriteValueOut: out Mword;
 				
-			sysRegDataOut: out InstructionState;
-			sysRegSending: out std_logic;
-				
-		selectedToCQ: out std_logic_vector(0 to 3); -- DEPREC?
+		sysRegDataOut: out InstructionState;
+		sysRegSending: out std_logic;
 
 		execEvent: out std_logic;
 		execCausingOut: out InstructionState;
@@ -109,7 +98,6 @@ entity UnitExec is
 		execOrIntCausingIn: in InstructionState
 	);
 end UnitExec;
-
 
 
 architecture Implem of UnitExec is
@@ -135,33 +123,9 @@ architecture Implem of UnitExec is
 			execSendingEffectiveD: std_logic := '0';
 	signal execAcceptingASig, execAcceptingBSig, execAcceptingCSig, execAcceptingDSig, execAcceptingESig:
 											std_logic := '0';
-
 	signal eventsD: StageMultiEventInfo;
-
 		signal inputDataA, outputDataA: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
-
 		signal inputDataD, outputDataD: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
-
-	---------------------------
-	---------------------------
-		signal inputDataC, outputDataC: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
-
-	signal addressingData: InstructionState := DEFAULT_INSTRUCTION_STATE;
-	signal sendingAddressing: std_logic := '0';
-	
-	signal sendingAddressToLoadUnit, memStoreAllowSig, sendingAddressToSQ: std_logic := '0';
-	
-		signal sendingOutSQ, acceptingOutSQ: std_logic := '0';
-		signal dataOutSQ: InstructionState := DEFAULT_INSTRUCTION_STATE;
-
-		signal storeAddressWr, storeValueWr: std_logic := '0';
-		signal storeAddressData, storeValueData: InstructionState := DEFAULT_INSTRUCTION_STATE;
-
-	signal dataOutLoadUnit, dataOutPreLoadUnit: InstructionState := DEFAULT_INSTRUCTION_STATE;
-				
-		signal acceptingLS, acceptingLU: std_logic := '0';
-	---------------------------
-	---------------------------
 
 			signal ch0, ch1: std_logic := '0';
 
@@ -250,23 +214,70 @@ begin
 						sysRegWriteValue => sysRegWriteValueStore
 					);	
 
-
-				dataC1 <= loadDataPre;
-				dataC2 <= loadData;		
+-----------------------------------
+	BQ_BLOCK: block
+		signal --acceptingNewBQ, 
+					--prevSendingToBQ, 
+					storeTargetWrSig--, sendingOutBQ
+					: std_logic := '0';
+		--signal dataNewToBQ: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
+		signal storeTargetDataSig--, dataOutBQ
+						: InstructionState := DEFAULT_INSTRUCTION_STATE;
+		--signal committing: std_logic := '0';
+		--signal groupCtrNext, groupCtrInc: SmallNumber := (others => '0');
 		
-				loadUnitNextAcceptingOut <= whichAcceptedCQ(2);		
-				execSendingC <= loadUnitSending;			
+		function trgToResult(ins: InstructionState) return InstructionState is
+			variable res: InstructionState := ins;
+		begin
+			-- CAREFUL! Here we use 'result' because it is the field copied to arg1 in mem queue!
+			-- TODO: regularize usage of such fields, maybe remove 'target' from InstructionState?
+			res.result := ins.target;
+			return res;
+		end function;
+	begin
+		storeTargetDataSig <= trgToResult(dataD0);
+		storeTargetWrSig <= execSendingD;
+	
+			BRANCH_QUEUE: entity work.MemoryUnit(Behavioral)
+			generic map(
+				QUEUE_SIZE => SQ_SIZE
+			)
+			port map(
+				clk => clk,
+				reset => reset,
+				en => en,
+				
+					acceptingOut => acceptingNewBQ,
+					prevSending => prevSendingToBQ,
+					dataIn => dataNewToBQ,
+				
+				storeAddressWr => storeTargetWrSig,
+				storeValueWr => '0',-- storeValueWrSig,
 
-				execSendingE <= --sendingIQE; -- Sending data to SQ is considered as finishing this uop
-										sendingQueueE;
-		
+				storeAddressDataIn => storeTargetDataSig,
+				storeValueDataIn => DEFAULT_INSTRUCTION_STATE,-- storeValueDataSig,
+				
+					committing => committing,
+					groupCtrNext => groupCtrNext,
+						groupCtrInc => groupCtrInc,
+						
+				execEventSignal => eventSignal,
+				execCausing => activeCausing,
+				
+				nextAccepting => '1',
+				
+				--acceptingOutSQ => execAcceptingESig,
+				sendingSQOut => sendingOutBQ, -- OUTPUT
+				dataOutSQ => dataOutBQ -- OUTPUT
+			);
+	end block;
+-------------------------------------
+
 		-- Data from sysreg reads goes to load pipe
 		sysRegDataOut <= dataD0;
 		sysRegSending <= execSendingD when dataD0.operation = (System, sysMfc) else '0';
 		-- CAREFUL: Don't send the same thing from both subpipes:
 		execSendingEffectiveD <= execSendingD when dataD0.operation /= (System, sysMfc) else '0';
-		
-		--------------------------------------------
 
 		execEventSignal <= eventsD.eventOccured;
 		execCausing <= eventsD.causing;
@@ -274,36 +285,18 @@ begin
 		eventSignal <= execOrIntEventSignalIn;	
 		activeCausing <= execOrIntCausingIn;	
 
-				execAcceptingA <= execAcceptingASig;
-				execAcceptingB <= execAcceptingBSig;
-				--execAcceptingC <= execAcceptingCSig;
-				execAcceptingD <= execAcceptingDSig;
-				--execAcceptingE <= execAcceptingESig;
-		
-		execSending <= 
-				(0 => execSendingA, 1 => execSendingB, 2 => execSendingC, 3 => execSendingD,
-													others => '0');				
-						
-			execSending2Sig <= (2 => execSendingE, 3 => --execSendingD,
-																		execSendingEffectiveD,
-										others => '0');
-			execSending2 <= execSending2Sig;
-						
-		execEndsSig <= (	
-							0=> clearTempControlInfoSimple(dataA0),
-							1=> clearTempControlInfoSimple(dataB2),
-							2=> clearTempControlInfoSimple(dataC2), -- CAREFUL: dataC2 is from load unit
-							3=> clearTempControlInfoSimple(dataD0),
-						others=> defaultInstructionState);
-			execEnds2Sig <= (2 => dataIQE, 3=> clearTempControlInfoSimple(dataD0),
-									others => DEFAULT_INSTRUCTION_STATE);
-		
-		execEnds <= execEndsSig;				
-			execEnds2 <= execEnds2Sig;
+		execAcceptingA <= execAcceptingASig;
+		execAcceptingB <= execAcceptingBSig;
+		execAcceptingD <= execAcceptingDSig;
 
-		execPreEnds <= (
-						1 => dataB1, 2 => dataC1, -- CAREFUL: dataC1 is fomr load unit (and UNUSED?)
-						others=> defaultInstructionState);											
+		outputA.ins <= clearTempControlInfoSimple(dataA0);	
+		outputA.full <= execSendingA; 
+		outputB.ins <= clearTempControlInfoSimple(dataB2);	
+		outputB.full <= execSendingB;
+		outputD.ins <= clearTempControlInfoSimple(dataD0);	
+		outputD.full <= execSendingEffectiveD;
+		
+		outputOpPreB <= dataB1;
 				
 	execEvent <= execEventSignal;
 	execCausingOut <= execCausing;

@@ -213,6 +213,10 @@ BEGIN
 			if en = '1' then -- TEMP! It shouldn't exist here
 				--alignedPC(MWORD_SIZE-1 downto ALIGN_BITS)
 					if iadrvalid = '1' then
+						assert iadr(31 downto 4) & "1111" /= X"ffffffff" 
+							report "Illegal address!" severity error;
+						
+												
 						-- CAREFUL! don't fetch if adr not valid, cause it may ovewrite previous, valid fetch block.
 						--				If fetch block is valid but cannot be sent further (pipe stall etc.),
 						--				it must remain in fetch buffer until it can be sent.
@@ -222,12 +226,12 @@ BEGIN
 							iin(i) <= --mainProgram --programMem
 										 --prog0 -- CAREFUL! if using prog0, PM_SIZE may be wrong
 										 --prog1
-										 testProg0
-										(slv2u(iadr(9 downto 2)) + i); -- CAREFUL! 2 low bits unused (32b memory) 									
+										 testProg1
+										(slv2u(iadr(10 downto 2)) + i); -- CAREFUL! 2 low bits unused (32b memory) 									
 						end loop;
 					end if;
 					
-					if iadrvalid = '1' and countOnes(iadr(iadr'high downto 9)) = 0 then
+					if iadrvalid = '1' and countOnes(iadr(iadr'high downto 10)) = 0 then
 						ivalid <= '1';					
 					else
 						ivalid <= '0';	
@@ -243,6 +247,11 @@ BEGIN
 	begin
 		if rising_edge(clk) then
 			if en = '1' then
+				if dwrite = '1' then
+					assert doutadr /= X"000000ff" 
+						report "Store to address 255 - illegal!" severity error;
+				end if;
+			
 				-- Reading
 				memReadDone <= --dadrvalid and not drw;
 									dread;
