@@ -38,12 +38,8 @@ use work.NewPipelineData.all;
 
 use work.TEMP_DEV.all;
 use work.GeneralPipeDev.all;
---use work.CommonRouting.all;
 
 use work.ProcComponents.all;
-
---use work.ProgramCode3.all;
-
 
 entity NewCore0 is
     Port ( clk : in  STD_LOGIC;
@@ -57,14 +53,15 @@ entity NewCore0 is
 			  ivalid: in std_logic;
            iin : in  InsGroup;
 			  
-					dread: out std_logic;
-					dwrite: out std_logic;
-			  dadrvalid: out std_logic; -- DEPREC
-			  drw: out std_logic; -- DEPREC
+			  -- Mem load interface
+			  dread: out std_logic;
            dadr : out  Mword;
-					doutadr: out Mword;
-			  dvalid: in std_logic;
+			  dvalid: in std_logic;			  
            din : in  Mword;
+			  
+			  -- Mem store interface
+			  dwrite: out std_logic;
+			  doutadr: out Mword;
            dout : out  Mword;
 			  			  
 			  -- Interrupt input (int0) and additional input (int1)

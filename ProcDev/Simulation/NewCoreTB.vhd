@@ -62,12 +62,10 @@ ARCHITECTURE behavior OF NewCoreTB IS
          ivalid : IN  std_logic;
          iin : IN  InsGroup;
 			
-					dread: out std_logic;
-					dwrite: out std_logic;
-			  dadrvalid: out std_logic;
-			  drw: out std_logic; -- read or write
+			  dread: out std_logic;
+			  dwrite: out std_logic;
            dadr : out  Mword;
-					doutadr: out Mword;
+			  doutadr: out Mword;
 			  dvalid: in std_logic;
            din : in  Mword;
            dout : out  Mword;			
@@ -92,8 +90,6 @@ ARCHITECTURE behavior OF NewCoreTB IS
 
 			signal dread: std_logic;
 			signal dwrite: std_logic;
-		signal	  dadrvalid: std_logic;
-		signal	  drw: std_logic; -- read or write
       signal     dadr : Mword;
 			signal	doutadr: Mword;
 		signal	  dvalid: std_logic;
@@ -105,9 +101,6 @@ ARCHITECTURE behavior OF NewCoreTB IS
    signal iadrvalid : std_logic;
    signal iadr : std_logic_vector(31 downto 0);
    signal oaux : std_logic_vector(31 downto 0);
-
-	signal outStage: InstructionStateArray(0 to PIPE_WIDTH-1) := (others => defaultInstructionState);
-
 	
 		signal memReadDone, memReadDonePrev, memWriteDone: std_logic := '0';
 		signal memReadValue, memReadValuePrev, memWriteAddress, memWriteValue: Mword := (others => '0');
@@ -135,16 +128,12 @@ BEGIN
 			 
 					dread => dread,
 					dwrite => dwrite,
-				dadrvalid => dadrvalid,
-				drw => drw,
 				dadr => dadr,
 					doutadr => doutadr,
 				dvalid => dvalid,
 				din => din,
 				dout => dout,			 
-			 
-			 --outStage => outStage,
-			 
+			 			 
           int0 => int0,
           int1 => int1,
           iaux => iaux,
@@ -206,12 +195,10 @@ BEGIN
 	end process;
 
 	PROGRAM_MEM: process (clk)
-		--variable alignedPC: mword := (others=>'0');
 		constant PM_SIZE: natural := WordMem'length; --programMem'length; 	
 	begin
 		if rising_edge(clk) then
 			if en = '1' then -- TEMP! It shouldn't exist here
-				--alignedPC(MWORD_SIZE-1 downto ALIGN_BITS)
 					if iadrvalid = '1' then
 						assert iadr(31 downto 4) & "1111" /= X"ffffffff" 
 							report "Illegal address!" severity error;
@@ -235,7 +222,6 @@ BEGIN
 						ivalid <= '1';					
 					else
 						ivalid <= '0';	
-						--iin(0) <= (others => 'Z');
 					end if;			
 			end if;
 		end if;	
@@ -243,7 +229,6 @@ BEGIN
 
 
 	DATA_MEM: process (clk)
-		--variable alignedPC: mword := (others=>'0'); 
 	begin
 		if rising_edge(clk) then
 			if en = '1' then
@@ -253,15 +238,13 @@ BEGIN
 				end if;
 			
 				-- Reading
-				memReadDone <= --dadrvalid and not drw;
-									dread;
+				memReadDone <= dread;
 				memReadDonePrev <= memReadDone;
 				memReadValue <= dataMem(slv2u(dadr)) ;--(9 downto 2))); 
 				memReadValuePrev <= memReadValue;	
 				
 				-- Writing
-				memWriteDone <= --dadrvalid and drw;
-										dwrite;
+				memWriteDone <= dwrite;
 				memWriteValue <= dout;
 				memWriteAddress <= doutadr;
 				if memWriteDone = '1' then
