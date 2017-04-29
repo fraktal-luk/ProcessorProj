@@ -133,7 +133,7 @@ architecture Behavioral5 of NewCore0 is
 	signal outputOpPreB, outputOpPreC: InstructionState := DEFAULT_INSTRUCTION_STATE;
 						
 	-- CAREFUL: this is used to turn off dependence on iqAccepts
-	constant	OMIT_IQ_ACCEPTS: std_logic := '0';			
+	constant	OMIT_IQ_ACCEPTS: std_logic := '0';	-- DEPREC	
 				
 	constant HAS_RESET: std_logic := '0';
 	constant HAS_EN: std_logic := '0';
@@ -183,9 +183,7 @@ begin
 		newPhysSourcesIn => newPhysSources,
 
 		-- Interface with IQ
-		-- CAREFUL: iqAccepts is needed here, but must be faster (based on 'full' instead of 'living')
-		iqAccepts => --robAccepting and (iqAccepts or OMIT_IQ_ACCEPTS) and acceptingNewSQ and acceptingNewLQ,
-							iqAccepts,
+		iqAccepts => iqAccepts,
 		renamedDataLiving => renamedDataLiving, -- !!!
 		renamedSending => renamedSending,
 
@@ -197,9 +195,9 @@ begin
 		robDataLiving => dataOutROB,
 		committing => committingSig,
 
-				---
-				sendingFromBQ => sendingFromBQ,
-				dataFromBQ => dataOutBQ,
+		---
+		sendingFromBQ => sendingFromBQ,
+		dataFromBQ => dataOutBQ,
 
 		-- Interface from committed stage
 		committedSending => committedSending,
@@ -210,7 +208,7 @@ begin
 		commitGroupCtrOut => commitGroupCtrSig,
 		commitGroupCtrNextOut => commitGroupCtrNextSig,
 		
-			commitGroupCtrIncOut => commitGroupCtrIncSig
+		commitGroupCtrIncOut => commitGroupCtrIncSig
 	);
 		
 	FRONT_PART: entity work.UnitFront(Behavioral)
@@ -236,17 +234,17 @@ begin
 	port map(
 		renamedDataLiving => renamedDataLiving,
 
-			acceptingVecA => acceptingVecA,
-			acceptingVecB => acceptingVecB,
-			acceptingVecC => acceptingVecC,
-			acceptingVecD => acceptingVecD,
-			acceptingVecE => acceptingVecE,
+		acceptingVecA => acceptingVecA,
+		acceptingVecB => acceptingVecB,
+		acceptingVecC => acceptingVecC,
+		acceptingVecD => acceptingVecD,
+		acceptingVecE => acceptingVecE,
 
-			acceptingROB => robAccepting,-- and (iqAccepts or OMIT_IQ_ACCEPTS)
-			acceptingSQ => acceptingNewSQ,
-			acceptingLQ => acceptingNewLQ,
-			acceptingBQ => acceptingNewBQ,
-		
+		acceptingROB => robAccepting,
+		acceptingSQ => acceptingNewSQ,
+		acceptingLQ => acceptingNewLQ,
+		acceptingBQ => acceptingNewBQ,
+
 		renamedSendingIn => renamedSending,
 		
 		renamedSendingOut => open, -- DEPREC??
@@ -434,21 +432,11 @@ begin
 		dataIQB => dataOutIQB,
 		dataIQD => dataOutIQD,
 		
-			outputA => outputA,
-			outputB => outputB,
-			outputD => outputD,
+		outputA => outputA,
+		outputB => outputB,
+		outputD => outputD,
 			
-			outputOpPreB => outputOpPreB,
-		
-		--dataQueueE => dataOutIQE,
-
-		--sendingQueueE => sendingQueueE,
-
-		--loadUnitNextAcceptingOut => loadUnitNextAccepting,
-			
-		--loadUnitSending => loadUnitSending,
-		--loadData => loadData,
-		--loadDataPre => loadDataPre,
+		outputOpPreB => outputOpPreB,
 			
 		sysRegSelect => sysRegReadSel,
 		sysRegIn => sysRegReadValue,
@@ -460,23 +448,16 @@ begin
 		
 		whichAcceptedCQ => whichAcceptedCQ,
 		
-		--execSending => execSending_C,
-		--execSending2 => execSending2_C,
-
-		--execPreEnds => execPreEnds_C,
-		--execEnds => execEnds_C,
-		--execEnds2 => execEnds2_C,
-
-			acceptingNewBQ => acceptingNewBQ,--: out std_logic;
-			sendingOutBQ => sendingFromBQ,--: out std_logic;
-			dataOutBQ => dataOutBQ,--: out InstructionState;
-			prevSendingToBQ => renamedSending,--: in std_logic;
-			dataNewToBQ => compactedToBQ,--: in StageDataMulti;
+		acceptingNewBQ => acceptingNewBQ,
+		sendingOutBQ => sendingFromBQ,
+		dataOutBQ => dataOutBQ,
+		prevSendingToBQ => renamedSending,
+		dataNewToBQ => compactedToBQ,
 			
-			committing => committingSig,--: in std_logic;
+		committing => committingSig,
 			
-			groupCtrNext => commitGroupCtrNextSig,--: in SmallNumber;
-			groupCtrInc => commitGroupCtrIncSig,--: in SmallNumber;
+		groupCtrNext => commitGroupCtrNextSig,
+		groupCtrInc => commitGroupCtrIncSig,
 		
 		execEvent => execEventSignal,
 		execCausingOut => execCausing,
@@ -489,14 +470,14 @@ begin
 		port map(
 			clk => clk, reset => reset, en => en,
 
-			execAcceptingC => execAcceptingC, --open,
-			execAcceptingE => execAcceptingE, --open, -- Store data
+			execAcceptingC => execAcceptingC,
+			execAcceptingE => execAcceptingE,
 			
 			sendingIQC => sendingSchedC,
-			sendingIQE => sendingSchedE, -- Store data
+			sendingIQE => sendingSchedE,
 
 			dataIQC => dataOutIQC,
-			dataIQE => dataOutIQE,	-- Store data			
+			dataIQE => dataOutIQE,
 			-------------
 
 			acceptingNewSQ => acceptingNewSQ,
@@ -506,35 +487,29 @@ begin
 			dataNewToSQ => compactedToSQ,
 			dataNewToLQ => compactedToLQ,
 
-				outputC => outputC,
-				outputE => outputE,
+			outputC => outputC,
+			outputE => outputE,
 				
-				outputOpPreC => outputOpPreC,
+			outputOpPreC => outputOpPreC,
 
-		whichAcceptedCQ => whichAcceptedCQ,
+			whichAcceptedCQ => whichAcceptedCQ,
 
-			--loadUnitNextAccepting => loadUnitNextAccepting,
-			--loadUnitSending => loadUnitSending,
-			--loadDataPreOut => loadDataPre,
-			--loadDataOut => loadData,
-				
-			memLoadReady => memLoadReady,--'0',
+			memLoadReady => memLoadReady,
 			memLoadValue => memLoadValue,
 			
-			memLoadAddress => memLoadAddress,--open,
-			memStoreAddress => memStoreAddress,--open,
-			memLoadAllow => memLoadAllow,--open,
-			memStoreAllow => memStoreAllow,--open,
-			memStoreValue => memStoreValue, --open,
-
-			--sendingQueueE => sendingQueueE,
+			memLoadAddress => memLoadAddress,
+			memStoreAddress => memStoreAddress,
+			memLoadAllow => memLoadAllow,
+			memStoreAllow => memStoreAllow,
+			memStoreValue => memStoreValue,
 
 			sysRegDataIn => sysRegData,
 			sysRegSendingIn => sysRegSending,
 
 			committing => committingSig,
 			groupCtrNext => commitGroupCtrNextSig,
-				groupCtrInc => commitGroupCtrIncSig,
+			
+			groupCtrInc => commitGroupCtrIncSig,
 
 			execOrIntEventSignalIn => execOrIntEventSignal,
 			execOrIntCausingIn => execOrIntCausing
@@ -591,21 +566,18 @@ begin
 					prevStablePhysDests => physStable,  -- FOR MAPPING (to FREE LIST)
 					stablePhysSources => open,
 					
-						sendingToWrite => anySendingFromCQ,
-						stageDataToWrite => cqDataLivingOut,
+					sendingToWrite => anySendingFromCQ,
+					stageDataToWrite => cqDataLivingOut,
 
-							stageDataToWritePre => cqDataLivingOut, -- TEMP!
+					stageDataToWritePre => cqDataLivingOut, -- TEMP!
 						
-						readyRegFlagsNext => readyRegFlagsNextV
+					readyRegFlagsNext => readyRegFlagsNextV
 				);
 
 			LAST_COMMITTED_SYNCHRONOUS: process(clk) 	
 			begin
 				if rising_edge(clk) then
-					--if resetSig = '1' then
-					--elsif enSig = '1' then
-						physStableDelayed <= work.ProcLogicRenaming.getStableDestsParallel(dataOutROB, physStable);					
-					--end if;
+					physStableDelayed <= work.ProcLogicRenaming.getStableDestsParallel(dataOutROB, physStable);					
 				end if;
 			end process;
 	
@@ -650,8 +622,8 @@ begin
 			READY_REGS_SYNCHRONOUS: process(clk) 	
 			begin
 				if rising_edge(clk) then
-						readyRegFlags_2 <= readyRegFlagsNext;
-						--	readyRegFlagsV <= readyRegFlagsNextV;
+					readyRegFlags_2 <= readyRegFlagsNext;
+					--	readyRegFlagsV <= readyRegFlagsNextV;
 				end if;
 			end process;
 

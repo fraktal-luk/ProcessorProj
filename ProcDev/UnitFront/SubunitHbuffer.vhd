@@ -74,6 +74,7 @@ architecture Implem of SubunitHbuffer is
 	signal hbufferDataANew: InstructionStateArray(0 to 2*PIPE_WIDTH-1)	
 			:= (others => DEFAULT_ANNOTATED_HWORD);	
 	
+	-- DEPREC
 	signal stageData, stageDataNext: StageDataHbuffer := DEFAULT_STAGE_DATA_HBUFFER;
 	
 	signal hbufferDrive: FlowDriveBuffer := (killAll => '0', lockAccept => '0', lockSend => '0',

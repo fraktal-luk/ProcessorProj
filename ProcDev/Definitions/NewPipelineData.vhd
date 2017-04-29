@@ -12,7 +12,6 @@ use IEEE.STD_LOGIC_1164.all;
 
 use work.ProcBasicDefs.all;
 use work.ProcInstructionsNew.all;
---use work.Renaming1.all;
 
 package NewPipelineData is
 
@@ -100,12 +99,6 @@ type ExecFunc is (unknown,
 										sysMTC, sysMFC, -- move to/from control
 										sysUndef
 							);	
-
---	-- CAREFUL: is this needed and correct?
---	type ExecStages is (	ExecA0, 
---								ExecB0, ExecB1, ExecB2,
---								ExecC0, ExecC1, ExecC2,
---								ExecD0);
 							
 type BinomialOp is record
 	unit: ExecUnit;
@@ -357,6 +350,7 @@ constant INITIAL_DATA_PC: InstructionState := initialPCData;
 
 constant DEFAULT_ANNOTATED_HWORD: InstructionState := defaultInstructionState;
 	
+	-- CAREFUL! Only needed for 1 function (a possible optimization idea, may be implemented with I.Slot.Arr.)
 	type StageDataHbuffer is record
 		fullMask: std_logic_vector(0 to HBUFFER_SIZE-1);
 		data: InstructionStateArray(0 to HBUFFER_SIZE-1);
@@ -396,17 +390,6 @@ constant DEFAULT_STAGE_MULTI_EVENT_INFO: StageMultiEventInfo
 													:= (eventOccured => '0',
 														  causing => defaultInstructionState,
 														  partialKillMask => (others => '0'));
-
-	-- UNUSED?
-	type InstructionResult is record
-		full: std_logic;
-		tag: SmallNumber;
-		value: Mword;
-	end record;
-
-	constant DEFAULT_INSTRUCTION_RESULT: InstructionResult := ('0', (others => '0'), (others => '0'));
-	
-	type InstructionResultArray is array(integer range <>) of InstructionResult;
 					
 			type ArgStatusInfo is record
 				stored: std_logic_vector(0 to 2); -- those that were already present in prev cycle	
