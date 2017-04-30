@@ -52,20 +52,12 @@ architecture Behavioral5 of NewCore0 is
 	--		rather than from forw. network, but readyRegFlags are not available in the 1st cycle after WB.
 	signal writtenTags: PhysNameArray(0 to PIPE_WIDTH-1) := (others => (others => '0'));
 
+	signal fni: ForwardingInfo := DEFAULT_FORWARDING_INFO;
+
 	signal execEnds, execEnds2: InstructionStateArray(0 to 3) := (others => DEFAULT_INSTRUCTION_STATE);
 	signal execPreEnds: InstructionStateArray(0 to 3) := (others => DEFAULT_INSTRUCTION_STATE);
 	signal execSending, execSending2: std_logic_vector(0 to 3) := (others => '0');
 
-	------------ TEMP!
-	signal execEnds_C, execEnds2_C: InstructionStateArray(0 to 3) := (others => DEFAULT_INSTRUCTION_STATE);
-	signal execPreEnds_C: InstructionStateArray(0 to 3) := (others => DEFAULT_INSTRUCTION_STATE);
-	signal execSending_C, execSending2_C: std_logic_vector(0 to 3) := (others => '0');
-	------------
-	
-	signal loadData, loadDataPre: InstructionState := DEFAULT_INSTRUCTION_STATE;	
-	signal loadUnitSending: std_logic := '0';
-	signal loadUnitNextAccepting: std_logic := '0';
-	
 	-- Mem interface
 	signal memLoadAddress, memStoreAddress, memLoadValue, memStoreValue: Mword := (others => '0');
 	signal memStoreAllow, memLoadAllow, memLoadReady: std_logic := '0';
@@ -133,7 +125,7 @@ architecture Behavioral5 of NewCore0 is
 	signal outputOpPreB, outputOpPreC: InstructionState := DEFAULT_INSTRUCTION_STATE;
 						
 	-- CAREFUL: this is used to turn off dependence on iqAccepts
-	constant	OMIT_IQ_ACCEPTS: std_logic := '0';	-- DEPREC	
+	--constant	OMIT_IQ_ACCEPTS: std_logic := '0';	-- DEPREC	
 				
 	constant HAS_RESET: std_logic := '0';
 	constant HAS_EN: std_logic := '0';
@@ -272,11 +264,8 @@ begin
 
 		prevSendingOK => renamedSending,
 		newData => dataToA,
-		
-		writtenTags => writtenTags,		
-		resultTags => resultTags,
-		nextResultTags => nextResultTags,
-		resultVals => resultVals,
+
+		fni => fni,
 		
 		readyRegFlags => readyRegFlags,
 		regsForDispatch => regsSelA,
@@ -302,11 +291,8 @@ begin
 		
 		prevSendingOK => renamedSending,
 		newData => dataToB,		
-		
-		writtenTags => writtenTags,		
-		resultTags => resultTags,
-		nextResultTags => nextResultTags,
-		resultVals => resultVals,
+
+		fni => fni,	
 				
 		readyRegFlags => readyRegFlags,		
 		regsForDispatch => regsSelB,
@@ -334,10 +320,7 @@ begin
 		prevSendingOK => renamedSending,
 		newData => dataToC,			
 
-		writtenTags => writtenTags,		
-		resultTags => resultTags,
-		nextResultTags => nextResultTags,
-		resultVals => resultVals,
+		fni => fni,
 				
 		readyRegFlags => readyRegFlags,
 		regsForDispatch => regsSelC,
@@ -362,12 +345,9 @@ begin
 		acceptingVec => acceptingVecD,		
 
 		prevSendingOK => renamedSending,
-		newData => dataToD,		
-		
-		writtenTags => writtenTags,
-		resultTags => resultTags,
-		nextResultTags => nextResultTags,
-		resultVals => resultVals,
+		newData => dataToD,
+
+		fni => fni,
 				
 		readyRegFlags => readyRegFlags,
 		regsForDispatch => regsSelD,
@@ -397,13 +377,8 @@ begin
 		nextAccepting => execAcceptingE,
 		dataOutIQ => dataOutIQE,
 		sendingOut => sendingSchedE,
-		
-		----------------------------
-		writtenTags => writtenTags, -- tag for registers just written
-		
-		resultTags => resultTags,
-		nextResultTags => nextResultTags,
-		resultVals => resultVals,
+				
+		fni => fni,	
 				
 		readyRegFlags => readyRegFlags, -- bits generated for input group
 		
@@ -521,8 +496,8 @@ begin
 			execEnds2 <= getExecEnds2(outputA, outputB, outputC, outputD, outputE);
 			execPreEnds <= getExecPreEnds(outputOpPreB, outputOpPreC);
 
-		cc0 <= '1' when execPreEnds_C = execPreEnds else '0';
-		cc1 <= '1' when execEnds2_C = execEnds2 else '0';
+		--cc0 <= '1' when execPreEnds_C = execPreEnds else '0';
+		--cc1 <= '1' when execEnds2_C = execEnds2 else '0';
 
 
 	COMMIT_QUEUE: entity work.TestCQPart0(Implem)
@@ -659,6 +634,7 @@ begin
 			lockCommand => '0'			
 		);
 			
+		-- Int register block	
 		cqPhysDestMask <= getPhysicalDestMask(cqDataLivingOut);
 		cqPhysicalDests <= getPhysicalDests(cqDataLivingOut);
 		cqInstructionResults <= getInstructionResults(cqDataLivingOut);
@@ -666,8 +642,10 @@ begin
 			regsSelCE(0 to 1) <= regsSelC(0 to 1);
 			regsSelCE(2) <= regsSelE(2);
 			regsAllowCE <= regsAllowC or regsAllowE;
-			regValsC <= regValsCE;
-			regValsE <= regValsCE;
+			--regValsC <= regValsCE;
+			--regValsE <= regValsCE;
+				regValsC(0 to 1) <= regValsCE(0 to 1);
+				regValsE(2) <= regValsCE(2);
 		
 		TEMP_REG_FILE_INPUTS: for i in 0 to PIPE_WIDTH-1 generate
 			rfWriteVec(i) <= cqPhysDestMask(i);
@@ -698,7 +676,7 @@ begin
 			readValues(6 to 8) => regValsCE,						
 			readValues(9 to 11) => regValsD			
 		);
-	
+		------------------------------
 	
 	REORDER_BUFFER: entity work.ReorderBuffer --(Behavioral) 
 															(Implem)
@@ -731,6 +709,11 @@ begin
 				execEnds, dataCQOut, dataOutIQA, dataOutIQB, dataOutIQC, dataOutIQD,	stageDataAfterCQ);
 	nextResultTags <= getNextResultTags(execPreEnds, dataOutIQA, dataOutIQB, dataOutIQC, dataOutIQD);
 	resultVals <= getResultValues(execEnds, dataCQOut, stageDataAfterCQ);
+	
+		fni.writtenTags <= writtenTags;
+		fni.resultTags <= resultTags;
+		fni.nextResultTags <= nextResultTags;
+		fni.resultValues <= resultVals;
 	
 	dadr <= memLoadAddress;
 	doutadr <= memStoreAddress;

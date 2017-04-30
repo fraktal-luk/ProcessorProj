@@ -64,10 +64,12 @@ entity UnitIQ is
 		execEventSignal: in std_logic;		
 			
 		
-		writtenTags: PhysNameArray(0 to PIPE_WIDTH-1);		
-		resultTags: in PhysNameArray(0 to N_RES_TAGS-1);
-		nextResultTags: in PhysNameArray(0 to N_NEXT_RES_TAGS-1);
-		resultVals: in MwordArray(0 to N_RES_TAGS-1);
+		--writtenTags: PhysNameArray(0 to PIPE_WIDTH-1);		
+		--resultTags: in PhysNameArray(0 to N_RES_TAGS-1);
+		--nextResultTags: in PhysNameArray(0 to N_NEXT_RES_TAGS-1);
+		--resultVals: in MwordArray(0 to N_RES_TAGS-1);
+			
+			fni: in ForwardingInfo;
 			
 		-- Phys regs to read - only for "full read ports" configuration 
 		regsForDispatch: out PhysNameArray(0 to 2);
@@ -135,9 +137,12 @@ begin
 		generic map(IQ_SIZE => PIPE_WIDTH)
 		port map(
 			queueData => newData.data,
-			resultTags => resultTags,
-			nextResultTags => nextResultTags,
-			writtenTags => writtenTags,
+			resultTags => --resultTags,
+								fni.resultTags,
+			nextResultTags => --nextResultTags,
+									fni.nextResultTags,
+			writtenTags => --writtenTags,
+									fni.writtenTags,
 			aiArray => aiNew
 		);
 		
@@ -145,8 +150,10 @@ begin
 	generic map(IQ_SIZE => IQ_SIZE)
 	port map(
 		queueData => iqData,
-		resultTags => resultTags,
-		nextResultTags => nextResultTags,
+		resultTags => --resultTags,
+							fni.resultTags,
+		nextResultTags => --nextResultTags,
+								fni.nextResultTags,
 		writtenTags => writtenTagsZ,
 		aiArray => aiArray
 	);
@@ -159,8 +166,10 @@ begin
 	 	nextAccepting => nextAccepting,
 		execEventSignal => execEventSignal,
 		execCausing => execCausing,
-		resultTags => resultTags,
-		resultVals => resultVals,
+		resultTags => --resultTags,
+							fni.resultTags,
+		resultVals => --resultVals,
+							fni.resultValues,
 		regValues => regValues,
 	 	stageDataIn => toDispatch,		
 		acceptingOut => dispatchAccepting,
