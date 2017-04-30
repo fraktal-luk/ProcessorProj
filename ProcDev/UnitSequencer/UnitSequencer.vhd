@@ -201,8 +201,7 @@ begin
 		-- $INPUT: 
 		--		stage0EventInfo, execEventSignal, execCausing, eiEvents
 		-- $OUTPUT:
-		-- 	execOrIntCausing, execOrIntEventSignal, killVecOut, generalEvents, 
-						
+		-- 	execOrIntCausing, execOrIntEventSignal, killVecOut, generalEvents, 					
 	begin	
 			killVecOut(6) <= eiEvents.eventOccured;
 			killVecOut(5) <= execOrIntEventSignal;
@@ -216,12 +215,7 @@ begin
 											stage0EventInfo.eventOccured, stage0EventInfo.causing,
 											pcNext, causingNext
 										);
-		
-		-- f(stage0EventInfo, execEventSignal, execCausing, eiEvents) -> generalEvents
-		-- g(generalEvents, stageDataOutPC, pcNext, causingNext) -> PC
-		-- => h(stage0EventInfo, execEventSignal, execCausing, eiEvents, stageDataOutPC, pcNext, causingNext)
-		--				-> (generalEvents' == (generalEvents, PC))  ??
-		
+
 		execOrIntEventSignal <= execEventSignal or eiEvents.eventOccured;
 		execOrIntCausing <= eiEvents.causing when eiEvents.eventOccured = '1' else execCausing;
 		
@@ -299,8 +293,6 @@ begin
 		CLOCKED: process(clk)
 		begin					
 			if rising_edge(clk) then
-				if resetSig = '1' then			
-				elsif enSig = '1' then
 					-- CAREFUL: writing to currentState BEFORE normal sys reg write gives priority to the latter;
 					--				otherwise explicit setting of currentState wouldn't work.
 					--				So maybe other sys regs should have it done the same way, not conversely? 
@@ -337,9 +329,7 @@ begin
 					-- Only some number of system regs exists		
 					for i in 6 to 31 loop
 						sysRegArray(i) <= (others => '0');
-					end loop;
-				
-				end if;
+					end loop;				
 			end if;	
 		end process;
 		
@@ -353,14 +343,11 @@ begin
 		FRONT_SEQ_SYNCHRONOUS: process(clk) 	
 		begin
 			if rising_edge(clk) then
-				if resetSig = '1' then					
-				elsif enSig = '1' then	
-					if fetchLockRequest = '1' then
-						fetchLockState <= '1';
-					elsif (fetchLockCommit or generalEvents.eventOccured) = '1' then
-						fetchLockState <= '0';
-					end if;				
-				end if;
+				if fetchLockRequest = '1' then
+					fetchLockState <= '1';
+				elsif (fetchLockCommit or generalEvents.eventOccured) = '1' then
+					fetchLockState <= '0';
+				end if;				
 			end if;	
 		end process;
 
@@ -377,18 +364,6 @@ begin
 		-- INPUT: newPhysSources, newPhysDests
 		signal stageDataRenameIn: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;		
 		signal reserveSelSig, takeVec: std_logic_vector(0 to PIPE_WIDTH-1) := (others => '0' );
-
---			function TMP_setReadyRegFlags(ig: StageDataMulti; rrfV: std_logic_vector)
---			return StageDataMulti is
---				variable res: StageDataMulti := ig;
---			begin
---				for i in 0 to PIPE_WIDTH-1 loop
---					res.data(i).argValues.missing(0) := ig.data(i).argValues.missing(0) and not rrfV(3*i + 0);
---					res.data(i).argValues.missing(1) := ig.data(i).argValues.missing(1) and not rrfV(3*i + 1);
---					res.data(i).argValues.missing(2) := ig.data(i).argValues.missing(2) and not rrfV(3*i + 2);
---				end loop;
---				return res;
---			end function;
 	begin	
 		reserveSelSig <= getDestMask(frontDataLastLiving);
 		takeVec <= (others => '1') when ALLOC_REGS_ALWAYS
@@ -434,15 +409,12 @@ begin
 		RENAME_SEQ_SYNCHRONOUS: process(clk) 	
 		begin
 			if rising_edge(clk) then
-				if resetSig = '1' then					
-				elsif enSig = '1' then	
-					-- Lock when exec part causes event
-					if execOrIntEventSignal = '1' then -- CAREFUL
-						renameLockState <= '1';	
-					elsif renameLockRelease = '1' then
-						renameLockState <= '0';
-					end if;					
-				end if;
+				-- Lock when exec part causes event
+				if execOrIntEventSignal = '1' then -- CAREFUL
+					renameLockState <= '1';	
+				elsif renameLockRelease = '1' then
+					renameLockState <= '0';
+				end if;					
 			end if;	
 		end process;
 			
@@ -474,13 +446,10 @@ begin
 		PIPE_SYNCHRONOUS: process(clk) 	
 		begin
 			if rising_edge(clk) then
-				if resetSig = '1' then					
-				elsif enSig = '1' then					
-					renameCtr <= renameCtrNext;
-					--commitCtr <= commitCtrNext;					
-					renameGroupCtr <= renameGroupCtrNext;
-					commitGroupCtr <= commitGroupCtrNext;
-				end if;
+				renameCtr <= renameCtrNext;
+				--commitCtr <= commitCtrNext;					
+				renameGroupCtr <= renameGroupCtrNext;
+				commitGroupCtr <= commitGroupCtrNext;
 			end if;
 		end process;	
 	end block;
@@ -489,7 +458,7 @@ begin
 	sendingToCommit <= sendingFromROB;	
 	stageDataToCommit <= robDataLiving;
 
-		committing <= sendingFromROB;
+	committing <= sendingFromROB;
 	
 	-- Commit stage: in order again				
 	SUBUNIT_COMMIT: entity work.GenericStageMulti(Behavioral)
@@ -552,8 +521,7 @@ begin
 				
 				incArg <= tempBuffValue when tempBuffWaiting = '1' else dataFromLastEffective.data(0).target;
 				
-				newEffectiveTarget <= --tempBuffValue when tempBuffWaiting = '1' 
-											 dataFromBQ.argValues.arg1 when committingTakenBranch = '1'		 
+				newEffectiveTarget <= dataFromBQ.argValues.arg1 when committingTakenBranch = '1'		 
 									else	 incTarget;
 			end block;
 		
@@ -562,11 +530,7 @@ begin
 
 			dataToLastEffective.fullMask(0) <= sendingToCommit;
 			dataToLastEffective.data(0) <= 
-										setInstructionTarget(
-											getLastEffective(stageDataToCommit)--,--,
-											, newEffectiveTarget)
-										--)
-										;
+									setInstructionTarget(getLastEffective(stageDataToCommit), newEffectiveTarget);
 
 			LAST_EFFECTIVE_SLOT: entity work.GenericStageMulti(LastEffective)
 			port map(
