@@ -409,7 +409,7 @@ begin
 		
 		-- Interface for reading registers
 		regsForDispatch => regsSelE,
-		regReadAllow => regsAllowE,
+		regReadAllow => regsAllowE, -- TODO: change to individual for each port
 		regValues => regValsE,		
 		
 		execCausing => execOrIntCausing,
@@ -680,16 +680,13 @@ begin
 		generic map(WIDTH => 4, WRITE_WIDTH => PIPE_WIDTH)
 		port map(
 			clk => clk, reset => resetSig, en => enSig,
-
-				readAllowT0 => regsAllowA,
-				readAllowT1 => regsAllowB,
-				readAllowT2 => regsAllowCE,
-				readAllowT3 => regsAllowD,
 				
 			writeAllow => anySendingFromCQ,
 			writeVec => rfWriteVec,
 			selectWrite => rfSelectWrite, -- NOTE: unneeded writing isn't harmful anyway
 			writeValues => rfWriteValues,
+			
+			readAllowVec => (others => '1'), -- TEMP!
 			
 			selectRead(0 to 2) => regsSelA,
 			selectRead(3 to 5) => regsSelB,
