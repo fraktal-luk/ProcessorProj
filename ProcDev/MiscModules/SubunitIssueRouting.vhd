@@ -117,7 +117,7 @@ begin
 		dataOutSQ <= dataToSQ;
 		dataToSQ <= routeToIQ(renamedDataLiving, storeVec);
 		dataOutLQ <= routeToIQ(renamedDataLiving, findLoads(renamedDataLiving));	
-			dataOutBQ <= routeToIQ(renamedDataLiving, srcVecD); -- TEMP! Contains system instructions!
+			dataOutBQ <= trgForBQ(routeToIQ(renamedDataLiving, srcVecD)); -- TEMP! Contains system instructions!
 	
 		invA <= invertVec(acceptingVecA);
 		invB <= invertVec(acceptingVecB);

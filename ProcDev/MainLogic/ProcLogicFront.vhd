@@ -555,12 +555,12 @@ begin
 			res.basicInfo.systemLevel := "00000001";
 		end if;	
 	elsif execEvent = '1' then		
-		if execCausing.controlInfo.newBranch = '1' then
+		--if execCausing.controlInfo.newBranch = '1' then
 			res.basicInfo.ip := execCausing.target;
-		else -- if execCausing.controlInfo.newReturn = '1'
-			res.basicInfo.ip := execCausing.result;
+		--else -- if execCausing.controlInfo.newReturn = '1'
+		--	res.basicInfo.ip := execCausing.result;
 														--target;
-		end if;	
+		--end if;	
 	elsif decodeEvent = '1' then
 			if BRANCH_AT_DECODE then
 				res.basicInfo.ip := decodeCausing.target;	

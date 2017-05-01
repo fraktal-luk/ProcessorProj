@@ -109,7 +109,7 @@ return InstructionState;
 function clearEmptyResultTags(insVec: InstructionStateArray; fullMask: std_logic_vector)
 return InstructionStateArray;
 
-
+function trgForBQ(insVec: StageDataMulti) return StageDataMulti;
 
 
 function findBranchLink(insv: StageDataMulti) return std_logic_vector;
@@ -576,6 +576,18 @@ end function;
 	-- or injected into mem/cross exchange),
 	--	with Int sources. But what about system regs? They probably belong to a category
 	-- together with branches.
+	
+	
+function trgForBQ(insVec: StageDataMulti) return StageDataMulti is
+	variable res: StageDataMulti := insVec;
+begin
+	for i in 0 to PIPE_WIDTH-1 loop
+		res.data(i).argValues.arg1 := res.data(i).target;
+	end loop;
+	
+	return res;
+end function;	
+	
 	
 function getStoreAddressPart(ins: InstructionState)
 return InstructionState is

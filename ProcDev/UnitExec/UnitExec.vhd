@@ -226,6 +226,8 @@ begin
 		--signal committing: std_logic := '0';
 		--signal groupCtrNext, groupCtrInc: SmallNumber := (others => '0');
 		
+		signal storingForMTC: std_logic := '0';
+		
 		function trgToResult(ins: InstructionState) return InstructionState is
 			variable res: InstructionState := ins;
 		begin
@@ -236,8 +238,13 @@ begin
 		end function;
 	begin
 		storeTargetDataSig <= trgToResult(dataD0);
-		storeTargetWrSig <= execSendingD;
-	
+		storeTargetWrSig <= execSendingD and
+										((dataD0.controlInfo.hasBranch and dataD0.classInfo.branchReg)
+									or   dataD0.controlInfo.hasReturn
+									or   storingForMTC);
+									
+			storingForMTC <= '1' when dataD0.operation.func = sysMtc and USE_BQ_FOR_MTC else '0';						
+									
 			BRANCH_QUEUE: entity work.MemoryUnit(Behavioral)
 			generic map(
 				QUEUE_SIZE => SQ_SIZE

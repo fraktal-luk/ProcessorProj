@@ -227,7 +227,13 @@ begin
 			res.data(i).physicalDestArgs.sel := (others => '0');			
 			res.data(i).physicalDestArgs.d0 := (others => '0');
 		end if;
-		res.data(i).constantArgs.imm := res.data(i).target;
+		
+		if insVec.data(i).controlInfo.hasBranch = '1' then
+			res.data(i).constantArgs.imm := res.data(i).result;			
+		else
+			res.data(i).constantArgs.imm := res.data(i).target;
+		end if;
+		
 	end loop;
 	return res;
 end function;
