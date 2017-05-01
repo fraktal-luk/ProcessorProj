@@ -75,10 +75,8 @@ architecture Behavioral of GenericStageMulti is
 	signal flowResponse: FlowResponseSimple := (others=>'0');		
 	signal stageData, stageDataLiving, stageDataNext, stageDataNew:
 														StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
-	signal partialKillMask: std_logic_vector(0 to PIPE_WIDTH-1) := (others => '0');
-		
-		--use work.ProcLogicFront.stageMultiEvents; -- TODO: func should be in a global package?
-		signal stageEvents: StageMultiEventInfo;
+	signal partialKillMask: std_logic_vector(0 to PIPE_WIDTH-1) := (others => '0');	
+	signal stageEvents: StageMultiEventInfo;
 begin
 	stageDataNew <= stageDataIn;										
 	stageDataNext <= stageMultiNext(stageDataLiving, stageDataNew,
@@ -126,10 +124,8 @@ architecture Renaming of GenericStageMulti is
 	signal flowResponse: FlowResponseSimple := (others=>'0');		
 	signal stageData, stageDataLiving, stageDataNext, stageDataNew:
 														StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
-	signal partialKillMask: std_logic_vector(0 to PIPE_WIDTH-1) := (others => '0');
-		
-		--use work.ProcLogicFront.stageMultiEvents; -- TODO: func should be in a global package?
-		signal stageEvents: StageMultiEventInfo;
+	signal partialKillMask: std_logic_vector(0 to PIPE_WIDTH-1) := (others => '0');	
+	signal stageEvents: StageMultiEventInfo;
 begin
 	stageDataNew <= work.TEMP_DEV.setBranchLink(stageDataIn);
 	stageDataNext <= stageMultiNextCl(stageDataLiving, stageDataNew,
@@ -179,9 +175,7 @@ architecture SingleTagged of GenericStageMulti is
 	signal stageData, stageDataLiving, stageDataNext, stageDataNew:
 														StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
 	signal partialKillMask: std_logic_vector(0 to PIPE_WIDTH-1) := (others => '0');
-	
-		use work.ProcLogicFront.stageMultiEvents; -- TODO: func should be in a global package?
-		signal stageEvents: StageMultiEventInfo;	
+	signal stageEvents: StageMultiEventInfo;	
 begin
 	stageDataNew <= stageDataIn;										
 	stageDataNext <= stageMultiNext(stageDataLiving, stageDataNew,
@@ -249,9 +243,7 @@ architecture Branch of GenericStageMulti is
 	signal stageData, stageDataLiving, stageDataNext, stageDataNew:
 														StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
 	signal partialKillMask: std_logic_vector(0 to PIPE_WIDTH-1) := (others => '0');
-	
-		use work.ProcLogicFront.stageMultiEvents; -- TODO: func should be in a global package?
-		signal stageEvents: StageMultiEventInfo;	
+	signal stageEvents: StageMultiEventInfo;	
 begin
 	stageDataNew <= stageDataIn;										
 	stageDataNext <= stageMultiNextCl(stageDataLiving, stageDataNew, -- CAREFUL: diffrence from SingleTagged
@@ -321,9 +313,7 @@ architecture LastEffective of GenericStageMulti is
 	signal stageData, stageDataLiving, stageDataNext, stageDataNew:
 														StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
 	signal partialKillMask: std_logic_vector(0 to PIPE_WIDTH-1) := (others => '0');
-	
-		use work.TEMP_DEV.setException; -- TODO: func should be in a global package?
-		signal stageEvents: StageMultiEventInfo;	
+	signal stageEvents: StageMultiEventInfo;	
 begin
 	stageDataNew <= stageDataIn;										
 	stageDataNext <= stageMultiNext(stageDataLiving, stageDataNew,
@@ -349,8 +339,8 @@ begin
 		flowDrive => flowDrive,
 		flowResponse => flowResponse
 	);
-	
-		stageEvents.causing <= setException(stageData.data(0),
+		-- TODO: move to visible package! 
+		stageEvents.causing <= work.TEMP_DEV.setException(stageData.data(0),
 					execCausing.controlInfo.hasInterrupt, execCausing.controlInfo.hasReset, flowResponse.isNew);
 		stageEvents.eventOccured <= stageEvents.causing.controlInfo.newEvent;
 		

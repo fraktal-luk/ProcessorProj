@@ -103,8 +103,6 @@ architecture Behavioral of UnitFront is
 		signal acceptingForFetchFirst: std_logic := '0';
 		
 		signal hbufferDataIn: InstructionState := DEFAULT_INSTRUCTION_STATE;
-		
-	constant FETCH_DELAYED: boolean := false;
 	
 	constant HAS_RESET_FRONT: std_logic := '1';
 	constant HAS_EN_FRONT: std_logic := '1';	
@@ -218,9 +216,7 @@ begin
 	STAGE_DECODE: block
 		signal newDecoded, newDecodedWithTargets, stageDataDecodeNew, stageDataDecodeOut: StageDataMulti
 				:= DEFAULT_STAGE_DATA_MULTI;
-		signal targets, links: MwordArray(0 to PIPE_WIDTH-1) := (others => (others => '0'));	
-				
-		constant EARLY_TARGET_ENABLE: boolean := true;
+		signal targets, links: MwordArray(0 to PIPE_WIDTH-1) := (others => (others => '0'));				
 	begin	
 		newDecoded <= decodeMulti(stageDataOutHbuffer);
 

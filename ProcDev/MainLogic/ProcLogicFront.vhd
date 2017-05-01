@@ -215,11 +215,13 @@ begin
 	--...
 				-- TEMP: code for predicting every regular jump (even "branch never"!) as taken
 --				if res.operation.func = jump then
---					res.controlInfo.newEvent := '1';
---					res.controlInfo.hasEvent := '1';
---					res.controlInfo.newBranch := '1';
---					res.controlInfo.hasBranch := '1';					
---				end if;
+				if ((res.classInfo.branchAlways or res.classInfo.branchCond)
+					and not res.classInfo.branchReg)	= '1' and BRANCH_AT_DECODE then
+					res.controlInfo.newEvent := '1';
+					res.controlInfo.hasEvent := '1';
+					res.controlInfo.newBranch := '1';
+					res.controlInfo.hasBranch := '1';					
+				end if;
 	
 		if res.classInfo.undef = '1' then
 			--res.controlInfo.newEvent := '1';
@@ -559,7 +561,10 @@ begin
 			res.basicInfo.ip := execCausing.result;
 														--target;
 		end if;	
-	elsif decodeEvent = '1' then		
+	elsif decodeEvent = '1' then
+			if BRANCH_AT_DECODE then
+				res.basicInfo.ip := decodeCausing.target;	
+			end if;
 		if decodeCausing.controlInfo.newFetchLock = '1' then	
 			res.basicInfo.ip := causingNext;
 		end if;

@@ -26,9 +26,15 @@ package NewPipelineData is
 	constant ALIGN_BITS: natural := LOG2_PIPE_WIDTH + 2;
 
 	constant FETCH_BLOCK_SIZE: natural := PIPE_WIDTH * 2;
+	constant FETCH_DELAYED: boolean := false; -- Additional fetch stage for slower caches
+	
 	constant HBUFFER_SIZE: natural := PIPE_WIDTH * 4;
 	
 	constant PROPAGATE_MODE: boolean := true; -- Int/exc level marked in instruction throughout pipeline
+	
+	constant EARLY_TARGET_ENABLE: boolean := true; -- Calc branch targets in front pipe
+	constant BRANCH_AT_DECODE: boolean := false;
+	
 	 -- System reg writing goes through BQ/ through special temp register
 	constant USE_BQ_FOR_MTC: boolean := false;
 	
