@@ -250,7 +250,19 @@ package ProgramCode4 is
 			20 => insNOP,-- ins65J(jl, r31, 4*(320-20)), -- Test result forwarding src1
 			21 => X"ffffffff", --ins65J(jl, r31, 4*(350-21)), -- Test result forwarding src0
 			22 => insNOP,--ins65J(jl, r31, 4*(380-22)), -- Test 0+1 forwarding 
-			23 => ins65J(jz, r0, 4* (-20)),
+			
+			-- Check sysReg storage
+			23 => insSet(r25, 491),
+			24 => ins655655(ext2, 0, r25, mtc, 2, 0),
+			25 => ins655655(ext2, r26, 0, mfc, 0, 2),
+			26 => ins655655(ext0, r25, r25, subR, r26, 0),
+			27 => ins65J(jnz, r25, 4*(1023 - 27)), -- if not, jump to illegal addr
+			28 => insNOP,
+			29 => insNOP,
+			30 => insNOP,
+			31 => insNOP,
+			32 => insNOP,			
+			33 => ins65J(jz, r0, 4* (-30)), -- jump to 3(@12)
 			
 			-- On expception
 			-- @256

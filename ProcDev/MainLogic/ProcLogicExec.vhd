@@ -131,6 +131,9 @@ package body ProcLogicExec is
 					res.result := sysRegValue;
 				elsif ins.operation.func = sysMtc then
 					res.result := ins.argValues.arg0;
+					if USE_BQ_FOR_MTC then
+						res.target := ins.argValues.arg0;
+					end if;	
 				elsif ins.operation.func = sysUndef then
 					--res.controlInfo.newException := '1';
 					res.controlInfo.hasException := '1';				

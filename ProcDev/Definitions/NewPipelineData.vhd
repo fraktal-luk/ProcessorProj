@@ -28,7 +28,9 @@ package NewPipelineData is
 	constant FETCH_BLOCK_SIZE: natural := PIPE_WIDTH * 2;
 	constant HBUFFER_SIZE: natural := PIPE_WIDTH * 4;
 	
-	constant PROPAGATE_MODE: boolean := true;
+	constant PROPAGATE_MODE: boolean := true; -- Int/exc level marked in instruction throughout pipeline
+	 -- System reg writing goes through BQ/ through special temp register
+	constant USE_BQ_FOR_MTC: boolean := false;
 	
 	-- TODO: eliminate, change to chained implementation
 	constant N_EVENT_AREAS: natural := 8;-- How many distinct stages or groups of stages have own event signals

@@ -288,8 +288,17 @@ begin
 		alias linkRegInt is sysRegArray(3);
 		
 		alias savedStateExc is sysRegArray(4);
-		alias savedStateInt is sysRegArray(5);			
+		alias savedStateInt is sysRegArray(5);
+
+		signal srWriteSel: slv5 := (others => '0');
+		signal srWriteVal: Mword := (others => '0');
 	begin
+			srWriteSel <= dataToLastEffective.data(0).constantArgs.c0 when USE_BQ_FOR_MTC
+						else sysRegWriteSel;
+							  
+			srWriteVal <= dataFromBQ.argValues.arg1 when USE_BQ_FOR_MTC
+						else sysRegWriteValue;
+	
 		CLOCKED: process(clk)
 		begin					
 			if rising_edge(clk) then
@@ -306,7 +315,7 @@ begin
 					
 					-- Write from system write instruction
 					if sysRegWriteAllow = '1' then
-						sysRegArray(slv2u(sysRegWriteSel)) <= sysRegWriteValue;
+						sysRegArray(slv2u(srWriteSel)) <= srWriteVal;
 					end if;
 					
 					-- NOTE: writing to link registers after sys reg writing gives priority to the former,
@@ -481,7 +490,8 @@ begin
 
 		lockCommand => '0'
 	);
-		
+
+
 			-- Tracking of target:
 			--			'target' field of last effective will hold the address of next instruction
 			--			to commit after lastEffective; it will be known with certainty because lastEffective is 
@@ -524,6 +534,7 @@ begin
 				newEffectiveTarget <= dataFromBQ.argValues.arg1 when committingTakenBranch = '1'		 
 									else	 incTarget;
 			end block;
+
 		
 			interruptCause.controlInfo.hasInterrupt <= intSignal;
 			interruptCause.controlInfo.hasReset <= start;
