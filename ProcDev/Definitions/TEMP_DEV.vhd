@@ -511,8 +511,16 @@ end function;
 	function setException(ins: InstructionState; intSignal, resetSignal, isNew: std_logic)
 	return InstructionState is
 		variable res: InstructionState := ins;
+			variable lateFetchLock: std_logic := '0';
 	begin
-		res.controlInfo.newEvent := (res.controlInfo.hasException and isNew) or intSignal or resetSignal;
+			if LATE_FETCH_LOCK then
+				lateFetchLock := '1';
+			end if;	
+				
+		res.controlInfo.newEvent := ((res.controlInfo.hasException 
+														or (res.controlInfo.hasFetchLock and lateFetchLock))
+												and isNew) 
+										or intSignal or resetSignal;
 		res.controlInfo.hasEvent := res.controlInfo.hasEvent or res.controlInfo.newEvent;
 
 		res.controlInfo.newException := res.controlInfo.hasException and isNew; 

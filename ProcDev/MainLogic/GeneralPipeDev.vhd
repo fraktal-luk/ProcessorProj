@@ -655,7 +655,10 @@ end function;
 			end if;
 			
 			-- If this one has an event, following ones don't count
-			if newContent.data(i).controlInfo.hasException = '1' then
+			if newContent.data(i).controlInfo.hasException = '1'
+																		-- CAREFUL! This also breaks flow!
+				or (newContent.data(i).controlInfo.hasFetchLock = '1' and LATE_FETCH_LOCK)
+			then 
 				res.controlInfo.newEvent := '1'; -- Announce that event is to happen now!
 				exit;
 			end if;
@@ -676,6 +679,7 @@ end function;
 				exit;
 			end if;
 			
+			-- CAREFUL, TODO: what if there's a branch (or branch correction) and valid path after it??
 			-- If this one has an event, following ones don't count
 			if 	newContent.data(i).controlInfo.hasEvent = '1' --??
 			then

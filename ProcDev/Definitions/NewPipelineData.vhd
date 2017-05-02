@@ -38,6 +38,8 @@ package NewPipelineData is
 	 -- System reg writing goes through BQ/ through special temp register
 	constant USE_BQ_FOR_MTC: boolean := false;
 	
+	constant LATE_FETCH_LOCK: boolean := false; -- Fetch lock not causing decode event, but only when committed
+	
 	-- TODO: eliminate, change to chained implementation
 	constant N_EVENT_AREAS: natural := 8;-- How many distinct stages or groups of stages have own event signals
 	-- PC, Fetch0, Fetch1, Hbuffer, Decode, Rename, OOO, Committed

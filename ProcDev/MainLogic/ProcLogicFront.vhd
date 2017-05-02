@@ -234,10 +234,13 @@ begin
 		
 		-- CAREFUL! Indicate that fetch lock must be applied
 		if res.classInfo.fetchLock = '1' then
-			res.controlInfo.newEvent := '1';
-			res.controlInfo.hasEvent := '1';				
+			if not LATE_FETCH_LOCK then
+				res.controlInfo.newEvent := '1';
+				res.controlInfo.hasEvent := '1';				
+			end if;	
 			res.controlInfo.newFetchLock := '1';
 			res.controlInfo.hasFetchLock := '1';
+			--	res.controlInfo.hasException := '1';
 		end if;
 		
 		
@@ -545,7 +548,7 @@ begin
 		elsif commitCausing.controlInfo.newInterrupt = '1' then
 			res.basicInfo.ip := INT_BASE; -- TEMP!
 			res.basicInfo.intLevel := "00000001";		
-		else -- if commitCausing.controlInfo.newException = '1' then
+		elsif commitCausing.controlInfo.newException = '1' or not LATE_FETCH_LOCK then
 			-- TODO, FIX: exceptionCode sliced - shift left by ALIGN_BITS? or leave just base address
 			res.basicInfo.ip := EXC_BASE(MWORD_SIZE-1 downto commitCausing.controlInfo.exceptionCode'length)
 									& commitCausing.controlInfo.exceptionCode(
@@ -553,6 +556,8 @@ begin
 									& EXC_BASE(ALIGN_BITS-1 downto 0);	
 									--		INT_BASE;
 			res.basicInfo.systemLevel := "00000001";
+		else -- fetchLock	
+			res.basicInfo.ip := causingNext;
 		end if;	
 	elsif execEvent = '1' then		
 		--if execCausing.controlInfo.newBranch = '1' then
