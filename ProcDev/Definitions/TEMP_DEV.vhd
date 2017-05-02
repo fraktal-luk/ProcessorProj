@@ -55,9 +55,6 @@ function routeToIQ(sd: StageDataMulti; srcVec: std_logic_vector) return StageDat
 
 	function routeToIQ2(sd: StageDataMulti; srcVec: std_logic_vector) return StageDataMulti;	
 	
-	function findForALU(iv: InstructionStateArray) return std_logic_vector;
-	
-	
 	-- Tells if 'a' is older than 'b'
 	function tagBefore(a, b: SmallNumber) return std_logic;
 
@@ -67,7 +64,7 @@ return std_logic_vector;
 function extractReadyRegBitsV(bits: std_logic_vector; data: InstructionStateArray)
 return std_logic_vector;
 
--- Next address, even if after a taken branch
+-- Next address, even if after a taken branch -- UNUSED
 function getIncrementedAddress(ins: InstructionState) return Mword;
 
 function getAddressIncrement(ins: InstructionState) return Mword;
@@ -78,39 +75,27 @@ function getNormalTargetAddress(ins: InstructionState; causingNext: Mword) retur
 -- Address to go to if exception happens
 function getHandlerAddress(ins: InstructionState) return Mword;
 
--- Instruction to be executed next in absence of interrupts: whether next, jump target or exc handler
-function getSuperTargetAddress(ins: InstructionState; causingNext: Mword)--; elr: Mword)
-return Mword;
-
--- Incremented address
-function getLinkInfoLinear(ins: InstructionState; causingNext: Mword) return InstructionBasicInfo;
--- Jump target, increment if not jumo 
+-- Jump target, increment if not jump 
 function getLinkInfoNormal(ins: InstructionState; causingNext: Mword) return InstructionBasicInfo;
 -- Handler address and system state
 function getExceptionTarget(ins: InstructionState; causingNext: Mword) return InstructionBasicInfo;
 -- Target, which may be exception handler call
-function getLinkInfoSuper(ins: InstructionState; --linkInfoExc: InstructionBasicInfo;
-								causingNext: Mword)
-return InstructionBasicInfo;
-
-function getLinkInfoSuper2(ins: InstructionState; normalTarget, excTarget: InstructionBasicInfo)
-return InstructionBasicInfo;
+function getLinkInfoSuper(ins: InstructionState; causingNext: Mword) return InstructionBasicInfo;
 
 
 function clearTempControlInfoSimple(ins: InstructionState) return InstructionState;
 function clearTempControlInfoMulti(sd: StageDataMulti) return StageDataMulti;
 
-function setInterrupt(ins: InstructionState; intSignal: std_logic; intCode: SmallNumber)
+function setException(ins: InstructionState; intSignal, resetSignal, isNew: std_logic)
 return InstructionState;
-
-	function setException(ins: InstructionState; intSignal, resetSignal, isNew: std_logic)
-	return InstructionState;
 
 function clearEmptyResultTags(insVec: InstructionStateArray; fullMask: std_logic_vector)
 return InstructionStateArray;
 
 function trgForBQ(insVec: StageDataMulti) return StageDataMulti;
 
+
+function findForALU(iv: InstructionStateArray) return std_logic_vector;
 
 function findBranchLink(insv: StageDataMulti) return std_logic_vector;
 
@@ -287,19 +272,7 @@ end function;
 			
 			return res;
 		end function;
-		
-	
-	function findForALU(iv: InstructionStateArray) return std_logic_vector is
-		constant LEN: integer := iv'length;
-		variable res: std_logic_vector(0 to LEN-1) := (others => '0'); 
-	begin
-		for i in 0 to LEN-1 loop
-			if iv(i).operation.unit = ALU then
-				res(i) := '1';
-			end if;
-		end loop;
-		return res;
-	end function;
+
 --------------------------------------
  
 
@@ -397,23 +370,6 @@ begin
 end function;
 
 
-function getSuperTargetAddress(ins: InstructionState; causingNext: Mword) return Mword is	
-begin
-	if ins.controlInfo.newException = '1' then 
-		return getHandlerAddress(ins);
-	else
-		return getNormalTargetAddress(ins, causingNext);
-	end if;
-end function;
-
-
-function getLinkInfoLinear(ins: InstructionState; causingNext: Mword) return InstructionBasicInfo is
-	variable res: InstructionBasicInfo := ins.basicInfo;
-begin
-	res.ip := causingNext;
-	return res;
-end function;
-
 function getLinkInfoNormal(ins: InstructionState; causingNext: Mword) return InstructionBasicInfo is
 	variable res: InstructionBasicInfo := ins.basicInfo;
 begin
@@ -427,8 +383,7 @@ function getExceptionTarget(ins: InstructionState; causingNext: Mword) return In
 	variable res: InstructionBasicInfo := ins.basicInfo;
 begin
 	-- get handler adr and system level 
-	res.ip := --getNormalTargetAddress(ins, causingNext); -- CAREFUL: Looks like error?
-				  getHandlerAddress(ins);
+	res.ip := getHandlerAddress(ins);
 	res.systemLevel := "00000001";	
 	return res;
 end function;
@@ -447,20 +402,6 @@ begin
 	end if;
 end function;
 
-function getLinkInfoSuper2(ins: InstructionState; normalTarget, excTarget: InstructionBasicInfo)
-return InstructionBasicInfo is
-	variable res: InstructionBasicInfo := ins.basicInfo;
-begin
-	if ins.controlInfo.hasException = '1' then 
-		return excTarget;
-	-- > NOTE, TODO: Interupt chaining can be implemented in a simple way: when another interrupt appears, 
-	--		jump to handler directly from currently running handler, but don't set ILR.
-	--		ILR will remain from the first interrupt in chain, just like in tail function call
-	else
-		return normalTarget;
-	end if;
-end function;
-
 
 function clearTempControlInfoSimple(ins: InstructionState) return InstructionState is
 	variable res: InstructionState := ins;
@@ -470,8 +411,6 @@ begin
 	res.controlInfo.newException := '0';
 	res.controlInfo.newBranch := '0';
 	res.controlInfo.newReturn := '0';
-	--res.controlInfo.newIntReturn := '0';
-	--res.controlInfo.newExcReturn := '0';
 	res.controlInfo.newFetchLock := '0';	
 	return res;
 end function;
@@ -485,56 +424,34 @@ begin
 	return res;
 end function;
 
-
-	-- to integrate interrupt signal into instruction where it is injected
-	function setInterrupt(ins: InstructionState; intSignal: std_logic; intCode: SmallNumber)
-	return InstructionState is
-		variable res: InstructionState := ins;
-	begin
-		res.controlInfo.newEvent := res.controlInfo.hasException or intSignal;
-		res.controlInfo.hasEvent := res.controlInfo.hasEvent or intSignal;
-		res.controlInfo.newInterrupt := intSignal;
-		res.controlInfo.hasInterrupt := intSignal;
-		-- ^ Interrupts delayed by 1 cycle if exception being committed!
-		
-			-- TEMP!	
-			--if intCode(0) = '1' then
-				res.controlInfo.newReset := intCode(0);
-				res.controlInfo.hasReset := intCode(0);
-			--end if;
-			
-		-- ...?	
-		return res;
-	end function;	
 	
-	
-	function setException(ins: InstructionState; intSignal, resetSignal, isNew: std_logic)
-	return InstructionState is
-		variable res: InstructionState := ins;
-			variable lateFetchLock: std_logic := '0';
-	begin
-			if LATE_FETCH_LOCK then
-				lateFetchLock := '1';
-			end if;	
-				
-		res.controlInfo.newEvent := ((res.controlInfo.hasException 
-														or (res.controlInfo.hasFetchLock and lateFetchLock))
-												and isNew) 
-										or intSignal or resetSignal;
-		res.controlInfo.hasEvent := res.controlInfo.hasEvent or res.controlInfo.newEvent;
-
-		res.controlInfo.newException := res.controlInfo.hasException and isNew; 
-
-		res.controlInfo.newInterrupt := intSignal;
-		res.controlInfo.hasInterrupt := intSignal;
-		-- ^ Interrupts delayed by 1 cycle if exception being committed!
-		
-		res.controlInfo.newReset := resetSignal;
-		res.controlInfo.hasReset := resetSignal;
+function setException(ins: InstructionState; intSignal, resetSignal, isNew: std_logic)
+return InstructionState is
+	variable res: InstructionState := ins;
+		variable lateFetchLock: std_logic := '0';
+begin
+		if LATE_FETCH_LOCK then
+			lateFetchLock := '1';
+		end if;	
 			
-		-- ...?	
-		return res;
-	end function;	
+	res.controlInfo.newEvent := ((res.controlInfo.hasException 
+													or (res.controlInfo.hasFetchLock and lateFetchLock))
+											and isNew) 
+									or intSignal or resetSignal;
+	res.controlInfo.hasEvent := res.controlInfo.hasEvent or res.controlInfo.newEvent;
+
+	res.controlInfo.newException := res.controlInfo.hasException and isNew; 
+
+	res.controlInfo.newInterrupt := intSignal;
+	res.controlInfo.hasInterrupt := intSignal;
+	-- ^ Interrupts delayed by 1 cycle if exception being committed!
+	
+	res.controlInfo.newReset := resetSignal;
+	res.controlInfo.hasReset := resetSignal;
+		
+	-- ...?	
+	return res;
+end function;	
 
 
 function clearEmptyResultTags(insVec: InstructionStateArray; fullMask: std_logic_vector)
@@ -642,6 +559,18 @@ begin
 	return res;
 end function;
 
+
+function findForALU(iv: InstructionStateArray) return std_logic_vector is
+	constant LEN: integer := iv'length;
+	variable res: std_logic_vector(0 to LEN-1) := (others => '0'); 
+begin
+	for i in 0 to LEN-1 loop
+		if iv(i).operation.unit = ALU then
+			res(i) := '1';
+		end if;
+	end loop;
+	return res;
+end function;
 
 function findBranchLink(insv: StageDataMulti) return std_logic_vector is
 	variable res: std_logic_vector(0 to PIPE_WIDTH-1) := (others => '0');

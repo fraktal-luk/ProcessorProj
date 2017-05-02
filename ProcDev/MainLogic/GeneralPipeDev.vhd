@@ -810,42 +810,28 @@ return StageDataCommitQueue is
 	variable newCompactedData: InstructionStateArray(0 to 3);
 	variable newCompactedMask: std_logic_vector(0 to 3);
 begin
-	newCompactedData := newContent; --compactData(newContent, ready);
-	newCompactedMask := ready; --compactMask(newContent, ready);
+	newCompactedData := newContent;
+	newCompactedMask := ready;
 	-- CAREFUL: even when not clearing empty slots, result tags probably should be cleared!
 	--				It's to prevent reading of fake results from empty slots
 	if not CLEAR_EMPTY_SLOTS_CQ then
-		dataTemp := contentExtended; -- content.data & newCompactedData;
+		dataTemp := contentExtended;
 	end if;	
 
---			for i in 0 to content.data'length-1 loop -- to livingContent'length - nOut - 1 loop
---				if i < nFull - nOut then
---					dataTemp(i) := content.data(i + nOut);		
---					fullMaskTemp(i) := '1'; -- content.fullMask(i + nOut);
---				elsif i < nFull - nOut + 4 then
---					dataTemp(i) := newCompactedData(k);
---					fullMaskTemp(i) := newCompactedMask(k);
---					k := k + 1;
---				else
---					--fullMaskTemp(i) := '0';
---				end if;
---			end loop;	
-		
 		for i in 0 to contentExtended'length - 1 - outWidth loop
 			contentExtended(i) := contentExtended(i + outWidth);
 		end loop;
 		
-		for i in 0 to content.data'length-1 loop -- to livingContent'length - nOut - 1 loop
+		for i in 0 to content.data'length-1 loop
 			if i < nFull - nOut then
 				dataTemp(i) := contentExtended(i);		
-				fullMaskTemp(i) := '1'; -- content.fullMask(i + nOut);
+				fullMaskTemp(i) := '1';
 			elsif i < nFull - nOut + 4 then
 				dataTemp(i) := newCompactedData(k);
 				fullMaskTemp(i) := newCompactedMask(k);
 				k := k + 1;
 			else
 				dataTemp(i) := contentExtended(i);
-				--fullMaskTemp(i) := '0';
 			end if;
 		end loop;		
 		

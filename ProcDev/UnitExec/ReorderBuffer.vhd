@@ -38,7 +38,6 @@ use work.NewPipelineData.all;
 
 use work.GeneralPipeDev.all;
 
---use work.CommonRouting.all;
 use work.TEMP_DEV.all;
 
 use work.ProcLogicROB.all;
@@ -153,10 +152,9 @@ begin
 				when execEventSignal = '1'
 		else (others => '0');
 		
-	isSending <= --stageDataLiving.fullMask(0) and groupCompleted(stageDataLiving.data(0));
-					 stageData.fullMask(0) and 
-						groupCompleted(stageData.data(0)) and --not intSignal;
-											 not fromCommitted;
+	isSending <= stageData.fullMask(0)
+				and groupCompleted(stageData.data(0))
+				and not fromCommitted;
 
 		lateFetchLock <= '1' when LATE_FETCH_LOCK else '0';
 	fromCommitted <= execEventSignal and 	

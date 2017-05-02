@@ -159,7 +159,6 @@ package body ProcLogicMemory is
 					for i in 0 to LEN-1 loop
 						tempNewContent(i) := newContent((nLiving-sh + i) mod PIPE_WIDTH);
 					end loop;
-					--	tempNewContent(SQ_SIZE to SQ_SIZE + PIPE_WIDTH-1) := newContent;
 					
 					tempMask(0 to LEN-1) := livingMask;
 
@@ -267,12 +266,10 @@ package body ProcLogicMemory is
 					for i in 0 to LEN-1 loop
 						tempNewContent(i) := newContent((nLiving-sh + i) mod PIPE_WIDTH);
 					end loop;
-					--	tempNewContent(SQ_SIZE to SQ_SIZE + PIPE_WIDTH-1) := newContent;
 					
 					tempMask(0 to LEN-1) := livingMask;
 
 					-- Shift by n of sending
-					--tempContent(0 to LEN - 1) := tempContent(sh to sh + LEN-1);
 					for i in 0 to LEN-1 loop
 						if sendingVec(i) = '1' then
 							shifted := true;

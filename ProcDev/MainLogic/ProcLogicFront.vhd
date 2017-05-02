@@ -21,8 +21,6 @@ use work.Decoding2.all;
 use work.TEMP_DEV.all;
 use work.GeneralPipeDev.all;
 
---use std.textio.all;
-
 
 package ProcLogicFront is
 
@@ -37,9 +35,6 @@ function instructionFromWord(w: word) return InstructionState;
 function decodeInstruction(inputState: InstructionState) return InstructionState;
 
 function decodeMulti(sd: StageDataMulti) return StageDataMulti;
-
--- DEPREC?? How many hwords will be fetched - depends on PC alignment
-function pc2size(pc: Mword; alignBits: natural; capacity: PipeFlow) return PipeFlow;
 
 function bufferAHNext(content: InstructionStateArray;
 									livingMask: std_logic_vector;
@@ -77,7 +72,6 @@ function newPCData(content: InstructionState;
 						  execEvent: std_logic; execCausing: InstructionState;	
 						  decodeEvent: std_logic; decodeCausing: InstructionState;
 						  pcNext, causingNext: Mword)
-						--					excTarget: InstructionBasicInfo
 return InstructionState;
 
 	function NEW_generalEvents(pcData: InstructionState;
@@ -85,16 +79,11 @@ return InstructionState;
 										execEvent: std_logic; execCausing: InstructionState;	
 										decodeEvent: std_logic; decodeCausing: InstructionState;
 										pcNext, causingNext: Mword)
-										--	excTarget: InstructionBasicInfo)
 	return GeneralEventInfo;
 
-function getAnnotatedHwords(--fetchData: InstructionState;
-									 fetchBasicInfo: InstructionBasicInfo; 
+function getAnnotatedHwords(fetchBasicInfo: InstructionBasicInfo; 
 									 fetchBlock: HwordArray)
 return InstructionStateArray;
-
-function getGeneralEvents(eventArr: InstructionSlotArray)
-return GeneralEventInfo;
 
 function stageMultiEvents(sd: StageDataMulti; isNew: std_logic) return StageMultiEventInfo;
 
@@ -261,17 +250,6 @@ begin
 	return res;
 end function;
 
-function pc2size(pc: Mword; alignBits: natural; capacity: PipeFlow) return PipeFlow is
-	variable res: PipeFlow := (others=>'0');
-	variable ending, cap: natural;
-begin
-	ending := slv2u(pc(alignBits-1 downto 0));
-	-- "ending" is eq to num of bytes over aligned PC
-	cap := binFlowNum(capacity);
-	res := num2flow(cap - slv2u(pc(alignBits-1 downto 1)));
-	return res;
-end function;
-
 
 function bufferAHNext(content: InstructionStateArray;
 									livingMask: std_logic_vector;
@@ -308,28 +286,25 @@ begin
 		--
 		-- Selection X vs Y: when nFull-nOut+nIn > i, select X, else select Y
 		--	
+		
+	-- Prepare initial tempX, tempY, masks
 	tempX := content & newContent;
 			tempMaskX(0 to content'length-1) := livingMask;
-	for k in 0 to --content'length + newContent'length - 1 loop
-						tempY'length-1 loop
-		tempY(k) := newContent(k mod newContent'length); -- & newContent & newContent & newContent;	
+	for k in 0 to tempY'length-1 loop
+		tempY(k) := newContent(k mod newContent'length);
 	end loop;
 			
-	--tempX(0 to content'length-1 - nOut) := tempX(nOut to content'length-1);
-	--	tempMaskX(0 to content'length-1 - nOut) := tempMaskX(nOut to content'length-1);
+		-- Shift tempX + mask	
 		tempX(0 to content'length-1) := tempX(nOut to content'length-1 + nOut);
 			tempMaskX(0 to content'length-1) := tempMaskX(nOut to content'length-1 + nOut);	
-
-	--tempY(0 to content'length-1 - newShift) := 
-	--	tempY(		(content'length - nFull + nOut) + newShift 
-	--				to (content'length - nFull + nOut) + content'length-1 );
+		-- Shift tempY
 		tempY(0 to content'length-1) := 
 			tempY(		(content'length - nFull + nOut) + newShift 
 								to (content'length - nFull + nOut) + content'length-1 + newShift);
-
+	
+	-- Select from X or Y
 	for p in 0 to content'length-1 loop
-		if --nFull - nOut > p then
-			tempMaskX(p) = '1' then
+		if tempMaskX(p) = '1' then
 			res(p) := tempX(p);
 		else		
 			res(p) := tempY(p);
@@ -383,17 +358,12 @@ begin
 	tempMaskX(0 to content'length-1) := livingMask;
 	for k in 0 to newContent'length - 1 loop
 		--if nIn /= 0 then
-			tempMaskY(k) := prevSending; --newContentMask(k); -- & newContent & newContent & newContent;
-			tempMaskY(content'length + k) := prevSending; --newContentMask(k); -- & newContent & newContent & newContent;
+			tempMaskY(k) := prevSending;
+			tempMaskY(content'length + k) := prevSending;
 		--end if;
 	end loop;
 	
 	tempMaskX(0 to tempMaskX'length-1 - nOut) := tempMaskX(nOut to tempMaskX'length-1);
-		
---	tempMaskY(0 to content'length-1 - newShift) := 
---		tempMaskY(		(content'length - nFull + nOut) + newShift 
---					to (content'length - nFull + nOut) + content'length-1 );
-					
 	tempMaskY(0 to content'length-1) := 
 		tempMaskY(		(content'length - nFull + nOut) + newShift 
 					to (content'length - nFull + nOut) + content'length-1 + newShift);					
@@ -434,7 +404,7 @@ return StageDataHbuffer is
 begin	
 	-- CAREFUL! Hbuffer size MUST be a multiple of newContent size!
 
-	newShift := slv2u(fetchBasicInfo.ip(ALIGN_BITS-1 downto 1)); -- pc(ALIGN_BITS-1 downto 1));					
+	newShift := slv2u(fetchBasicInfo.ip(ALIGN_BITS-1 downto 1));					
 		-- For position 'i':
 		-- Y: if taking newContent[y], it must be: nFull + y - newShift = i, so
 		--		y = i + newShift - nFull 
@@ -456,8 +426,8 @@ begin
 			
 	for k in 0 to newContent'length - 1 loop
 		--if nIn /= 0 then
-			tempMaskY(k) := prevSending; --newContentMask(k); -- & newContent & newContent & newContent;
-			tempMaskY(content'length + k) := prevSending; --newContentMask(k); -- & newContent & newContent & newContent;
+			tempMaskY(k) := prevSending;
+			tempMaskY(content'length + k) := prevSending;
 		--end if;
 	end loop;
 
@@ -495,28 +465,21 @@ return HbuffOutData is
 	variable nOut: integer;
 begin
 	for i in 0 to PIPE_WIDTH-1 loop
-		--res.data(i).bits := content(i).bits(15 downto 0) & X"0000"; --content(i+1).bits;
 		res.data(i).bits := content(i).bits(15 downto 0) & content(i+1).bits(15 downto 0);		
 		res.data(i).basicInfo := content(i).basicInfo;
 	end loop;
 
 	for i in 0 to PIPE_WIDTH-1 loop
 		nOut := PIPE_WIDTH;
-		if (fullMask(j) and --content(j).shortIns) = '1' then
-									content(j).classInfo.short) = '1' then
+		if (fullMask(j) and content(j).classInfo.short) = '1' then
 			res.fullMask(i) := '1';
-			--res.data(i).bits(31 downto 16) := content(j).bits(15 downto 0); -- & content(j+1).bits; --X"0000";
 			res.data(i).bits := content(j).bits(15 downto 0) & content(j+1).bits(15 downto 0);			
 			res.data(i).basicInfo := content(j).basicInfo;
-				--res.data(i).basicInfo.intLevel(7 downto 2) := "000000";
-				--res.data(i).basicInfo.systemLevel(7 downto 2) := "000000";				
 			j := j + 1;
 		elsif (fullMask(j) and fullMask(j+1)) = '1' then
 			res.fullMask(i) := '1';
 			res.data(i).bits := content(j).bits(15 downto 0) & content(j+1).bits(15 downto 0);
 			res.data(i).basicInfo := content(j).basicInfo;	
-				--res.data(i).basicInfo.intLevel(7 downto 2) := "000000";
-				--res.data(i).basicInfo.systemLevel(7 downto 2) := "000000";				
 			j := j + 2;
 		else
 			nOut := i;
@@ -536,7 +499,6 @@ function newPCData(content: InstructionState;
 						  execEvent: std_logic; execCausing: InstructionState;	
 						  decodeEvent: std_logic; decodeCausing: InstructionState;
 						  pcNext, causingNext: Mword)
-							--	excTarget: InstructionBasicInfo)
 return InstructionState is
 	variable res: InstructionState := content;
 	variable newPC: Mword := (others=>'0');
@@ -560,12 +522,7 @@ begin
 			res.basicInfo.ip := causingNext;
 		end if;	
 	elsif execEvent = '1' then		
-		--if execCausing.controlInfo.newBranch = '1' then
-			res.basicInfo.ip := execCausing.target;
-		--else -- if execCausing.controlInfo.newReturn = '1'
-		--	res.basicInfo.ip := execCausing.result;
-														--target;
-		--end if;	
+		res.basicInfo.ip := execCausing.target;
 	elsif decodeEvent = '1' then
 			if BRANCH_AT_DECODE then
 				res.basicInfo.ip := decodeCausing.target;	
@@ -586,7 +543,6 @@ end function;
 										execEvent: std_logic; execCausing: InstructionState;	
 										decodeEvent: std_logic; decodeCausing: InstructionState;
 										pcNext, causingNext: Mword)
-											--excTarget: InstructionBasicInfo
 	return GeneralEventInfo is
 		variable res: GeneralEventInfo;
 	begin
@@ -611,19 +567,16 @@ end function;
 												commitEvent, commitCausing,
 												execEvent, execCausing,
 												decodeEvent, decodeCausing,
-												pcNext, causingNext);
-												--	excTarget);
-		
+												pcNext, causingNext);		
 		return res;
 	end function;
 
 
-function getAnnotatedHwords(--fetchData: InstructionState;
-									 fetchBasicInfo: InstructionBasicInfo; 
+function getAnnotatedHwords(fetchBasicInfo: InstructionBasicInfo; 
 									 fetchBlock: HwordArray)
 return InstructionStateArray is
 	variable res: InstructionStateArray(0 to 2*PIPE_WIDTH-1) := (others => DEFAULT_ANNOTATED_HWORD);
-	variable hwordBasicInfo: InstructionBasicInfo := fetchBasicInfo; --fetchData.basicInfo;
+	variable hwordBasicInfo: InstructionBasicInfo := fetchBasicInfo;
 	variable	tempWord: word := (others => '0');
 begin
 	for i in 0 to 2*PIPE_WIDTH-1 loop
@@ -636,25 +589,6 @@ begin
 		res(i).basicInfo := hwordBasicInfo;
 		res(i).classInfo.short := '0'; -- TEMP!	
 	end loop;
-	return res;
-end function;
-
-
-function getGeneralEvents(eventArr: InstructionSlotArray)
-return GeneralEventInfo is	
-	variable res: GeneralEventInfo;
-begin
-	res.eventOccured := eventArr(0).full;
-	--res.fromExec := eventArr(6).data.controlInfo.newEvent;
-	--res.fromInt := eventArr(0).ins.controlInfo.newInterrupt;
-	res.causing := eventArr(0).ins;
-			
-		-- CAREFUL! Must have matching indices to work correctly!	
-		res.affectedVec := (others => '0');
-		for i in res.affectedVec'range loop
-			res.affectedVec(i) := eventArr(i).full;
-		end loop;
-		
 	return res;
 end function;
 
