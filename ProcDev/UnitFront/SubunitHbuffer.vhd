@@ -46,6 +46,7 @@ use work.ProcLogicFront.all;
 
 use work.BasicCheck.all;
 
+	use work.Queues.all;
 
 entity SubunitHbuffer is
 	port(
@@ -136,10 +137,14 @@ begin
 															livingMask2);
 	
 	FRONT_CLOCKED: process(clk)
+		variable dm: InstructionStateArray(0 to HBUFFER_SIZE-1);
 	begin					
 		if rising_edge(clk) then
 			--if reset = '1' then
-				
+			dm :=	TEMP_movingQueue_q16_i8_o8(hbufferDataA, hbufferDataANew,
+														binFlowNum(hbufferResponse.living),
+														binFlowNum(hbufferDrive.prevSending),
+														binFlowNum(hbufferResponse.sending));
 			--elsif en = '1' then
 				hbufferDataA <= hbufferDataANext;
 									--	stageDataNext.data;
