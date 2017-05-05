@@ -144,7 +144,8 @@ begin
 			dm :=	TEMP_movingQueue_q16_i8_o8(hbufferDataA, hbufferDataANew,
 														binFlowNum(hbufferResponse.living),
 														binFlowNum(hbufferDrive.prevSending),
-														binFlowNum(hbufferResponse.sending));
+														binFlowNum(hbufferResponse.sending),
+														execEventSignal);
 			--elsif en = '1' then
 				hbufferDataA <= hbufferDataANext;
 									--	stageDataNext.data;
