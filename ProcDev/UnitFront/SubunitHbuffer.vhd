@@ -77,6 +77,8 @@ architecture Implem of SubunitHbuffer is
 	
 	-- DEPREC
 	signal stageData, stageDataNext: StageDataHbuffer := DEFAULT_STAGE_DATA_HBUFFER;
+	signal fullMaskHbuffer2, livingMaskHbuffer2: std_logic_vector(0 to HBUFFER_SIZE-1) := (others=>'0');
+
 	
 	signal hbufferDrive: FlowDriveBuffer := (killAll => '0', lockAccept => '0', lockSend => '0',
 																others=>(others=>'0'));
@@ -137,15 +139,18 @@ begin
 															livingMask2);
 	
 	FRONT_CLOCKED: process(clk)
-		variable dm: InstructionStateArray(0 to HBUFFER_SIZE-1);
+		variable dm: InstructionSlotArray(0 to HBUFFER_SIZE-1);
 	begin					
 		if rising_edge(clk) then
 			--if reset = '1' then
 			dm :=	TEMP_movingQueue_q16_i8_o8(hbufferDataA, hbufferDataANew,
-														binFlowNum(hbufferResponse.living),
+														binFlowNum(hbufferResponse.full),
 														binFlowNum(hbufferDrive.prevSending),
 														binFlowNum(hbufferResponse.sending),
 														execEventSignal);
+			stageData.data <= extractData(dm);
+			stageData.fullMask <= extractFullMask(dm);
+														
 			--elsif en = '1' then
 				hbufferDataA <= hbufferDataANext;
 									--	stageDataNext.data;
@@ -155,7 +160,9 @@ begin
 				-- NOTE: below has no info about flow constraints. It just checks data against
 				--			flow numbers, while the validity of those numbers is checked by slot logic
 				checkBuffer(hbufferDataA, fullMask2, hbufferDataANext, fullMask2Next,
-									hbufferDrive, hbufferResponse);								
+									hbufferDrive, hbufferResponse);	
+
+					logBuffer(stageData.data, stageData.fullMask, livingMask2, hbufferResponse);
 			--end if;					
 		end if;
 	end process;	
