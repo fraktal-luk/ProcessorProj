@@ -202,21 +202,23 @@ begin
 		if i < nRem then
 			if nOut <= 4 then
 				sT := "00";
-						report "A";
+					--	report "A";
 			else
 				sT := "01";
-						report "B";
+					--	report "B";
 			end if;	
 		else	
-			if i + nOffMR < 4 then
+			if nOffMR < 4 - i then
 				sT := "10";
-						report "C";
+					--	report "C";
 			else
 				sT := "11";
-						report "D";
+					--	report "D";
 			end if;
 		end if;
 		
+		-- This condition generates clock enable
+		-- CAREFUL: nOut 
 		if	nOut /= 0 or i >= nRem then --  nRem can be replaced with nFull
 			resContentT(i) := selectIns4x4(v0, v1, v2, v3, 
 													s0, s1, s2, s3,
@@ -251,7 +253,7 @@ begin
 	end loop;
 	
 		res.contentT := resContentT;
-	res.content := resContent;
+	res.content := resContentT;
 	res.fullMask := resMask;
 	res.nFullV := i2slv(nFullNew, SMALL_NUMBER_SIZE);
 	
