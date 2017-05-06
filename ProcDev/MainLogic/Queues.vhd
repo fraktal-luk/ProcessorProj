@@ -102,6 +102,8 @@ begin
 	if killAll = '1' then
 		nNew := 0;
 	end if;
+
+	resContent := qin;
 	
 		report   integer'image(nOut) & "<<" & integer'image(nFull) & "<<"
 				&	integer'image(nIn);
@@ -113,6 +115,8 @@ begin
 	-- {sel(i), cken(i)} = f(i, nFull, nIn, nOut)
 	-- where sel is 4b
 	for i in 0 to QLEN-1 loop
+				--report "Iter " & integer'image(i);
+			
 		-- q(0) can be updated from q(1..8) or from input(0..7) etc
 		
 		-- nFull[5], nIn[4], nOut[4]  -> 13 bits!
@@ -128,8 +132,6 @@ begin
 		--		and only second level selection (which group of 4) is different
 		
 		-- Formula for CKEN:
-		--		///CKEN = (i >= nFull - nOut)  WRONG!!
-		--		///	variable: (nFull-nOut) [5b + 4b = 9b :(]
 		--	  When nOut /= 0: everything moves	
 		--	  When nOut = 0 : only those not full  
 		--   So formula would be:

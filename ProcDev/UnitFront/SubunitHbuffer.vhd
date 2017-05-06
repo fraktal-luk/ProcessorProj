@@ -159,16 +159,17 @@ begin
 														
 			--elsif en = '1' then
 				hbufferDataA <= --hbufferDataANext;
-										stageData.data;
+										dm.content;
 					fullMask2 <= --fullMask2Next;
-										stageData.fullMask;
+										dm.fullMask;
 				logBuffer(hbufferDataA, fullMask2, livingMask2, hbufferResponse);	
 				-- NOTE: below has no info about flow constraints. It just checks data against
 				--			flow numbers, while the validity of those numbers is checked by slot logic
+				
 				checkBuffer(hbufferDataA, fullMask2, hbufferDataANext, fullMask2Next,
 									hbufferDrive, hbufferResponse);	
 
-					logBuffer(stageData.data, stageData.fullMask, livingMask2, hbufferResponse);
+					logBuffer(buffData.content, buffData.fullMask, livingMask2, hbufferResponse);
 			--end if;					
 		end if;
 	end process;	
