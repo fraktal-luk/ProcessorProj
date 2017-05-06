@@ -147,7 +147,8 @@ begin
 														binFlowNum(hbufferResponse.full),
 														binFlowNum(hbufferDrive.prevSending),
 														binFlowNum(hbufferResponse.sending),
-														execEventSignal);
+														execEventSignal,
+														stageDataIn.basicInfo.ip);
 			stageData.data <= extractData(dm);
 			stageData.fullMask <= extractFullMask(dm);
 														
