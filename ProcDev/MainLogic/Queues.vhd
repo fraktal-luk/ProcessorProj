@@ -24,14 +24,18 @@ use work.GeneralPipeDev.all;
 package Queues is
 
 type HbuffQueueData is record
+		contentT: InstructionStateArray(0 to HBUFFER_SIZE-1);
 	content: InstructionStateArray(0 to HBUFFER_SIZE-1);
 	fullMask: std_logic_vector(0 to HBUFFER_SIZE-1);
+		cmpMask: std_logic_vector(0 to HBUFFER_SIZE-1);
 	nFullV: SmallNumber;
 end record;
 
 constant DEFAULT_HBUFF_QUEUE_DATA: HbuffQueueData := (
+		contentT => (others => DEFAULT_INSTRUCTION_STATE),
 	content => (others => DEFAULT_INSTRUCTION_STATE),
 	fullMask => (others => '0'),
+		cmpMask => (others => '0'),	
 	nFullV => (others => '0')
 );
 
@@ -91,6 +95,8 @@ return HbuffQueueData is
 	-- Extended: aditional 8 elements, filled with the last in queue; for convenience
 	variable qinExt: InstructionStateArray(0 to HBUFFER_SIZE + 8 - 1) := 
 																(others => qin(HBUFFER_SIZE-1));
+	variable inputExt: InstructionStateArray(0 to ILEN + 4 - 1) := 
+																(others => input(ILEN-1));
 	
 	variable resContent: InstructionStateArray(0 to QLEN-1) := (others => DEFAULT_INSTRUCTION_STATE);
 	variable resContentT: InstructionStateArray(0 to QLEN-1) := (others => DEFAULT_INSTRUCTION_STATE);
@@ -100,6 +106,8 @@ return HbuffQueueData is
 	variable nRem, nOff, nOffMR, nFullNew: integer := 0;
 	variable s0, s1, s2, s3, sT: std_logic_vector(1 downto 0) := "00";
 	variable v0, v1, v2, v3, vT: InstructionStateArray(0 to 3) := (others => DEFAULT_INSTRUCTION_STATE);
+	
+	variable iMod: integer := 0;
 begin
 	nFull := binFlowNum(nFullV);
 	nIn := binFlowNum(nInV);
@@ -113,9 +121,11 @@ begin
 		nFullNew := 0;
 	end if;
 
+	inputExt(0 to ILEN-1) := input;
 	qinExt(0 to HBUFFER_SIZE-1) := qin;
 
 	resContent := qin;
+	resContentT := qin;
 	
 		report   integer'image(nOut) & "<<" & integer'image(nFull) & "<<"
 				&	integer'image(nIn);
@@ -177,29 +187,41 @@ begin
 		--		C) nOffMR[1:0] // This time from 0; nOffMR := offset - nRem
 		--		D) nOffMR[1:0]
 		
+		iMod := i mod 4;
+		
 		v0 := qinExt(i+1 to i+4);
 		v1 := qinExt(i+5 to i+8);
-		v2 := input(0 to 3);
-		v3 := input(4 to 7);
+		v2 := inputExt(iMod+0 to iMod+3);
+		v3 := inputExt(iMod+4 to iMod+7);
 		
-		s0 := i2slv(i + nOut+1, 2);
+		s0 := i2slv(nOut-1, 2);
 		s1 := s0;
-		s2 := i2slv(i + nOffMR, 2);
+		s2 := i2slv(nOffMR, 2);
 		s3 := s2;
 
 		if i < nRem then
 			if nOut <= 4 then
 				sT := "00";
+						report "A";
 			else
 				sT := "01";
+						report "B";
 			end if;	
 		else	
 			if i + nOffMR < 4 then
 				sT := "10";
+						report "C";
 			else
 				sT := "11";
+						report "D";
 			end if;
 		end if;
+		
+		if	nOut /= 0 or i >= nRem then --  nRem can be replaced with nFull
+			resContentT(i) := selectIns4x4(v0, v1, v2, v3, 
+													s0, s1, s2, s3,
+													sT);
+		end if;										 
 		
 		-- Fill reference queue
 		if i < nRem then -- from queue
@@ -221,8 +243,14 @@ begin
 			resMask(i) := '1';
 		end if;
 		
+			if resMask(i) = '1' and resContent(i) /= resContentT(i) then
+				--report "ohno!";
+				res.cmpMask(i) := '1';				
+			end if;
+		
 	end loop;
 	
+		res.contentT := resContentT;
 	res.content := resContent;
 	res.fullMask := resMask;
 	res.nFullV := i2slv(nFullNew, SMALL_NUMBER_SIZE);
