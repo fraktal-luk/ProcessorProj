@@ -26,12 +26,13 @@ package Queues is
 type HbuffQueueData is record
 	content: InstructionStateArray(0 to HBUFFER_SIZE-1);
 	fullMask: std_logic_vector(0 to HBUFFER_SIZE-1);
-	
+	nFullV: SmallNumber;
 end record;
 
 constant DEFAULT_HBUFF_QUEUE_DATA: HbuffQueueData := (
 	content => (others => DEFAULT_INSTRUCTION_STATE),
-	fullMask => (others => '0')
+	fullMask => (others => '0'),
+	nFullV => (others => '0')
 );
 
 
@@ -78,7 +79,7 @@ end function;
 -- CAREFUL: The start IP in bock can be encoded in the IP of element (0)?
 function TEMP_movingQueue_q16_i8_o8(buffIn: HbuffQueueData;
 												input: InstructionStateArray;
-												nFull: integer; nIn: integer; nOut: integer; killAll: std_logic;
+												nFullV, nInV, nOutV: SmallNumber; killAll: std_logic;
 												startIP: Mword)
 return HbuffQueueData is
 	constant qin: InstructionStateArray(0 to HBUFFER_SIZE-1) := buffIn.content;
@@ -87,21 +88,32 @@ return HbuffQueueData is
 	constant ILEN: integer := input'length; -- must be 8
 	variable res: HbuffQueueData := DEFAULT_HBUFF_QUEUE_DATA;
 	
+	-- Extended: aditional 8 elements, filled with the last in queue; for convenience
+	variable qinExt: InstructionStateArray(0 to HBUFFER_SIZE + 8 - 1) := 
+																(others => qin(HBUFFER_SIZE-1));
+	
 	variable resContent: InstructionStateArray(0 to QLEN-1) := (others => DEFAULT_INSTRUCTION_STATE);
 	variable resContentT: InstructionStateArray(0 to QLEN-1) := (others => DEFAULT_INSTRUCTION_STATE);
 	variable resMask, resMaskT: std_logic_vector(0 to QLEN-1) := (others => '0');
 	
-	variable nRem, nOff, nOffMR, nNew: integer := 0;
+	variable nFull, nIn, nOut: integer := 0;
+	variable nRem, nOff, nOffMR, nFullNew: integer := 0;
 	variable s0, s1, s2, s3, sT: std_logic_vector(1 downto 0) := "00";
-	variable sv0, v1, v2, v3, vT: InstructionStateArray(0 to 3) := (others => DEFAULT_INSTRUCTION_STATE);
+	variable v0, v1, v2, v3, vT: InstructionStateArray(0 to 3) := (others => DEFAULT_INSTRUCTION_STATE);
 begin
+	nFull := binFlowNum(nFullV);
+	nIn := binFlowNum(nInV);
+	nOut := binFlowNum(nOutV);	
+
 	nOff := ILEN - nIn; -- TODO: It will be gathered from low bits of IP of fetched block!
 	nRem := nFull - nOut;
 	nOffMR := nOff - nRem;
-	nNew := nRem + nIn;
+	nFullNew := nRem + nIn;
 	if killAll = '1' then
-		nNew := 0;
+		nFullNew := 0;
 	end if;
+
+	qinExt(0 to HBUFFER_SIZE-1) := qin;
 
 	resContent := qin;
 	
@@ -162,8 +174,13 @@ begin
 		--	 Bit widths:
 		--		A) nOut[1:0] // CAREFUL! Indexing form 1, not 0 because nOut==0 is not moving
 		--		B) nOut[1:0] //
-		--		C) (-nRem+offset)[1:0] // This time from 0
-		--		D) (-nRem+offset)[1:0]
+		--		C) nOffMR[1:0] // This time from 0; nOffMR := offset - nRem
+		--		D) nOffMR[1:0]
+		
+		v0 := qinExt(i+1 to i+4);
+		v1 := qinExt(i+5 to i+8);
+		v2 := input(0 to 3);
+		v3 := input(4 to 7);
 		
 		-- Fill reference queue
 		if i < nRem then -- from queue
@@ -181,7 +198,7 @@ begin
 		end if;
 		
 		-- Fill reference mask
-		if i < nNew then
+		if i < nFullNew then
 			resMask(i) := '1';
 		end if;
 		
@@ -189,6 +206,7 @@ begin
 	
 	res.content := resContent;
 	res.fullMask := resMask;
+	res.nFullV := i2slv(nFullNew, SMALL_NUMBER_SIZE);
 	
 	return res;
 end function;

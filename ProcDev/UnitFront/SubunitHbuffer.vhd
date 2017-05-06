@@ -147,9 +147,9 @@ begin
 			--if reset = '1' then
 			dm :=	TEMP_movingQueue_q16_i8_o8(buffData,
 														hbufferDataANew,
-														binFlowNum(hbufferResponse.full),
-														binFlowNum(hbufferDrive.prevSending),
-														binFlowNum(hbufferResponse.sending),
+														hbufferResponse.full,
+														hbufferDrive.prevSending,
+														hbufferResponse.sending,
 														execEventSignal,
 														stageDataIn.basicInfo.ip);
 														
