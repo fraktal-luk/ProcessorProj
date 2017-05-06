@@ -182,6 +182,25 @@ begin
 		v2 := input(0 to 3);
 		v3 := input(4 to 7);
 		
+		s0 := i2slv(i + nOut+1, 2);
+		s1 := s0;
+		s2 := i2slv(i + nOffMR, 2);
+		s3 := s2;
+
+		if i < nRem then
+			if nOut <= 4 then
+				sT := "00";
+			else
+				sT := "01";
+			end if;	
+		else	
+			if i + nOffMR < 4 then
+				sT := "10";
+			else
+				sT := "11";
+			end if;
+		end if;
+		
 		-- Fill reference queue
 		if i < nRem then -- from queue
 			if i + nOut < QLEN then
