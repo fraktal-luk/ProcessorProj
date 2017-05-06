@@ -93,6 +93,8 @@ architecture Implem of SubunitHbuffer is
 	signal partialKillMaskHbuffer: std_logic_vector(0 to HBUFFER_SIZE-1) := (others=>'0');
 	signal nHIn: SmallNumber := (others => '0');
 	signal sendingSig: SmallNumber := (others => '0');
+	
+		signal buffData: HbuffQueueData := DEFAULT_HBUFF_QUEUE_DATA;
 begin
 	nHIn <= i2slv(FETCH_BLOCK_SIZE - (slv2u(stageDataIn.basicInfo.ip(ALIGN_BITS-1 downto 1))),
 					  SMALL_NUMBER_SIZE);
@@ -139,24 +141,27 @@ begin
 															livingMask2);
 	
 	FRONT_CLOCKED: process(clk)
-		variable dm: InstructionSlotArray(0 to HBUFFER_SIZE-1);
+		variable dm: HbuffQueueData := DEFAULT_HBUFF_QUEUE_DATA;
 	begin					
 		if rising_edge(clk) then
 			--if reset = '1' then
-			dm :=	TEMP_movingQueue_q16_i8_o8(hbufferDataA, hbufferDataANew,
+			dm :=	TEMP_movingQueue_q16_i8_o8(buffData,
+														hbufferDataANew,
 														binFlowNum(hbufferResponse.full),
 														binFlowNum(hbufferDrive.prevSending),
 														binFlowNum(hbufferResponse.sending),
 														execEventSignal,
 														stageDataIn.basicInfo.ip);
-			stageData.data <= extractData(dm);
-			stageData.fullMask <= extractFullMask(dm);
+														
+				buffData <= dm;									
+			stageData.data <= dm.content;
+			stageData.fullMask <= dm.fullMask;
 														
 			--elsif en = '1' then
-				hbufferDataA <= hbufferDataANext;
-									--	stageDataNext.data;
-					fullMask2 <= fullMask2Next;
-									--	stageDataNext.fullMask;
+				hbufferDataA <= --hbufferDataANext;
+										stageData.data;
+					fullMask2 <= --fullMask2Next;
+										stageData.fullMask;
 				logBuffer(hbufferDataA, fullMask2, livingMask2, hbufferResponse);	
 				-- NOTE: below has no info about flow constraints. It just checks data against
 				--			flow numbers, while the validity of those numbers is checked by slot logic

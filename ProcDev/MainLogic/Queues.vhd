@@ -23,6 +23,17 @@ use work.GeneralPipeDev.all;
 
 package Queues is
 
+type HbuffQueueData is record
+	content: InstructionStateArray(0 to HBUFFER_SIZE-1);
+	fullMask: std_logic_vector(0 to HBUFFER_SIZE-1);
+	
+end record;
+
+constant DEFAULT_HBUFF_QUEUE_DATA: HbuffQueueData := (
+	content => (others => DEFAULT_INSTRUCTION_STATE),
+	fullMask => (others => '0')
+);
+
 
 function selectIns4(v0: InstructionStateArray(0 to 3);
 						  s0: std_logic_vector(1 downto 0))
@@ -65,16 +76,19 @@ end function;
 
 -- nIn indicates number of full positions, aligned to right (for jump to not-beginning of block)
 -- CAREFUL: The start IP in bock can be encoded in the IP of element (0)?
-function TEMP_movingQueue_q16_i8_o8(qin: InstructionStateArray; input: InstructionStateArray;
-								  nFull: integer; nIn: integer; nOut: integer; killAll: std_logic;
-								  startIP: Mword)
-return InstructionSlotArray is
+function TEMP_movingQueue_q16_i8_o8(buffIn: HbuffQueueData;
+												input: InstructionStateArray;
+												nFull: integer; nIn: integer; nOut: integer; killAll: std_logic;
+												startIP: Mword)
+return HbuffQueueData is
+	constant qin: InstructionStateArray(0 to HBUFFER_SIZE-1) := buffIn.content;
+	constant maskIn: std_logic_vector(0 to HBUFFER_SIZE-1) := buffIn.fullMask;
 	constant QLEN: integer := qin'length; -- Must be 16
 	constant ILEN: integer := input'length; -- must be 8
-	variable resAll: InstructionSlotArray(0 to QLEN-1);
+	variable res: HbuffQueueData := DEFAULT_HBUFF_QUEUE_DATA;
 	
-	variable res: InstructionStateArray(0 to QLEN-1) := (others => DEFAULT_INSTRUCTION_STATE);
-	variable resT: InstructionStateArray(0 to QLEN-1) := (others => DEFAULT_INSTRUCTION_STATE);
+	variable resContent: InstructionStateArray(0 to QLEN-1) := (others => DEFAULT_INSTRUCTION_STATE);
+	variable resContentT: InstructionStateArray(0 to QLEN-1) := (others => DEFAULT_INSTRUCTION_STATE);
 	variable resMask, resMaskT: std_logic_vector(0 to QLEN-1) := (others => '0');
 	
 	variable nRem, nOff, nOffMR, nNew: integer := 0;
@@ -152,13 +166,13 @@ begin
 		-- Fill reference queue
 		if i < nRem then -- from queue
 			if i + nOut < QLEN then
-				res(i) := qin(i + nOut);
+				resContent(i) := qin(i + nOut);
 			else
 				-- ??
 			end if;
 		else -- from input
-			if i - nRem + nOff < ILEN then
-				res(i) := input(i - nRem + nOff);
+			if i + nOffMR < ILEN then
+				resContent(i) := input(i + nOffMR);
 			else
 				-- ??
 			end if;
@@ -171,9 +185,10 @@ begin
 		
 	end loop;
 	
+	res.content := resContent;
+	res.fullMask := resMask;
 	
-	resAll := makeSlotArray(res, resMask);
-	return resAll;
+	return res;
 end function;
 
 
