@@ -199,7 +199,7 @@ begin
 		s2 := i2slv(nOffMR, 2);
 		s3 := s2;
 
-		if i < nRem then
+		if nRem > i then
 			if nOut <= 4 then
 				sT := "00";
 					--	report "A";
@@ -218,8 +218,10 @@ begin
 		end if;
 		
 		-- This condition generates clock enable
-		-- CAREFUL: nOut 
-		if	nOut /= 0 or i >= nRem then --  nRem can be replaced with nFull
+		-- CAREFUL: nOut /= 0 could be equiv to nextAccepting?
+		--				nextAccepting will differ from nOut /= 0 when nFull = 0, but in this case
+		--				the second part of condition is true everywhere, so the substitution seems valid!
+		if	nOut /= 0 or nRem <= i then --  nRem can be replaced with nFull
 			resContentT(i) := selectIns4x4(v0, v1, v2, v3, 
 													s0, s1, s2, s3,
 													sT);
