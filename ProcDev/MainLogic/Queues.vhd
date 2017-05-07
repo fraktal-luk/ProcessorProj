@@ -67,6 +67,57 @@ begin
 	return res;
 end function;
 
+function lessThan(v: SmallNumber; ref: integer; nb: integer) return std_logic is
+	variable res: std_logic := '0';
+	variable table: std_logic_vector(0 to 2**nb-1) := (others => '0');
+	
+	variable vv, rv: std_logic_vector(nb-1 downto 0) := (others => '0');
+begin
+	assert nb < 9 report "Dont use so large numbers!" severity failure;
+
+	rv := i2slv(ref, nb); 
+	vv := v(nb-1 downto 0);
+
+	-- Generate truth table 
+	for i in 0 to 2**nb-1 loop
+		if i < ref then
+			table(i) := '1';
+		else
+			table(i) := '0';
+		end if;
+	end loop;
+	
+	res := table(slv2u(vv));
+	
+	return res;
+end function;
+
+function greaterThan(v: SmallNumber; ref: integer; nb: integer) return std_logic is
+	variable res: std_logic := '0';
+	variable table: std_logic_vector(0 to 2**nb-1) := (others => '0');
+	
+	variable vv, rv: std_logic_vector(nb-1 downto 0) := (others => '0');
+begin
+	assert nb < 9 report "Dont use so large numbers!" severity failure;
+
+	rv := i2slv(ref, nb); 
+	vv := v(nb-1 downto 0);
+
+	-- Generate truth table 
+	for i in 0 to 2**nb-1 loop
+		if i > ref then
+			table(i) := '1';
+		else
+			table(i) := '0';
+		end if;
+	end loop;
+	
+	res := table(slv2u(vv));
+	
+	return res;
+end function;
+
+
 
 function selectIns4(v0: InstructionStateArray(0 to 3);
 						  s0: std_logic_vector(1 downto 0))
@@ -177,9 +228,9 @@ begin
 	resContent := qin;
 	resContentT := qin;
 	
-		report   integer'image(nOut) & "<<" & integer'image(nFull) & "<<"
-				&	integer'image(nIn);
-		report  "nRem: " & integer'image(nRem) & ", nOffMR: " & integer'image(nOffMR);
+		--report   integer'image(nOut) & "<<" & integer'image(nFull) & "<<"
+		--		&	integer'image(nIn);
+		--report  "nRem: " & integer'image(nRem) & ", nOffMR: " & integer'image(nOffMR);
 	
 	
 	-- For each index in queue we have to find a set of functions:
@@ -249,7 +300,12 @@ begin
 		s2 := i2slv(nOffMR, 2);
 		s3 := s2;
 
-			if nRem > i then -- !! 5b - 1b
+
+			--		report integer'image(i) & ": " & integer'image(nRem) & "/ " 
+			--					& std_logic'image(greaterThan(nRemV, i, 5));
+
+			if --nRem > i then -- !! 5b - 1b
+				greaterThan(nRemV, i, 5) = '1' then
 				cond0 := '1';
 			else
 				cond0 := '0';
@@ -258,7 +314,9 @@ begin
 		if --nRem > i then
 			cond0 = '1' then
 			if --nOut <= 4 then   -- !! 4b -> 1b (universal)
-				(nOutV(3) or (nOutV(2) and (nOutV(1) or nOutV(0)))) = '0' then
+				--(nOutV(3) or (nOutV(2) and (nOutV(1) or nOutV(0)))) = '0' then
+				greaterThan(nOutV, 4, 4) = '0' then
+				
 				sT := "00";
 					--	report "A";
 			else
@@ -266,7 +324,7 @@ begin
 					--	report "B";
 			end if;	
 		else	
-			if nOffMR < 4 - i then -- !! 5b (range -1:7) -> 1b (each i)
+			if nOffMR < 4 - i then -- !! 5b (range -16:7) -> 1b (each i)
 				sT := "10";
 					--	report "C";
 			else
@@ -308,6 +366,11 @@ begin
 			resMask(i) := '1';
 		end if;
 		
+		-- Fill implementation mask
+		if greaterThan(nFullNewV, i, 5) = '1' then
+			resMaskT(i) := '1';
+		end if;
+		
 			if resMask(i) = '1' and resContent(i) /= resContentT(i) then
 				--report "ohno!";
 				res.cmpMask(i) := '1';				
@@ -317,7 +380,7 @@ begin
 	
 		res.contentT := resContentT;
 	res.content := resContentT;
-		res.fullMaskT := resMask; -- TEMP!
+		res.fullMaskT := resMaskT;
 	res.fullMask := resMask;
 	res.nFullV := i2slv(nFullNew, SMALL_NUMBER_SIZE);
 	
