@@ -117,6 +117,31 @@ begin
 	return res;
 end function;
 
+function lessThanSigned(v: SmallNumber; ref: integer; nb: integer) return std_logic is
+	variable res: std_logic := '0';
+	variable table: std_logic_vector(0 to 2**nb-1) := (others => '0');
+	
+	variable vv, rv: std_logic_vector(nb-1 downto 0) := (others => '0');
+begin
+	assert nb < 9 report "Dont use so large numbers!" severity failure;
+
+	rv := i2slv(ref, nb); 
+	vv := v(nb-1 downto 0);
+
+	-- Generate truth table 
+	for i in 0 to 2**nb-1 loop
+		if i - 2**(nb-1) < ref then
+			table(i) := '1';
+		else
+			table(i) := '0';
+		end if;
+	end loop;
+	
+	res := table(slv2s(vv) + 2**(nb-1));
+	
+	return res;
+end function;
+
 
 
 function selectIns4(v0: InstructionStateArray(0 to 3);
@@ -324,7 +349,8 @@ begin
 					--	report "B";
 			end if;	
 		else	
-			if nOffMR < 4 - i then -- !! 5b (range -16:7) -> 1b (each i)
+			if --nOffMR < 4 - i then -- !! 5b (range -16:7) -> 1b (each i)
+				lessThanSigned(nOffMRV, 4-i, 6) = '1' then
 				sT := "10";
 					--	report "C";
 			else
@@ -332,6 +358,9 @@ begin
 					--	report "D";
 			end if;
 		end if;
+
+					report integer'image(4 - i) & ": " & integer'image(nOffMR) & "/ " 
+								& std_logic'image(lessThanSigned(nOffMRV, 4-i, 6));
 		
 		-- This condition generates clock enable
 		-- CAREFUL: nOut /= 0 could be equiv to nextAccepting?
@@ -339,7 +368,8 @@ begin
 		--				the second part of condition is true everywhere, so the substitution seems valid!
 		if	--nOut /= 0 or --nRem <= i then --  nRem can be replaced with nFull
 			--				 cond0 = '0' then
-			(isNonzero(nOutV) or not cond0) = '1' then -- !! 4b + 1b -> 1b
+			--(isNonzero(nOutV(3 downto 0)) or not cond0) = '1' then -- !! 4b + 1b -> 1b
+			(nOutV(3 downto 0) & cond0) /= "00001" then
 							 
 			resContentT(i) := selectIns4x4(v0, v1, v2, v3, 
 													s0, s1, s2, s3,
