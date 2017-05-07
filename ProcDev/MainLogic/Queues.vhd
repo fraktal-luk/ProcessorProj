@@ -26,6 +26,7 @@ package Queues is
 type HbuffQueueData is record
 		contentT: InstructionStateArray(0 to HBUFFER_SIZE-1);
 	content: InstructionStateArray(0 to HBUFFER_SIZE-1);
+		fullMaskT: std_logic_vector(0 to HBUFFER_SIZE-1);
 	fullMask: std_logic_vector(0 to HBUFFER_SIZE-1);
 		cmpMask: std_logic_vector(0 to HBUFFER_SIZE-1);
 	nFullV: SmallNumber;
@@ -34,10 +35,37 @@ end record;
 constant DEFAULT_HBUFF_QUEUE_DATA: HbuffQueueData := (
 		contentT => (others => DEFAULT_INSTRUCTION_STATE),
 	content => (others => DEFAULT_INSTRUCTION_STATE),
+		fullMaskT => (others => '0'),	
 	fullMask => (others => '0'),
 		cmpMask => (others => '0'),	
 	nFullV => (others => '0')
 );
+
+
+function addSN(a, b: SmallNumber) return SmallNumber is
+	variable res: SmallNumber := (others => '0');
+	variable rdigit, carry: std_logic := '0';
+begin
+	for i in 0 to SMALL_NUMBER_SIZE-1 loop
+		rdigit := a(i) xor b(i) xor carry;
+		carry := (a(i) and b(i)) or (a(i) and carry) or (b(i) and carry);
+		res(i) := rdigit;
+	end loop;
+	return res;
+end function;
+
+function subSN(a, b: SmallNumber) return SmallNumber is
+	variable res: SmallNumber := (others => '0');
+	variable rdigit, carry: std_logic := '0';
+begin
+	carry := '1';
+	for i in 0 to SMALL_NUMBER_SIZE-1 loop
+		rdigit := a(i) xor (not b(i)) xor carry;
+		carry := (a(i) and not b(i)) or (a(i) and carry) or ((not b(i)) and carry);
+		res(i) := rdigit;
+	end loop;
+	return res;
+end function;
 
 
 function selectIns4(v0: InstructionStateArray(0 to 3);
@@ -110,12 +138,13 @@ return HbuffQueueData is
 	variable v0, v1, v2, v3, vT: InstructionStateArray(0 to 3) := (others => DEFAULT_INSTRUCTION_STATE);
 	
 	variable iMod: integer := 0;
+		variable cond0: std_logic := '0';
 begin
 	nFull := binFlowNum(nFullV);
 	nIn := binFlowNum(nInV);
 	nOut := binFlowNum(nOutV);	
 
-	nOff := ILEN - nIn; -- TODO: It will be gathered from low bits of IP of fetched block!
+	nOff := (ILEN - nIn) mod 8; -- TODO: It will be gathered from low bits of IP of fetched block!
 	nRem := nFull - nOut;
 	nOffMR := nOff - nRem;
 	nFullNew := nRem + nIn;
@@ -123,10 +152,24 @@ begin
 		nFullNew := 0;
 	end if;
 
-		nOffV := i2slv(nOff, SMALL_NUMBER_SIZE);
-		nRemV := i2slv(nRem, SMALL_NUMBER_SIZE);
-		nOffMRV := i2slv(nOffMR, SMALL_NUMBER_SIZE);
-		nFullNewV := i2slv(nFullNew, SMALL_NUMBER_SIZE);
+		--nOffV := i2slv(nOff, SMALL_NUMBER_SIZE);
+			nOffV(ALIGN_BITS-2 downto 0) := startIP(ALIGN_BITS-1 downto 1);
+			--		assert slv2u(nOffV) = nOff report "a jak!";
+		--nRemV := i2slv(nRem, SMALL_NUMBER_SIZE);
+		--			assert nRemV = subSN(nFullV, nOutV) report "okuq";
+			nRemV := subSN(nFullV, nOutV);
+					
+		--nOffMRV := i2slv(nOffMR, SMALL_NUMBER_SIZE);
+		--			assert nOffMRV = subSN(nOffV, nRemV) report "hhee!";
+			nOffMRV := subSN(nOffV, nRemV);
+			
+		--nFullNewV := i2slv(nFullNew, SMALL_NUMBER_SIZE);
+			if killAll = '1' then
+				nFullNewV := (others => '0');
+			else
+				nFullNewV := addSN(nRemV, nInV);			
+			end if;
+			--	assert slv2u(nFullNewV) = nFullNew report "sjuss";
 
 	inputExt(0 to ILEN-1) := input;
 	qinExt(0 to HBUFFER_SIZE-1) := qin;
@@ -206,8 +249,16 @@ begin
 		s2 := i2slv(nOffMR, 2);
 		s3 := s2;
 
-		if nRem > i then
-			if nOut <= 4 then
+			if nRem > i then -- !! 5b - 1b
+				cond0 := '1';
+			else
+				cond0 := '0';
+			end if;	
+
+		if --nRem > i then
+			cond0 = '1' then
+			if --nOut <= 4 then   -- !! 4b -> 1b (universal)
+				(nOutV(3) or (nOutV(2) and (nOutV(1) or nOutV(0)))) = '0' then
 				sT := "00";
 					--	report "A";
 			else
@@ -215,7 +266,7 @@ begin
 					--	report "B";
 			end if;	
 		else	
-			if nOffMR < 4 - i then
+			if nOffMR < 4 - i then -- !! 5b (range -1:7) -> 1b (each i)
 				sT := "10";
 					--	report "C";
 			else
@@ -228,7 +279,10 @@ begin
 		-- CAREFUL: nOut /= 0 could be equiv to nextAccepting?
 		--				nextAccepting will differ from nOut /= 0 when nFull = 0, but in this case
 		--				the second part of condition is true everywhere, so the substitution seems valid!
-		if	nOut /= 0 or nRem <= i then --  nRem can be replaced with nFull
+		if	--nOut /= 0 or --nRem <= i then --  nRem can be replaced with nFull
+			--				 cond0 = '0' then
+			(isNonzero(nOutV) or not cond0) = '1' then -- !! 4b + 1b -> 1b
+							 
 			resContentT(i) := selectIns4x4(v0, v1, v2, v3, 
 													s0, s1, s2, s3,
 													sT);
@@ -250,7 +304,7 @@ begin
 		end if;
 		
 		-- Fill reference mask
-		if i < nFullNew then
+		if i < nFullNew then -- !! Make new condition for resMaskT. 5b -> 1b (each i) 
 			resMask(i) := '1';
 		end if;
 		
@@ -263,6 +317,7 @@ begin
 	
 		res.contentT := resContentT;
 	res.content := resContentT;
+		res.fullMaskT := resMask; -- TEMP!
 	res.fullMask := resMask;
 	res.nFullV := i2slv(nFullNew, SMALL_NUMBER_SIZE);
 	
