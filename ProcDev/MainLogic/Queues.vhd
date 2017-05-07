@@ -411,7 +411,7 @@ begin
 		res.contentT := resContentT;
 	res.content := resContentT;
 		res.fullMaskT := resMaskT;
-	res.fullMask := resMask;
+	res.fullMask := resMaskT;
 	res.nFullV := i2slv(nFullNew, SMALL_NUMBER_SIZE);
 	
 	return res;
