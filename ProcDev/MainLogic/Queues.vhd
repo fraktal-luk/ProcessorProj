@@ -104,6 +104,8 @@ return HbuffQueueData is
 	
 	variable nFull, nIn, nOut: integer := 0;
 	variable nRem, nOff, nOffMR, nFullNew: integer := 0;
+	variable nRemV, nOffV, nOffMRV, nFullNewV: SmallNumber := (others => '0');
+	
 	variable s0, s1, s2, s3, sT: std_logic_vector(1 downto 0) := "00";
 	variable v0, v1, v2, v3, vT: InstructionStateArray(0 to 3) := (others => DEFAULT_INSTRUCTION_STATE);
 	
@@ -120,6 +122,11 @@ begin
 	if killAll = '1' then
 		nFullNew := 0;
 	end if;
+
+		nOffV := i2slv(nOff, SMALL_NUMBER_SIZE);
+		nRemV := i2slv(nRem, SMALL_NUMBER_SIZE);
+		nOffMRV := i2slv(nOffMR, SMALL_NUMBER_SIZE);
+		nFullNewV := i2slv(nFullNew, SMALL_NUMBER_SIZE);
 
 	inputExt(0 to ILEN-1) := input;
 	qinExt(0 to HBUFFER_SIZE-1) := qin;
