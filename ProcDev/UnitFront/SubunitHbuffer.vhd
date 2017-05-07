@@ -142,22 +142,16 @@ begin
 	
 	FRONT_CLOCKED: process(clk)
 		variable dm: HbuffQueueData := DEFAULT_HBUFF_QUEUE_DATA;
-		variable tmpSN: SmallNumber := (others => '0');
 	begin					
 		if rising_edge(clk) then
 			--if reset = '1' then
-			if nextAccepting = '1' then
-				tmpSN := hBuffOut.nHOut;
-			else
-				tmpSN := (others => '0');
-			end if;
 						
 			dm :=	TEMP_movingQueue_q16_i8_o8(buffData,
 														hbufferDataANew,
 														hbufferResponse.full,
 														hbufferDrive.prevSending,
 														--hbufferResponse.sending,
-															tmpSN,
+															hbufferDrive.nextAccepting,
 														execEventSignal,
 														stageDataIn.basicInfo.ip);
 														
