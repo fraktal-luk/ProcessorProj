@@ -468,7 +468,8 @@ function findOverriddenDests(insVec: StageDataMulti) return std_logic_vector is
 begin
 	for i in insVec.fullMask'range loop
 		for j in insVec.fullMask'range loop
-			if j > i and insVec.data(i).virtualDestArgs.d0 = insVec.data(j).virtualDestArgs.d0 then
+			if 		j > i and insVec.fullMask(j) = '1'
+				and insVec.data(i).virtualDestArgs.d0 = insVec.data(j).virtualDestArgs.d0 then
 				res(i) := '1';
 			end if;
 		end loop;
