@@ -94,6 +94,7 @@ entity UnitSequencer is
 		sendingFromROB: in std_logic;
 		
 			sendingFromBQ: in std_logic;
+				dataFromBQV: in StageDataMulti;
 			dataFromBQ: in InstructionState;
 		
 			committing: out std_logic;
@@ -504,8 +505,28 @@ begin
 			--			The 'target' field will be used to update return address for exc/int
 			NEW_TARGET: block
 				signal lastEffectiveData: InstructionState := DEFAULT_INSTRUCTION_STATE;
-				signal committingTakenBranch, tempBuffWaiting: std_logic := '0';
+				signal committingTakenBranch, committingTakenBranchAsLE, tempBuffWaiting: std_logic := '0';
 				signal tempBuffValue, normalIncTarget, incTarget, incArg: Mword := (others => '0');
+				signal leGrInd: integer := 0;
+				
+				function totalEffectiveInc(sd: StageDataMulti) return Mword is
+					variable res: Mword := (others => '0');
+					variable em: std_logic_vector(0 to PIPE_WIDTH-1) := (others => '0');
+					variable tmp: integer := 0;
+				begin
+					em := getEffectiveMask(sd);
+					for i in 0 to PIPE_WIDTH-1 loop
+						if em(i) = '1' then
+							if sd.data(i).classInfo.short = '1' then
+								tmp := tmp + 2;
+							else
+								tmp := tmp + 4;
+							end if;
+						end if;
+					end loop;
+					res := i2slv(tmp, MWORD_SIZE);
+					return res;
+				end function;
 			begin
 				
 				SYNCH: process(clk)
@@ -520,19 +541,29 @@ begin
 					end if;
 				end process;
 				
+				-- CAREFUL: without *LE only valid for scalar?
 				committingTakenBranch <= sendingFromROB and dataToLastEffective.data(0).controlInfo.hasBranch;
+				committingTakenBranchAsLE <= sendingFromROB and dataToLastEffective.data(0).controlInfo.hasBranch;
 				
 				TRG_ADDER: entity work.IntegerAdder
 				port map(
-					inA => incArg, -- dataFromLastEffective.data(0).target,
-					inB => getAddressIncrement(dataFromLastEffective.data(0)),
+					inA => incArg,
+						-- TODO: below change to sum for whole effective slot -> getTotalAddressIncrement(...)
+					inB => --getAddressIncrement(dataFromLastEffective.data(0)),
+							 totalEffectiveInc(stageDataToCommit),
 					output => incTarget
 				);
 				
 				incArg <= tempBuffValue when tempBuffWaiting = '1' else dataFromLastEffective.data(0).target;
 				
-				newEffectiveTarget <= dataFromBQ.argValues.arg1 when committingTakenBranch = '1'		 
-									else	 incTarget;
+				-- TODO, CAREFUL: data from BQ will be multi, must choose correct branch
+				--			 -> [select element of dataFromBQ that corr. to last effective in this group]
+				--			! And taken branch is not always last in effective group! (?)
+				--			  So choose branch target only if THE last efective is taken branch!
+					leGrInd <= slv2u(dataToLastEffective.data(0).groupTag(LOG2_PIPE_WIDTH-1 downto 0));
+				newEffectiveTarget <= --dataFromBQ.argValues.arg1 when --committingTakenBranch = '1'
+							 dataFromBQV.data(leGrInd).argValues.arg1 when committingTakenBranchAsLE = '1'
+					else	 incTarget;
 			end block;
 
 		
