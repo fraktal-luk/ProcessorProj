@@ -457,7 +457,7 @@ begin
 		begin
 			if rising_edge(clk) then
 				renameCtr <= renameCtrNext;
-				--commitCtr <= commitCtrNext;					
+				commitCtr <= commitCtrNext;					
 				renameGroupCtr <= renameGroupCtrNext;
 				commitGroupCtr <= commitGroupCtrNext;
 			end if;
