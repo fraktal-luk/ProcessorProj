@@ -230,12 +230,12 @@ begin
 					begin
 						a <= execCausing.groupTag;
 						b <= content(i).ins.groupTag;
-						IQ_KILLER: entity work.CompareBefore8 port map(
-							inA =>  a,
-							inB =>  b,
-							outC => --before
-										open
-						);		
+--						IQ_KILLER: entity work.CompareBefore8 port map(
+--							inA =>  a,
+--							inB =>  b,
+--							outC => --before
+--										open
+--						);		
 						
 						c <= subSN(a, b);
 						before <= c(7);

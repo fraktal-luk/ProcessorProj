@@ -51,32 +51,32 @@ entity BufferPipeLogic is
 end BufferPipeLogic;
 
 
-
-architecture Behavioral_DEPREC of BufferPipeLogic is
-
-begin
-	IMPLEM: entity work.PipeStageLogicBuffer(Behavioral) generic map(
-		CAPACITY => CAPACITY,
-		MAX_OUTPUT => MAX_OUTPUT,
-		MAX_INPUT => MAX_INPUT
-	)
-	port map(
-		clk => clk, reset => reset, en => en,
-			lockAccept => flowDrive.lockAccept,
-			lockSend => flowDrive.lockSend,
-		killAll => flowDrive.killAll,
-		kill => flowDrive.kill,
-		prevSending => flowDrive.prevSending,
-		nextAccepting => flowDrive.nextAccepting,
-		
-		isNew => flowResponse.isNew,
-		full => flowResponse.full,
-		living => flowResponse.living,
-		accepting => flowResponse.accepting,
-		sending => flowResponse.sending
-	);
-
-end Behavioral_DEPREC;
+--
+--architecture Behavioral_DEPREC of BufferPipeLogic is
+--
+--begin
+--	IMPLEM: entity work.PipeStageLogicBuffer(Behavioral) generic map(
+--		CAPACITY => CAPACITY,
+--		MAX_OUTPUT => MAX_OUTPUT,
+--		MAX_INPUT => MAX_INPUT
+--	)
+--	port map(
+--		clk => clk, reset => reset, en => en,
+--			lockAccept => flowDrive.lockAccept,
+--			lockSend => flowDrive.lockSend,
+--		killAll => flowDrive.killAll,
+--		kill => flowDrive.kill,
+--		prevSending => flowDrive.prevSending,
+--		nextAccepting => flowDrive.nextAccepting,
+--		
+--		isNew => flowResponse.isNew,
+--		full => flowResponse.full,
+--		living => flowResponse.living,
+--		accepting => flowResponse.accepting,
+--		sending => flowResponse.sending
+--	);
+--
+--end Behavioral_DEPREC;
 
 architecture BehavioralDirect of BufferPipeLogic is
 		constant CAP: PipeFlow := num2flow(CAPACITY);
@@ -143,26 +143,26 @@ begin
 		
 		afterReceivingSig <= afterReceiving;
 		
-		IMPLEM: entity work.BufferCounter port map(
-			capacity => CAP,
-			maxInput => MAX_IN,
-			maxOutput => MAX_OUT,
-			
-			full => fullSig,
-				lockAccept => lockAccept,
-				lockSend => lockSend,
-			killAll => killAll,
-			kill => kill,
-			living => open,--livingSig,
-			nextAccepting => nextAccepting,
-			prevSending => prevSending,
-			wantSend => open,--wantSend,
-			canAccept => open,--canAccept,
-			sending => open,--sendingSig,
-			accepting => open,--acceptingSig,
-			afterSending => open,--afterSending,
-			afterReceiving => open--afterReceiving	
-		);
+--		IMPLEM: entity work.BufferCounter port map(
+--			capacity => CAP,
+--			maxInput => MAX_IN,
+--			maxOutput => MAX_OUT,
+--			
+--			full => fullSig,
+--				lockAccept => lockAccept,
+--				lockSend => lockSend,
+--			killAll => killAll,
+--			kill => kill,
+--			living => open,--livingSig,
+--			nextAccepting => nextAccepting,
+--			prevSending => prevSending,
+--			wantSend => open,--wantSend,
+--			canAccept => open,--canAccept,
+--			sending => open,--sendingSig,
+--			accepting => open,--acceptingSig,
+--			afterSending => open,--afterSending,
+--			afterReceiving => open--afterReceiving	
+--		);
 
 			canAccept <= (others => '0') when lockAccept = '1'
 					else uminSN(MAX_IN, CAP);
