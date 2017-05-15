@@ -52,7 +52,7 @@ end BufferPipeLogic;
 
 
 
-architecture Behavioral of BufferPipeLogic is
+architecture Behavioral_DEPREC of BufferPipeLogic is
 
 begin
 	IMPLEM: entity work.PipeStageLogicBuffer(Behavioral) generic map(
@@ -76,7 +76,7 @@ begin
 		sending => flowResponse.sending
 	);
 
-end Behavioral;
+end Behavioral_DEPREC;
 
 architecture BehavioralDirect of BufferPipeLogic is
 		constant CAP: PipeFlow := num2flow(CAPACITY);
@@ -153,16 +153,29 @@ begin
 				lockSend => lockSend,
 			killAll => killAll,
 			kill => kill,
-			living => livingSig,
+			living => open,--livingSig,
 			nextAccepting => nextAccepting,
 			prevSending => prevSending,
-			wantSend => wantSend,
-			canAccept => canAccept,
-			sending => sendingSig,
-			accepting => acceptingSig,
-			afterSending => afterSending,
-			afterReceiving => afterReceiving	
+			wantSend => open,--wantSend,
+			canAccept => open,--canAccept,
+			sending => open,--sendingSig,
+			accepting => open,--acceptingSig,
+			afterSending => open,--afterSending,
+			afterReceiving => open--afterReceiving	
 		);
+
+			canAccept <= (others => '0') when lockAccept = '1'
+					else uminSN(MAX_IN, CAP);
+			acceptingSig <= uminSN(canAccept, subSN(CAP, afterSending));		
+
+			livingSig <= (others => '0') when killAll = '1'
+					else	 subSN(fullSig, kill);
+			wantSend <= (others => '0') when lockSend = '1'
+					else   uminSN(MAX_OUT, livingSig);
+			sendingSig <= uminSN(nextAccepting, wantSend);
+			afterSending <= subSN(livingSig, sendingSig);
+			
+			afterReceiving <= addSN(afterSending, prevSending);
 
 end BehavioralDirect;
 

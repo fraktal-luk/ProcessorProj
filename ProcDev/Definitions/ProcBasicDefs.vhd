@@ -151,6 +151,55 @@ begin
 	return res;
 end function;
 
+function uminSN(a, b: SmallNumber) return SmallNumber is
+	variable res: SmallNumber := (others => '0');
+	variable rdigit, carry: std_logic := '0';
+begin
+	res := a;
+	for i in SMALL_NUMBER_SIZE-1 downto 0 loop
+		if a(i) = '0' and b(i) = '1' then
+			res := a;
+			exit;
+		elsif a(i) = '1' and b(i) = '0' then 
+			res := b;
+			exit;
+		else
+			null;
+		end if;
+	end loop;
+	return res;
+end function;
+
+function sminSN(a, b: SmallNumber) return SmallNumber is
+	variable res: SmallNumber := (others => '0');
+	variable rdigit, carry: std_logic := '0';
+begin
+	res := a;
+	if a(SMALL_NUMBER_SIZE-1) = '1' and b(SMALL_NUMBER_SIZE-1) = '0' then
+		res := a;
+		return res;
+	elsif a(SMALL_NUMBER_SIZE-1) = '0' and b(SMALL_NUMBER_SIZE-1) = '1' then
+		res := b;
+		return res;
+	else
+		null;
+	end if;
+	
+	for i in SMALL_NUMBER_SIZE-2 downto 0 loop
+		if a(i) = '0' and b(i) = '1' then
+			res := a;
+			exit;
+		elsif a(i) = '1' and b(i) = '0' then 
+			res := b;
+			exit;
+		else
+			null;
+		end if;
+	end loop;
+	return res;
+end function;
+
+
 end ProcBasicDefs;
 
 

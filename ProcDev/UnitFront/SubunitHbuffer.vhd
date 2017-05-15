@@ -154,7 +154,7 @@ begin
 		end if;
 	end process;	
 
-	SLOT_HBUFF: entity work.BufferPipeLogic(Behavioral)
+	SLOT_HBUFF: entity work.BufferPipeLogic(BehavioralDirect)
 															--BehavioralDirect)
 	generic map(
 		CAPACITY => HBUFFER_SIZE, -- PIPE_WIDTH*2*2

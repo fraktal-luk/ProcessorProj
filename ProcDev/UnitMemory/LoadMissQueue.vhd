@@ -201,7 +201,7 @@ begin
 				end if;
 			end process;
 					
-			SLOT_BUFF: entity work.BufferPipeLogic(Behavioral)
+			SLOT_BUFF: entity work.BufferPipeLogic(BehavioralDirect)
 																	--BehavioralDirect)
 			generic map(
 				CAPACITY => QUEUE_SIZE, -- PIPE_WIDTH*2*2
