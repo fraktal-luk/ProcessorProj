@@ -21,7 +21,7 @@ package NewPipelineData is
 	-- Configuration defs 
 	constant MW: natural := 4; -- Max pipe width  
 
-	constant LOG2_PIPE_WIDTH: natural := 0 + 1; -- + 2; -- Must match the width!
+	constant LOG2_PIPE_WIDTH: natural := 0 ; -- + 2; -- Must match the width!
 	constant PIPE_WIDTH: positive := 2**LOG2_PIPE_WIDTH; -- + 1 + 2; 
 	constant ALIGN_BITS: natural := LOG2_PIPE_WIDTH + 2;
 
@@ -84,11 +84,6 @@ package NewPipelineData is
 	
 	subtype PhysName is slv6;
 	type PhysNameArray is array(natural range <>) of PhysName;
-
-
-subtype SmallNumber is byte;
-type SmallNumberArray is array(integer range <>) of SmallNumber;
-constant SMALL_NUMBER_SIZE: natural := SmallNumber'length;
 
 
 constant PROCESSOR_ID: Mword := X"001100aa";

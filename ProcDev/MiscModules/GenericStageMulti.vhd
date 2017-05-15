@@ -205,6 +205,7 @@ begin
 	KILLER: block
 		signal before: std_logic;
 		signal a, b: std_logic_vector(7 downto 0);
+		signal c: SmallNumber := (others => '0');
 	begin
 		a <= execCausing.groupTag;
 		b <= stageData.data(0).groupTag;	
@@ -212,9 +213,11 @@ begin
 		IQ_KILLER: entity work.CompareBefore8 port map(
 			inA =>  a,
 			inB =>  b,
-			outC => before
+			outC => open --
+						--before
 		);
-		
+			c <= subSN(a, b);
+		before <= c(7);
 		--before <= '0'; --
 					--tagBefore(a, b);			
 		flowDrive.kill <= killByTag(before, execEventSignal,
@@ -273,6 +276,7 @@ begin
 	KILLER: block
 		signal before: std_logic;
 		signal a, b: std_logic_vector(7 downto 0);
+		signal c: SmallNumber := (others => '0');
 	begin
 		a <= execCausing.groupTag;
 		b <= stageData.data(0).groupTag;	
@@ -280,16 +284,17 @@ begin
 		IQ_KILLER: entity work.CompareBefore8 port map(
 			inA =>  a,
 			inB =>  b,
-			outC => before
+			outC => open --
+						--before
 		);
-		
+			c <= subSN(a, b);
+		before <= c(7);
 		--before <= '0'; --
 					--tagBefore(a, b);			
 		flowDrive.kill <= killByTag(before, execEventSignal,
 										execCausing.controlInfo.newInterrupt); -- CAREFUL: no separat interrupt signal!
 										-- before and execEventSignal; 	
-	end block;	
-			-- CAREFUL: in this architecture 'isNew' is irrelevant because clearing vacating slot;
+	end block;			-- CAREFUL: in this architecture 'isNew' is irrelevant because clearing vacating slot;
 			--				second difference from SingleTagged
 		stageEvents <= stageMultiEvents(stageData, flowResponse.isNew or '1');
 	
