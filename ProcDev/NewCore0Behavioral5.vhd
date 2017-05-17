@@ -124,9 +124,6 @@ architecture Behavioral5 of NewCore0 is
 						
 	signal outputA, outputB, outputC, outputD, outputE: InstructionSlot := DEFAULT_INSTRUCTION_SLOT;
 	signal outputOpPreB, outputOpPreC: InstructionState := DEFAULT_INSTRUCTION_STATE;
-						
-	-- CAREFUL: this is used to turn off dependence on iqAccepts
-	--constant	OMIT_IQ_ACCEPTS: std_logic := '0';	-- DEPREC	
 				
 	constant HAS_RESET: std_logic := '0';
 	constant HAS_EN: std_logic := '0';

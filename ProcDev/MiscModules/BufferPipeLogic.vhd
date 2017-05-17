@@ -51,33 +51,6 @@ entity BufferPipeLogic is
 end BufferPipeLogic;
 
 
---
---architecture Behavioral_DEPREC of BufferPipeLogic is
---
---begin
---	IMPLEM: entity work.PipeStageLogicBuffer(Behavioral) generic map(
---		CAPACITY => CAPACITY,
---		MAX_OUTPUT => MAX_OUTPUT,
---		MAX_INPUT => MAX_INPUT
---	)
---	port map(
---		clk => clk, reset => reset, en => en,
---			lockAccept => flowDrive.lockAccept,
---			lockSend => flowDrive.lockSend,
---		killAll => flowDrive.killAll,
---		kill => flowDrive.kill,
---		prevSending => flowDrive.prevSending,
---		nextAccepting => flowDrive.nextAccepting,
---		
---		isNew => flowResponse.isNew,
---		full => flowResponse.full,
---		living => flowResponse.living,
---		accepting => flowResponse.accepting,
---		sending => flowResponse.sending
---	);
---
---end Behavioral_DEPREC;
-
 architecture BehavioralDirect of BufferPipeLogic is
 		constant CAP: PipeFlow := num2flow(CAPACITY);
 		constant MAX_IN: PipeFlow := num2flow(MAX_INPUT);
@@ -103,14 +76,6 @@ architecture BehavioralDirect of BufferPipeLogic is
 			  
          signal prevSending: SmallNumber;
          signal nextAccepting: SmallNumber;
---			  
---			signal isNew: SmallNumber;
---			  
---			signal full: SmallNumber;
---			signal living: SmallNumber;				  
---			  
---         signal accepting: SmallNumber;
---			signal sending: SmallNumber;
 begin
 		lockAccept <= flowDrive.lockAccept;
 		lockSend <= flowDrive.lockSend;
@@ -143,27 +108,6 @@ begin
 		
 		afterReceivingSig <= afterReceiving;
 		
---		IMPLEM: entity work.BufferCounter port map(
---			capacity => CAP,
---			maxInput => MAX_IN,
---			maxOutput => MAX_OUT,
---			
---			full => fullSig,
---				lockAccept => lockAccept,
---				lockSend => lockSend,
---			killAll => killAll,
---			kill => kill,
---			living => open,--livingSig,
---			nextAccepting => nextAccepting,
---			prevSending => prevSending,
---			wantSend => open,--wantSend,
---			canAccept => open,--canAccept,
---			sending => open,--sendingSig,
---			accepting => open,--acceptingSig,
---			afterSending => open,--afterSending,
---			afterReceiving => open--afterReceiving	
---		);
-
 			canAccept <= (others => '0') when lockAccept = '1'
 					else uminSN(MAX_IN, CAP);
 			acceptingSig <= uminSN(canAccept, subSN(CAP, afterSending));		
@@ -206,14 +150,6 @@ architecture BehavioralIQ of BufferPipeLogic is
 			  
          signal prevSending: SmallNumber;
          signal nextAccepting: SmallNumber;
---			  
---			signal isNew: SmallNumber;
---			  
---			signal full: SmallNumber;
---			signal living: SmallNumber;				  
---			  
---         signal accepting: SmallNumber;
---			signal sending: SmallNumber;
 begin
 		lockAccept <= flowDrive.lockAccept;
 		lockSend <= flowDrive.lockSend;
@@ -232,14 +168,11 @@ begin
 		-- when sending and not reveiving
 		-- when sending and killed
 		-- when not sending and {...}
-				livingSig <= num2flow(binFlowNum(fullSig) - binFlowNum(kill));
-		
+		livingSig <= num2flow(binFlowNum(fullSig) - binFlowNum(kill));
 		
 		sendingSig(0) <= nextAccepting(0);
 		
 		acceptingSig <= num2flow(CAPACITY - binFlowNum(fullSig) + binFlowNum(sendingSig));
-							--	num2flow(2);
-								-- ignore killing, baecause it will flush prev stage
 		
 		receivingSig <= num2flow(-binFlowNum(kill)) when isNonzero(kill) = '1' else 
 								prevSending;

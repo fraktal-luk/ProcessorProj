@@ -63,13 +63,7 @@ entity UnitIQ is
 		execCausing: in InstructionState;
 		execEventSignal: in std_logic;		
 			
-		
-		--writtenTags: PhysNameArray(0 to PIPE_WIDTH-1);		
-		--resultTags: in PhysNameArray(0 to N_RES_TAGS-1);
-		--nextResultTags: in PhysNameArray(0 to N_NEXT_RES_TAGS-1);
-		--resultVals: in MwordArray(0 to N_RES_TAGS-1);
-			
-			fni: in ForwardingInfo;
+		fni: in ForwardingInfo;
 			
 		-- Phys regs to read - only for "full read ports" configuration 
 		regsForDispatch: out PhysNameArray(0 to 2);
