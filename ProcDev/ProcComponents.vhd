@@ -40,53 +40,6 @@ package ProcComponents is
 		);
 	end component;
 
-	component RegisterMap is
-		generic(
-			WIDTH: natural := 1;
-			MAX_WIDTH:natural := 4
-		);
-		 Port ( clk : in  STD_LOGIC;
-				  reset : in  STD_LOGIC;
-				  en : in  STD_LOGIC;
-				  rewind : in  STD_LOGIC;
-				  reserveAllow : in  STD_LOGIC;
-				  reserve : in  STD_LOGIC_VECTOR (0 to WIDTH-1);
-				  commitAllow : in  STD_LOGIC;
-				  commit : in  STD_LOGIC_VECTOR (0 to WIDTH-1);
-					selectReserve: in RegNameArray(0 to WIDTH-1);
-					writeReserve: in PhysNameArray(0 to WIDTH-1);
-					selectCommit: in RegNameArray(0 to WIDTH-1);
-					writeCommit: in PhysNameArray(0 to WIDTH-1);
-					selectNewest: in RegNameArray(0 to 3*WIDTH-1);
-					readNewest: out PhysNameArray(0 to 3*WIDTH-1);
-					selectStable: in RegNameArray(0 to WIDTH-1);
-					readStable: out PhysNameArray(0 to WIDTH-1) 			  
-			  );
-	end component;
-
-	component FreeListQuad is
-		generic(
-			WIDTH: natural := 1;
-			MAX_WIDTH: natural := 4		
-		);
-		 Port ( clk : in  STD_LOGIC;
-				  reset : in  STD_LOGIC;
-				  en : in  STD_LOGIC;
-				  rewind : in  STD_LOGIC;
-				  
-				  writeTag: in PhysName;
-				  readTags: out PhysNameArray(0 to WIDTH-1);			  
-				  
-				  take: in std_logic_vector(0 to WIDTH-1);
-				  enableTake: in std_logic;
-				  readTake: out PhysNameArray(0 to WIDTH-1);
-				  
-				  put: in std_logic_vector(0 to WIDTH-1);
-				  enablePut: in std_logic;			  
-				  writePut: in PhysNameArray(0 to WIDTH-1)
-			  );
-	end component;
-
 end ProcComponents;
 
 
