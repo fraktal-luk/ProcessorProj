@@ -85,6 +85,31 @@ package NewPipelineData is
 	subtype PhysName is slv6;
 	type PhysNameArray is array(natural range <>) of PhysName;
 
+	constant TAG_SIZE: integer := 8;
+	subtype InsTag is std_logic_vector(TAG_SIZE-1 downto 0);
+	
+	function getTagHigh(tag: std_logic_vector) return std_logic_vector is
+		variable res: std_logic_vector(tag'high-LOG2_PIPE_WIDTH downto 0) := (others => '0');
+	begin
+		res := tag(tag'high downto LOG2_PIPE_WIDTH);
+		return res;
+	end function;
+
+	function getTagLow(tag: std_logic_vector) return std_logic_vector is
+		variable res: std_logic_vector(tag'high-LOG2_PIPE_WIDTH downto 0) := (others => '0');
+	begin
+		res := tag(LOG2_PIPE_WIDTH-1 downto 0);
+		return res;
+	end function;
+
+	function clearTagLow(tag: std_logic_vector) return std_logic_vector is
+		variable res: std_logic_vector(tag'high downto 0) := (others => '0');
+	begin
+		res := tag;
+		res(LOG2_PIPE_WIDTH-1 downto 0) := (others => '0');
+		return res;
+	end function;	
+
 
 constant PROCESSOR_ID: Mword := X"001100aa";
 
