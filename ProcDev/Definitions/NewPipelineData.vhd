@@ -82,7 +82,9 @@ package NewPipelineData is
 	
 	constant FREE_LIST_SIZE: natural := 64; -- ??
 	
-	subtype PhysName is slv6;
+	constant PHYS_NAME_SIZE: integer := 6;
+	subtype PhysName is --slv6;
+								std_logic_vector(PHYS_NAME_SIZE-1 downto 0);
 	type PhysNameArray is array(natural range <>) of PhysName;
 
 	constant TAG_SIZE: integer := 8;
@@ -96,7 +98,7 @@ package NewPipelineData is
 	end function;
 
 	function getTagLow(tag: std_logic_vector) return std_logic_vector is
-		variable res: std_logic_vector(tag'high-LOG2_PIPE_WIDTH downto 0) := (others => '0');
+		variable res: std_logic_vector(LOG2_PIPE_WIDTH-1 downto 0) := (others => '0');
 	begin
 		res := tag(LOG2_PIPE_WIDTH-1 downto 0);
 		return res;
@@ -110,6 +112,28 @@ package NewPipelineData is
 		return res;
 	end function;	
 
+	function alignAddress(adr: std_logic_vector) return std_logic_vector is
+		variable res: std_logic_vector(adr'high downto 0) := (others => '0');
+	begin
+		res := adr;
+		res(ALIGN_BITS-1 downto 0) := (others => '0');
+		return res;
+	end function;
+
+	function clearLowBits(vec: std_logic_vector; n: integer) return std_logic_vector is
+		variable res: std_logic_vector(vec'high downto 0) := (others => '0');
+	begin
+		res := vec;
+		res(n-1 downto 0) := (others => '0');
+		return res;
+	end function;
+	
+	function getLowBits(vec: std_logic_vector; n: integer) return std_logic_vector is
+		variable res: std_logic_vector(n-1 downto 0) := (others => '0');
+	begin
+		res(n-1 downto 0) := vec(n-1 downto 0);
+		return res;
+	end function;
 
 constant PROCESSOR_ID: Mword := X"001100aa";
 

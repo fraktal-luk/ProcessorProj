@@ -148,6 +148,10 @@ architecture Behavioral of UnitSequencer is
 	signal sendingToCommit, sendingOutCommit, acceptingOutCommit: std_logic := '0';
 	signal stageDataToCommit, stageDataOutCommit: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;						
 
+
+		signal stageDataToCommit_2, stageDataOutCommit_2: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;						
+				
+
 	signal newPhysDests: PhysNameArray(0 to PIPE_WIDTH-1) := (others=>(others=>'0'));
 	signal newPhysDestPointer: SmallNumber := (others => '0');
 
@@ -468,6 +472,7 @@ begin
 	stageDataToCommit <= robDataLiving;
 
 	committing <= sendingFromROB;
+
 	
 	-- Commit stage: in order again				
 	SUBUNIT_COMMIT: entity work.GenericStageMulti(Behavioral)
@@ -527,10 +532,19 @@ begin
 					return res;
 				end function;
 			begin
+
+
+				stageDataToCommit_2 <= recreateGroup(robDataLiving, dataFromBQV, 
+																	dataFromLastEffective.data(0).target,
+																	tempBuffValue, tempBuffWaiting);
 				
 				SYNCH: process(clk)
 				begin
 					if rising_edge(clk) then
+							if sendingToCommit = '1' then
+								stageDataOutCommit_2 <= stageDataToCommit_2;
+							end if;
+					
 						if eiEvents.eventOccured = '1' then 
 							tempBuffWaiting <= '1';
 							tempBuffValue <= stageDataToPC.basicInfo.ip;
