@@ -160,6 +160,7 @@ begin
 	fromCommitted <= execEventSignal and 	
 							(	execCausing.controlInfo.newInterrupt 
 							or execCausing.controlInfo.newException
+							or execCausing.controlInfo.specialAction
 							or (execCausing.controlInfo.hasFetchLock and lateFetchLock));
 						
 	-- TODO: allow accepting also when queue full but sending, that is freeing a place.

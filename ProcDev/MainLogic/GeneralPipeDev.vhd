@@ -700,6 +700,7 @@ end function;
 			
 			-- If this one has an event, following ones don't count
 			if newContent.data(i).controlInfo.hasException = '1'
+				or newContent.data(i).controlInfo.specialAction = '1'
 																		-- CAREFUL! This also breaks flow!
 				or (newContent.data(i).controlInfo.hasFetchLock = '1' and LATE_FETCH_LOCK)
 			then 
@@ -725,7 +726,9 @@ end function;
 			
 			-- CAREFUL, TODO: what if there's a branch (or branch correction) and valid path after it??
 			-- If this one has an event, following ones don't count
-			if 	newContent.data(i).controlInfo.hasEvent = '1' --??
+			if --	newContent.data(i).controlInfo.hasEvent = '1' --??
+					newContent.data(i).controlInfo.hasException = '1'
+				or newContent.data(i).controlInfo.specialAction = '1'
 			then
 				exit;
 			end if;

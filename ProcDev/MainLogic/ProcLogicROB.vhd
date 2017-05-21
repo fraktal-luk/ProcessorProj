@@ -321,6 +321,10 @@ begin
 					if execEnds2(i).controlInfo.hasBranch = '1' then
 						res.data(index).data(indL).controlInfo.hasBranch := '1';
 					end if;
+
+					if execEnds2(i).controlInfo.specialAction = '1' then
+						res.data(index).data(indL).controlInfo.specialAction := '1';
+					end if;
 					
 				
 					if i = 3 then

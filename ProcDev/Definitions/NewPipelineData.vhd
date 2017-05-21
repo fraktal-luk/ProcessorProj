@@ -150,6 +150,9 @@ type ExecFunc is (unknown,
 										
 										jump,
 										
+										sysRetI, sysRetE,
+										sysHalt,
+										sysSync, sysReplay,
 										sysMTC, sysMFC, -- move to/from control
 										sysUndef
 							);	
@@ -186,6 +189,7 @@ type InstructionControlInfo is record
 	hasBranch: std_logic;
 	hasReturn: std_logic;
 	hasFetchLock: std_logic;
+		specialAction: std_logic;
 	exceptionCode: SmallNumber; -- Set when exception occurs, remains cause exception can be only 1 per op
 end record;
 
@@ -519,7 +523,7 @@ begin
 												hasReturn => '0',												
 												newFetchLock => '0',
 												hasFetchLock => '0',
-												
+													specialAction => '0',
 												exceptionCode => (others=>'0')
 												);
 end function;

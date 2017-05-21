@@ -435,6 +435,7 @@ begin
 		end if;	
 			
 	res.controlInfo.newEvent := ((res.controlInfo.hasException 
+											or res.controlInfo.specialAction
 													or (res.controlInfo.hasFetchLock and lateFetchLock))
 											and isNew) 
 									or intSignal or resetSignal;
