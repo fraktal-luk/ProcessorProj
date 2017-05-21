@@ -436,7 +436,8 @@ begin
 			
 	res.controlInfo.newEvent := ((res.controlInfo.hasException 
 											or res.controlInfo.specialAction
-													or (res.controlInfo.hasFetchLock and lateFetchLock))
+											--		or (res.controlInfo.hasFetchLock and lateFetchLock)
+											)
 											and isNew) 
 									or intSignal or resetSignal;
 	res.controlInfo.hasEvent := res.controlInfo.hasEvent or res.controlInfo.newEvent;

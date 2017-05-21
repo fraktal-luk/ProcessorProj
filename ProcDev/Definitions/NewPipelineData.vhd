@@ -36,9 +36,10 @@ package NewPipelineData is
 	constant BRANCH_AT_DECODE: boolean := false;
 	
 	 -- System reg writing goes through BQ/ through special temp register
-	constant USE_BQ_FOR_MTC: boolean := false;
+	constant USE_BQ_FOR_MTC: boolean := true;--false;
 	
-	constant LATE_FETCH_LOCK: boolean := false; -- Fetch lock not causing decode event, but only when committed
+	constant LATE_FETCH_LOCK: boolean 
+				:= true; --false; -- Fetch lock not causing decode event, but only when committed
 	
 	-- TODO: eliminate, change to chained implementation
 	constant N_EVENT_AREAS: natural := 8;-- How many distinct stages or groups of stages have own event signals

@@ -254,10 +254,10 @@ package ProgramCode4 is
 			-- Check sysReg storage
 			23 => insSet(r25, 491),
 			24 => ins655655(ext2, 0, r25, mtc, 2, 0),
-			25 => ins655655(ext2, r26, 0, mfc, 0, 2),
-			26 => ins655655(ext0, r25, r25, subR, r26, 0),
-			27 => ins65J(jnz, r25, 4*(1023 - 27)), -- if not, jump to illegal addr
-			28 => insNOP,
+				25 => ins655655(ext2, 0, 0, sync, 0, 0),
+			26 => ins655655(ext2, r26, 0, mfc, 0, 2),
+			27 => ins655655(ext0, r25, r25, subR, r26, 0),
+			28 => ins65J(jnz, r25, 4*(1023 - 28)), -- if not, jump to illegal addr
 			29 => insNOP,
 			30 => insNOP,
 			31 => insNOP,
@@ -271,7 +271,8 @@ package ProgramCode4 is
 			66 => ins655655(ext2, r20, 0, mfc, 0, 2), -- 2: ELR
 			67 => ins655655(ext2, r21, 0, mfc, 0, 4), -- 4: Exc saved state
 			68 => ins655655(ext2, 0, r21, mtc, 1, 0),   -- 1: current state
-			69 => ins655655(ext1, r0, r0, jzR, r20, 0),	-- Jump to saved link address	
+				69 => ins655655(ext2, 0, 0, sync, 0, 0),
+			70 => ins655655(ext1, r0, r0, jzR, r20, 0),	-- Jump to saved link address	
 			
 			-- On interrupt
 			-- @512
@@ -280,7 +281,8 @@ package ProgramCode4 is
 			130 => ins655655(ext2, r20, 0, mfc, 0, 3), -- 3: ILR
 			131 => ins655655(ext2, r21, 0, mfc, 0, 5), -- 5: Int saved state
 			132 => ins655655(ext2, 0, r21, mtc, 1, 0),   -- 1: current state
-			133 => ins655655(ext1, r0, r0, jzR, r20, 0),	-- Jump to saved link address	
+				133 => ins655655(ext2, 0, 0, sync, 0, 0),			
+			134 => ins655655(ext1, r0, r0, jzR, r20, 0),	-- Jump to saved link address	
 			
 			-- Clear registers
 			-- @800

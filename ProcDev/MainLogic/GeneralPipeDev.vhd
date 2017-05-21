@@ -702,7 +702,7 @@ end function;
 			if newContent.data(i).controlInfo.hasException = '1'
 				or newContent.data(i).controlInfo.specialAction = '1'
 																		-- CAREFUL! This also breaks flow!
-				or (newContent.data(i).controlInfo.hasFetchLock = '1' and LATE_FETCH_LOCK)
+				--or (newContent.data(i).controlInfo.hasFetchLock = '1' and LATE_FETCH_LOCK)
 			then 
 				res.controlInfo.newEvent := '1'; -- Announce that event is to happen now!
 				exit;
