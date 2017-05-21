@@ -171,6 +171,7 @@ architecture Behavioral of UnitSequencer is
 	signal renameLockCommand, renameLockRelease, renameLockState, renameLockEnd: std_logic := '0';	
 				
 	signal dataToLastEffective, dataFromLastEffective: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;	
+		signal insLastEffective_2, insToLastEffective_2: InstructionState := DEFAULT_INSTRUCTION_STATE;	
 			
 	signal eiEvents: StageMultiEventInfo;
 			
@@ -471,7 +472,8 @@ begin
 
 
 	sendingToCommit <= sendingFromROB;	
-	stageDataToCommit <= robDataLiving;
+	stageDataToCommit <= --robDataLiving;
+									stageDataToCommit_2;
 
 	committing <= sendingFromROB;
 
@@ -539,12 +541,17 @@ begin
 				stageDataToCommit_2 <= recreateGroup(robDataLiving, dataFromBQV, 
 																	dataFromLastEffective.data(0).target,
 																	tempBuffValue, tempBuffWaiting);
+					insToLastEffective_2 <= getLastEffective(stageDataToCommit_2);
+				
+				
+							ch0 <= '1' when insLastEffective_2 = dataFromLastEffective.data(0) else '0';
 				
 				SYNCH: process(clk)
 				begin
 					if rising_edge(clk) then
 							if sendingToCommit = '1' then
 								stageDataOutCommit_2 <= stageDataToCommit_2;
+								insLastEffective_2 <= insToLastEffective_2;
 							end if;
 					
 						if eiEvents.eventOccured = '1' then 
@@ -586,7 +593,8 @@ begin
 
 			dataToLastEffective.fullMask(0) <= sendingToCommit;
 			dataToLastEffective.data(0) <= 
-									setInstructionTarget(getLastEffective(stageDataToCommit), newEffectiveTarget);
+									--setInstructionTarget(getLastEffective(stageDataToCommit), newEffectiveTarget);
+									insToLastEffective_2;
 
 			LAST_EFFECTIVE_SLOT: entity work.GenericStageMulti(LastEffective)
 			port map(

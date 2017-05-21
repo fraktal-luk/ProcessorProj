@@ -532,8 +532,8 @@ begin
 						res.basicInfo.ip := X"00000030";  --TEMP!!					
 				end if;
 				
-		else -- fetchLock	
-			res.basicInfo.ip := causingNext;
+		--else -- fetchLock	
+		--	res.basicInfo.ip := causingNext;
 		end if;	
 	elsif execEvent = '1' then		
 		res.basicInfo.ip := execCausing.target;
