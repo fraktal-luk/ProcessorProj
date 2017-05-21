@@ -234,7 +234,8 @@ package ProgramCode4 is
 		constant testProg1: WordMem := ( -- mem load testing 
 			0 => insNOP, --ins655H(addI, r1, r0, 300),
 			1 => insNOP, --ins655H(subI, r30, r0, 1),
-			2 => insNOP, 
+			2 => insNOP,
+					--ins655655(ext2, 0, 0, halt, 0, 0),
 			3 => insNOP,
 			
 			4 => ins65J(jl, r31, 4*(320-4)), -- Test result forwarding src1

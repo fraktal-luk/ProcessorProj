@@ -239,7 +239,8 @@ begin
 	-- CAREFUL: prevSending normally means that 'full' bit inside will be set, but
 	--				when en = '0' this won't happen.
 	--				To be fully correct, prevSending should not be '1' when receiving prevented.			
-	sendingToPC <= acceptingOutPC and (sendingOutPC or generalEvents.eventOccured);
+	sendingToPC <= acceptingOutPC and (sendingOutPC
+												or (generalEvents.eventOccured and not isHalt(generalEvents.causing)));
 
 	newTargetInfo <= stageDataToPC.basicInfo;
 
