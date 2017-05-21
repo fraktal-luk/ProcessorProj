@@ -541,9 +541,9 @@ begin
 			if BRANCH_AT_DECODE then
 				res.basicInfo.ip := decodeCausing.target;	
 			end if;
-		if decodeCausing.controlInfo.newFetchLock = '1' then	
-			res.basicInfo.ip := causingNext;
-		end if;
+		--if decodeCausing.controlInfo.newFetchLock = '1' then	
+		--	res.basicInfo.ip := causingNext;
+		--end if;
 	else	-- Increment by the width of fetch group
 		res.basicInfo.ip := pcNext;
 	end if;	

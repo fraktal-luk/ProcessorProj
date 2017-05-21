@@ -80,6 +80,7 @@ architecture Behavioral5 of NewCore0 is
 	signal robSending, robAccepting: std_logic := '0';
 	signal dataOutROB: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;					
 
+		signal commitAccepting: std_logic := '0';
 		signal committingSig: std_logic := '0';
 
 		signal acceptingNewSQ, acceptingNewLQ, acceptingNewBQ: std_logic := '0';
@@ -181,6 +182,7 @@ begin
 		readyRegFlagsNextV => readyRegFlagsNextV,
 		
 		-- Interface from ROB
+		commitAccepting => commitAccepting,
 		sendingFromROB => robSending,	
 		robDataLiving => dataOutROB,
 		committing => committingSig,
@@ -700,6 +702,7 @@ begin
 		prevSending => renamedSending,
 		acceptingOut => robAccepting,
 		
+			nextAccepting => commitAccepting,
 		sendingOut => robSending, 
 		outputData => dataOutROB		
 	);

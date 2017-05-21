@@ -89,6 +89,7 @@ entity UnitSequencer is
 		renamedSending: out std_logic;
 
 		-- Interface with ROB
+		commitAccepting: out std_logic;
 		robDataLiving: in StageDataMulti;
 		sendingFromROB: in std_logic;
 		
@@ -210,7 +211,7 @@ begin
 			killVecOut(6) <= eiEvents.eventOccured;
 			killVecOut(5) <= execOrIntEventSignal;
 			killVecOut(0 to 4) <= newGeneralEvents.affectedVec;
-		
+
 		generalEvents <= newGeneralEvents;
 			newGeneralEvents <= NEW_generalEvents(
 											stageDataOutPC,
@@ -513,7 +514,7 @@ begin
 				signal committingTakenBranch, committingTakenBranchAsLE, tempBuffWaiting: std_logic := '0';
 				signal tempBuffValue, normalIncTarget, incTarget, incArg: Mword := (others => '0');
 				signal leGrInd: integer := 0;
-				
+
 				function totalEffectiveInc(sd: StageDataMulti) return Mword is
 					variable res: Mword := (others => '0');
 					variable em: std_logic_vector(0 to PIPE_WIDTH-1) := (others => '0');
@@ -579,7 +580,6 @@ begin
 							 dataFromBQV.data(leGrInd).argValues.arg1 when committingTakenBranchAsLE = '1'
 					else	 incTarget;
 			end block;
-
 		
 			interruptCause.controlInfo.hasInterrupt <= intSignal;
 			interruptCause.controlInfo.hasReset <= start;
@@ -625,6 +625,8 @@ begin
 		newPhysSources <= newPhysSourcesIn;
 
 		renameLockEndOut <= renameLockEnd;
+
+		commitAccepting <= '1';
 
 		committedSending <= sendingOutCommit;
 		committedDataOut <= stageDataOutCommit;
