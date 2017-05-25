@@ -78,19 +78,27 @@ architecture Implem of TestCQPart0 is
 	signal stageDataCQNew: InstructionStateArray(0 to 3) := (others => defaultInstructionState);
 
 	signal livingMaskRaw, livingMaskCQ: std_logic_vector(0 to CQ_SIZE-1) := (others=>'0');
-	signal stageDataCQ, stageDataCQLiving, stageDataCQNext: StageDataCommitQueue 
+		
+		constant zeroMaskCQ: std_logic_vector(0 to CQ_SIZE-1) := (others=>'0');
+		constant zeroInputMask: std_logic_vector(0 to 3) := (others=>'0');
+		signal compareMaskCQ: std_logic_vector(0 to CQ_SIZE-1) := (others=>'0');
+	
+	signal stageDataCQ, stageDataCQLiving, stageDataCQNext,
+									stageDataCQNextCheckOld, stageDataCQNextCheckNew
+							: StageDataCommitQueue 
 									:= (fullMask=>(others=>'0'), data=>(others=>defaultInstructionState));
 			
 	signal whichSendingFromCQ: std_logic_vector(0 to PIPE_WIDTH-1) := (others=>'0'); 
 	signal whichAcceptedCQSig: std_logic_vector(0 to 3) := (others=>'0');
 
-	constant HAS_RESET_CQ: std_logic := '1';
-	constant HAS_EN_CQ: std_logic := '1';
+	constant HAS_RESET_CQ: std_logic := '0';
+	constant HAS_EN_CQ: std_logic := '0';
 begin
 	resetSig <= reset and HAS_RESET_CQ;
 	enSig <= en or not HAS_EN_CQ;
 
-	CQ_SYNCHRONOUS: process(clk) 	
+	CQ_SYNCHRONOUS: process(clk)
+		variable fullMaskShifted: std_logic_vector(0 to PIPE_WIDTH-1) := (others => '0');
 	begin
 		if rising_edge(clk) then
 			if resetSig = '1' then
@@ -101,7 +109,8 @@ begin
 				logBuffer(stageDataCQ.data, stageDataCQ.fullMask, livingMaskCQ,
 								flowResponseCQ);
 				checkBuffer(stageDataCQ.data, stageDataCQ.fullMask, stageDataCQNext.data, stageDataCQNext.fullMask,
-								flowDriveCQ, flowResponseCQ);				
+								flowDriveCQ, flowResponseCQ);	
+					assert isNonzero(compareMaskCQ) = '0' report "Overwriting in CQ!";		
 			end if;
 		end if;
 	end process;
@@ -119,9 +128,28 @@ begin
 												PIPE_WIDTH,
 												binFlowNum(flowResponseCQ.living),
 												binFlowNum(flowResponseCQ.sending),
-												binFlowNum(flowDriveCQ.prevSending));	
-
-											
+												binFlowNum(flowDriveCQ.prevSending));
+												
+--		stageDataCQNextCheckOld <= stageCQNext(stageDataCQ,
+--													compactData(stageDataCQNew, cqWhichSend),
+--												livingMaskCQ,
+--													compactMask(stageDataCQNew, zeroInputMask),
+--												PIPE_WIDTH,
+--												binFlowNum(flowResponseCQ.living),
+--												binFlowNum(flowResponseCQ.sending),
+--												binFlowNum(flowDriveCQ.prevSending));
+--
+--		stageDataCQNextCheckNew <= stageCQNext(stageDataCQ,
+--													compactData(stageDataCQNew, cqWhichSend),
+--												zeroMaskCQ,
+--													compactMask(stageDataCQNew, cqWhichSend),
+--												PIPE_WIDTH,
+--												binFlowNum(flowResponseCQ.living),
+--												binFlowNum(flowResponseCQ.sending),
+--												binFlowNum(flowDriveCQ.prevSending));
+--
+--		compareMaskCQ <= stageDataCQNextCheckOld.fullMask and stageDataCQNextCheckNew.fullMask;
+		
 	whichAcceptedCQSig <= (others => '1');
 													
 	SLOT_CQ: entity work.BufferPipeLogic(BehavioralDirect)
@@ -154,4 +182,3 @@ begin
 			
 	whichAcceptedCQ <= whichAcceptedCQSig;	
 end Implem;
-

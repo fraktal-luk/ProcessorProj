@@ -871,9 +871,11 @@ begin
 		
 		for i in 0 to content.data'length-1 loop
 			if i < nFull - nOut then
+								--outWidth then
 				dataTemp(i) := contentExtended(i);		
 				fullMaskTemp(i) := '1';
 			elsif i < nFull - nOut + 4 then
+									--outWidth + 4 then
 				dataTemp(i) := newCompactedData(k);
 				fullMaskTemp(i) := newCompactedMask(k);
 				k := k + 1;
