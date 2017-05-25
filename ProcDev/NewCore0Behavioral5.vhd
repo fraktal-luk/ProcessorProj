@@ -568,7 +568,8 @@ begin
 				causingInstruction => execOrIntCausing,
 				
 				sendingToReserve => frontLastSending, 
-				takeAllow => frontLastSending or renameLockEnd,	-- FROM SEQ
+				takeAllow => frontLastSending,	-- FROM SEQ
+					auxTakeAllow => renameLockEnd,
 				stageDataToReserve => frontDataLastLiving,
 				
 				newPhysDests => newPhysDests,			-- TO SEQ

@@ -457,7 +457,8 @@ begin
 		commitGroupCtrNext <= nextCtr(commitGroupCtr, '0', (others => '0'), sendingToCommit, ALL_FULL);
 		commitCtrNext <= nextCtr(commitCtr, '0', (others => '0'), sendingToCommit, effectiveMask);
 
-		effectiveMask <= getEffectiveMask(stageDataToCommit);
+		effectiveMask <= getEffectiveMask(--stageDataToCommit);
+													  stageDataToCommit_2);
 			
 		PIPE_SYNCHRONOUS: process(clk) 	
 		begin
@@ -472,8 +473,11 @@ begin
 
 
 	sendingToCommit <= sendingFromROB;	
-	stageDataToCommit <= --robDataLiving;
-									stageDataToCommit_2;
+--	stageDataToCommit <= --robDataLiving;
+--									stageDataToCommit_2;
+	stageDataToCommit.fullMask <= --effectiveMask;
+											stageDataToCommit_2.fullMask;
+	stageDataToCommit.data <= stageDataToCommit_2.data;
 
 	committing <= sendingFromROB;
 

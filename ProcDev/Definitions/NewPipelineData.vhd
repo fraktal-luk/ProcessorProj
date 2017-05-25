@@ -65,6 +65,11 @@ package NewPipelineData is
 		-- If true, physical registers are allocated even for empty slots in instruction group
 		--		and later freed from them.
 		constant ALLOC_REGS_ALWAYS: boolean := false;
+
+		constant INITIAL_GROUP_TAG: SmallNumber := (others => '0');
+															-- i2slv(-PIPE_WIDTH, SMALL_NUMBER_SIZE)
+		constant USE_GPR_TAG: boolean := true;
+
 		
 		-- Allows to raise 'lockSend' for instruction before Exec when source which was 'readyNext'
 		--	doesn't show in 'ready'	when expected	
@@ -73,6 +78,9 @@ package NewPipelineData is
 	constant N_RES_TAGS: natural := 4-1 + CQ_SIZE; -- + PIPE_WIDTH; -- + 3*PIPE_WIDTH; 
 						-- Above: num subpipe results + CQ slots + max commited slots + pre-IQ red ports
 	constant N_NEXT_RES_TAGS: natural := 2; 
+
+
+
 	
 	constant zerosPW: std_logic_vector(0 to PIPE_WIDTH-1) := (others=>'0');	
 	------
@@ -279,10 +287,6 @@ type InstructionState is record
 end record;
 
 type InstructionStateArray is array(integer range <>) of InstructionState;
-	
-	constant INITIAL_GROUP_TAG: SmallNumber := (others => '0');
-															-- i2slv(-PIPE_WIDTH, SMALL_NUMBER_SIZE)
-	constant USE_GPR_TAG: boolean := false;
 	
 	
 -- Number of words proper for fetch group size

@@ -199,6 +199,12 @@ begin
 				end if;
 
 				if sendingToCommit = '1' then -- and rewind = '0' then -- block when rewinding??
+				
+						--	report ":: " & integer'image(slv2u(commitMW)) & ", " &
+						--						integer'image(slv2u(stageDataToCommit.fullMask)) & ", " 							
+						--	&					integer'image(slv2u(getDestMask(stageDataToCommit))) & ", " 
+						--	& 					integer'image(slv2u(findOverriddenDests(stageDataToCommit)));
+									
 					for i in 0 to commitMW'length-1 loop
 						if commitMW(i) = '1' then
 							stableMap(slv2u(selectCommitMW(i))) <= writeCommitMW(i);
@@ -212,9 +218,11 @@ begin
 
 		-- for stable
 		readyTableSetAllow <= sendingToWrite;	
-		readyTableSetSel <= getPhysicalDestMask(stageDataToWrite) 
+		readyTableSetSel <= getPhysicalDestMask(stageDataToWrite)
+						and 		stageDataToWrite.fullMask
 						and not getExceptionMask(stageDataToWrite);
-			readyTableFailSel <= getPhysicalDestMask(stageDataToWrite)			
+			readyTableFailSel <= getPhysicalDestMask(stageDataToWrite)
+						and 		stageDataToWrite.fullMask
 						and getExceptionMask(stageDataToWrite);
 						
 		readyTableSetPhysicalTags <= getPhysicalDests(stageDataToWrite); -- for ready table

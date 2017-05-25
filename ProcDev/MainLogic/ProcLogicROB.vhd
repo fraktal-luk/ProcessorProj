@@ -293,6 +293,11 @@ begin
 			if execEnds(i).controlInfo.hasException = '1' then	
 				res.data(index).data(indL).controlInfo.hasException := '1';
 				res.data(index).data(indL).controlInfo.hasEvent := '1';
+				for k in 0 to PIPE_WIDTH-1 loop
+					if k > indL then
+						res.data(index).fullMask(k) := '0';
+					end if;
+				end loop;
 			end if;		
 			res.data(index).data(indL).controlInfo.completed := '1';
 		end if;
@@ -317,6 +322,11 @@ begin
 				if execEnds2(i).controlInfo.hasException = '1' then	
 					res.data(index).data(indL).controlInfo.hasException := '1';
 					res.data(index).data(indL).controlInfo.hasEvent := '1';
+					for k in 0 to PIPE_WIDTH-1 loop
+						if k > indL then
+							res.data(index).fullMask(k) := '0';
+						end if;
+					end loop;					
 				end if;
 				res.data(index).data(indL).controlInfo.completed2 := '1';
 				
@@ -326,6 +336,11 @@ begin
 
 					if execEnds2(i).controlInfo.specialAction = '1' then
 						res.data(index).data(indL).controlInfo.specialAction := '1';
+						for k in 0 to PIPE_WIDTH-1 loop
+							if k > indL then
+								res.data(index).fullMask(k) := '0';
+							end if;
+						end loop;						
 					end if;
 					
 				
