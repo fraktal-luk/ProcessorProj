@@ -43,6 +43,9 @@ use work.TEMP_DEV.all;
 
 
 entity ReadyRegisterTable is
+	generic(
+		WRITE_WIDTH: integer := 1
+	);
 	port(
 		clk: in std_logic;
 		reset: in std_logic;
@@ -57,8 +60,8 @@ entity ReadyRegisterTable is
 
 		sendingToWrite: in std_logic;
 		stageDataToWrite: in StageDataMulti;
-			writingMask: in std_logic_vector(0 to 2);
-			writingData: in InstructionStateArray(0 to 2);
+			writingMask: in std_logic_vector(0 to WRITE_WIDTH-1);
+			writingData: in InstructionStateArray(0 to WRITE_WIDTH-1);
 		
 		readyRegFlagsNext: out std_logic_vector(0 to 3*PIPE_WIDTH-1)
 	);
@@ -67,7 +70,7 @@ end ReadyRegisterTable;
 
 
 architecture Behavioral of ReadyRegisterTable is
-		constant WIDTH: natural := PIPE_WIDTH;
+		constant WIDTH: natural := WRITE_WIDTH;
 
 		signal readyTableClearAllow: std_logic := '0';
 		signal readyTableClearSel: std_logic_vector(0 to PIPE_WIDTH-1) := (others => '0');
@@ -78,8 +81,8 @@ architecture Behavioral of ReadyRegisterTable is
 		signal readyRegsSig: std_logic_vector(0 to N_PHYSICAL_REGS-1) := (0 to 31 => '1', others=>'0');
 
 		--signal newPhysDests: PhysNameArray(0 to PIPE_WIDTH-1) := (others=>(others=>'0'));
-			signal altMask: std_logic_vector(0 to 2) := (others => '0');
-			signal altDests: PhysNameArray(0 to 2) := (others => (others => '0'));
+			signal altMask: std_logic_vector(0 to WRITE_WIDTH-1) := (others => '0');
+			signal altDests: PhysNameArray(0 to WRITE_WIDTH-1) := (others => (others => '0'));
 begin		
 		readyTableSetAllow <= sendingToWrite;  -- for ready table	
 		readyTableSetSel <= getPhysicalDestMask(stageDataToWrite) 

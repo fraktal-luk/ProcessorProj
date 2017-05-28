@@ -100,8 +100,8 @@ architecture Behavioral5 of NewCore0 is
 		signal cqBufferData: InstructionStateArray(0 to CQ_SIZE-1) := (others => DEFAULT_INSTRUCTION_STATE);
 	signal cqDataLivingOut: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
 
-		signal cqMaskOut: std_logic_vector(0 to 2) := (others => '0');
-		signal cqDataOut: InstructionStateArray(0 to 2) := (others => DEFAULT_INSTRUCTION_STATE);
+		signal cqMaskOut: std_logic_vector(0 to INTEGER_WRITE_WIDTH-1) := (others => '0');
+		signal cqDataOut: InstructionStateArray(0 to INTEGER_WRITE_WIDTH-1) := (others => DEFAULT_INSTRUCTION_STATE);
 
 	signal cqPhysDestMask: std_logic_vector(0 to PIPE_WIDTH-1) := (others => '0');
 	signal cqPhysicalDests: PhysNameArray(0 to PIPE_WIDTH-1) := (others => (others => '0'));
@@ -599,6 +599,9 @@ begin
 			);		
 
 			INT_READY_TABLE: entity work.ReadyRegisterTable(Behavioral)
+			generic map(
+				WRITE_WIDTH => INTEGER_WRITE_WIDTH
+			)
 			port map(
 				clk => clk, reset => resetSig, en => enSig, 
 				
@@ -675,9 +678,9 @@ begin
 			--rfWriteValues(i) <= cqInstructionResults(i);
 		end generate;		
 		
-			rfWriteVec(0 to 2) <= getArrayDestMask(cqDataOut, cqMaskOut);
-			rfSelectWrite(0 to 2) <= getArrayPhysicalDests(cqDataOut);
-			rfWriteValues(0 to 2) <= getArrayResults(cqDataOut);
+			rfWriteVec(0 to INTEGER_WRITE_WIDTH-1) <= getArrayDestMask(cqDataOut, cqMaskOut);
+			rfSelectWrite(0 to INTEGER_WRITE_WIDTH-1) <= getArrayPhysicalDests(cqDataOut);
+			rfWriteValues(0 to INTEGER_WRITE_WIDTH-1) <= getArrayResults(cqDataOut);
 		
 		GPR_FILE_DISPATCH: entity work.RegisterFile0 (Behavioral)
 																	--(Implem)

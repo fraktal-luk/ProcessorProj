@@ -64,8 +64,8 @@ entity TestCQPart0 is
 		
 		anySending: out std_logic;		
 		cqOut: out StageDataMulti;
-			cqMaskOut: out std_logic_vector(0 to 2);
-			cqDataOut: out InstructionStateArray(0 to 2);
+			cqMaskOut: out std_logic_vector(0 to OUTPUT_SIZE-1);
+			cqDataOut: out InstructionStateArray(0 to OUTPUT_SIZE-1);
 		-- NOTE: cqOut is for data to commit, dataCQOut is for forwarding info
 		--dataCQOut: out StageDataCommitQueue;
 				
