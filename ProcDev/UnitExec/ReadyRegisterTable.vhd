@@ -57,6 +57,8 @@ entity ReadyRegisterTable is
 
 		sendingToWrite: in std_logic;
 		stageDataToWrite: in StageDataMulti;
+			writingMask: in std_logic_vector(0 to 2);
+			writingData: in InstructionStateArray(0 to 2);
 		
 		readyRegFlagsNext: out std_logic_vector(0 to 3*PIPE_WIDTH-1)
 	);
@@ -75,7 +77,9 @@ architecture Behavioral of ReadyRegisterTable is
 		
 		signal readyRegsSig: std_logic_vector(0 to N_PHYSICAL_REGS-1) := (0 to 31 => '1', others=>'0');
 
-		--signal newPhysDests: PhysNameArray(0 to PIPE_WIDTH-1) := (others=>(others=>'0'));		
+		--signal newPhysDests: PhysNameArray(0 to PIPE_WIDTH-1) := (others=>(others=>'0'));
+			signal altMask: std_logic_vector(0 to 2) := (others => '0');
+			signal altDests: PhysNameArray(0 to 2) := (others => (others => '0'));
 begin		
 		readyTableSetAllow <= sendingToWrite;  -- for ready table	
 		readyTableSetSel <= getPhysicalDestMask(stageDataToWrite) 
@@ -86,7 +90,8 @@ begin
 		readyTableClearSel <= getDestMask(stageDataToReserve);	-- for ready table		
 		
 		--newPhysDests <= getPhysicalDests(stageDataToReserve);
-
+			altMask <= getArrayDestMask(writingData, writingMask);
+			altDests <= getArrayPhysicalDests(writingData);
 		
 		IMPL: block
 			signal content: std_logic_vector(0 to N_PHYSICAL_REGS-1) := (0 to 31 => '1', others => '0');
@@ -96,15 +101,24 @@ begin
 					if rising_edge(clk) then
 						--if reset = '1' then
 						--elsif en = '1' then
-							if readyTableSetAllow = '1' then
-								for i in 0 to WIDTH-1 loop
-									if readyTableSetSel(i) = '1' then
-										-- set 
-										content(slv2u(readyTableSetTags(i))) <= '1';
-									end if;
-								end loop;
+							if CQ_SINGLE_OUTPUT then
+								if readyTableSetAllow = '1' then
+									for i in 0 to WIDTH-1 loop
+										if readyTableSetSel(i) = '1' then
+											-- set 
+											content(slv2u(readyTableSetTags(i))) <= '1';
+										end if;
+									end loop;
+								end if;
+							elsif CQ_THREE_OUTPUTS then
+									for i in 0 to altMask'length-1 loop
+										if altMask(i) = '1' then
+											-- set 
+											content(slv2u(altDests(i))) <= '1';
+										end if;
+									end loop;	
 							end if;
-
+							
 							if readyTableClearAllow = '1' then							
 								for i in 0 to WIDTH-1 loop								
 									if readyTableClearSel(i) = '1' then

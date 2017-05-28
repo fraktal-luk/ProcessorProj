@@ -81,7 +81,36 @@ function stageCQNext(content: StageDataCommitQueue; newContent: InstructionState
 return StageDataCommitQueue;
 
 -----------------------									
-				
+	
+	-- TODO: use these to implement StageDataMulti corresponding functions?
+	function getArrayResults(ia: InstructionStateArray) return MwordArray is
+		variable res: MwordArray(0 to ia'length-1) := (others => (others => '0'));
+	begin
+		for i in 0 to res'length-1 loop
+			res(i) := ia(i).result; 
+		end loop;
+		return res;
+	end function;
+	
+	function getArrayPhysicalDests(ia: InstructionStateArray) return PhysNameArray is
+		variable res: PhysNameArray(0 to ia'length-1) := (others => (others => '0'));
+	begin
+		for i in 0 to res'length-1 loop
+			res(i) := ia(i).physicalDestArgs.d0; 
+		end loop;
+		return res;
+	end function;
+	
+	function getArrayDestMask(ia: InstructionStateArray; fm: std_logic_vector) return std_logic_vector is
+		variable res: std_logic_vector(0 to ia'length-1) := (others => '0');
+	begin
+		for i in 0 to res'length-1 loop
+			res(i) := fm(i) and ia(i).physicalDestArgs.sel(0); 
+		end loop;
+		return res;
+	end function;
+
+	
 function getInstructionResults(insVec: StageDataMulti) return MwordArray;
 function getVirtualArgs(insVec: StageDataMulti) return RegNameArray;
 function getPhysicalArgs(insVec: StageDataMulti) return PhysNameArray;
@@ -446,8 +475,6 @@ function getInstructionResults(insVec: StageDataMulti) return MwordArray is
 	variable res: MwordArray(0 to PIPE_WIDTH-1) := (others => (others => '0'));
 begin
 	for i in insVec.fullMask'range loop
-		res(i) := insVec.data(i).result;
-		res(i) := insVec.data(i).result;
 		res(i) := insVec.data(i).result;
 	end loop;
 	return res;

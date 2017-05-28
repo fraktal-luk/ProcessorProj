@@ -41,6 +41,20 @@ package NewPipelineData is
 	constant LATE_FETCH_LOCK: boolean 
 				:= true; --false; -- Fetch lock not causing decode event, but only when committed
 	
+	constant CQ_SINGLE_OUTPUT: boolean := true;
+	constant CQ_THREE_OUTPUTS: boolean := not CQ_SINGLE_OUTPUT;
+	
+	function getIntegerWriteWidth(so: boolean) return integer is
+	begin
+		if so then
+			return 1;
+		else
+			return 3;
+		end if;	
+	end function;
+	
+	constant INTEGER_WRITE_WIDTH: integer := getIntegerWriteWidth(CQ_SINGLE_OUTPUT);
+	
 	-- TODO: eliminate, change to chained implementation
 	constant N_EVENT_AREAS: natural := 8;-- How many distinct stages or groups of stages have own event signals
 	-- PC, Fetch0, Fetch1, Hbuffer, Decode, Rename, OOO, Committed

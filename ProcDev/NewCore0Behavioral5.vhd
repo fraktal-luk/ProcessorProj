@@ -98,6 +98,9 @@ architecture Behavioral5 of NewCore0 is
 										:= (fullMask=>(others=>'0'), data=>(others=>defaultInstructionState));	
 	signal cqDataLivingOut: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
 
+		signal cqMaskOut: std_logic_vector(0 to 2) := (others => '0');
+		signal cqDataOut: InstructionStateArray(0 to 2) := (others => DEFAULT_INSTRUCTION_STATE);
+
 	signal cqPhysDestMask: std_logic_vector(0 to PIPE_WIDTH-1) := (others => '0');
 	signal cqPhysicalDests: PhysNameArray(0 to PIPE_WIDTH-1) := (others => (others => '0'));
 	signal cqInstructionResults: MwordArray(0 to PIPE_WIDTH-1) := (others => (others => '0'));
@@ -514,6 +517,8 @@ begin
 		cqWhichSend => (0 => execSending(0), 1 => execSending(1), 2 => execSending(2), others => '0'),
 		anySending => anySendingFromCQ,
 		cqOut => cqDataLivingOut,
+			cqMaskOut => cqMaskOut,
+			cqDataOut => cqDataOut,
 		dataCQOut => dataCQOut -- CAREFUL: must remain, because used by forwarding network!
 	);
 		
@@ -593,7 +598,8 @@ begin
 				
 				sendingToWrite => anySendingFromCQ,
 				stageDataToWrite => cqDataLivingOut,
-				
+					writingMask => cqMaskOut,
+					writingData => cqDataOut,
 				readyRegFlagsNext => readyRegFlagsNext -- FOR IQs
 			);
 
@@ -641,7 +647,8 @@ begin
 		cqPhysDestMask <= getPhysicalDestMask(cqDataLivingOut);
 		cqPhysicalDests <= getPhysicalDests(cqDataLivingOut);
 		cqInstructionResults <= getInstructionResults(cqDataLivingOut);
-				
+			
+
 			regsSelCE(0 to 1) <= regsSelC(0 to 1);
 			regsSelCE(2) <= regsSelE(2);
 			regsAllowCE <= regsAllowC or regsAllowE;
@@ -651,18 +658,23 @@ begin
 				regValsE(2) <= regValsCE(2);
 		
 		TEMP_REG_FILE_INPUTS: for i in 0 to PIPE_WIDTH-1 generate
-			rfWriteVec(i) <= cqPhysDestMask(i);
-			rfSelectWrite(i) <= cqPhysicalDests(i);
-			rfWriteValues(i) <= cqInstructionResults(i);
+			--rfWriteVec(i) <= cqPhysDestMask(i);
+			--rfSelectWrite(i) <= cqPhysicalDests(i);
+			--rfWriteValues(i) <= cqInstructionResults(i);
 		end generate;		
+		
+			rfWriteVec(0 to 2) <= getArrayDestMask(cqDataOut, cqMaskOut);
+			rfSelectWrite(0 to 2) <= getArrayPhysicalDests(cqDataOut);
+			rfWriteValues(0 to 2) <= getArrayResults(cqDataOut);
 		
 		GPR_FILE_DISPATCH: entity work.RegisterFile0 (Behavioral)
 																	--(Implem)
-		generic map(WIDTH => 4, WRITE_WIDTH => PIPE_WIDTH)
+		generic map(WIDTH => 4, WRITE_WIDTH => INTEGER_WRITE_WIDTH)
 		port map(
 			clk => clk, reset => resetSig, en => enSig,
 				
-			writeAllow => anySendingFromCQ,
+			writeAllow => --anySendingFromCQ,
+								'1',
 			writeVec => rfWriteVec,
 			selectWrite => rfSelectWrite, -- NOTE: unneeded writing isn't harmful anyway
 			writeValues => rfWriteValues,
@@ -708,7 +720,11 @@ begin
 		outputData => dataOutROB		
 	);
 	
-	writtenTags <= getWrittenTags(stageDataAfterCQ);
+	
+	WRITTEN_TAG_GEN: if CQ_SINGLE_OUTPUT generate
+		writtenTags <= getWrittenTags(stageDataAfterCQ);
+	end generate;
+	
 	resultTags <= getResultTags(
 				execEnds, dataCQOut, dataOutIQA, dataOutIQB, dataOutIQC, dataOutIQD,	stageDataAfterCQ);
 	nextResultTags <= getNextResultTags(execPreEnds, dataOutIQA, dataOutIQB, dataOutIQC, dataOutIQD);

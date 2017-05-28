@@ -62,6 +62,8 @@ entity TestCQPart0 is
 		anySending: out std_logic; 
 		
 		cqOut: out StageDataMulti;
+			cqMaskOut: out std_logic_vector(0 to 2);
+			cqDataOut: out InstructionStateArray(0 to 2);
 		-- NOTE: cqOut is for data to commit, dataCQOut is for forwarding info
 		dataCQOut: out StageDataCommitQueue	
 	);
@@ -108,19 +110,22 @@ begin
 				
 				logBuffer(stageDataCQ.data, stageDataCQ.fullMask, livingMaskCQ,
 								flowResponseCQ);
-				checkBuffer(stageDataCQ.data, stageDataCQ.fullMask, stageDataCQNext.data, stageDataCQNext.fullMask,
-								flowDriveCQ, flowResponseCQ);	
-					assert isNonzero(compareMaskCQ) = '0' report "Overwriting in CQ!";		
+
+				if CQ_SINGLE_OUTPUT then				
+					checkBuffer(stageDataCQ.data, stageDataCQ.fullMask,
+									stageDataCQNext.data, stageDataCQNext.fullMask,
+									flowDriveCQ, flowResponseCQ);	
+					assert isNonzero(compareMaskCQ) = '0' report "Overwriting in CQ!";
+				end if;
 			end if;
 		end if;
 	end process;
-		
-	flowDriveCQ.prevSending <=	num2flow(countOnes(cqWhichSend));
 	
 	stageDataCQLiving.data <= stageDataCQ.data;
 	stageDataCQLiving.fullMask <= livingMaskCQ;
 	stageDataCQNew(0 to 3) <= inputInstructions; --(0 to 2); -- Don't use branch result
-												
+	
+	SINGLE_OUTPUT_REGS: if CQ_SINGLE_OUTPUT generate
 		stageDataCQNext <= stageCQNext(stageDataCQ,
 													compactData(stageDataCQNew, cqWhichSend),
 												livingMaskCQ,
@@ -129,27 +134,37 @@ begin
 												binFlowNum(flowResponseCQ.living),
 												binFlowNum(flowResponseCQ.sending),
 												binFlowNum(flowDriveCQ.prevSending));
-												
---		stageDataCQNextCheckOld <= stageCQNext(stageDataCQ,
---													compactData(stageDataCQNew, cqWhichSend),
---												livingMaskCQ,
---													compactMask(stageDataCQNew, zeroInputMask),
---												PIPE_WIDTH,
---												binFlowNum(flowResponseCQ.living),
---												binFlowNum(flowResponseCQ.sending),
---												binFlowNum(flowDriveCQ.prevSending));
---
---		stageDataCQNextCheckNew <= stageCQNext(stageDataCQ,
---													compactData(stageDataCQNew, cqWhichSend),
---												zeroMaskCQ,
---													compactMask(stageDataCQNew, cqWhichSend),
---												PIPE_WIDTH,
---												binFlowNum(flowResponseCQ.living),
---												binFlowNum(flowResponseCQ.sending),
---												binFlowNum(flowDriveCQ.prevSending));
---
---		compareMaskCQ <= stageDataCQNextCheckOld.fullMask and stageDataCQNextCheckNew.fullMask;
+
+		stageDataCQNextCheckOld <= stageCQNext(stageDataCQ,
+													compactData(stageDataCQNew, cqWhichSend),
+												livingMaskCQ,
+													compactMask(stageDataCQNew, zeroInputMask),
+												PIPE_WIDTH,
+												binFlowNum(flowResponseCQ.living),
+												binFlowNum(flowResponseCQ.sending),
+												binFlowNum(flowDriveCQ.prevSending));
+
+		stageDataCQNextCheckNew <= stageCQNext(stageDataCQ,
+													compactData(stageDataCQNew, cqWhichSend),
+												zeroMaskCQ,
+													compactMask(stageDataCQNew, cqWhichSend),
+												PIPE_WIDTH,
+												binFlowNum(flowResponseCQ.living),
+												binFlowNum(flowResponseCQ.sending),
+												binFlowNum(flowDriveCQ.prevSending));
+
+		compareMaskCQ <= stageDataCQNextCheckOld.fullMask and stageDataCQNextCheckNew.fullMask;
 		
+												
+		flowDriveCQ.prevSending <=	num2flow(countOnes(cqWhichSend));
+		flowDriveCQ.nextAccepting <= num2flow(countOnes(whichSendingFromCQ));												
+	end generate;
+
+	THREE_OUTPUTS_REGS: if CQ_THREE_OUTPUTS generate
+		stageDataCQNext.fullMask(0 to 2) <= cqWhichSend(0 to 2);
+		stageDataCQNext.data(0 to 2) <= inputInstructions(0 to 2);
+	end generate;
+
 	whichAcceptedCQSig <= (others => '1');
 													
 	SLOT_CQ: entity work.BufferPipeLogic(BehavioralDirect)
@@ -168,8 +183,6 @@ begin
 	livingMaskCQ <= stageDataCQ.fullMask;	
 	
 	whichSendingFromCQ <= getSendingFromCQ(livingMaskRaw);
-	
-	flowDriveCQ.nextAccepting <= num2flow(countOnes(whichSendingFromCQ));
 
 	cqOut.fullMask <= whichSendingFromCQ;
 	cqOut.data <= stageDataCQLiving.data(0 to PIPE_WIDTH-1); -- ??(some may be killed? careful)			
@@ -181,4 +194,18 @@ begin
 	dataCQOut <= stageDataCQLiving;	
 			
 	whichAcceptedCQ <= whichAcceptedCQSig;	
+	
+	-- CAREFUL, TODO: this conditional generation seems to slow down timing without need, fix it!
+	SINGLE_OUTPUT: if CQ_SINGLE_OUTPUT generate
+		cqMaskOut <= (0 => whichSendingFromCQ(0), others => '0');
+		cqDataOut <= (0 => stageDataCQLiving.data(0), others => DEFAULT_INSTRUCTION_STATE);
+	end generate;
+
+	THREE_OUTPUTS: if CQ_THREE_OUTPUTS generate
+		cqMaskOut <= cqWhichSend(0 to 2);
+		cqDataOut <= inputInstructions(0 to 2);
+	end generate;
+	
 end Implem;
+
+
