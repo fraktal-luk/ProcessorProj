@@ -46,26 +46,34 @@ use work.BasicCheck.all;
 
 
 entity TestCQPart0 is
+	generic(
+		INPUT_WIDTH: integer := 3;
+		QUEUE_SIZE: integer := 3;
+		OUTPUT_SIZE: integer := 1
+	);
 	port(
 		clk: in std_logic;
 		reset: in std_logic;
 		en: in std_logic;
-		
-		execEventSignal: in std_logic;
-		execCausing: in InstructionState; -- Redundant cause we have inputs from all Exec ends? 
-				
+
+		whichAcceptedCQ: out std_logic_vector(0 to 3) := (others=>'0');
+		cqWhichSend: in std_logic_vector(0 to 3);				
 		inputInstructions: in InstructionStateArray(0 to 3);
+				maskIn: in std_logic_vector(0 to INPUT_WIDTH-1);
+				dataIn: in InstructionStateArray(0 to INPUT_WIDTH-1);
 		
-		--selectedToCQ: in std_logic_vector(0 to 3) := (others=>'0');
-		whichAcceptedCQ: out std_logic_vector(0 to 3) := (others=>'0');	
-		cqWhichSend: in std_logic_vector(0 to 3);
-		anySending: out std_logic; 
-		
+		anySending: out std_logic;		
 		cqOut: out StageDataMulti;
 			cqMaskOut: out std_logic_vector(0 to 2);
 			cqDataOut: out InstructionStateArray(0 to 2);
 		-- NOTE: cqOut is for data to commit, dataCQOut is for forwarding info
-		dataCQOut: out StageDataCommitQueue	
+		--dataCQOut: out StageDataCommitQueue;
+				
+				bufferMaskOut: out std_logic_vector(0 to QUEUE_SIZE-1);
+				bufferDataOut: out InstructionStateArray(0 to QUEUE_SIZE-1);
+		
+		execEventSignal: in std_logic;
+		execCausing: in InstructionState -- Redundant cause we have inputs from all Exec ends? 		
 	);
 end TestCQPart0;
 
@@ -79,11 +87,11 @@ architecture Implem of TestCQPart0 is
 		
 	signal stageDataCQNew: InstructionStateArray(0 to 3) := (others => defaultInstructionState);
 
-	signal livingMaskRaw, livingMaskCQ: std_logic_vector(0 to CQ_SIZE-1) := (others=>'0');
+	signal livingMaskRaw, livingMaskCQ: std_logic_vector(0 to QUEUE_SIZE-1) := (others=>'0');
 		
-		constant zeroMaskCQ: std_logic_vector(0 to CQ_SIZE-1) := (others=>'0');
+		constant zeroMaskCQ: std_logic_vector(0 to QUEUE_SIZE-1) := (others=>'0');
 		constant zeroInputMask: std_logic_vector(0 to 3) := (others=>'0');
-		signal compareMaskCQ: std_logic_vector(0 to CQ_SIZE-1) := (others=>'0');
+		signal compareMaskCQ: std_logic_vector(0 to QUEUE_SIZE-1) := (others=>'0');
 	
 	signal stageDataCQ, stageDataCQLiving, stageDataCQNext,
 									stageDataCQNextCheckOld, stageDataCQNextCheckNew
@@ -191,7 +199,11 @@ begin
 
 	-- CAREFUL: don't propagate here result tags from empty slots!	
 	--				Clearing result tags for empty slots handled in CQ step function 
-	dataCQOut <= stageDataCQLiving;	
+	--dataCQOut <= stageDataCQLiving;	
+			
+		bufferMaskOut <= stageDataCQLiving.fullMask;
+		bufferDataOut <= stageDataCQLiving.data;
+
 			
 	whichAcceptedCQ <= whichAcceptedCQSig;	
 	

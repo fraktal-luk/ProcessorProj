@@ -142,7 +142,7 @@ function killByTag(before, ei, int: std_logic) return std_logic;
 function getWrittenTags(lastCommitted: StageDataMulti) return PhysNameArray;
 
 function getResultTags(execEnds: InstructionStateArray;
-			stageDataCQ: StageDataCommitQueue;
+			stageDataCQ: InstructionStateArray;
 			dispatchDataA, dispatchDataB, dispatchDataC, dispatchDataD: InstructionState;
 			lastCommitted: StageDataMulti) 
 return PhysNameArray;
@@ -152,7 +152,7 @@ function getNextResultTags(execPreEnds: InstructionStateArray;
 return PhysNameArray;
 	
 function getResultValues(execEnds: InstructionStateArray; 
-										stageDataCQ: StageDataCommitQueue;
+										stageDataCQ: InstructionStateArray;
 										lastCommitted: StageDataMulti)
 return MwordArray;	
 
@@ -582,7 +582,7 @@ end function;
 
 
 function getResultTags(execEnds: InstructionStateArray; 
-						stageDataCQ: StageDataCommitQueue;
+						stageDataCQ: InstructionStateArray;
 						dispatchDataA, dispatchDataB, dispatchDataC, dispatchDataD: InstructionState;
 						lastCommitted: StageDataMulti) 
 return PhysNameArray is
@@ -597,7 +597,7 @@ begin
 	
 	-- CQ slots
 	for i in 0 to CQ_SIZE-1 loop 
-		resultTags(4-1 + i) := stageDataCQ.data(i).physicalDestArgs.d0;  	
+		resultTags(4-1 + i) := stageDataCQ(i).physicalDestArgs.d0;  	
 	end loop;
 
 	return resultTags;
@@ -626,7 +626,7 @@ end function;
 
 
 function getResultValues(execEnds: InstructionStateArray; 
-						stageDataCQ: StageDataCommitQueue;
+						stageDataCQ: InstructionStateArray;
 						lastCommitted: StageDataMulti)
 return MwordArray is
 	variable resultVals: MwordArray(0 to N_RES_TAGS-1) := (others=>(others=>'0'));		
@@ -638,7 +638,7 @@ begin
 			
 	-- CQ slots
 	for i in 0 to CQ_SIZE-1 loop 
-		resultVals(4-1 + i) := stageDataCQ.data(i).result;  	
+		resultVals(4-1 + i) := stageDataCQ(i).result;  	
 	end loop;
 	
 	return resultVals;

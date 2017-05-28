@@ -94,8 +94,10 @@ architecture Behavioral5 of NewCore0 is
 	signal whichAcceptedCQ: std_logic_vector(0 to 3) := (others=>'0');	
 	signal anySendingFromCQ: std_logic := '0';
 	
-	signal dataCQOut: StageDataCommitQueue
-										:= (fullMask=>(others=>'0'), data=>(others=>defaultInstructionState));	
+	--signal dataCQOut: StageDataCommitQueue
+	--									:= (fullMask=>(others=>'0'), data=>(others=>defaultInstructionState));
+		signal cqBufferMask: std_logic_vector(0 to CQ_SIZE-1) := (others => '0');
+		signal cqBufferData: InstructionStateArray(0 to CQ_SIZE-1) := (others => DEFAULT_INSTRUCTION_STATE);
 	signal cqDataLivingOut: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
 
 		signal cqMaskOut: std_logic_vector(0 to 2) := (others => '0');
@@ -506,11 +508,19 @@ begin
 
 
 	COMMIT_QUEUE: entity work.TestCQPart0(Implem)
+	generic map(
+		INPUT_WIDTH => 3,
+		QUEUE_SIZE => CQ_SIZE,
+		OUTPUT_SIZE => INTEGER_WRITE_WIDTH
+	)
 	port map(
 		clk => clk, reset => resetSig, en => enSig,
 		
 		execEventSignal => execOrIntEventSignal,
 		execCausing => execOrIntCausing,
+		
+			maskIn => execSending(0 to 2),
+			dataIn => execEnds(0 to 2),
 		
 		inputInstructions => execEnds,
 		whichAcceptedCQ => whichAcceptedCQ,
@@ -519,7 +529,9 @@ begin
 		cqOut => cqDataLivingOut,
 			cqMaskOut => cqMaskOut,
 			cqDataOut => cqDataOut,
-		dataCQOut => dataCQOut -- CAREFUL: must remain, because used by forwarding network!
+				bufferMaskOut => cqBufferMask,
+				bufferDataOut => cqBufferData
+		--dataCQOut => open --dataCQOut -- CAREFUL: must remain, because used by forwarding network!
 	);
 		
 	INT_REG_MAPPING: block
@@ -726,9 +738,9 @@ begin
 	end generate;
 	
 	resultTags <= getResultTags(
-				execEnds, dataCQOut, dataOutIQA, dataOutIQB, dataOutIQC, dataOutIQD,	stageDataAfterCQ);
+				execEnds, cqBufferData, dataOutIQA, dataOutIQB, dataOutIQC, dataOutIQD,	stageDataAfterCQ);
 	nextResultTags <= getNextResultTags(execPreEnds, dataOutIQA, dataOutIQB, dataOutIQC, dataOutIQD);
-	resultVals <= getResultValues(execEnds, dataCQOut, stageDataAfterCQ);
+	resultVals <= getResultValues(execEnds, cqBufferData, stageDataAfterCQ);
 	
 		fni.writtenTags <= writtenTags;
 		fni.resultTags <= resultTags;
