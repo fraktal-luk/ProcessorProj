@@ -560,6 +560,8 @@ begin
 					prevStablePhysDests => physStable,  -- FOR MAPPING (to FREE LIST)
 					stablePhysSources => open,
 					
+					-- CAREFUL,TODO! This is for possible virtual ready table. If used, must be refactored for
+					--					  writeback width and removal of StageDataCQ!
 					sendingToWrite => anySendingFromCQ,
 					stageDataToWrite => cqDataLivingOut,
 
@@ -611,8 +613,8 @@ begin
 				newPhysDests => newPhysDests,	-- FOR MAPPING
 				stageDataReserved => renamedDataLiving, --stageDataOutRename,
 				
-				sendingToWrite => anySendingFromCQ,
-				stageDataToWrite => cqDataLivingOut,
+				--sendingToWrite => anySendingFromCQ,
+				--stageDataToWrite => cqDataLivingOut,
 					writingMask => cqMaskOut,
 					writingData => cqDataOut,
 				readyRegFlagsNext => readyRegFlagsNext -- FOR IQs
@@ -658,11 +660,12 @@ begin
 			lockCommand => '0'			
 		);
 			
-		-- Int register block	
+		-- Int register block
+		-- DEPREC?
 		cqPhysDestMask <= getPhysicalDestMask(cqDataLivingOut);
 		cqPhysicalDests <= getPhysicalDests(cqDataLivingOut);
 		cqInstructionResults <= getInstructionResults(cqDataLivingOut);
-			
+		----------------------------
 
 			regsSelCE(0 to 1) <= regsSelC(0 to 1);
 			regsSelCE(2) <= regsSelE(2);

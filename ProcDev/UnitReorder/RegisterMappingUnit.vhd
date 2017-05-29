@@ -221,7 +221,7 @@ begin
 		readyTableSetSel <= getPhysicalDestMask(stageDataToWrite)
 						and 		stageDataToWrite.fullMask
 						and not getExceptionMask(stageDataToWrite);
-			readyTableFailSel <= getPhysicalDestMask(stageDataToWrite)
+		readyTableFailSel <= getPhysicalDestMask(stageDataToWrite)
 						and 		stageDataToWrite.fullMask
 						and getExceptionMask(stageDataToWrite);
 						
