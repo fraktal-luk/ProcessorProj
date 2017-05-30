@@ -522,16 +522,14 @@ begin
 			maskIn => execSending(0 to 2),
 			dataIn => execEnds(0 to 2),
 		
-		inputInstructions => execEnds,
+		--inputInstructions => execEnds,
 		whichAcceptedCQ => whichAcceptedCQ,
-		cqWhichSend => (0 => execSending(0), 1 => execSending(1), 2 => execSending(2), others => '0'),
+		--cqWhichSend => (0 => execSending(0), 1 => execSending(1), 2 => execSending(2), others => '0'),
 		anySending => anySendingFromCQ,
-		cqOut => open,--cqDataLivingOut,
 			cqMaskOut => cqMaskOut,
 			cqDataOut => cqDataOut,
 				bufferMaskOut => cqBufferMask,
 				bufferDataOut => cqBufferData
-		--dataCQOut => open --dataCQOut -- CAREFUL: must remain, because used by forwarding network!
 	);
 		
 			cqDataLivingOut.fullMask(0) <= cqMaskOut(0);
@@ -562,13 +560,6 @@ begin
 					
 					prevStablePhysDests => physStable,  -- FOR MAPPING (to FREE LIST)
 					stablePhysSources => open,
-					
-					-- CAREFUL,TODO! This is for possible virtual ready table. If used, must be refactored for
-					--					  writeback width and removal of StageDataCQ!
-					--sendingToWrite => anySendingFromCQ,
-					--stageDataToWrite => cqDataLivingOut,
-
-					--stageDataToWritePre => cqDataLivingOut, -- TEMP!
 						
 					readyRegFlagsNext => readyRegFlagsNextV
 				);
@@ -616,8 +607,6 @@ begin
 				newPhysDests => newPhysDests,	-- FOR MAPPING
 				stageDataReserved => renamedDataLiving, --stageDataOutRename,
 				
-				--sendingToWrite => anySendingFromCQ,
-				--stageDataToWrite => cqDataLivingOut,
 					writingMask => cqMaskOut,
 					writingData => cqDataOut,
 				readyRegFlagsNext => readyRegFlagsNext -- FOR IQs
@@ -631,19 +620,7 @@ begin
 				end if;
 			end process;
 
-			readyRegFlags <= readyRegFlags_2;
-			
---				INT_READY_TABLE_V: entity work.ReadyRegTableV(Behavioral)
---				port map(
---					clk => clk, reset => resetSig, en => enSig, 
---					sendingToReserve => frontLastSending,
---					stageDataToReserve => frontDataLastLiving,
---					--newPhysDests => newPhysDests,	-- FOR MAPPING
---					--stageDataReserved => renamedDataLiving, --stageDataOutRename,
---					sendingToWrite => anySendingFromCQ,
---					stageDataToWrite => cqDataLivingOut,
---					readyRegFlagsNext => readyRegFlagsNextV -- FOR IQs
---				);			
+			readyRegFlags <= readyRegFlags_2;		
 		end block;
 	
 		-- CAREFUL! This stage is needed to keep result tags 1 for cycle when writing to reg file,
@@ -664,26 +641,14 @@ begin
 		);
 			
 		-- Int register block
-		-- DEPREC?
---		cqPhysDestMask <= getPhysicalDestMask(cqDataLivingOut);
---		cqPhysicalDests <= getPhysicalDests(cqDataLivingOut);
---		cqInstructionResults <= getInstructionResults(cqDataLivingOut);
-		----------------------------
-
 			regsSelCE(0 to 1) <= regsSelC(0 to 1);
 			regsSelCE(2) <= regsSelE(2);
 			regsAllowCE <= regsAllowC or regsAllowE;
 			--regValsC <= regValsCE;
 			--regValsE <= regValsCE;
 				regValsC(0 to 1) <= regValsCE(0 to 1);
-				regValsE(2) <= regValsCE(2);
-		
---		TEMP_REG_FILE_INPUTS: for i in 0 to PIPE_WIDTH-1 generate
---			--rfWriteVec(i) <= cqPhysDestMask(i);
---			--rfSelectWrite(i) <= cqPhysicalDests(i);
---			--rfWriteValues(i) <= cqInstructionResults(i);
---		end generate;		
-		
+				regValsE(2) <= regValsCE(2);	
+
 			rfWriteVec(0 to INTEGER_WRITE_WIDTH-1) <= getArrayDestMask(cqDataOut, cqMaskOut);
 			rfSelectWrite(0 to INTEGER_WRITE_WIDTH-1) <= getArrayPhysicalDests(cqDataOut);
 			rfWriteValues(0 to INTEGER_WRITE_WIDTH-1) <= getArrayResults(cqDataOut);
