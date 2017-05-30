@@ -526,13 +526,16 @@ begin
 		whichAcceptedCQ => whichAcceptedCQ,
 		cqWhichSend => (0 => execSending(0), 1 => execSending(1), 2 => execSending(2), others => '0'),
 		anySending => anySendingFromCQ,
-		cqOut => cqDataLivingOut,
+		cqOut => open,--cqDataLivingOut,
 			cqMaskOut => cqMaskOut,
 			cqDataOut => cqDataOut,
 				bufferMaskOut => cqBufferMask,
 				bufferDataOut => cqBufferData
 		--dataCQOut => open --dataCQOut -- CAREFUL: must remain, because used by forwarding network!
 	);
+		
+			cqDataLivingOut.fullMask(0) <= cqMaskOut(0);
+			cqDataLivingOut.data(0) <= cqDataOut(0);
 		
 	INT_REG_MAPPING: block
 		signal physStable, physStableDelayed: PhysNameArray(0 to PIPE_WIDTH-1) := (others=>(others=>'0'));
@@ -562,10 +565,10 @@ begin
 					
 					-- CAREFUL,TODO! This is for possible virtual ready table. If used, must be refactored for
 					--					  writeback width and removal of StageDataCQ!
-					sendingToWrite => anySendingFromCQ,
-					stageDataToWrite => cqDataLivingOut,
+					--sendingToWrite => anySendingFromCQ,
+					--stageDataToWrite => cqDataLivingOut,
 
-					stageDataToWritePre => cqDataLivingOut, -- TEMP!
+					--stageDataToWritePre => cqDataLivingOut, -- TEMP!
 						
 					readyRegFlagsNext => readyRegFlagsNextV
 				);
@@ -644,7 +647,7 @@ begin
 		end block;
 	
 		-- CAREFUL! This stage is needed to keep result tags 1 for cycle when writing to reg file,
-		--				so that "black hole" of inivisible readiness doesn't occur
+		--				so that "black hole" of invisible readiness doesn't occur
 		AFTER_CQ: entity work.GenericStageMulti(Behavioral) port map(
 			clk => clk, reset => resetSig, en => enSig,
 			
@@ -662,9 +665,9 @@ begin
 			
 		-- Int register block
 		-- DEPREC?
-		cqPhysDestMask <= getPhysicalDestMask(cqDataLivingOut);
-		cqPhysicalDests <= getPhysicalDests(cqDataLivingOut);
-		cqInstructionResults <= getInstructionResults(cqDataLivingOut);
+--		cqPhysDestMask <= getPhysicalDestMask(cqDataLivingOut);
+--		cqPhysicalDests <= getPhysicalDests(cqDataLivingOut);
+--		cqInstructionResults <= getInstructionResults(cqDataLivingOut);
 		----------------------------
 
 			regsSelCE(0 to 1) <= regsSelC(0 to 1);
@@ -675,11 +678,11 @@ begin
 				regValsC(0 to 1) <= regValsCE(0 to 1);
 				regValsE(2) <= regValsCE(2);
 		
-		TEMP_REG_FILE_INPUTS: for i in 0 to PIPE_WIDTH-1 generate
-			--rfWriteVec(i) <= cqPhysDestMask(i);
-			--rfSelectWrite(i) <= cqPhysicalDests(i);
-			--rfWriteValues(i) <= cqInstructionResults(i);
-		end generate;		
+--		TEMP_REG_FILE_INPUTS: for i in 0 to PIPE_WIDTH-1 generate
+--			--rfWriteVec(i) <= cqPhysDestMask(i);
+--			--rfSelectWrite(i) <= cqPhysicalDests(i);
+--			--rfWriteValues(i) <= cqInstructionResults(i);
+--		end generate;		
 		
 			rfWriteVec(0 to INTEGER_WRITE_WIDTH-1) <= getArrayDestMask(cqDataOut, cqMaskOut);
 			rfSelectWrite(0 to INTEGER_WRITE_WIDTH-1) <= getArrayPhysicalDests(cqDataOut);
@@ -743,10 +746,10 @@ begin
 		writtenTags <= getWrittenTags(stageDataAfterCQ);
 	end generate;
 	
-	resultTags <= getResultTags(
-				execEnds, cqBufferData, dataOutIQA, dataOutIQB, dataOutIQC, dataOutIQD,	stageDataAfterCQ);
+	resultTags <= getResultTags(execEnds, cqBufferData, dataOutIQA, dataOutIQB, dataOutIQC, dataOutIQD,
+																											DEFAULT_STAGE_DATA_MULTI);
 	nextResultTags <= getNextResultTags(execPreEnds, dataOutIQA, dataOutIQB, dataOutIQC, dataOutIQD);
-	resultVals <= getResultValues(execEnds, cqBufferData, stageDataAfterCQ);
+	resultVals <= getResultValues(execEnds, cqBufferData, DEFAULT_STAGE_DATA_MULTI);
 	
 		fni.writtenTags <= writtenTags;
 		fni.resultTags <= resultTags;

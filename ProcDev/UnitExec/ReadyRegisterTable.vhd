@@ -123,7 +123,7 @@ begin
 							--end if;
 							
 							if readyTableClearAllow = '1' then							
-								for i in 0 to WIDTH-1 loop								
+								for i in 0 to PIPE_WIDTH-1 loop								
 									if readyTableClearSel(i) = '1' then
 										-- clear
 										content(slv2u(newPhysDests(i))) <= '0';						
