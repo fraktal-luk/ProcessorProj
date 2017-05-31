@@ -213,6 +213,26 @@ function simpleQueueNext(content: InstructionStateArray; newContent: Instruction
 		sending: std_logic
 )
 return InstructionSlotArray;
+
+
+function combineMulti(vec0, vec1: StageDataMulti) return StageDataMulti is
+	variable res: StageDataMulti := vec0;
+	variable j: integer := 0;
+begin
+	for i in 0 to PIPE_WIDTH-1 loop
+		if vec0.fullMask(i) = '1' then
+			next;
+		else
+			res.fullMask(i) := vec0.fullMask(j);
+			res.data(i) := vec1.data(j);
+			j := j + 1;
+		end if;
+		
+	end loop;
+	
+	return res;
+end function;
+
 	
 end GeneralPipeDev;
 

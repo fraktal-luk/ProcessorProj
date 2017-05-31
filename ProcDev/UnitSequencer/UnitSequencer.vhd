@@ -97,6 +97,9 @@ entity UnitSequencer is
 				dataFromBQV: in StageDataMulti;
 			dataFromBQ: in InstructionState;
 		
+				sendingFromSB: in std_logic;
+				dataFromSB: in InstructionState;
+		
 			committing: out std_logic;
 		
 		-- Counter outputs

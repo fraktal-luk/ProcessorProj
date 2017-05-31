@@ -41,7 +41,8 @@ package NewPipelineData is
 	constant LATE_FETCH_LOCK: boolean 
 				:= true; --false; -- Fetch lock not causing decode event, but only when committed
 	
-	constant CQ_SINGLE_OUTPUT: boolean := true;
+	constant CQ_SINGLE_OUTPUT: boolean := --false;--
+															true;
 	constant CQ_THREE_OUTPUTS: boolean := not CQ_SINGLE_OUTPUT;
 	
 	function getIntegerWriteWidth(so: boolean) return integer is

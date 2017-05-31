@@ -79,12 +79,20 @@ entity UnitMemory is
 			memStoreAllow: out std_logic;
 			memStoreValue: out Mword;
 			
+				sysStoreAllow: out std_logic;
+				sysStoreAddress: out slv5;
+				sysStoreValue: out Mword;
+			
 			sysRegDataIn: in InstructionState;
 			sysRegSendingIn: in std_logic;
 			
 			committing: in std_logic;
 			groupCtrNext: in SmallNumber;
 			groupCtrInc: in SmallNumber;
+			
+			sbAccepting: out std_logic;
+			
+			dataBQV: in StageDataMulti;
 			
 		execOrIntEventSignalIn: in std_logic;
 		execOrIntCausingIn: in InstructionState			
@@ -127,6 +135,14 @@ architecture Behavioral of UnitMemory is
 				 storeAddressWrSig, storeValueWrSig: std_logic := '0';
 		signal dataToLoadUnitSig, storeAddressDataSig, storeValueDataSig: InstructionState
 					:= DEFAULT_INSTRUCTION_STATE;
+					
+	signal sbAcceptingV: std_logic_vector(0 to 3) := (others => '0');				
+		signal sbSending: std_logic := '0';
+	
+		signal sbMaskOut: std_logic_vector(0 to 0) := (others => '0');
+		signal sbDataOut: InstructionStateArray(0 to 0) := (others => DEFAULT_INSTRUCTION_STATE);
+	
+	signal combinedQueueData: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
 ----------------	
 	signal ch0, ch1, ch2, ch3, ch4, ch5, ch6, ch7: std_logic := '0';
 begin
@@ -287,6 +303,9 @@ begin
 				dataOutSQ => dataOutSQ -- OUTPUT
 			);
 
+				-- NOTE: all ops committed in 1 cycle are from the same group, so they'll always fit into one
+				combinedQueueData <= combineMulti(dataOutSQV, dataBQV);
+
 					STORE_BUFFER: entity work.TestCQPart0(WriteBuffer)
 					generic map(
 						INPUT_WIDTH => PIPE_WIDTH,
@@ -296,16 +315,16 @@ begin
 					port map(
 						clk => clk, reset => reset, en => en,
 						
-						whichAcceptedCQ => open,
-						maskIn => dataOutSQV.fullMask,
-						dataIn => dataOutSQV.data,
+						whichAcceptedCQ => sbAcceptingV,
+						maskIn => combinedQueueData.fullMask,
+						dataIn => combinedQueueData.data,
 						
 						bufferMaskOut => open,
 						bufferDataOut => open,
 						
-						anySending => open,
-						cqMaskOut => open,
-						cqDataOut => open,
+						anySending => sbSending,
+						cqMaskOut => sbMaskOut,
+						cqDataOut => sbDataOut,
 						
 						execEventSignal => '0',
 						execCausing => DEFAULT_INSTRUCTION_STATE
@@ -412,6 +431,12 @@ begin
 		
 				memLoadAllow <= sendingToLoadUnitSig;
 				memStoreAllow <= sendingOutSQ;
+									--	  sbSending when sbDataOut(0).operation = (Memory, store) else '0';
+				 sysStoreAllow <= sbSending when sbDataOut(0).operation = (System, sysMTC) else '0';
+				 sysStoreAddress <= sbDataOut(0).constantArgs.c0;
+				 sysStoreValue <= sbDataOut(0).argValues.arg2;
+				 
+		sbAccepting <= sbAcceptingV(0);	
 			
 end Behavioral;
 
