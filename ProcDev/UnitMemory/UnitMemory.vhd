@@ -101,6 +101,7 @@ architecture Behavioral of UnitMemory is
 	
 	signal sendingOutSQ: std_logic  := '0';
 	signal dataOutSQ: InstructionState := DEFAULT_INSTRUCTION_STATE;
+		signal dataOutSQV: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
 	
 	signal sendingToDLQ, sendingFromDLQ, loadResultSending, isLoad: std_logic := '0';
 	signal dataToDLQ: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
@@ -282,9 +283,35 @@ begin
 				
 				--acceptingOutSQ => execAcceptingESig,
 				sendingSQOut => sendingOutSQ, -- OUTPUT
-					dataOutV => open,
+					dataOutV => dataOutSQV,
 				dataOutSQ => dataOutSQ -- OUTPUT
 			);
+
+					STORE_BUFFER: entity work.TestCQPart0(WriteBuffer)
+					generic map(
+						INPUT_WIDTH => PIPE_WIDTH,
+						QUEUE_SIZE => SB_SIZE,
+						OUTPUT_SIZE => 1
+					)
+					port map(
+						clk => clk, reset => reset, en => en,
+						
+						whichAcceptedCQ => open,
+						maskIn => dataOutSQV.fullMask,
+						dataIn => dataOutSQV.data,
+						
+						bufferMaskOut => open,
+						bufferDataOut => open,
+						
+						anySending => open,
+						cqMaskOut => open,
+						cqDataOut => open,
+						
+						execEventSignal => '0',
+						execCausing => DEFAULT_INSTRUCTION_STATE
+					);
+					
+
 
 			MEM_LOAD_QUEUE: entity --work.LoadQueue(Behavioral)
 											work.MemoryUnit(Behavioral)

@@ -221,14 +221,18 @@ architecture WriteBuffer of TestCQPart0 is
 																others=>(others=>'0'));
 	signal flowResponseCQ: FlowResponseBuffer := (others => (others=> '0'));				
 		
-	signal stageDataCQNew: InstructionStateArray(0 to 3) := (others => defaultInstructionState);
-	signal maskNew: std_logic_vector(0 to 3) := (others => '0');
-
-	signal livingMaskRaw, livingMaskCQ: std_logic_vector(0 to QUEUE_SIZE-1) := (others=>'0');
+	signal queueDataNext: InstructionSlotArray(0 to QUEUE_SIZE-1) := (others => DEFAULT_INSTRUCTION_SLOT);	
 		
+	signal stageData, stageDataNext:
+								InstructionStateArray(0 to QUEUE_SIZE-1) := (others => defaultInstructionState);
+	signal stageFullMask, stageFullMaskNext: std_logic_vector(0 to QUEUE_SIZE-1) := (others => '0');
+
+	--signal livingMaskRaw, livingMaskCQ: std_logic_vector(0 to QUEUE_SIZE-1) := (others=>'0');
+	signal isSending: std_logic := '0';
+	
 		constant zeroMaskCQ: std_logic_vector(0 to QUEUE_SIZE-1) := (others=>'0');
-		constant zeroInputMask: std_logic_vector(0 to 3) := (others=>'0');
-		signal compareMaskCQ: std_logic_vector(0 to QUEUE_SIZE-1) := (others=>'0');
+		--constant zeroInputMask: std_logic_vector(0 to 3) := (others=>'0');
+		--signal compareMaskCQ: std_logic_vector(0 to QUEUE_SIZE-1) := (others=>'0');
 	
 	signal stageDataCQ, stageDataCQLiving, stageDataCQNext,
 									stageDataCQNextCheckOld, stageDataCQNextCheckNew
@@ -250,36 +254,31 @@ begin
 			--if resetSig = '1' then
 				
 			--elsif enSig = '1' then	
-				stageDataCQ <= stageDataCQNext;
+				stageData <= stageDataNext;
+				stageFullMask <= stageFullMaskNext;
 				
-				logBuffer(stageDataCQ.data, stageDataCQ.fullMask, livingMaskCQ,
-								flowResponseCQ);
+				logBuffer(stageData, stageFullMask, stageFullMask, flowResponseCQ);
 
-					checkBuffer(stageDataCQ.data, stageDataCQ.fullMask,
-									stageDataCQNext.data, stageDataCQNext.fullMask,
+					checkBuffer(stageData, stageFullMask,
+									stageDataNext, stageFullMaskNext,
 									flowDriveCQ, flowResponseCQ);	
 			--end if;
 		end if;
 	end process;
-	
-	stageDataCQLiving.data <= stageDataCQ.data;
-	stageDataCQLiving.fullMask <= livingMaskCQ;
-	stageDataCQNew(0 to INPUT_WIDTH-1) <= dataIn;
-	maskNew(0 to INPUT_WIDTH-1) <= maskIn;
-	
-		stageDataCQNext <= stageCQNext(stageDataCQ,
-													compactData(stageDataCQNew, maskNew),
-												livingMaskCQ,
-													compactMask(stageDataCQNew, maskNew),
-												PIPE_WIDTH,
-												binFlowNum(flowResponseCQ.living),
-												binFlowNum(flowResponseCQ.sending),
-												binFlowNum(flowDriveCQ.prevSending));
-												
+		
+		queueDataNext <= simpleQueueNext(stageData, dataIn,
+													stageFullMask, maskIn,
+													binFlowNum(flowResponseCQ.living),
+													isSending);
+			stageDataNext <= extractData(queueDataNext);
+			stageFullMaskNext <= extractFullMask(queueDataNext);
+				
 		flowDriveCQ.prevSending <=	num2flow(countOnes(maskIn));
-		flowDriveCQ.nextAccepting <= num2flow(countOnes(whichSendingFromCQ));												
+		flowDriveCQ.nextAccepting <= num2flow(1) when isSending = '1' else (others => '0');												
 
-	whichAcceptedCQSig <= (others => '1');
+	whichAcceptedCQSig <= -- CAREFUL, TEMP: some simple condition: at least PIPE_WIDTH free slots
+					(others => '1') when stageFullMask(QUEUE_SIZE - PIPE_WIDTH) = '0'
+			 else (others => '0');
 													
 	SLOT_CQ: entity work.BufferPipeLogic(BehavioralDirect)
 	generic map(
@@ -293,20 +292,20 @@ begin
 		flowResponse => flowResponseCQ
 	);			
 											
-	livingMaskRaw <= stageDataCQ.fullMask;	
-	livingMaskCQ <= stageDataCQ.fullMask;	
+	--livingMaskRaw <= stageFullMask;	
+	--livingMaskCQ <= stageFullMask;	
 	
-	whichSendingFromCQ <= getSendingFromCQ(livingMaskRaw);
+	isSending <= stageFullMask(0); -- CAREFUL: no 'nextAccepting' - introduce?
 	
-	anySending <= whichSendingFromCQ(0); -- Because CQ(0) must be committing if any other is 
+	anySending <= isSending; -- Because CQ(0) must be committing if any other is 
 			
-		bufferMaskOut <= stageDataCQLiving.fullMask;
-		bufferDataOut <= stageDataCQLiving.data;
+		bufferMaskOut <= stageFullMask;
+		bufferDataOut <= stageData;
 			
 	whichAcceptedCQ <= whichAcceptedCQSig;	
 	
-		cqMaskOut <= (0 => whichSendingFromCQ(0), others => '0');
-		cqDataOut <= (0 => stageDataCQLiving.data(0), others => DEFAULT_INSTRUCTION_STATE);
+		cqMaskOut <= (0 => isSending, others => '0');
+		cqDataOut <= (0 => stageData(0), others => DEFAULT_INSTRUCTION_STATE);
 	
 end WriteBuffer;
 

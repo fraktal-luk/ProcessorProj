@@ -74,7 +74,9 @@ package NewPipelineData is
 	
 	constant CQ_SIZE: natural := PIPE_WIDTH * 3;
 	
-		constant ROB_SIZE: natural := 8; -- ??
+	constant SB_SIZE: natural := 4;
+	
+	constant ROB_SIZE: natural := 8; -- ??
 	
 		-- If true, physical registers are allocated even for empty slots in instruction group
 		--		and later freed from them.

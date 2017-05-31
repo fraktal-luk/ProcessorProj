@@ -205,6 +205,14 @@ begin
 	return res;
 end function;
 
+
+function simpleQueueNext(content: InstructionStateArray; newContent: InstructionStateArray;
+		livingMask: std_logic_vector;
+		newMask: std_logic_vector;
+		nFull: integer;
+		sending: std_logic
+)
+return InstructionSlotArray;
 	
 end GeneralPipeDev;
 
@@ -932,6 +940,64 @@ begin
 	
 	return res;		
 end function;
+
+
+
+function simpleQueueNext(content: InstructionStateArray; newContent: InstructionStateArray;
+		livingMask: std_logic_vector;
+		newMask: std_logic_vector;
+		nFull: integer;
+		sending: std_logic
+)
+return InstructionSlotArray is
+	constant LEN: integer := content'length;
+	constant INPUT_LEN: integer := newContent'length;
+	variable res: InstructionSlotArray(0 to LEN-1) := (others => DEFAULT_INSTRUCTION_SLOT);
+	variable contentExtended: InstructionStateArray(0 to LEN + INPUT_LEN - 1) := 
+																				content & newContent;
+	variable dataTemp: InstructionStateArray(0 to LEN + INPUT_LEN - 1) := (others => defaultInstructionState);
+	variable fullMaskTemp: std_logic_vector(0 to LEN + INPUT_LEN - 1) := (others => '0');
+		
+	variable j: integer;
+	variable k: integer := 0;
+	variable newFullMask: std_logic_vector(0 to LEN-1) := (others => '0');
+		constant CLEAR_EMPTY_SLOTS: boolean := false;
+	variable nFullNew: integer := nFull;
+begin
+	-- CAREFUL: even when not clearing empty slots, result tags probably should be cleared!
+	--				It's to prevent reading of fake results from empty slots
+
+	dataTemp(0 to LEN-1) := content;
+	if not CLEAR_EMPTY_SLOTS then
+		dataTemp := contentExtended;
+	end if;	
+
+	if sending = '1' then
+		dataTemp(0 to LEN + INPUT_LEN - 2) := dataTemp(1 to LEN + INPUT_LEN - 1);
+		nFullNew := nFull-1;
+	end if;
+		
+		for i in 0 to LEN + INPUT_LEN - 1 loop
+			if i < nFullNew then
+								--outWidth then
+				--dataTemp(i) := contentExtended(i);		
+				fullMaskTemp(i) := '1';
+			elsif i < nFullNew + INPUT_LEN then
+									--outWidth + 4 then
+				dataTemp(i) := newContent(k);
+				fullMaskTemp(i) := newMask(k);
+				k := k + 1;
+			else
+				--dataTemp(i) := contentExtended(i);
+			end if;
+		end loop;		
+		
+		
+	res := makeSlotArray(dataTemp(0 to LEN-1), fullMaskTemp(0 to LEN-1));
+	
+	return res;		
+end function;
+
 
 
 end GeneralPipeDev;
