@@ -132,6 +132,11 @@ architecture Behavioral5 of NewCore0 is
 						
 	signal outputA, outputB, outputC, outputD, outputE: InstructionSlot := DEFAULT_INSTRUCTION_SLOT;
 	signal outputOpPreB, outputOpPreC: InstructionState := DEFAULT_INSTRUCTION_STATE;
+
+		signal sysStoreAllow: std_logic := '0';
+		signal sysStoreAddress: slv5 := (others => '0'); 
+		signal sysStoreValue: Mword := (others => '0');
+
 				
 	constant HAS_RESET: std_logic := '0';
 	constant HAS_EN: std_logic := '0';
@@ -201,6 +206,10 @@ begin
 
 				sendingFromSB => '0',
 				dataFromSB => DEFAULT_INSTRUCTION_STATE,
+
+			 sysStoreAllow => sysStoreAllow,
+			 sysStoreAddress => sysStoreAddress,
+			 sysStoreValue => sysStoreValue,
 
 		-- Interface from committed stage
 		committedSending => committedSending,

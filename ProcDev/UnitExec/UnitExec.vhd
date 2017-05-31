@@ -218,6 +218,7 @@ begin
 	BQ_BLOCK: block
 		signal storeTargetWrSig: std_logic := '0';
 		signal storeTargetDataSig: InstructionState := DEFAULT_INSTRUCTION_STATE;
+			signal storeTargetDataSRSig: InstructionState := DEFAULT_INSTRUCTION_STATE;
 		
 		signal storingForMTC: std_logic := '0';
 		
@@ -229,8 +230,22 @@ begin
 			res.result := ins.target;
 			return res;
 		end function;
+		
+		function trgToSR(ins: InstructionState) return InstructionState is
+			variable res: InstructionState := ins;
+		begin
+			-- CAREFUL! Here we use 'result' because it is the field copied to arg1 in mem queue!
+			-- TODO: regularize usage of such fields, maybe remove 'target' from InstructionState?
+			res.argValues.arg2(4 downto 0) := ins.constantArgs.c0;
+			res.argValues.arg2(MWORD_SIZE-1 downto 5) := (others => '0');
+			return res;
+		end function;		
 	begin
 		storeTargetDataSig <= trgToResult(dataD0);
+		
+			storeTargetDataSRSig <= trgToSR(dataD0);
+
+		
 		storeTargetWrSig <= execSendingD and
 										((dataD0.controlInfo.hasBranch and dataD0.classInfo.branchReg)
 									or   dataD0.controlInfo.hasReturn
@@ -252,10 +267,11 @@ begin
 					dataIn => dataNewToBQ,
 				
 				storeAddressWr => storeTargetWrSig,
-				storeValueWr => '0',-- storeValueWrSig,
+				storeValueWr => storeTargetWrSig,
 
 				storeAddressDataIn => storeTargetDataSig,
-				storeValueDataIn => DEFAULT_INSTRUCTION_STATE,-- storeValueDataSig,
+				storeValueDataIn => --DEFAULT_INSTRUCTION_STATE,-- storeValueDataSig,
+											storeTargetDataSRSig,
 				
 					committing => committing,
 					groupCtrNext => groupCtrNext,

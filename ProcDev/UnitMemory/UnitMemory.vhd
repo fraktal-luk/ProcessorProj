@@ -424,17 +424,21 @@ begin
 				else stageDataAfterCache;
 
 				-- Mem interface
-				memStoreAddress <= dataOutSQ.argValues.arg1;
-				memStoreValue <= dataOutSQ.argValues.arg2;
+				memStoreAddress <= --dataOutSQ.argValues.arg1;
+											sbDataOut(0).argValues.arg1;
+				memStoreValue <= --dataOutSQ.argValues.arg2;
+											sbDataOut(0).argValues.arg2;
 		
 				memLoadAddress <= dataToLoadUnitSig.result; -- in LoadUnit
 		
 				memLoadAllow <= sendingToLoadUnitSig;
-				memStoreAllow <= sendingOutSQ;
-									--	  sbSending when sbDataOut(0).operation = (Memory, store) else '0';
+				memStoreAllow <= --sendingOutSQ;
+										  sbSending when sbDataOut(0).operation = (Memory, store) else '0';
+										  
 				 sysStoreAllow <= sbSending when sbDataOut(0).operation = (System, sysMTC) else '0';
-				 sysStoreAddress <= sbDataOut(0).constantArgs.c0;
-				 sysStoreValue <= sbDataOut(0).argValues.arg2;
+				 sysStoreAddress <= sbDataOut(0).argValues.arg2(4 downto 0);
+				 sysStoreValue <= sbDataOut(0).argValues.arg1; 
+														-- ^ CAREFUL: address holds data, cause it's queue for addresses
 				 
 		sbAccepting <= sbAcceptingV(0);	
 			

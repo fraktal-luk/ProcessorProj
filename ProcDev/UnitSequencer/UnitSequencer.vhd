@@ -100,6 +100,10 @@ entity UnitSequencer is
 				sendingFromSB: in std_logic;
 				dataFromSB: in InstructionState;
 		
+					sysStoreAllow: in std_logic;
+					sysStoreAddress: in slv5; 
+					sysStoreValue: in Mword;		
+		
 			committing: out std_logic;
 		
 		-- Counter outputs
@@ -187,8 +191,6 @@ architecture Behavioral of UnitSequencer is
 begin	 
 	resetSig <= reset and HAS_RESET_SEQ;
 	enSig <= en or not HAS_EN_SEQ;
-
-	sysRegWriteAllow <= getSysRegWriteAllow(stageDataToCommit, effectiveMask) and sendingToCommit;
 
 	CAUSING_ADDER: entity work.IntegerAdder
 	port map(
@@ -303,6 +305,9 @@ begin
 		signal srWriteSel: slv5 := (others => '0');
 		signal srWriteVal: Mword := (others => '0');
 	begin
+
+			sysRegWriteAllow <= getSysRegWriteAllow(stageDataToCommit, effectiveMask) and sendingToCommit;
+	
 			srWriteSel <= dataToLastEffective.data(0).constantArgs.c0 when USE_BQ_FOR_MTC
 						else sysRegWriteSel;
 							  
