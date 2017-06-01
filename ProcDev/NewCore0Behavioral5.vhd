@@ -80,7 +80,7 @@ architecture Behavioral5 of NewCore0 is
 	signal robSending, robAccepting: std_logic := '0';
 	signal dataOutROB: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;					
 
-		signal sbAccepting: std_logic := '0';
+		signal sbAccepting, sbEmpty: std_logic := '0';
 
 		signal commitAccepting: std_logic := '0';
 		signal committingSig: std_logic := '0';
@@ -206,6 +206,7 @@ begin
 
 				sendingFromSB => '0',
 				dataFromSB => DEFAULT_INSTRUCTION_STATE,
+					sbEmpty => sbEmpty,
 
 			 sysStoreAllow => sysStoreAllow,
 			 sysStoreAddress => sysStoreAddress,
@@ -499,9 +500,9 @@ begin
 			memStoreAllow => memStoreAllow,
 			memStoreValue => memStoreValue,
 
-				sysStoreAllow => open,
-				sysStoreAddress => open,
-				sysStoreValue => open,
+				sysStoreAllow => sysStoreAllow,
+				sysStoreAddress => sysStoreAddress,
+				sysStoreValue => sysStoreValue,
 
 			sysRegDataIn => sysRegData,
 			sysRegSendingIn => sysRegSending,
@@ -512,6 +513,7 @@ begin
 			groupCtrInc => commitGroupCtrIncSig,
 
 				sbAccepting => sbAccepting,
+					sbEmpty => sbEmpty,
 				
 				dataBQV => dataOutBQV,
 					

@@ -42,7 +42,7 @@ package NewPipelineData is
 				:= true; --false; -- Fetch lock not causing decode event, but only when committed
 	
 	constant CQ_SINGLE_OUTPUT: boolean := --false;--
-															true;
+														true;
 	constant CQ_THREE_OUTPUTS: boolean := not CQ_SINGLE_OUTPUT;
 	
 	function getIntegerWriteWidth(so: boolean) return integer is

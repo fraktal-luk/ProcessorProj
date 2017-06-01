@@ -91,6 +91,7 @@ entity UnitMemory is
 			groupCtrInc: in SmallNumber;
 			
 			sbAccepting: out std_logic;
+				sbEmpty: out std_logic;
 			
 			dataBQV: in StageDataMulti;
 			
@@ -141,6 +142,8 @@ architecture Behavioral of UnitMemory is
 	
 		signal sbMaskOut: std_logic_vector(0 to 0) := (others => '0');
 		signal sbDataOut: InstructionStateArray(0 to 0) := (others => DEFAULT_INSTRUCTION_STATE);
+	
+			signal sbFullMask: std_logic_vector(0 to SB_SIZE-1) := (others => '0');
 	
 	signal combinedQueueData: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
 ----------------	
@@ -319,7 +322,7 @@ begin
 						maskIn => combinedQueueData.fullMask,
 						dataIn => combinedQueueData.data,
 						
-						bufferMaskOut => open,
+						bufferMaskOut => sbFullMask,
 						bufferDataOut => open,
 						
 						anySending => sbSending,
@@ -441,6 +444,6 @@ begin
 														-- ^ CAREFUL: address holds data, cause it's queue for addresses
 				 
 		sbAccepting <= sbAcceptingV(0);	
-			
+			sbEmpty <= sbFullMask(0);
 end Behavioral;
 

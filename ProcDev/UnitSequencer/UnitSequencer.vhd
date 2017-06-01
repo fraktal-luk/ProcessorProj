@@ -99,6 +99,7 @@ entity UnitSequencer is
 		
 				sendingFromSB: in std_logic;
 				dataFromSB: in InstructionState;
+					sbEmpty: in std_logic;
 		
 					sysStoreAllow: in std_logic;
 					sysStoreAddress: in slv5; 
@@ -306,13 +307,16 @@ begin
 		signal srWriteVal: Mword := (others => '0');
 	begin
 
-			sysRegWriteAllow <= getSysRegWriteAllow(stageDataToCommit, effectiveMask) and sendingToCommit;
-	
-			srWriteSel <= dataToLastEffective.data(0).constantArgs.c0 when USE_BQ_FOR_MTC
-						else sysRegWriteSel;
+			sysRegWriteAllow <= --getSysRegWriteAllow(stageDataToCommit, effectiveMask) and sendingToCommit;
+										sysStoreAllow;
+									
+			srWriteSel <= --dataToLastEffective.data(0).constantArgs.c0 when USE_BQ_FOR_MTC
+						--else sysRegWriteSel;
+								sysStoreAddress;
 							  
-			srWriteVal <= dataFromBQ.argValues.arg1 when USE_BQ_FOR_MTC
-						else sysRegWriteValue;
+			srWriteVal <= --dataFromBQ.argValues.arg1 when USE_BQ_FOR_MTC
+						--else sysRegWriteValue;
+								sysStoreValue;
 	
 		CLOCKED: process(clk)
 		begin					

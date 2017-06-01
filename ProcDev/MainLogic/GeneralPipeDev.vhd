@@ -223,7 +223,7 @@ begin
 		if vec0.fullMask(i) = '1' then
 			next;
 		else
-			res.fullMask(i) := vec0.fullMask(j);
+			res.fullMask(i) := vec1.fullMask(j);
 			res.data(i) := vec1.data(j);
 			j := j + 1;
 		end if;
