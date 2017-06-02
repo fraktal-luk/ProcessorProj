@@ -157,9 +157,7 @@ architecture Behavioral of UnitSequencer is
 	signal sendingToCommit, sendingOutCommit, acceptingOutCommit: std_logic := '0';
 	signal stageDataToCommit, stageDataOutCommit: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;						
 
-
-		signal stageDataToCommit_2, stageDataOutCommit_2: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;						
-				
+		signal stageDataToCommit_2, stageDataOutCommit_2: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;				
 
 	signal newPhysDests: PhysNameArray(0 to PIPE_WIDTH-1) := (others=>(others=>'0'));
 	signal newPhysDestPointer: SmallNumber := (others => '0');
@@ -179,11 +177,11 @@ architecture Behavioral of UnitSequencer is
 	signal renameLockCommand, renameLockRelease, renameLockState, renameLockEnd: std_logic := '0';	
 				
 	signal dataToLastEffective, dataFromLastEffective: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;	
-		signal insLastEffective_2, insToLastEffective_2: InstructionState := DEFAULT_INSTRUCTION_STATE;	
+		signal insToLastEffective_2: InstructionState := DEFAULT_INSTRUCTION_STATE;	
 			
 	signal eiEvents: StageMultiEventInfo;
 			
-		signal newEffectiveTarget: Mword := (others => '0');
+		signal newEffectiveTarget: Mword := (others => '0'); -- DEPREC
 			
 			signal ch0, ch1: std_logic := '0';
 				
@@ -306,17 +304,9 @@ begin
 		signal srWriteSel: slv5 := (others => '0');
 		signal srWriteVal: Mword := (others => '0');
 	begin
-
-			sysRegWriteAllow <= --getSysRegWriteAllow(stageDataToCommit, effectiveMask) and sendingToCommit;
-										sysStoreAllow;
-									
-			srWriteSel <= --dataToLastEffective.data(0).constantArgs.c0 when USE_BQ_FOR_MTC
-						--else sysRegWriteSel;
-								sysStoreAddress;
-							  
-			srWriteVal <= --dataFromBQ.argValues.arg1 when USE_BQ_FOR_MTC
-						--else sysRegWriteValue;
-								sysStoreValue;
+		sysRegWriteAllow <= sysStoreAllow;									
+		srWriteSel <= sysStoreAddress;
+		srWriteVal <= sysStoreValue;
 	
 		CLOCKED: process(clk)
 		begin					
@@ -469,8 +459,7 @@ begin
 		commitGroupCtrNext <= nextCtr(commitGroupCtr, '0', (others => '0'), sendingToCommit, ALL_FULL);
 		commitCtrNext <= nextCtr(commitCtr, '0', (others => '0'), sendingToCommit, effectiveMask);
 
-		effectiveMask <= getEffectiveMask(--stageDataToCommit);
-													  stageDataToCommit_2);
+		effectiveMask <= getEffectiveMask(stageDataToCommit_2);
 			
 		PIPE_SYNCHRONOUS: process(clk) 	
 		begin
@@ -483,17 +472,12 @@ begin
 		end process;	
 	end block;
 
-
 	sendingToCommit <= sendingFromROB;	
---	stageDataToCommit <= --robDataLiving;
---									stageDataToCommit_2;
-	stageDataToCommit.fullMask <= --effectiveMask;
-											stageDataToCommit_2.fullMask;
+	stageDataToCommit.fullMask <= stageDataToCommit_2.fullMask;
 	stageDataToCommit.data <= stageDataToCommit_2.data;
 
 	committing <= sendingFromROB;
 
-	
 	-- Commit stage: in order again				
 	SUBUNIT_COMMIT: entity work.GenericStageMulti(Behavioral)
 	port map(
@@ -516,7 +500,6 @@ begin
 		lockCommand => '0'
 	);
 
-
 			-- Tracking of target:
 			--			'target' field of last effective will hold the address of next instruction
 			--			to commit after lastEffective; it will be known with certainty because lastEffective is 
@@ -528,48 +511,18 @@ begin
 			--			
 			--			The 'target' field will be used to update return address for exc/int
 			NEW_TARGET: block
-				signal lastEffectiveData: InstructionState := DEFAULT_INSTRUCTION_STATE;
-				signal committingTakenBranch, committingTakenBranchAsLE, tempBuffWaiting: std_logic := '0';
-				signal tempBuffValue, normalIncTarget, incTarget, incArg: Mword := (others => '0');
-				signal leGrInd: integer := 0;
-
-				function totalEffectiveInc(sd: StageDataMulti) return Mword is
-					variable res: Mword := (others => '0');
-					variable em: std_logic_vector(0 to PIPE_WIDTH-1) := (others => '0');
-					variable tmp: integer := 0;
-				begin
-					em := getEffectiveMask(sd);
-					for i in 0 to PIPE_WIDTH-1 loop
-						if em(i) = '1' then
-							if sd.data(i).classInfo.short = '1' then
-								tmp := tmp + 2;
-							else
-								tmp := tmp + 4;
-							end if;
-						end if;
-					end loop;
-					res := i2slv(tmp, MWORD_SIZE);
-					return res;
-				end function;
+				signal tempBuffWaiting: std_logic := '0';
+				signal tempBuffValue: Mword := (others => '0');
 			begin
-
 
 				stageDataToCommit_2 <= recreateGroup(robDataLiving, dataFromBQV, 
 																	dataFromLastEffective.data(0).target,
 																	tempBuffValue, tempBuffWaiting);
-					insToLastEffective_2 <= getLastEffective(stageDataToCommit_2);
-				
-				
-							ch0 <= '1' when insLastEffective_2 = dataFromLastEffective.data(0) else '0';
+					insToLastEffective_2 <= getLastEffective(stageDataToCommit_2);		
 				
 				SYNCH: process(clk)
 				begin
 					if rising_edge(clk) then
-							if sendingToCommit = '1' then
-								stageDataOutCommit_2 <= stageDataToCommit_2;
-								insLastEffective_2 <= insToLastEffective_2;
-							end if;
-					
 						if eiEvents.eventOccured = '1' then 
 							tempBuffWaiting <= '1';
 							tempBuffValue <= stageDataToPC.basicInfo.ip;
@@ -578,39 +531,13 @@ begin
 						end if;
 					end if;
 				end process;
-				
-				-- CAREFUL: without *LE only valid for scalar?
-				committingTakenBranch <= sendingFromROB and dataToLastEffective.data(0).controlInfo.hasBranch;
-				committingTakenBranchAsLE <= sendingFromROB and dataToLastEffective.data(0).controlInfo.hasBranch;
-				
-				TRG_ADDER: entity work.IntegerAdder
-				port map(
-					inA => incArg,
-						-- TODO: below change to sum for whole effective slot -> getTotalAddressIncrement(...)
-					inB => --getAddressIncrement(dataFromLastEffective.data(0)),
-							 totalEffectiveInc(stageDataToCommit),
-					output => incTarget
-				);
-				
-				incArg <= tempBuffValue when tempBuffWaiting = '1' else dataFromLastEffective.data(0).target;
-				
-				-- TODO, CAREFUL: data from BQ will be multi, must choose correct branch
-				--			 -> [select element of dataFromBQ that corr. to last effective in this group]
-				--			! And taken branch is not always last in effective group! (?)
-				--			  So choose branch target only if THE last efective is taken branch!
-					leGrInd <= slv2u(dataToLastEffective.data(0).groupTag(LOG2_PIPE_WIDTH-1 downto 0));
-				newEffectiveTarget <= --dataFromBQ.argValues.arg1 when --committingTakenBranch = '1'
-							 dataFromBQV.data(leGrInd).argValues.arg1 when committingTakenBranchAsLE = '1'
-					else	 incTarget;
 			end block;
 		
 			interruptCause.controlInfo.hasInterrupt <= intSignal;
 			interruptCause.controlInfo.hasReset <= start;
 
 			dataToLastEffective.fullMask(0) <= sendingToCommit;
-			dataToLastEffective.data(0) <= 
-									--setInstructionTarget(getLastEffective(stageDataToCommit), newEffectiveTarget);
-									insToLastEffective_2;
+			dataToLastEffective.data(0) <= insToLastEffective_2;
 
 			LAST_EFFECTIVE_SLOT: entity work.GenericStageMulti(LastEffective)
 			port map(
