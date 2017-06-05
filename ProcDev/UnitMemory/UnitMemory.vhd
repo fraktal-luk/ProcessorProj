@@ -92,6 +92,8 @@ entity UnitMemory is
 			
 			sbAccepting: out std_logic;
 				sbEmpty: out std_logic;
+				sbSendingOut: out std_logic;
+				dataFromSB: out InstructionState;
 			
 			dataBQV: in StageDataMulti;
 			
@@ -438,12 +440,14 @@ begin
 				memStoreAllow <= --sendingOutSQ;
 										  sbSending when sbDataOut(0).operation = (Memory, store) else '0';
 										  
-				 sysStoreAllow <= sbSending when sbDataOut(0).operation = (System, sysMTC) else '0';
+				 sysStoreAllow <= sbSending when sbDataOut(0).operation = (System, sysMTC) else '0'; 
 				 sysStoreAddress <= sbDataOut(0).argValues.arg2(4 downto 0);
 				 sysStoreValue <= sbDataOut(0).argValues.arg1; 
 														-- ^ CAREFUL: address holds data, cause it's queue for addresses
 				 
 		sbAccepting <= sbAcceptingV(0);	
-			sbEmpty <= sbFullMask(0);
+			sbEmpty <= not sbFullMask(0);
+			sbSendingOut <= sbSending;
+			dataFromSB <= sbDataOut(0);
 end Behavioral;
 

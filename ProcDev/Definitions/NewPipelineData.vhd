@@ -446,6 +446,7 @@ end record;
 
 type GeneralEventInfo is record
 	eventOccured: std_logic;
+		killPC: std_logic;
 	causing: InstructionState;
 	affectedVec --, causingVec
 		: std_logic_vector(0 to 4);	

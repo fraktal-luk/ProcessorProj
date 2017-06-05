@@ -100,6 +100,7 @@ entity UnitSequencer is
 				sendingFromSB: in std_logic;
 				dataFromSB: in InstructionState;
 					sbEmpty: in std_logic;
+					sbSending: in std_logic;
 		
 					sysStoreAllow: in std_logic;
 					sysStoreAddress: in slv5; 
@@ -182,6 +183,8 @@ architecture Behavioral of UnitSequencer is
 	signal eiEvents: StageMultiEventInfo;
 			
 		signal newEffectiveTarget: Mword := (others => '0'); -- DEPREC
+
+				signal TMP_writeEventTarget, TMP_waitForEmptySB: std_logic := '0';
 			
 			signal ch0, ch1: std_logic := '0';
 				
@@ -211,7 +214,9 @@ begin
 		-- $INPUT: 
 		--		stage0EventInfo, execEventSignal, execCausing, eiEvents
 		-- $OUTPUT:
-		-- 	execOrIntCausing, execOrIntEventSignal, killVecOut, generalEvents, 					
+		-- 	execOrIntCausing, execOrIntEventSignal, killVecOut, generalEvents,
+
+			signal committingSync, committingRet: std_logic := '0';			
 	begin	
 			killVecOut(6) <= eiEvents.eventOccured;
 			killVecOut(5) <= execOrIntEventSignal;
@@ -231,6 +236,10 @@ begin
 		
 		execOrIntEventSignalOut <= execOrIntEventSignal;	-- $MODULE_OUT
 		execOrIntCausingOut <= execOrIntCausing; -- $MODULE_OUT
+		
+			committingSync <= sbSending when dataFromSB.operation = (System, sysSync) else '0';
+			committingRet <= sbSending when 
+				(dataFromSB.operation = (System, sysRetI) or dataFromSB.operation = (System, sysRetE)) else '0';
 	end block;
 
 			stageDataToPC <= newPCData(
@@ -246,7 +255,8 @@ begin
 	--				when en = '0' this won't happen.
 	--				To be fully correct, prevSending should not be '1' when receiving prevented.			
 	sendingToPC <= acceptingOutPC and (sendingOutPC
-												or (generalEvents.eventOccured and not isHalt(generalEvents.causing)));
+												or (generalEvents.eventOccured and --not isHalt(generalEvents.causing)));
+																								not generalEvents.killPC));
 
 	newTargetInfo <= stageDataToPC.basicInfo;
 
@@ -520,6 +530,9 @@ begin
 																	tempBuffValue, tempBuffWaiting);
 					insToLastEffective_2 <= getLastEffective(stageDataToCommit_2);		
 				
+						TMP_writeEventTarget <= 
+							(eiEvents.eventOccured and sbEmpty) or (TMP_waitForEmptySB and sbEmpty);
+
 				SYNCH: process(clk)
 				begin
 					if rising_edge(clk) then
@@ -528,6 +541,14 @@ begin
 							tempBuffValue <= stageDataToPC.basicInfo.ip;
 						elsif sendingFromROB = '1' then -- when committing
 							tempBuffWaiting <= '0';
+						end if;
+						
+						if (eiEvents.eventOccured and not sbEmpty) = '1' then
+							TMP_waitForEmptySB <= '1';
+						end if;
+						
+						if sbEmpty = '1' then
+							TMP_waitForEmptySB <= '0';
 						end if;
 					end if;
 				end process;
