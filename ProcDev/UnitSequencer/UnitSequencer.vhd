@@ -178,13 +178,13 @@ architecture Behavioral of UnitSequencer is
 	signal renameLockCommand, renameLockRelease, renameLockState, renameLockEnd: std_logic := '0';	
 				
 	signal dataToLastEffective, dataFromLastEffective: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;	
-		signal insToLastEffective_2: InstructionState := DEFAULT_INSTRUCTION_STATE;	
+		signal insToLastEffective_2, insToLastEffective_3: InstructionState := DEFAULT_INSTRUCTION_STATE;	
 			
 	signal eiEvents: StageMultiEventInfo;
 			
 		signal newEffectiveTarget: Mword := (others => '0'); -- DEPREC
 
-				signal TMP_writeEventTarget, TMP_waitForEmptySB: std_logic := '0';
+				signal TMP_writeEventTarget, TMP_waitForEmptySB, TMP_lateEvent: std_logic := '0';
 			
 			signal ch0, ch1: std_logic := '0';
 				
@@ -528,7 +528,9 @@ begin
 				stageDataToCommit_2 <= recreateGroup(robDataLiving, dataFromBQV, 
 																	dataFromLastEffective.data(0).target,
 																	tempBuffValue, tempBuffWaiting);
-					insToLastEffective_2 <= getLastEffective(stageDataToCommit_2);		
+					insToLastEffective_2 <= getLastEffective(stageDataToCommit_2);	
+					insToLastEffective_3 <= getLastEffective2(stageDataToCommit_2, dataFromLastEffective.data(0),
+																stageDataToPC.basicInfo.ip, TMP_writeEventTarget);
 				
 						TMP_writeEventTarget <= 
 							(eiEvents.eventOccured and sbEmpty) or (TMP_waitForEmptySB and sbEmpty);
@@ -550,6 +552,8 @@ begin
 						if sbEmpty = '1' then
 							TMP_waitForEmptySB <= '0';
 						end if;
+						
+						TMP_lateEvent <= TMP_writeEventTarget;
 					end if;
 				end process;
 			end block;

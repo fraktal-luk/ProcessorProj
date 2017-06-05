@@ -129,6 +129,10 @@ function getExceptionMask(insVec: StageDataMulti) return std_logic_vector;
 function getLastFull(newContent: StageDataMulti) return InstructionState;
 function getEffectiveMask(newContent: StageDataMulti) return std_logic_vector;
 function getLastEffective(newContent: StageDataMulti) return InstructionState;
+	function getLastEffective2(newContent: StageDataMulti;
+										lastEffective: InstructionState;
+										newTarget: Mword; changeTarget: std_logic)
+	return InstructionState;
 function groupHasException(newContent: StageDataMulti) return std_logic;
 
 
@@ -766,6 +770,41 @@ end function;
 		end loop;
 		return res;
 	end function;
+
+			function getLastEffective2(newContent: StageDataMulti;
+												lastEffective: InstructionState;
+												newTarget: Mword; changeTarget: std_logic)
+			return InstructionState is
+				variable res: InstructionState := newContent.data(0);
+			begin
+				-- Seeking from right side cause we need the last one 
+				for i in newContent.fullMask'range loop
+					-- Count only full instructions
+					if newContent.fullMask(i) = '1' then
+						res := newContent.data(i);
+					else
+						exit;
+					end if;
+					
+					-- If this one has an event, following ones don't count
+					if newContent.data(i).controlInfo.hasException = '1'
+						or newContent.data(i).controlInfo.specialAction = '1'
+																				-- CAREFUL! This also breaks flow!
+						--or (newContent.data(i).controlInfo.hasFetchLock = '1' and LATE_FETCH_LOCK)
+					then 
+						res.controlInfo.newEvent := '1'; -- Announce that event is to happen now!
+						exit;
+					end if;
+					
+				end loop;
+				
+				if changeTarget = '1' then
+					res := lastEffective;
+					res.target := newTarget;
+				end if;
+				
+				return res;
+			end function;
 
 	function getEffectiveMask(newContent: StageDataMulti) return std_logic_vector is
 		variable res: std_logic_vector(0 to PIPE_WIDTH-1) := (others => '0');
