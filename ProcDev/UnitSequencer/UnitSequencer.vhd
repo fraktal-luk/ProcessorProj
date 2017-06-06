@@ -563,13 +563,15 @@ begin
 
 			dataToLastEffective.fullMask(0) <= sendingToCommit;
 			dataToLastEffective.data(0) <= insToLastEffective_2;
+													--	insToLastEffective_3;
 
 			LAST_EFFECTIVE_SLOT: entity work.GenericStageMulti(LastEffective)
 			port map(
 				clk => clk, reset => resetSig, en => enSig,
 				
 				-- Interface with CQ
-				prevSending => sendingToCommit,
+				prevSending => sendingToCommit--,
+												or TMP_writeEventTarget,
 				stageDataIn => dataToLastEffective,-- TMPpre_lastEffective,
 				acceptingOut => open, -- unused but don't remove
 				

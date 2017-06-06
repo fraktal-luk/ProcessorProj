@@ -216,6 +216,7 @@ type InstructionControlInfo is record
 	hasReturn: std_logic;
 	hasFetchLock: std_logic;
 		specialAction: std_logic;
+		lateEvent: std_logic;
 	exceptionCode: SmallNumber; -- Set when exception occurs, remains cause exception can be only 1 per op
 end record;
 
@@ -547,6 +548,7 @@ begin
 												newFetchLock => '0',
 												hasFetchLock => '0',
 													specialAction => '0',
+													lateEvent => '0',
 												exceptionCode => (others=>'0')
 												);
 end function;

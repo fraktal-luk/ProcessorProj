@@ -800,6 +800,7 @@ end function;
 				
 				if changeTarget = '1' then
 					res := lastEffective;
+					res.controlInfo.lateEvent := '1';
 					res.target := newTarget;
 				end if;
 				
