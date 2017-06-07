@@ -273,11 +273,11 @@ begin
 	
 	nFullNext := nLiving + nReceiving - nSending;
 	-- full, fullMask - agree?
-	assert countOnes(fullMask) = nFull;
-		assert countOnes(fullMask(0 to nFull-1)) = nFull; -- checking continuity		
+	assert countOnes(fullMask) = nFull report "eeee";
+		assert countOnes(fullMask(0 to nFull-1)) = nFull report "hjuu"; -- checking continuity		
 	-- next full, fullMaskNext - agree?
-	assert countOnes(fullMaskNext) = nFullNext;
-		assert countOnes(fullMaskNext(0 to nFullNext-1)) = nFullNext; -- checking continuity	
+	assert countOnes(fullMaskNext) = nFullNext report "h";
+		assert countOnes(fullMaskNext(0 to nFullNext-1)) = nFullNext report "m,"; -- checking continuity	
 	-- number of killed agrees?
 		--??
 	-- number of new agrees?
@@ -299,8 +299,8 @@ begin
 					--report "rtttt";
 			insSendingMatch := bufferData(i);
 			-- Check the op that is sent?
-			assert insSendingMatch.numberTag = insSending.numberTag; -- TODO: is this the right tag field?
-			assert insSendingMatch.basicInfo.ip = insSending.basicInfo.ip;		
+			assert insSendingMatch.numberTag = insSending.numberTag report "byj"; -- TODO: is this the right tag field?
+			assert insSendingMatch.basicInfo.ip = insSending.basicInfo.ip report "jjj";		
 		end if;
 		
 		-- If we have visited all living instructions in old array, we break, because 
@@ -315,8 +315,8 @@ begin
 	
 	-- CHECK: does it make sense to examine this? Should other kinds of data be compared?
 	for i in 0 to nCommon-1 loop
-		assert commonPart1(i).numberTag = commonPart2(i).numberTag; -- TODO: is this the right tag field?
-		assert commonPart1(i).basicInfo.ip = commonPart2(i).basicInfo.ip;
+		assert commonPart1(i).numberTag = commonPart2(i).numberTag report "jutrrrr"; -- TODO: is this the right tag field?
+		assert commonPart1(i).basicInfo.ip = commonPart2(i).basicInfo.ip report "oiu";
 	end loop;
 	
 	-- pragma synthesis on	

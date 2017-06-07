@@ -81,7 +81,36 @@ function stageCQNext(content: StageDataCommitQueue; newContent: InstructionState
 return StageDataCommitQueue;
 
 -----------------------									
-				
+	
+	-- TODO: use these to implement StageDataMulti corresponding functions?
+	function getArrayResults(ia: InstructionStateArray) return MwordArray is
+		variable res: MwordArray(0 to ia'length-1) := (others => (others => '0'));
+	begin
+		for i in 0 to res'length-1 loop
+			res(i) := ia(i).result; 
+		end loop;
+		return res;
+	end function;
+	
+	function getArrayPhysicalDests(ia: InstructionStateArray) return PhysNameArray is
+		variable res: PhysNameArray(0 to ia'length-1) := (others => (others => '0'));
+	begin
+		for i in 0 to res'length-1 loop
+			res(i) := ia(i).physicalDestArgs.d0; 
+		end loop;
+		return res;
+	end function;
+	
+	function getArrayDestMask(ia: InstructionStateArray; fm: std_logic_vector) return std_logic_vector is
+		variable res: std_logic_vector(0 to ia'length-1) := (others => '0');
+	begin
+		for i in 0 to res'length-1 loop
+			res(i) := fm(i) and ia(i).physicalDestArgs.sel(0); 
+		end loop;
+		return res;
+	end function;
+
+	
 function getInstructionResults(insVec: StageDataMulti) return MwordArray;
 function getVirtualArgs(insVec: StageDataMulti) return RegNameArray;
 function getPhysicalArgs(insVec: StageDataMulti) return PhysNameArray;
@@ -113,7 +142,7 @@ function killByTag(before, ei, int: std_logic) return std_logic;
 function getWrittenTags(lastCommitted: StageDataMulti) return PhysNameArray;
 
 function getResultTags(execEnds: InstructionStateArray;
-			stageDataCQ: StageDataCommitQueue;
+			stageDataCQ: InstructionStateArray;
 			dispatchDataA, dispatchDataB, dispatchDataC, dispatchDataD: InstructionState;
 			lastCommitted: StageDataMulti) 
 return PhysNameArray;
@@ -123,7 +152,7 @@ function getNextResultTags(execPreEnds: InstructionStateArray;
 return PhysNameArray;
 	
 function getResultValues(execEnds: InstructionStateArray; 
-										stageDataCQ: StageDataCommitQueue;
+										stageDataCQ: InstructionStateArray;
 										lastCommitted: StageDataMulti)
 return MwordArray;	
 
@@ -447,8 +476,6 @@ function getInstructionResults(insVec: StageDataMulti) return MwordArray is
 begin
 	for i in insVec.fullMask'range loop
 		res(i) := insVec.data(i).result;
-		res(i) := insVec.data(i).result;
-		res(i) := insVec.data(i).result;
 	end loop;
 	return res;
 end function;
@@ -555,7 +582,7 @@ end function;
 
 
 function getResultTags(execEnds: InstructionStateArray; 
-						stageDataCQ: StageDataCommitQueue;
+						stageDataCQ: InstructionStateArray;
 						dispatchDataA, dispatchDataB, dispatchDataC, dispatchDataD: InstructionState;
 						lastCommitted: StageDataMulti) 
 return PhysNameArray is
@@ -570,7 +597,7 @@ begin
 	
 	-- CQ slots
 	for i in 0 to CQ_SIZE-1 loop 
-		resultTags(4-1 + i) := stageDataCQ.data(i).physicalDestArgs.d0;  	
+		resultTags(4-1 + i) := stageDataCQ(i).physicalDestArgs.d0;  	
 	end loop;
 
 	return resultTags;
@@ -599,7 +626,7 @@ end function;
 
 
 function getResultValues(execEnds: InstructionStateArray; 
-						stageDataCQ: StageDataCommitQueue;
+						stageDataCQ: InstructionStateArray;
 						lastCommitted: StageDataMulti)
 return MwordArray is
 	variable resultVals: MwordArray(0 to N_RES_TAGS-1) := (others=>(others=>'0'));		
@@ -611,7 +638,7 @@ begin
 			
 	-- CQ slots
 	for i in 0 to CQ_SIZE-1 loop 
-		resultVals(4-1 + i) := stageDataCQ.data(i).result;  	
+		resultVals(4-1 + i) := stageDataCQ(i).result;  	
 	end loop;
 	
 	return resultVals;
@@ -871,9 +898,11 @@ begin
 		
 		for i in 0 to content.data'length-1 loop
 			if i < nFull - nOut then
+								--outWidth then
 				dataTemp(i) := contentExtended(i);		
 				fullMaskTemp(i) := '1';
 			elsif i < nFull - nOut + 4 then
+									--outWidth + 4 then
 				dataTemp(i) := newCompactedData(k);
 				fullMaskTemp(i) := newCompactedMask(k);
 				k := k + 1;

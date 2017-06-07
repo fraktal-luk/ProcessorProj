@@ -41,6 +41,20 @@ package NewPipelineData is
 	constant LATE_FETCH_LOCK: boolean 
 				:= true; --false; -- Fetch lock not causing decode event, but only when committed
 	
+	constant CQ_SINGLE_OUTPUT: boolean := true;
+	constant CQ_THREE_OUTPUTS: boolean := not CQ_SINGLE_OUTPUT;
+	
+	function getIntegerWriteWidth(so: boolean) return integer is
+	begin
+		if so then
+			return 1;
+		else
+			return 3;
+		end if;	
+	end function;
+	
+	constant INTEGER_WRITE_WIDTH: integer := getIntegerWriteWidth(CQ_SINGLE_OUTPUT);
+	
 	-- TODO: eliminate, change to chained implementation
 	constant N_EVENT_AREAS: natural := 8;-- How many distinct stages or groups of stages have own event signals
 	-- PC, Fetch0, Fetch1, Hbuffer, Decode, Rename, OOO, Committed
@@ -65,6 +79,11 @@ package NewPipelineData is
 		-- If true, physical registers are allocated even for empty slots in instruction group
 		--		and later freed from them.
 		constant ALLOC_REGS_ALWAYS: boolean := false;
+
+		constant INITIAL_GROUP_TAG: SmallNumber := (others => '0');
+															-- i2slv(-PIPE_WIDTH, SMALL_NUMBER_SIZE)
+		constant USE_GPR_TAG: boolean := true;
+
 		
 		-- Allows to raise 'lockSend' for instruction before Exec when source which was 'readyNext'
 		--	doesn't show in 'ready'	when expected	
@@ -73,6 +92,9 @@ package NewPipelineData is
 	constant N_RES_TAGS: natural := 4-1 + CQ_SIZE; -- + PIPE_WIDTH; -- + 3*PIPE_WIDTH; 
 						-- Above: num subpipe results + CQ slots + max commited slots + pre-IQ red ports
 	constant N_NEXT_RES_TAGS: natural := 2; 
+
+
+
 	
 	constant zerosPW: std_logic_vector(0 to PIPE_WIDTH-1) := (others=>'0');	
 	------
@@ -279,10 +301,6 @@ type InstructionState is record
 end record;
 
 type InstructionStateArray is array(integer range <>) of InstructionState;
-	
-	constant INITIAL_GROUP_TAG: SmallNumber := (others => '0');
-															-- i2slv(-PIPE_WIDTH, SMALL_NUMBER_SIZE)
-	constant USE_GPR_TAG: boolean := false;
 	
 	
 -- Number of words proper for fetch group size
