@@ -562,8 +562,8 @@ begin
 			interruptCause.controlInfo.hasReset <= start;
 
 			dataToLastEffective.fullMask(0) <= sendingToCommit;
-			dataToLastEffective.data(0) <= insToLastEffective_2;
-													--	insToLastEffective_3;
+			dataToLastEffective.data(0) <= --insToLastEffective_2;
+														insToLastEffective_3;
 
 			LAST_EFFECTIVE_SLOT: entity work.GenericStageMulti(LastEffective)
 			port map(

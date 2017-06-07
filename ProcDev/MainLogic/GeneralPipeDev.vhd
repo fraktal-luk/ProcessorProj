@@ -802,6 +802,16 @@ end function;
 					res := lastEffective;
 					res.controlInfo.lateEvent := '1';
 					res.target := newTarget;
+						res.controlInfo.newEvent := '0';
+						res.controlInfo.newInterrupt := '0';
+						res.controlInfo.newReset := '0';
+						res.controlInfo.newException := '0';
+						res.controlInfo.hasEvent := '0';
+						res.controlInfo.hasInterrupt := '0';
+						res.controlInfo.hasReset := '0';
+						res.controlInfo.hasException := '0';
+
+						res.controlInfo.specialAction := '0';
 				end if;
 				
 				return res;
