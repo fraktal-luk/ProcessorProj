@@ -210,12 +210,12 @@ begin
 		a <= execCausing.groupTag;
 		b <= stageData.data(0).groupTag;	
 
-		IQ_KILLER: entity work.CompareBefore8 port map(
-			inA =>  a,
-			inB =>  b,
-			outC => open --
-						--before
-		);
+--		IQ_KILLER: entity work.CompareBefore8 port map(
+--			inA =>  a,
+--			inB =>  b,
+--			outC => open --
+--						--before
+--		);
 			c <= subSN(a, b);
 		before <= c(7);
 		--before <= '0'; --
@@ -281,12 +281,12 @@ begin
 		a <= execCausing.groupTag;
 		b <= stageData.data(0).groupTag;	
 
-		IQ_KILLER: entity work.CompareBefore8 port map(
-			inA =>  a,
-			inB =>  b,
-			outC => open --
-						--before
-		);
+--		IQ_KILLER: entity work.CompareBefore8 port map(
+--			inA =>  a,
+--			inB =>  b,
+--			outC => open --
+--						--before
+--		);
 			c <= subSN(a, b);
 		before <= c(7);
 		--before <= '0'; --

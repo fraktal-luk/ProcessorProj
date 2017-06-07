@@ -124,7 +124,7 @@ begin
 											
 	whichAcceptedCQSig <= (others => '1');
 													
-	SLOT_CQ: entity work.BufferPipeLogic(Behavioral)
+	SLOT_CQ: entity work.BufferPipeLogic(BehavioralDirect)
 	generic map(
 		CAPACITY => CQ_SIZE,
 		MAX_OUTPUT => PIPE_WIDTH,	

@@ -201,7 +201,7 @@ begin
 				end if;
 			end process;
 					
-			SLOT_BUFF: entity work.BufferPipeLogic(Behavioral)
+			SLOT_BUFF: entity work.BufferPipeLogic(BehavioralDirect)
 																	--BehavioralDirect)
 			generic map(
 				CAPACITY => QUEUE_SIZE, -- PIPE_WIDTH*2*2
@@ -230,12 +230,12 @@ begin
 					begin
 						a <= execCausing.groupTag;
 						b <= content(i).ins.groupTag;
-						IQ_KILLER: entity work.CompareBefore8 port map(
-							inA =>  a,
-							inB =>  b,
-							outC => --before
-										open
-						);		
+--						IQ_KILLER: entity work.CompareBefore8 port map(
+--							inA =>  a,
+--							inB =>  b,
+--							outC => --before
+--										open
+--						);		
 						
 						c <= subSN(a, b);
 						before <= c(7);

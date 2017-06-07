@@ -216,15 +216,8 @@ begin
 
 -----------------------------------
 	BQ_BLOCK: block
-		signal --acceptingNewBQ, 
-					--prevSendingToBQ, 
-					storeTargetWrSig--, sendingOutBQ
-					: std_logic := '0';
-		--signal dataNewToBQ: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
-		signal storeTargetDataSig--, dataOutBQ
-						: InstructionState := DEFAULT_INSTRUCTION_STATE;
-		--signal committing: std_logic := '0';
-		--signal groupCtrNext, groupCtrInc: SmallNumber := (others => '0');
+		signal storeTargetWrSig: std_logic := '0';
+		signal storeTargetDataSig: InstructionState := DEFAULT_INSTRUCTION_STATE;
 		
 		signal storingForMTC: std_logic := '0';
 		

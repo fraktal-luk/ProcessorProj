@@ -68,8 +68,6 @@ entity UnitFront is
 		lastSending: out std_logic;
 		-------
 		killVector: in std_logic_vector(0 to N_EVENT_AREAS-1)
-
-		--fetchLockCommand: in std_logic
 	);
 end UnitFront;
 
@@ -136,7 +134,7 @@ begin
 			
 			execEventSignal => killVector(1),
 			execCausing => DEFAULT_INSTRUCTION_STATE,
-			lockCommand => '0' --fetchLockCommand		
+			lockCommand => '0'		
 		);	
 		
 		stageDataOutFetch <= f0output.data(0);

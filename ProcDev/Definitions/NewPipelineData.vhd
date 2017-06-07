@@ -151,8 +151,6 @@ type InstructionClassInfo is record
 	system: std_logic; -- ??
 	--memory: std_logic; -- ??
 	fetchLock: std_logic;
-	--renameLock: std_logic; -- prob. cannot be here; maybe should in controlInfo
-	--		short: std_logic;
 	undef: std_logic;
 	illegal: std_logic;
 	privilege: SmallNumber;
