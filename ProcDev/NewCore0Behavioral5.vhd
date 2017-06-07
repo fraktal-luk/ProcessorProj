@@ -87,6 +87,7 @@ architecture Behavioral5 of NewCore0 is
 
 			signal sendingFromBQ: std_logic := '0';
 			signal dataOutBQ: InstructionState := DEFAULT_INSTRUCTION_STATE;
+			signal dataOutBQV: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
 
 	-- back end interfaces
 	signal whichAcceptedCQ: std_logic_vector(0 to 3) := (others=>'0');	
@@ -189,6 +190,7 @@ begin
 
 		---
 		sendingFromBQ => sendingFromBQ,
+			dataFromBQV => dataOutBQV,
 		dataFromBQ => dataOutBQ,
 
 		-- Interface from committed stage
@@ -425,6 +427,7 @@ begin
 		
 		acceptingNewBQ => acceptingNewBQ,
 		sendingOutBQ => sendingFromBQ,
+			dataOutBQV => dataOutBQV,
 		dataOutBQ => dataOutBQ,
 		prevSendingToBQ => renamedSending,
 		dataNewToBQ => compactedToBQ,

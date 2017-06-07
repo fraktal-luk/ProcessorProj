@@ -229,15 +229,15 @@ begin
 					
 			NEW_TARGET_ADDER: entity work.IntegerAdder
 			port map(
-				inA => newDecoded.data(0).basicInfo.ip,
-				inB => newDecoded.data(0).constantArgs.imm,
+				inA => newDecoded.data(i).basicInfo.ip,
+				inB => newDecoded.data(i).constantArgs.imm,
 				output => targets(i)
 			);
 			
 			NEW_LINK_ADDER: entity work.IntegerAdder
 			port map(
-				inA => newDecoded.data(0).basicInfo.ip,
-				inB => getAddressIncrement(newDecoded.data(0)),
+				inA => newDecoded.data(i).basicInfo.ip,
+				inB => getAddressIncrement(newDecoded.data(i)),
 				output => links(i)
 			);			
 		end generate;

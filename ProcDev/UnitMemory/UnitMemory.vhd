@@ -283,6 +283,7 @@ begin
 				
 				--acceptingOutSQ => execAcceptingESig,
 				sendingSQOut => sendingOutSQ, -- OUTPUT
+					dataOutV => open,
 				dataOutSQ => dataOutSQ -- OUTPUT
 			);
 
@@ -317,6 +318,7 @@ begin
 
 				--acceptingOutSQ => open,--acceptingLoadUnitOut, -- ! dont do multiple drivers!
 				sendingSQOut => open,--sendingOutLQ, --??
+					dataOutV => open,
 				dataOutSQ => open--dataOutLQ--?? 
 			);
 

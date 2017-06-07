@@ -86,11 +86,6 @@ package NewPipelineData is
 	type PhysNameArray is array(natural range <>) of PhysName;
 
 
-subtype SmallNumber is byte;
-type SmallNumberArray is array(integer range <>) of SmallNumber;
-constant SMALL_NUMBER_SIZE: natural := SmallNumber'length;
-
-
 constant PROCESSOR_ID: Mword := X"001100aa";
 
 type ExecUnit is (General, ALU, MAC, Divide, Jump, Memory, System );

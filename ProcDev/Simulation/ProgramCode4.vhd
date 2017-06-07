@@ -223,7 +223,7 @@ package ProgramCode4 is
 		function insCLEAR(reg: integer) return word is begin return ins655H(addI, reg, r0, 0); end function;
 		function insSET(reg, num: integer) return word is
 			begin return ins655H(addI, reg, r0, num); end function;		
-		function insMOVE(rd, rs: integer) return word is begin return ins655H(addI, rd, rs, 0); end function;
+		function insMOVE(rd, rs: integer) return word is begin return ins655H(orI, rd, rs, 0); end function;
 
 		function insSTORE(ra, rb, num: integer) return word is
 			begin return ins6556X(ext1, ra, rb, store, num); end function;
