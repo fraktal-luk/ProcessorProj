@@ -510,7 +510,7 @@ begin
 		elsif commitCausing.controlInfo.newInterrupt = '1' then
 			res.basicInfo.ip := INT_BASE; -- TEMP!
 			res.basicInfo.intLevel := "00000001";		
-		elsif commitCausing.controlInfo.newException = '1' or not LATE_FETCH_LOCK then
+		elsif commitCausing.controlInfo.newException = '1' then--or not LATE_FETCH_LOCK then
 			-- TODO, FIX: exceptionCode sliced - shift left by ALIGN_BITS? or leave just base address
 			res.basicInfo.ip := EXC_BASE(MWORD_SIZE-1 downto commitCausing.controlInfo.exceptionCode'length)
 									& commitCausing.controlInfo.exceptionCode(
@@ -518,8 +518,22 @@ begin
 									& EXC_BASE(ALIGN_BITS-1 downto 0);	
 									--		INT_BASE;
 			res.basicInfo.systemLevel := "00000001";
-		else -- fetchLock	
-			res.basicInfo.ip := causingNext;
+			
+			elsif commitCausing.controlInfo.specialAction = '1' then
+				if commitCausing.operation.func = sysSync then
+					res.basicInfo.ip := commitCausing.target;
+				elsif commitCausing.operation.func = sysReplay then
+					res.basicInfo.ip := commitCausing.basicInfo.ip;
+				elsif commitCausing.operation.func = sysHalt then
+					res.basicInfo.ip := commitCausing.target; -- ???
+				elsif commitCausing.operation.func = sysRetI then
+						res.basicInfo.ip := X"00000020";  --TEMP!!
+				elsif commitCausing.operation.func = sysRetE then
+						res.basicInfo.ip := X"00000030";  --TEMP!!					
+				end if;
+				
+		--else -- fetchLock	
+		--	res.basicInfo.ip := causingNext;
 		end if;	
 	elsif execEvent = '1' then		
 		res.basicInfo.ip := execCausing.target;
@@ -527,9 +541,9 @@ begin
 			if BRANCH_AT_DECODE then
 				res.basicInfo.ip := decodeCausing.target;	
 			end if;
-		if decodeCausing.controlInfo.newFetchLock = '1' then	
-			res.basicInfo.ip := causingNext;
-		end if;
+		--if decodeCausing.controlInfo.newFetchLock = '1' then	
+		--	res.basicInfo.ip := causingNext;
+		--end if;
 	else	-- Increment by the width of fetch group
 		res.basicInfo.ip := pcNext;
 	end if;	

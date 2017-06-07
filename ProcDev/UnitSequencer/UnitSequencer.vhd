@@ -89,6 +89,7 @@ entity UnitSequencer is
 		renamedSending: out std_logic;
 
 		-- Interface with ROB
+		commitAccepting: out std_logic;
 		robDataLiving: in StageDataMulti;
 		sendingFromROB: in std_logic;
 		
@@ -148,6 +149,10 @@ architecture Behavioral of UnitSequencer is
 	signal sendingToCommit, sendingOutCommit, acceptingOutCommit: std_logic := '0';
 	signal stageDataToCommit, stageDataOutCommit: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;						
 
+
+		signal stageDataToCommit_2, stageDataOutCommit_2: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;						
+				
+
 	signal newPhysDests: PhysNameArray(0 to PIPE_WIDTH-1) := (others=>(others=>'0'));
 	signal newPhysDestPointer: SmallNumber := (others => '0');
 
@@ -166,6 +171,7 @@ architecture Behavioral of UnitSequencer is
 	signal renameLockCommand, renameLockRelease, renameLockState, renameLockEnd: std_logic := '0';	
 				
 	signal dataToLastEffective, dataFromLastEffective: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;	
+		signal insLastEffective_2, insToLastEffective_2: InstructionState := DEFAULT_INSTRUCTION_STATE;	
 			
 	signal eiEvents: StageMultiEventInfo;
 			
@@ -206,7 +212,7 @@ begin
 			killVecOut(6) <= eiEvents.eventOccured;
 			killVecOut(5) <= execOrIntEventSignal;
 			killVecOut(0 to 4) <= newGeneralEvents.affectedVec;
-		
+
 		generalEvents <= newGeneralEvents;
 			newGeneralEvents <= NEW_generalEvents(
 											stageDataOutPC,
@@ -235,7 +241,8 @@ begin
 	-- CAREFUL: prevSending normally means that 'full' bit inside will be set, but
 	--				when en = '0' this won't happen.
 	--				To be fully correct, prevSending should not be '1' when receiving prevented.			
-	sendingToPC <= acceptingOutPC and (sendingOutPC or generalEvents.eventOccured);
+	sendingToPC <= acceptingOutPC and (sendingOutPC
+												or (generalEvents.eventOccured and not isHalt(generalEvents.causing)));
 
 	newTargetInfo <= stageDataToPC.basicInfo;
 
@@ -465,9 +472,11 @@ begin
 
 
 	sendingToCommit <= sendingFromROB;	
-	stageDataToCommit <= robDataLiving;
+	stageDataToCommit <= --robDataLiving;
+									stageDataToCommit_2;
 
 	committing <= sendingFromROB;
+
 	
 	-- Commit stage: in order again				
 	SUBUNIT_COMMIT: entity work.GenericStageMulti(Behavioral)
@@ -507,7 +516,7 @@ begin
 				signal committingTakenBranch, committingTakenBranchAsLE, tempBuffWaiting: std_logic := '0';
 				signal tempBuffValue, normalIncTarget, incTarget, incArg: Mword := (others => '0');
 				signal leGrInd: integer := 0;
-				
+
 				function totalEffectiveInc(sd: StageDataMulti) return Mword is
 					variable res: Mword := (others => '0');
 					variable em: std_logic_vector(0 to PIPE_WIDTH-1) := (others => '0');
@@ -527,10 +536,24 @@ begin
 					return res;
 				end function;
 			begin
+
+
+				stageDataToCommit_2 <= recreateGroup(robDataLiving, dataFromBQV, 
+																	dataFromLastEffective.data(0).target,
+																	tempBuffValue, tempBuffWaiting);
+					insToLastEffective_2 <= getLastEffective(stageDataToCommit_2);
+				
+				
+							ch0 <= '1' when insLastEffective_2 = dataFromLastEffective.data(0) else '0';
 				
 				SYNCH: process(clk)
 				begin
 					if rising_edge(clk) then
+							if sendingToCommit = '1' then
+								stageDataOutCommit_2 <= stageDataToCommit_2;
+								insLastEffective_2 <= insToLastEffective_2;
+							end if;
+					
 						if eiEvents.eventOccured = '1' then 
 							tempBuffWaiting <= '1';
 							tempBuffValue <= stageDataToPC.basicInfo.ip;
@@ -564,14 +587,14 @@ begin
 							 dataFromBQV.data(leGrInd).argValues.arg1 when committingTakenBranchAsLE = '1'
 					else	 incTarget;
 			end block;
-
 		
 			interruptCause.controlInfo.hasInterrupt <= intSignal;
 			interruptCause.controlInfo.hasReset <= start;
 
 			dataToLastEffective.fullMask(0) <= sendingToCommit;
 			dataToLastEffective.data(0) <= 
-									setInstructionTarget(getLastEffective(stageDataToCommit), newEffectiveTarget);
+									--setInstructionTarget(getLastEffective(stageDataToCommit), newEffectiveTarget);
+									insToLastEffective_2;
 
 			LAST_EFFECTIVE_SLOT: entity work.GenericStageMulti(LastEffective)
 			port map(
@@ -610,6 +633,8 @@ begin
 		newPhysSources <= newPhysSourcesIn;
 
 		renameLockEndOut <= renameLockEnd;
+
+		commitAccepting <= '1';
 
 		committedSending <= sendingOutCommit;
 		committedDataOut <= stageDataOutCommit;

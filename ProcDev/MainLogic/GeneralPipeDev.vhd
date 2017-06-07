@@ -133,6 +133,49 @@ function getExecSending(oA, oB, oC, oD, oE: InstructionSlot) return std_logic_ve
 function getExecSending2(oA, oB, oC, oD, oE: InstructionSlot) return std_logic_vector;
 function getExecPreEnds(opB, opC: InstructionState) return InstructionStateArray;
 
+
+-- Unifies content of ROB slot with BQ, others queues etc. to restore full state needed at Commit
+function recreateGroup(insVec: StageDataMulti; bqGroup: StageDataMulti;
+							  prevAddress: Mword; tempValue: Mword; useTemp: std_logic) return StageDataMulti is
+	variable res: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
+	variable targets: MwordArray(0 to PIPE_WIDTH-1) := (others => (others => '0'));
+	variable ind: integer := 0;
+	variable prevAdr: Mword := (others => '0');
+begin
+	res := insVec;
+	
+	if useTemp = '1' then
+		prevAdr := tempValue;
+	else
+		prevAdr := prevAddress;
+	end if;
+	
+	for i in 0 to PIPE_WIDTH-1 loop
+		targets(i) := bqGroup.data(i).target; -- Default to some input, not zeros 
+	end loop;
+	
+	-- Take branch targets to correct places
+	for i in 0 to PIPE_WIDTH-1 loop
+		if bqGroup.fullMask(i) = '1' then
+			ind := slv2u(getTagLow(bqGroup.data(i).groupTag));
+			targets(ind) := bqGroup.data(i).argValues.arg1;
+		end if;
+	end loop;
+
+	for i in 0 to PIPE_WIDTH-1 loop
+		if insVec.data(i).controlInfo.hasBranch = '1' then
+			null;
+		else
+			targets(i) := i2slv(slv2u(prevAdr) + slv2u(getAddressIncrement(insVec.data(i))), MWORD_SIZE);
+		end if;
+		res.data(i).basicInfo.ip := prevAdr; -- ??
+		prevAdr := targets(i);
+		res.data(i).target := targets(i);
+	end loop;
+	
+	return res;
+end function;
+
 	
 end GeneralPipeDev;
 
@@ -657,8 +700,9 @@ end function;
 			
 			-- If this one has an event, following ones don't count
 			if newContent.data(i).controlInfo.hasException = '1'
+				or newContent.data(i).controlInfo.specialAction = '1'
 																		-- CAREFUL! This also breaks flow!
-				or (newContent.data(i).controlInfo.hasFetchLock = '1' and LATE_FETCH_LOCK)
+				--or (newContent.data(i).controlInfo.hasFetchLock = '1' and LATE_FETCH_LOCK)
 			then 
 				res.controlInfo.newEvent := '1'; -- Announce that event is to happen now!
 				exit;
@@ -682,7 +726,9 @@ end function;
 			
 			-- CAREFUL, TODO: what if there's a branch (or branch correction) and valid path after it??
 			-- If this one has an event, following ones don't count
-			if 	newContent.data(i).controlInfo.hasEvent = '1' --??
+			if --	newContent.data(i).controlInfo.hasEvent = '1' --??
+					newContent.data(i).controlInfo.hasException = '1'
+				or newContent.data(i).controlInfo.specialAction = '1'
 			then
 				exit;
 			end if;

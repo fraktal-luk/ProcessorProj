@@ -89,6 +89,8 @@ function clearTempControlInfoMulti(sd: StageDataMulti) return StageDataMulti;
 function setException(ins: InstructionState; intSignal, resetSignal, isNew: std_logic)
 return InstructionState;
 
+function isHalt(ins: InstructionState) return std_logic;
+
 function clearEmptyResultTags(insVec: InstructionStateArray; fullMask: std_logic_vector)
 return InstructionStateArray;
 
@@ -435,7 +437,9 @@ begin
 		end if;	
 			
 	res.controlInfo.newEvent := ((res.controlInfo.hasException 
-													or (res.controlInfo.hasFetchLock and lateFetchLock))
+											or res.controlInfo.specialAction
+											--		or (res.controlInfo.hasFetchLock and lateFetchLock)
+											)
 											and isNew) 
 									or intSignal or resetSignal;
 	res.controlInfo.hasEvent := res.controlInfo.hasEvent or res.controlInfo.newEvent;
@@ -453,6 +457,14 @@ begin
 	return res;
 end function;	
 
+function isHalt(ins: InstructionState) return std_logic is
+	variable res: std_logic := '0';
+begin
+	if ins.operation = (System, sysHalt) and ins.controlInfo.hasInterrupt = '0' then 
+		res := '1';
+	end if;
+	return res;
+end function;
 
 function clearEmptyResultTags(insVec: InstructionStateArray; fullMask: std_logic_vector)
 return InstructionStateArray is

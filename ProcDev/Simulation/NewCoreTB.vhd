@@ -237,10 +237,12 @@ BEGIN
 						report "Store to address 255 - illegal!" severity error;
 				end if;
 			
+				-- TODO: define effective address exact size
+			
 				-- Reading
 				memReadDone <= dread;
 				memReadDonePrev <= memReadDone;
-				memReadValue <= dataMem(slv2u(dadr)) ;--(9 downto 2))); 
+				memReadValue <= dataMem(slv2u(dadr(MWORD_SIZE-1 downto 2))) ;-- CAREFUL: pseudo-byte addressing 
 				memReadValuePrev <= memReadValue;	
 				
 				-- Writing
@@ -248,7 +250,7 @@ BEGIN
 				memWriteValue <= dout;
 				memWriteAddress <= doutadr;
 				if memWriteDone = '1' then
-					dataMem(slv2u(memWriteAddress)) -- (9 downto 2)))
+					dataMem(slv2u(memWriteAddress(MWORD_SIZE-1 downto 2))) -- CAREFUL: pseudo-byte addressing
 											<= memWriteValue;
 				end if;
 				

@@ -102,8 +102,12 @@ type ProcOpcont is ( -- ALU functions
 							
 							-- ext2: 
 							-- system jumps
-							--rete,
-							--reti,
+							retE,
+							retI,
+							halt,
+							sync,
+							replay,
+							
 							
 							mfc,
 							mtc,

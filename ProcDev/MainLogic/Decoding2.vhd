@@ -139,7 +139,7 @@ package Decoding2 is
 		constant undefInsDef: InsDefNewW := (opcode2slv(ext2), opcont2slv(ext2, undef),
 																				System, sysUndef, fmtUndef);
 		
-		constant decodeTableNew: InsDefArrayNew(0 to 25) := (
+		constant decodeTableNew: InsDefArrayNew(0 to 31) := (
 				0 => (andI, none, Alu, logicAnd, fmtImm),
 				1 => (orI,  none, Alu, logicOr,  fmtImm),
 				2 => (addI, none, Alu, arithAdd, fmtImm),
@@ -173,6 +173,12 @@ package Decoding2 is
 
 					23 => (ext1, loadFP,		Memory,load,	fmtLoadImm),
 					24 => (ext1, storeFP,	Memory,store,	fmtStoreImm),
+				
+					25 => (ext2, halt, System, sysHalt, fmtNoArgs),
+					26 => (ext2, retI, System, sysRetI, fmtNoArgs),
+					27 => (ext2, retE, System, sysRetE, fmtNoArgs),
+					28 => (ext2, sync,	System, sysSync,	 fmtNoArgs),
+					29 => (ext2, replay, System, sysReplay, fmtNoArgs),
 				
 				others => (ext2, undef, System, sysUndef, fmtUndef)
 				);
