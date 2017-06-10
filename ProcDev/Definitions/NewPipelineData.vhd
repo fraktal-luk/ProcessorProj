@@ -41,7 +41,8 @@ package NewPipelineData is
 	constant LATE_FETCH_LOCK: boolean 
 				:= true; --false; -- Fetch lock not causing decode event, but only when committed
 	
-	constant CQ_SINGLE_OUTPUT: boolean := true;
+	constant CQ_SINGLE_OUTPUT: boolean := --false;--
+														true;
 	constant CQ_THREE_OUTPUTS: boolean := not CQ_SINGLE_OUTPUT;
 	
 	function getIntegerWriteWidth(so: boolean) return integer is
@@ -74,7 +75,9 @@ package NewPipelineData is
 	
 	constant CQ_SIZE: natural := PIPE_WIDTH * 3;
 	
-		constant ROB_SIZE: natural := 8; -- ??
+	constant SB_SIZE: natural := 4;
+	
+	constant ROB_SIZE: natural := 8; -- ??
 	
 		-- If true, physical registers are allocated even for empty slots in instruction group
 		--		and later freed from them.
