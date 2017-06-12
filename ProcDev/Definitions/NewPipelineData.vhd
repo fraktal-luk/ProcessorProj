@@ -216,6 +216,7 @@ type InstructionControlInfo is record
 	hasReturn: std_logic;
 	hasFetchLock: std_logic;
 		specialAction: std_logic;
+		phase0, phase1, phase2: std_logic;
 	exceptionCode: SmallNumber; -- Set when exception occurs, remains cause exception can be only 1 per op
 end record;
 
@@ -547,6 +548,9 @@ begin
 												newFetchLock => '0',
 												hasFetchLock => '0',
 													specialAction => '0',
+													phase0 => '0',
+													phase1 => '0',
+													phase2 => '0',
 												exceptionCode => (others=>'0')
 												);
 end function;

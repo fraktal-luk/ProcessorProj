@@ -86,7 +86,12 @@ function getLinkInfoSuper(ins: InstructionState; causingNext: Mword) return Inst
 function clearTempControlInfoSimple(ins: InstructionState) return InstructionState;
 function clearTempControlInfoMulti(sd: StageDataMulti) return StageDataMulti;
 
-function setException(ins: InstructionState; intSignal, resetSignal, isNew: std_logic)
+function setException(ins: InstructionState;
+							 intSignal, resetSignal, isNew, phase0, phase1, phase2: std_logic)
+return InstructionState;
+
+function setException2(ins, causing: InstructionState;
+							  intSignal, resetSignal, isNew, phase0, phase1, phase2: std_logic)
 return InstructionState;
 
 function isHalt(ins: InstructionState) return std_logic;
@@ -427,7 +432,8 @@ begin
 end function;
 
 	
-function setException(ins: InstructionState; intSignal, resetSignal, isNew: std_logic)
+function setException(ins: InstructionState;
+							 intSignal, resetSignal, isNew, phase0, phase1, phase2: std_logic)
 return InstructionState is
 	variable res: InstructionState := ins;
 		variable lateFetchLock: std_logic := '0';
@@ -454,8 +460,48 @@ begin
 	res.controlInfo.hasReset := resetSignal;
 		
 	-- ...?	
+		res.controlInfo.phase0 := phase0;
+		res.controlInfo.phase1 := phase1;
+		res.controlInfo.phase2 := phase2;
+
 	return res;
 end function;	
+
+
+function setException2(ins, causing: InstructionState;
+							  intSignal, resetSignal, isNew, phase0, phase1, phase2: std_logic)
+return InstructionState is
+	variable res: InstructionState := ins;
+		variable lateFetchLock: std_logic := '0';
+begin
+		if LATE_FETCH_LOCK then
+			lateFetchLock := '1';
+		end if;	
+			
+	res.controlInfo.newEvent := ((res.controlInfo.hasException 
+											or res.controlInfo.specialAction
+											--		or (res.controlInfo.hasFetchLock and lateFetchLock)
+											)
+											and isNew) 
+									or intSignal or resetSignal;
+	res.controlInfo.hasEvent := res.controlInfo.hasEvent or res.controlInfo.newEvent;
+
+	res.controlInfo.newException := res.controlInfo.hasException and isNew; 
+
+	res.controlInfo.newInterrupt := intSignal;
+	res.controlInfo.hasInterrupt := intSignal;
+	-- ^ Interrupts delayed by 1 cycle if exception being committed!
+	
+	res.controlInfo.newReset := resetSignal;
+	res.controlInfo.hasReset := resetSignal;
+		
+	-- ...?	
+	if phase1 = '1' then
+		res.target := causing.target;
+	end if;
+	return res;
+end function;
+
 
 function isHalt(ins: InstructionState) return std_logic is
 	variable res: std_logic := '0';

@@ -179,12 +179,17 @@ architecture Behavioral of UnitSequencer is
 				
 	signal dataToLastEffective, dataFromLastEffective: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;	
 		signal insToLastEffective_2: InstructionState := DEFAULT_INSTRUCTION_STATE;	
-			
-	signal eiEvents: StageMultiEventInfo;
+
+				signal sendingLateEvent: std_logic := '0';
+				signal dataFromLateEvent: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
+
+	signal eiEvents, lateEvents: StageMultiEventInfo;
 			
 		signal newEffectiveTarget: Mword := (others => '0'); -- DEPREC
 
 				signal TMP_writeEventTarget, TMP_waitForEmptySB: std_logic := '0';
+				
+				signal TMP_targetIns: InstructionState := DEFAULT_INSTRUCTION_STATE;
 			
 			signal ch0, ch1: std_logic := '0';
 				
@@ -522,7 +527,7 @@ begin
 			--			The 'target' field will be used to update return address for exc/int
 			NEW_TARGET: block
 				signal tempBuffWaiting: std_logic := '0';
-				signal tempBuffValue: Mword := (others => '0');
+				signal tempBuffValue: Mword := (others => '0');				
 			begin
 
 				stageDataToCommit_2 <= recreateGroup(robDataLiving, dataFromBQV, 
@@ -553,9 +558,17 @@ begin
 					end if;
 				end process;
 			end block;
-		
+				
+				TMP_targetIns <= getLatePCData(
+											stageDataOutPC,
+											eiEvents.eventOccured, eiEvents.causing,
+											execEventSignal, execCausing,
+											stage0EventInfo.eventOccured, stage0EventInfo.causing,
+											pcNext, causingNext);
+											
 			interruptCause.controlInfo.hasInterrupt <= intSignal;
 			interruptCause.controlInfo.hasReset <= start;
+				interruptCause.target <= TMP_targetIns.basicInfo.ip;
 
 			dataToLastEffective.fullMask(0) <= sendingToCommit;
 			dataToLastEffective.data(0) <= insToLastEffective_2;
@@ -578,9 +591,32 @@ begin
 				execEventSignal => '0', -- CAREFUL: committed cannot be killed!
 				execCausing => interruptCause,		
 
-				lockCommand => '0',
+				lockCommand => not sbEmpty,
 
 				stageEventsOut => eiEvents
+			);
+
+			LATE_EVENT_SLOT: entity work.GenericStageMulti(LastEffective)
+			port map(
+				clk => clk, reset => resetSig, en => enSig,
+				
+				-- Interface with CQ
+				prevSending => sendingToCommit,
+				stageDataIn => dataToLastEffective,-- TMPpre_lastEffective,
+				acceptingOut => open, -- unused but don't remove
+				
+				-- Interface with hypothetical further stage
+				nextAccepting => sbEmpty or not lateEvents.eventOccured,
+				sendingOut => sendingLateEvent,
+				stageDataOut => dataFromLateEvent,--TMP_lastEffective,
+				
+				-- Event interface
+				execEventSignal => '0', -- CAREFUL: committed cannot be killed!
+				execCausing => interruptCause,		
+
+				lockCommand => '0',
+
+				stageEventsOut => lateEvents
 			);
 			
 	renameAccepting <= acceptingOutRename;

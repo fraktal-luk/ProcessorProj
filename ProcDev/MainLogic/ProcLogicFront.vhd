@@ -67,6 +67,13 @@ return StageDataHbuffer;
 function newFromHbuffer(content: InstructionStateArray; fullMask: std_logic_vector)
 return HbuffOutData;
 
+function getLatePCData(content: InstructionState;
+						  commitEvent: std_logic; commitCausing: InstructionState;
+						  execEvent: std_logic; execCausing: InstructionState;	
+						  decodeEvent: std_logic; decodeCausing: InstructionState;
+						  pcNext, causingNext: Mword)
+return InstructionState;
+
 function newPCData(content: InstructionState;
 						  commitEvent: std_logic; commitCausing: InstructionState;
 						  execEvent: std_logic; execCausing: InstructionState;	
@@ -491,6 +498,50 @@ begin
 	ret.nOut := i2slv(nOut, SMALL_NUMBER_SIZE);
 	ret.nHOut := i2slv(j, SMALL_NUMBER_SIZE);
 	return ret;
+end function;
+
+function getLatePCData(content: InstructionState;
+						  commitEvent: std_logic; commitCausing: InstructionState;
+						  execEvent: std_logic; execCausing: InstructionState;	
+						  decodeEvent: std_logic; decodeCausing: InstructionState;
+						  pcNext, causingNext: Mword)
+return InstructionState is
+	variable res: InstructionState := content;
+	variable newPC: Mword := (others=>'0');
+begin
+		if commitCausing.controlInfo.newReset = '1' then -- TEMP!
+			res.basicInfo.ip := (others => '0');
+			res.basicInfo.intLevel := "00000000";				
+		elsif commitCausing.controlInfo.newInterrupt = '1' then
+			res.basicInfo.ip := INT_BASE; -- TEMP!
+			res.basicInfo.intLevel := "00000001";		
+		elsif commitCausing.controlInfo.newException = '1' then--or not LATE_FETCH_LOCK then
+			-- TODO, FIX: exceptionCode sliced - shift left by ALIGN_BITS? or leave just base address
+			res.basicInfo.ip := EXC_BASE(MWORD_SIZE-1 downto commitCausing.controlInfo.exceptionCode'length)
+									& commitCausing.controlInfo.exceptionCode(
+													commitCausing.controlInfo.exceptionCode'length-1 downto ALIGN_BITS)
+									& EXC_BASE(ALIGN_BITS-1 downto 0);	
+									--		INT_BASE;
+			res.basicInfo.systemLevel := "00000001";
+			
+			elsif commitCausing.controlInfo.specialAction = '1' then
+				if commitCausing.operation.func = sysSync then
+					res.basicInfo.ip := commitCausing.target;
+				elsif commitCausing.operation.func = sysReplay then
+					res.basicInfo.ip := commitCausing.basicInfo.ip;
+				elsif commitCausing.operation.func = sysHalt then
+					res.basicInfo.ip := commitCausing.target; -- ???
+				elsif commitCausing.operation.func = sysRetI then
+						res.basicInfo.ip := X"00000020";  --TEMP!!
+				elsif commitCausing.operation.func = sysRetE then
+						res.basicInfo.ip := X"00000030";  --TEMP!!					
+				end if;
+				
+		--else -- fetchLock	
+		--	res.basicInfo.ip := causingNext;
+		end if;		
+	
+	return res;
 end function;
 
 
