@@ -330,7 +330,7 @@ begin
 		stageDataLiving.data(0) <= work.TEMP_DEV.setException2(
 								stageData.data(0),
 								execCausing,
-								execCausing.controlInfo.hasInterrupt, execCausing.controlInfo.hasReset, '0',
+								execCausing.controlInfo.hasInterrupt, execCausing.controlInfo.hasReset, flowResponse.isNew,
 								evtPhase0, evtPhase1, evtPhase2);
 	
 	PIPE_CLOCKED: process(clk) 	
@@ -372,7 +372,8 @@ begin
 		flowResponse => flowResponse
 	);
 		-- TODO: move to visible package! 
-		stageEvents.causing <= work.TEMP_DEV.setException(stageData.data(0),
+		stageEvents.causing <= work.TEMP_DEV.setException(--stageData.data(0),
+																			stageDataLiving.data(0),
 					execCausing.controlInfo.hasInterrupt, execCausing.controlInfo.hasReset, flowResponse.isNew,
 					evtPhase0, evtPhase1, evtPhase2);
 		stageEvents.eventOccured <= stageEvents.causing.controlInfo.newEvent;

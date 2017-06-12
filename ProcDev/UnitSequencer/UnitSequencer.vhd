@@ -265,8 +265,10 @@ begin
 
 	newTargetInfo <= stageDataToPC.basicInfo;
 
-	excInfoUpdate <= eiEvents.eventOccured and eiEvents.causing.controlInfo.newException;
-	intInfoUpdate <= eiEvents.eventOccured and eiEvents.causing.controlInfo.newInterrupt;
+	excInfoUpdate <= --eiEvents.eventOccured and eiEvents.causing.controlInfo.newException;
+							eiEvents.causing.controlInfo.phase1 and eiEvents.causing.controlInfo.hasException;
+	intInfoUpdate <= --eiEvents.eventOccured and eiEvents.causing.controlInfo.newInterrupt;
+							eiEvents.causing.controlInfo.phase1 and eiEvents.causing.controlInfo.hasInterrupt;
 	
 	excLinkInfo <= getLinkInfoNormal(eiEvents.causing, causingNext);
 	intLinkInfo <= getLinkInfoSuper(eiEvents.causing, causingNext);		

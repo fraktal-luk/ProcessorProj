@@ -382,6 +382,7 @@ function getLinkInfoNormal(ins: InstructionState; causingNext: Mword) return Ins
 begin
 	-- get next adr considering possible jump 
 	res.ip := getNormalTargetAddress(ins, causingNext);
+		res.ip := ins.result;
 	return res;
 end function;
 
@@ -442,22 +443,22 @@ begin
 			lateFetchLock := '1';
 		end if;	
 			
-	res.controlInfo.newEvent := ((res.controlInfo.hasException 
-											or res.controlInfo.specialAction
-											--		or (res.controlInfo.hasFetchLock and lateFetchLock)
-											)
-											and isNew) 
-									or intSignal or resetSignal;
-	res.controlInfo.hasEvent := res.controlInfo.hasEvent or res.controlInfo.newEvent;
+	--res.controlInfo.newEvent := ((res.controlInfo.hasException 
+	--										or res.controlInfo.specialAction
+	--										--		or (res.controlInfo.hasFetchLock and lateFetchLock)
+	--										)
+	--										and isNew) 
+	--								or intSignal or resetSignal;
+	--res.controlInfo.hasEvent := res.controlInfo.hasEvent or res.controlInfo.newEvent;
 
-	res.controlInfo.newException := res.controlInfo.hasException and isNew; 
+	--res.controlInfo.newException := res.controlInfo.hasException and isNew; 
 
-	res.controlInfo.newInterrupt := intSignal;
-	res.controlInfo.hasInterrupt := intSignal;
+	--res.controlInfo.newInterrupt := intSignal;
+	--res.controlInfo.hasInterrupt := intSignal;
 	-- ^ Interrupts delayed by 1 cycle if exception being committed!
 	
-	res.controlInfo.newReset := resetSignal;
-	res.controlInfo.hasReset := resetSignal;
+	--res.controlInfo.newReset := resetSignal;
+	--res.controlInfo.hasReset := resetSignal;
 		
 	-- ...?	
 		res.controlInfo.phase0 := phase0;
@@ -489,7 +490,7 @@ begin
 	res.controlInfo.newException := res.controlInfo.hasException and isNew; 
 
 	res.controlInfo.newInterrupt := intSignal;
-	res.controlInfo.hasInterrupt := intSignal;
+	res.controlInfo.hasInterrupt := res.controlInfo.hasInterrupt or intSignal;
 	-- ^ Interrupts delayed by 1 cycle if exception being committed!
 	
 	res.controlInfo.newReset := resetSignal;
@@ -497,8 +498,17 @@ begin
 		
 	-- ...?	
 	if phase1 = '1' then
+			res.result := res.target;
 		res.target := causing.target;
 	end if;
+	
+	if phase2 = '1' then
+		res.controlInfo.newException := '0';
+		res.controlInfo.newInterrupt := '0';
+		res.controlInfo.newReset := '0';
+		res.controlInfo.newEvent := '0';		
+	end if;
+	
 	return res;
 end function;
 
