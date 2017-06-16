@@ -71,21 +71,21 @@ function getLatePCData(content: InstructionState;
 						  commitEvent: std_logic; commitCausing: InstructionState;
 						  execEvent: std_logic; execCausing: InstructionState;	
 						  decodeEvent: std_logic; decodeCausing: InstructionState;
-						  pcNext, causingNext: Mword)
+						  pcNext: Mword)
 return InstructionState;
 
 function newPCData(content: InstructionState;
 						  commitEvent: std_logic; commitCausing: InstructionState;
 						  execEvent: std_logic; execCausing: InstructionState;	
 						  decodeEvent: std_logic; decodeCausing: InstructionState;
-						  pcNext, causingNext: Mword)
+						  pcNext: Mword)
 return InstructionState;
 
 	function NEW_generalEvents(pcData: InstructionState;
 										commitEvent: std_logic; commitCausing: InstructionState;
 										execEvent: std_logic; execCausing: InstructionState;	
 										decodeEvent: std_logic; decodeCausing: InstructionState;
-										pcNext, causingNext: Mword)
+										pcNext: Mword)
 	return GeneralEventInfo;
 
 function getAnnotatedHwords(fetchBasicInfo: InstructionBasicInfo; 
@@ -504,7 +504,7 @@ function getLatePCData(content: InstructionState;
 						  commitEvent: std_logic; commitCausing: InstructionState;
 						  execEvent: std_logic; execCausing: InstructionState;	
 						  decodeEvent: std_logic; decodeCausing: InstructionState;
-						  pcNext, causingNext: Mword)
+						  pcNext: Mword)
 return InstructionState is
 	variable res: InstructionState := content;
 	variable newPC: Mword := (others=>'0');
@@ -549,7 +549,7 @@ function newPCData(content: InstructionState;
 						  commitEvent: std_logic; commitCausing: InstructionState;
 						  execEvent: std_logic; execCausing: InstructionState;	
 						  decodeEvent: std_logic; decodeCausing: InstructionState;
-						  pcNext, causingNext: Mword)
+						  pcNext: Mword)
 return InstructionState is
 	variable res: InstructionState := content;
 	variable newPC: Mword := (others=>'0');
@@ -609,7 +609,7 @@ end function;
 										commitEvent: std_logic; commitCausing: InstructionState;
 										execEvent: std_logic; execCausing: InstructionState;	
 										decodeEvent: std_logic; decodeCausing: InstructionState;
-										pcNext, causingNext: Mword)
+										pcNext: Mword)
 	return GeneralEventInfo is
 		variable res: GeneralEventInfo;
 	begin

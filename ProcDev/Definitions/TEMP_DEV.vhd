@@ -70,17 +70,17 @@ function getIncrementedAddress(ins: InstructionState) return Mword;
 function getAddressIncrement(ins: InstructionState) return Mword;
 
 -- What would be next in flow without exceptions - that is next one or jump target 
-function getNormalTargetAddress(ins: InstructionState; causingNext: Mword) return Mword;
+function getNormalTargetAddress(ins: InstructionState) return Mword;
 
 -- Address to go to if exception happens
 function getHandlerAddress(ins: InstructionState) return Mword;
 
 -- Jump target, increment if not jump 
-function getLinkInfoNormal(ins: InstructionState; causingNext: Mword) return InstructionBasicInfo;
+function getLinkInfoNormal(ins: InstructionState) return InstructionBasicInfo;
 -- Handler address and system state
-function getExceptionTarget(ins: InstructionState; causingNext: Mword) return InstructionBasicInfo;
+function getExceptionTarget(ins: InstructionState) return InstructionBasicInfo;
 -- Target, which may be exception handler call
-function getLinkInfoSuper(ins: InstructionState; causingNext: Mword) return InstructionBasicInfo;
+function getLinkInfoSuper(ins: InstructionState) return InstructionBasicInfo;
 
 
 function clearTempControlInfoSimple(ins: InstructionState) return InstructionState;
@@ -356,7 +356,7 @@ end function;
 --			but this would be very complex.
 
 -- "Normal target" is sequential/branch, without exceptions
-function getNormalTargetAddress(ins: InstructionState; causingNext: Mword) return Mword is
+function getNormalTargetAddress(ins: InstructionState) return Mword is
 begin
 	if ins.controlInfo.hasBranch = '1' then
 		return ins.target;
@@ -377,17 +377,17 @@ begin
 end function;
 
 
-function getLinkInfoNormal(ins: InstructionState; causingNext: Mword) return InstructionBasicInfo is
+function getLinkInfoNormal(ins: InstructionState) return InstructionBasicInfo is
 	variable res: InstructionBasicInfo := ins.basicInfo;
 begin
 	-- get next adr considering possible jump 
-	res.ip := getNormalTargetAddress(ins, causingNext);
+	--res.ip := getNormalTargetAddress(ins, causingNext);
 		res.ip := ins.result;
 	return res;
 end function;
 
 
-function getExceptionTarget(ins: InstructionState; causingNext: Mword) return InstructionBasicInfo is
+function getExceptionTarget(ins: InstructionState) return InstructionBasicInfo is
 	variable res: InstructionBasicInfo := ins.basicInfo;
 begin
 	-- get handler adr and system level 
@@ -397,16 +397,16 @@ begin
 end function;
 
 
-function getLinkInfoSuper(ins: InstructionState; causingNext: Mword) return InstructionBasicInfo is
+function getLinkInfoSuper(ins: InstructionState) return InstructionBasicInfo is
 	variable res: InstructionBasicInfo := ins.basicInfo;
 begin
 	if ins.controlInfo.hasException = '1' then 
-		return getExceptionTarget(ins, causingNext);
+		return getExceptionTarget(ins);
 	-- > NOTE, TODO: Interupt chaining can be implemented in a simple way: when another interrupt appears, 
 	--		jump to handler directly from currently running handler, but don't set ILR.
 	--		ILR will remain from the first interrupt in chain, just like in tail function call
 	else
-		return getLinkInfoNormal(ins, causingNext);
+		return getLinkInfoNormal(ins);
 	end if;
 end function;
 

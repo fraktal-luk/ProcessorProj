@@ -135,7 +135,7 @@ architecture Behavioral of UnitSequencer is
 	signal resetSig, enSig: std_logic := '0';							
 
 	constant PC_INC: Mword := (ALIGN_BITS => '1', others => '0');	
-	signal pcBase, pcNext, causingNext: Mword := (others => '0');
+	signal pcBase, pcNext, causingNext: Mword := (others => '0'); -- causingNext DEPREC
 
 	signal stageDataToPC, stageDataOutPC, stageDataToPC_C: InstructionState := DEFAULT_INSTRUCTION_STATE;
 
@@ -180,10 +180,10 @@ architecture Behavioral of UnitSequencer is
 	signal dataToLastEffective, dataFromLastEffective: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;	
 		signal insToLastEffective_2: InstructionState := DEFAULT_INSTRUCTION_STATE;	
 
-				signal sendingLateEvent: std_logic := '0';
-				signal dataFromLateEvent: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
+				signal sendingLateEvent: std_logic := '0'; -- DEPREC
+				signal dataFromLateEvent: StageDataMulti := DEFAULT_STAGE_DATA_MULTI; -- DEPREC
 
-	signal eiEvents, lateEvents: StageMultiEventInfo;
+	signal eiEvents, lateEvents: StageMultiEventInfo; -- lateEvents DEPREC
 			
 		signal newEffectiveTarget: Mword := (others => '0'); -- DEPREC
 
@@ -201,12 +201,12 @@ begin
 	resetSig <= reset and HAS_RESET_SEQ;
 	enSig <= en or not HAS_EN_SEQ;
 
-	CAUSING_ADDER: entity work.IntegerAdder
-	port map(
-		inA => eiEvents.causing.basicInfo.ip,
-		inB => getAddressIncrement(eiEvents.causing),
-		output => causingNext
-	);
+--	CAUSING_ADDER: entity work.IntegerAdder
+--	port map(
+--		inA => eiEvents.causing.basicInfo.ip,
+--		inB => getAddressIncrement(eiEvents.causing),
+--		output => causingNext
+--	);
 		
 	pcBase <= stageDataOutPC.basicInfo.ip and i2slv(-PIPE_WIDTH*4, MWORD_SIZE); -- Clearing low bits
 
@@ -217,10 +217,8 @@ begin
 		output => pcNext
 	);
 
-		TMP_phase0 <= eiEvents.--eventOccured;
-										causing.controlInfo.phase0;
-		TMP_phase2 <= eiEvents.--eventOccured;
-										causing.controlInfo.phase2;
+		TMP_phase0 <= eiEvents.causing.controlInfo.phase0;
+		TMP_phase2 <= eiEvents.causing.controlInfo.phase2;
 
 	EVENTS: block
 		-- $INPUT: 
@@ -241,7 +239,7 @@ begin
 											eiEvents.causing,
 											execEventSignal, execCausing,
 											stage0EventInfo.eventOccured, stage0EventInfo.causing,
-											pcNext, causingNext
+											pcNext
 										);
 
 		execOrIntEventSignal <= execEventSignal or TMP_phase0;
@@ -250,9 +248,9 @@ begin
 		execOrIntEventSignalOut <= execOrIntEventSignal;	-- $MODULE_OUT
 		execOrIntCausingOut <= execOrIntCausing; -- $MODULE_OUT
 		
-			committingSync <= sbSending when dataFromSB.operation = (System, sysSync) else '0';
-			committingRet <= sbSending when 
-				(dataFromSB.operation = (System, sysRetI) or dataFromSB.operation = (System, sysRetE)) else '0';
+			--committingSync <= sbSending when dataFromSB.operation = (System, sysSync) else '0';
+			--committingRet <= sbSending when 
+			--	(dataFromSB.operation = (System, sysRetI) or dataFromSB.operation = (System, sysRetE)) else '0';
 	end block;
 
 			stageDataToPC <= newPCData(
@@ -261,7 +259,7 @@ begin
 											eiEvents.causing,
 											execEventSignal, execCausing,
 											stage0EventInfo.eventOccured, stage0EventInfo.causing,
-											pcNext, causingNext
+											pcNext
 										);
 									--newGeneralEvents.newStagePC;					
 
@@ -276,8 +274,8 @@ begin
 	excInfoUpdate <= eiEvents.causing.controlInfo.phase1 and eiEvents.causing.controlInfo.hasException;
 	intInfoUpdate <= eiEvents.causing.controlInfo.phase1 and eiEvents.causing.controlInfo.hasInterrupt;
 	
-	excLinkInfo <= getLinkInfoNormal(eiEvents.causing, causingNext);
-	intLinkInfo <= getLinkInfoSuper(eiEvents.causing, causingNext);		
+	excLinkInfo <= getLinkInfoNormal(eiEvents.causing);
+	intLinkInfo <= getLinkInfoSuper(eiEvents.causing);		
 
 	PC_STAGE: block
 		signal tmpPcIn, tmpPcOut: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
@@ -561,7 +559,7 @@ begin
 											'1', eiEvents.causing,
 											execEventSignal, execCausing,
 											stage0EventInfo.eventOccured, stage0EventInfo.causing,
-											pcNext, causingNext);
+											pcNext);
 											
 			interruptCause.controlInfo.hasInterrupt <= intSignal;
 			interruptCause.controlInfo.hasReset <= start;
@@ -593,28 +591,28 @@ begin
 				stageEventsOut => eiEvents
 			);
 
-			LATE_EVENT_SLOT: entity work.GenericStageMulti(LastEffective)
-			port map(
-				clk => clk, reset => resetSig, en => enSig,
-				
-				-- Interface with CQ
-				prevSending => sendingToCommit,
-				stageDataIn => dataToLastEffective,-- TMPpre_lastEffective,
-				acceptingOut => open, -- unused but don't remove
-				
-				-- Interface with hypothetical further stage
-				nextAccepting => sbEmpty or not lateEvents.eventOccured,
-				sendingOut => sendingLateEvent,
-				stageDataOut => dataFromLateEvent,--TMP_lastEffective,
-				
-				-- Event interface
-				execEventSignal => '0', -- CAREFUL: committed cannot be killed!
-				execCausing => interruptCause,		
-
-				lockCommand => '0',
-
-				stageEventsOut => lateEvents
-			);
+--			LATE_EVENT_SLOT: entity work.GenericStageMulti(LastEffective)
+--			port map(
+--				clk => clk, reset => resetSig, en => enSig,
+--				
+--				-- Interface with CQ
+--				prevSending => sendingToCommit,
+--				stageDataIn => dataToLastEffective,-- TMPpre_lastEffective,
+--				acceptingOut => open, -- unused but don't remove
+--				
+--				-- Interface with hypothetical further stage
+--				nextAccepting => sbEmpty or not lateEvents.eventOccured,
+--				sendingOut => sendingLateEvent,
+--				stageDataOut => dataFromLateEvent,--TMP_lastEffective,
+--				
+--				-- Event interface
+--				execEventSignal => '0', -- CAREFUL: committed cannot be killed!
+--				execCausing => interruptCause,		
+--
+--				lockCommand => '0',
+--
+--				stageEventsOut => lateEvents
+--			);
 			
 	renameAccepting <= acceptingOutRename;
 	renamedDataLiving <= stageDataOutRename;
