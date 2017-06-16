@@ -509,13 +509,13 @@ return InstructionState is
 	variable res: InstructionState := content;
 	variable newPC: Mword := (others=>'0');
 begin
-		if commitCausing.controlInfo.newReset = '1' then -- TEMP!
+		if commitCausing.controlInfo.hasReset = '1' then -- TEMP!
 			res.basicInfo.ip := (others => '0');
 			res.basicInfo.intLevel := "00000000";				
-		elsif commitCausing.controlInfo.newInterrupt = '1' then
+		elsif commitCausing.controlInfo.hasInterrupt = '1' then
 			res.basicInfo.ip := INT_BASE; -- TEMP!
 			res.basicInfo.intLevel := "00000001";		
-		elsif commitCausing.controlInfo.newException = '1' then--or not LATE_FETCH_LOCK then
+		elsif commitCausing.controlInfo.hasException = '1' then--or not LATE_FETCH_LOCK then
 			-- TODO, FIX: exceptionCode sliced - shift left by ALIGN_BITS? or leave just base address
 			res.basicInfo.ip := EXC_BASE(MWORD_SIZE-1 downto commitCausing.controlInfo.exceptionCode'length)
 									& commitCausing.controlInfo.exceptionCode(
@@ -586,6 +586,8 @@ begin
 		--else -- fetchLock	
 		--	res.basicInfo.ip := causingNext;
 		end if;	
+		
+				res.basicInfo.ip := commitCausing.target;
 	elsif execEvent = '1' then		
 		res.basicInfo.ip := execCausing.target;
 	elsif decodeEvent = '1' then

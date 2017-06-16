@@ -217,8 +217,10 @@ begin
 		output => pcNext
 	);
 
-		TMP_phase0 <= eiEvents.eventOccured;
-		TMP_phase2 <= eiEvents.eventOccured;
+		TMP_phase0 <= eiEvents.--eventOccured;
+										causing.controlInfo.phase0;
+		TMP_phase2 <= eiEvents.--eventOccured;
+										causing.controlInfo.phase2;
 
 	EVENTS: block
 		-- $INPUT: 
