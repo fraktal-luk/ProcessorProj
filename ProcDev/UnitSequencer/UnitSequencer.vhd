@@ -235,7 +235,8 @@ begin
 		generalEvents <= newGeneralEvents;
 			newGeneralEvents <= NEW_generalEvents(
 											stageDataOutPC,
-											eiEvents.eventOccured, eiEvents.causing,
+												TMP_phase0,--eiEvents.eventOccured, 
+											eiEvents.causing,
 											execEventSignal, execCausing,
 											stage0EventInfo.eventOccured, stage0EventInfo.causing,
 											pcNext, causingNext
@@ -266,7 +267,7 @@ begin
 	--				when en = '0' this won't happen.
 	--				To be fully correct, prevSending should not be '1' when receiving prevented.			
 	sendingToPC <= acceptingOutPC and (sendingOutPC
-												or (generalEvents.eventOccured and not generalEvents.killPC));
+												or (generalEvents.eventOccured and not generalEvents.killPC) or TMP_phase2);
 
 	newTargetInfo <= stageDataToPC.basicInfo;
 
@@ -537,7 +538,7 @@ begin
 
 				stageDataToCommit_2 <= recreateGroup(robDataLiving, dataFromBQV, 
 																	dataFromLastEffective.data(0).target,
-																	tempBuffValue, tempBuffWaiting);
+																	tempBuffValue, tempBuffWaiting and '0');
 					insToLastEffective_2 <= getLastEffective(stageDataToCommit_2);		
 
 				SYNCH: process(clk)

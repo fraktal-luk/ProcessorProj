@@ -618,8 +618,8 @@ end function;
 		res.causing := decodeCausing;
 	
 		if commitEvent = '1' then 
-			res.killPC := isHalt(commitCausing) or '0';
-		
+			res.killPC := --isHalt(commitCausing) or '0';
+								'1';
 			res.causing := commitCausing;
 			res.affectedVec(0 to 4) := (others => '1');
 		elsif execEvent = '1' then
