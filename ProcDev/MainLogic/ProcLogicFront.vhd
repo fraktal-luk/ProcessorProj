@@ -632,11 +632,11 @@ end function;
 			res.eventOccured := '0';
 		end if;
 		
-		res.newStagePC := newPCData( pcData,
-												commitEvent, commitCausing,
-												execEvent, execCausing,
-												decodeEvent, decodeCausing,
-												pcNext, causingNext);		
+		--res.newStagePC := newPCData( pcData,
+		--										commitEvent, commitCausing,
+		--										execEvent, execCausing,
+		--										decodeEvent, decodeCausing,
+		--										pcNext, causingNext);		
 		return res;
 	end function;
 

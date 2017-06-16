@@ -191,6 +191,8 @@ architecture Behavioral of UnitSequencer is
 				
 				signal TMP_targetIns: InstructionState := DEFAULT_INSTRUCTION_STATE;
 			
+				signal TMP_phase0, TMP_phase2: std_logic := '0';
+			
 			signal ch0, ch1: std_logic := '0';
 				
 	constant HAS_RESET_SEQ: std_logic := '1';
@@ -201,8 +203,8 @@ begin
 
 	CAUSING_ADDER: entity work.IntegerAdder
 	port map(
-		inA => generalEvents.causing.basicInfo.ip,
-		inB => getAddressIncrement(generalEvents.causing),
+		inA => eiEvents.causing.basicInfo.ip,
+		inB => getAddressIncrement(eiEvents.causing),
 		output => causingNext
 	);
 		
@@ -215,6 +217,9 @@ begin
 		output => pcNext
 	);
 
+		TMP_phase0 <= eiEvents.eventOccured;
+		TMP_phase2 <= eiEvents.eventOccured;
+
 	EVENTS: block
 		-- $INPUT: 
 		--		stage0EventInfo, execEventSignal, execCausing, eiEvents
@@ -223,7 +228,7 @@ begin
 
 			signal committingSync, committingRet: std_logic := '0';			
 	begin	
-			killVecOut(6) <= eiEvents.eventOccured;
+			killVecOut(6) <= TMP_phase0;
 			killVecOut(5) <= execOrIntEventSignal;
 			killVecOut(0 to 4) <= newGeneralEvents.affectedVec;
 
@@ -236,8 +241,8 @@ begin
 											pcNext, causingNext
 										);
 
-		execOrIntEventSignal <= execEventSignal or eiEvents.eventOccured;
-		execOrIntCausing <= eiEvents.causing when eiEvents.eventOccured = '1' else execCausing;
+		execOrIntEventSignal <= execEventSignal or TMP_phase0;
+		execOrIntCausing <= eiEvents.causing when TMP_phase0 = '1' else execCausing;
 		
 		execOrIntEventSignalOut <= execOrIntEventSignal;	-- $MODULE_OUT
 		execOrIntCausingOut <= execOrIntCausing; -- $MODULE_OUT
@@ -249,7 +254,8 @@ begin
 
 			stageDataToPC <= newPCData(
 											stageDataOutPC,
-											eiEvents.eventOccured, eiEvents.causing,
+											TMP_phase2,
+											eiEvents.causing,
 											execEventSignal, execCausing,
 											stage0EventInfo.eventOccured, stage0EventInfo.causing,
 											pcNext, causingNext
@@ -369,7 +375,7 @@ begin
 		sysRegReadValue <= sysRegArray(slv2u(sysRegReadSel));							
 	end block;
 
-	
+	-- DEPREC??
 	fetchLockRequest <= generalEvents.eventOccured and generalEvents.causing.controlInfo.newFetchLock;
 
 		FRONT_SEQ_SYNCHRONOUS: process(clk) 	
@@ -549,7 +555,7 @@ begin
 				
 				TMP_targetIns <= getLatePCData(
 											stageDataOutPC,
-											eiEvents.eventOccured, eiEvents.causing,
+											'1', eiEvents.causing,
 											execEventSignal, execCausing,
 											stage0EventInfo.eventOccured, stage0EventInfo.causing,
 											pcNext, causingNext);
