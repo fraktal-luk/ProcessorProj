@@ -141,7 +141,7 @@ architecture Behavioral of UnitSequencer is
 
 	signal sendingToPC, sendingOutPC, acceptingOutPC: std_logic := '0';
 		
-	signal generalEvents, newGeneralEvents: GeneralEventInfo;
+	signal generalEvents: GeneralEventInfo;
 
 	signal excLinkInfo, intLinkInfo, newTargetInfo: InstructionBasicInfo := defaultBasicInfo;
 	signal excInfoUpdate, intInfoUpdate: std_logic := '0';
@@ -212,10 +212,9 @@ begin
 	begin	
 			killVecOut(6) <= TMP_phase0;
 			killVecOut(5) <= execOrIntEventSignal;
-			killVecOut(0 to 4) <= newGeneralEvents.affectedVec;
+			killVecOut(0 to 4) <= generalEvents.affectedVec;
 
-		generalEvents <= newGeneralEvents;
-			newGeneralEvents <= NEW_generalEvents(
+			generalEvents <= NEW_generalEvents(
 											stageDataOutPC,
 												TMP_phase0,--eiEvents.eventOccured, 
 											eiEvents.causing,

@@ -177,7 +177,7 @@ begin
 --	if useTemp = '1' then
 --		prevAdr := tempValue;
 --	else
---		prevAdr := prevAddress;
+	prevAdr := prevAddress;
 --	end if;
 	
 	for i in 0 to PIPE_WIDTH-1 loop
