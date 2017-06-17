@@ -165,7 +165,8 @@ function getExecPreEnds(opB, opC: InstructionState) return InstructionStateArray
 
 -- Unifies content of ROB slot with BQ, others queues etc. to restore full state needed at Commit
 function recreateGroup(insVec: StageDataMulti; bqGroup: StageDataMulti;
-							  prevAddress: Mword; tempValue: Mword; useTemp: std_logic) return StageDataMulti is
+							  prevAddress: Mword--; tempValue: Mword; useTemp: std_logic
+							  ) return StageDataMulti is
 	variable res: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
 	variable targets: MwordArray(0 to PIPE_WIDTH-1) := (others => (others => '0'));
 	variable ind: integer := 0;
@@ -173,11 +174,11 @@ function recreateGroup(insVec: StageDataMulti; bqGroup: StageDataMulti;
 begin
 	res := insVec;
 	
-	if useTemp = '1' then
-		prevAdr := tempValue;
-	else
-		prevAdr := prevAddress;
-	end if;
+--	if useTemp = '1' then
+--		prevAdr := tempValue;
+--	else
+--		prevAdr := prevAddress;
+--	end if;
 	
 	for i in 0 to PIPE_WIDTH-1 loop
 		targets(i) := bqGroup.data(i).target; -- Default to some input, not zeros 

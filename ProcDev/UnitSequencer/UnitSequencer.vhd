@@ -135,7 +135,7 @@ architecture Behavioral of UnitSequencer is
 	signal resetSig, enSig: std_logic := '0';							
 
 	constant PC_INC: Mword := (ALIGN_BITS => '1', others => '0');	
-	signal pcBase, pcNext, causingNext: Mword := (others => '0'); -- causingNext DEPREC
+	signal pcBase, pcNext: Mword := (others => '0');
 
 	signal stageDataToPC, stageDataOutPC, stageDataToPC_C: InstructionState := DEFAULT_INSTRUCTION_STATE;
 
@@ -158,8 +158,6 @@ architecture Behavioral of UnitSequencer is
 	signal sendingToCommit, sendingOutCommit, acceptingOutCommit: std_logic := '0';
 	signal stageDataToCommit, stageDataOutCommit: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;						
 
-		signal stageDataToCommit_2, stageDataOutCommit_2: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;				
-
 	signal newPhysDests: PhysNameArray(0 to PIPE_WIDTH-1) := (others=>(others=>'0'));
 	signal newPhysDestPointer: SmallNumber := (others => '0');
 
@@ -178,17 +176,10 @@ architecture Behavioral of UnitSequencer is
 	signal renameLockCommand, renameLockRelease, renameLockState, renameLockEnd: std_logic := '0';	
 				
 	signal dataToLastEffective, dataFromLastEffective: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;	
-		signal insToLastEffective_2: InstructionState := DEFAULT_INSTRUCTION_STATE;	
+		signal insToLastEffective: InstructionState := DEFAULT_INSTRUCTION_STATE;	
 
-				signal sendingLateEvent: std_logic := '0'; -- DEPREC
-				signal dataFromLateEvent: StageDataMulti := DEFAULT_STAGE_DATA_MULTI; -- DEPREC
-
-	signal eiEvents, lateEvents: StageMultiEventInfo; -- lateEvents DEPREC
-			
-		signal newEffectiveTarget: Mword := (others => '0'); -- DEPREC
-
-				signal TMP_writeEventTarget, TMP_waitForEmptySB: std_logic := '0'; -- DEPREC
-				
+	signal eiEvents: StageMultiEventInfo;
+							
 				signal TMP_targetIns: InstructionState := DEFAULT_INSTRUCTION_STATE;
 			
 				signal TMP_phase0, TMP_phase2: std_logic := '0';
@@ -201,13 +192,6 @@ begin
 	resetSig <= reset and HAS_RESET_SEQ;
 	enSig <= en or not HAS_EN_SEQ;
 
---	CAUSING_ADDER: entity work.IntegerAdder
---	port map(
---		inA => eiEvents.causing.basicInfo.ip,
---		inB => getAddressIncrement(eiEvents.causing),
---		output => causingNext
---	);
-		
 	pcBase <= stageDataOutPC.basicInfo.ip and i2slv(-PIPE_WIDTH*4, MWORD_SIZE); -- Clearing low bits
 
 	SEQ_ADDER: entity work.IntegerAdder
@@ -225,8 +209,6 @@ begin
 		--		stage0EventInfo, execEventSignal, execCausing, eiEvents
 		-- $OUTPUT:
 		-- 	execOrIntCausing, execOrIntEventSignal, killVecOut, generalEvents,
-
-			signal committingSync, committingRet: std_logic := '0';			
 	begin	
 			killVecOut(6) <= TMP_phase0;
 			killVecOut(5) <= execOrIntEventSignal;
@@ -247,10 +229,6 @@ begin
 		
 		execOrIntEventSignalOut <= execOrIntEventSignal;	-- $MODULE_OUT
 		execOrIntCausingOut <= execOrIntCausing; -- $MODULE_OUT
-		
-			--committingSync <= sbSending when dataFromSB.operation = (System, sysSync) else '0';
-			--committingRet <= sbSending when 
-			--	(dataFromSB.operation = (System, sysRetI) or dataFromSB.operation = (System, sysRetE)) else '0';
 	end block;
 
 			stageDataToPC <= newPCData(
@@ -261,7 +239,6 @@ begin
 											stage0EventInfo.eventOccured, stage0EventInfo.causing,
 											pcNext
 										);
-									--newGeneralEvents.newStagePC;					
 
 	-- CAREFUL: prevSending normally means that 'full' bit inside will be set, but
 	--				when en = '0' this won't happen.
@@ -480,7 +457,7 @@ begin
 		commitGroupCtrNext <= nextCtr(commitGroupCtr, '0', (others => '0'), sendingToCommit, ALL_FULL);
 		commitCtrNext <= nextCtr(commitCtr, '0', (others => '0'), sendingToCommit, effectiveMask);
 
-		effectiveMask <= getEffectiveMask(stageDataToCommit_2);
+		effectiveMask <= getEffectiveMask(stageDataToCommit);
 			
 		PIPE_SYNCHRONOUS: process(clk) 	
 		begin
@@ -493,10 +470,7 @@ begin
 		end process;	
 	end block;
 
-	sendingToCommit <= sendingFromROB;	
-	stageDataToCommit.fullMask <= stageDataToCommit_2.fullMask;
-	stageDataToCommit.data <= stageDataToCommit_2.data;
-
+	sendingToCommit <= sendingFromROB;
 	committing <= sendingFromROB;
 
 	-- Commit stage: in order again				
@@ -527,32 +501,10 @@ begin
 			--			already committed. 
 			--			When committing a taken branch -> fill with target from BQ output
 			--			When committing normal op -> increment by length of the op 
-			--			When committing 1st op after expception/int -> fill with content of tempBuffer*
-			--			*tempBuffer will be set to handler address of exception/int when it's signaled
 			--			
 			--			The 'target' field will be used to update return address for exc/int
-			NEW_TARGET: block
-				signal tempBuffWaiting: std_logic := '0';
-				signal tempBuffValue: Mword := (others => '0');				
-			begin
-
-				stageDataToCommit_2 <= recreateGroup(robDataLiving, dataFromBQV, 
-																	dataFromLastEffective.data(0).target,
-																	tempBuffValue, tempBuffWaiting and '0');
-					insToLastEffective_2 <= getLastEffective(stageDataToCommit_2);		
-
-				SYNCH: process(clk)
-				begin
-					if rising_edge(clk) then
-						if eiEvents.eventOccured = '1' then 
-							tempBuffWaiting <= '1';
-							tempBuffValue <= stageDataToPC.basicInfo.ip;
-						elsif sendingFromROB = '1' then -- when committing
-							tempBuffWaiting <= '0';
-						end if;
-					end if;
-				end process;
-			end block;
+			stageDataToCommit <= recreateGroup(robDataLiving, dataFromBQV, dataFromLastEffective.data(0).target);
+			insToLastEffective <= getLastEffective(stageDataToCommit);		
 				
 				TMP_targetIns <= getLatePCData(
 											stageDataOutPC,
@@ -566,7 +518,7 @@ begin
 				interruptCause.target <= TMP_targetIns.basicInfo.ip;
 
 			dataToLastEffective.fullMask(0) <= sendingToCommit;
-			dataToLastEffective.data(0) <= insToLastEffective_2;
+			dataToLastEffective.data(0) <= insToLastEffective;
 
 			LAST_EFFECTIVE_SLOT: entity work.GenericStageMulti(LastEffective)
 			port map(
@@ -590,29 +542,6 @@ begin
 
 				stageEventsOut => eiEvents
 			);
-
---			LATE_EVENT_SLOT: entity work.GenericStageMulti(LastEffective)
---			port map(
---				clk => clk, reset => resetSig, en => enSig,
---				
---				-- Interface with CQ
---				prevSending => sendingToCommit,
---				stageDataIn => dataToLastEffective,-- TMPpre_lastEffective,
---				acceptingOut => open, -- unused but don't remove
---				
---				-- Interface with hypothetical further stage
---				nextAccepting => sbEmpty or not lateEvents.eventOccured,
---				sendingOut => sendingLateEvent,
---				stageDataOut => dataFromLateEvent,--TMP_lastEffective,
---				
---				-- Event interface
---				execEventSignal => '0', -- CAREFUL: committed cannot be killed!
---				execCausing => interruptCause,		
---
---				lockCommand => '0',
---
---				stageEventsOut => lateEvents
---			);
 			
 	renameAccepting <= acceptingOutRename;
 	renamedDataLiving <= stageDataOutRename;
