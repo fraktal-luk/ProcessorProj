@@ -67,18 +67,25 @@ return StageDataHbuffer;
 function newFromHbuffer(content: InstructionStateArray; fullMask: std_logic_vector)
 return HbuffOutData;
 
+function getLatePCData(content: InstructionState;
+						  commitEvent: std_logic; commitCausing: InstructionState;
+						  execEvent: std_logic; execCausing: InstructionState;	
+						  decodeEvent: std_logic; decodeCausing: InstructionState;
+						  pcNext: Mword)
+return InstructionState;
+
 function newPCData(content: InstructionState;
 						  commitEvent: std_logic; commitCausing: InstructionState;
 						  execEvent: std_logic; execCausing: InstructionState;	
 						  decodeEvent: std_logic; decodeCausing: InstructionState;
-						  pcNext, causingNext: Mword)
+						  pcNext: Mword)
 return InstructionState;
 
 	function NEW_generalEvents(pcData: InstructionState;
 										commitEvent: std_logic; commitCausing: InstructionState;
 										execEvent: std_logic; execCausing: InstructionState;	
 										decodeEvent: std_logic; decodeCausing: InstructionState;
-										pcNext, causingNext: Mword)
+										pcNext: Mword)
 	return GeneralEventInfo;
 
 function getAnnotatedHwords(fetchBasicInfo: InstructionBasicInfo; 
@@ -493,12 +500,56 @@ begin
 	return ret;
 end function;
 
+function getLatePCData(content: InstructionState;
+						  commitEvent: std_logic; commitCausing: InstructionState;
+						  execEvent: std_logic; execCausing: InstructionState;	
+						  decodeEvent: std_logic; decodeCausing: InstructionState;
+						  pcNext: Mword)
+return InstructionState is
+	variable res: InstructionState := content;
+	variable newPC: Mword := (others=>'0');
+begin
+		if commitCausing.controlInfo.hasReset = '1' then -- TEMP!
+			res.basicInfo.ip := (others => '0');
+			res.basicInfo.intLevel := "00000000";				
+		elsif commitCausing.controlInfo.hasInterrupt = '1' then
+			res.basicInfo.ip := INT_BASE; -- TEMP!
+			res.basicInfo.intLevel := "00000001";		
+		elsif commitCausing.controlInfo.hasException = '1' then--or not LATE_FETCH_LOCK then
+			-- TODO, FIX: exceptionCode sliced - shift left by ALIGN_BITS? or leave just base address
+			res.basicInfo.ip := EXC_BASE(MWORD_SIZE-1 downto commitCausing.controlInfo.exceptionCode'length)
+									& commitCausing.controlInfo.exceptionCode(
+													commitCausing.controlInfo.exceptionCode'length-1 downto ALIGN_BITS)
+									& EXC_BASE(ALIGN_BITS-1 downto 0);	
+									--		INT_BASE;
+			res.basicInfo.systemLevel := "00000001";
+			
+			elsif commitCausing.controlInfo.specialAction = '1' then
+				if commitCausing.operation.func = sysSync then
+					res.basicInfo.ip := commitCausing.target;
+				elsif commitCausing.operation.func = sysReplay then
+					res.basicInfo.ip := commitCausing.basicInfo.ip;
+				elsif commitCausing.operation.func = sysHalt then
+					res.basicInfo.ip := commitCausing.target; -- ???
+				elsif commitCausing.operation.func = sysRetI then
+						res.basicInfo.ip := X"00000020";  --TEMP!!
+				elsif commitCausing.operation.func = sysRetE then
+						res.basicInfo.ip := X"00000030";  --TEMP!!					
+				end if;
+				
+		--else -- fetchLock	
+		--	res.basicInfo.ip := causingNext;
+		end if;		
+	
+	return res;
+end function;
+
 
 function newPCData(content: InstructionState;
 						  commitEvent: std_logic; commitCausing: InstructionState;
 						  execEvent: std_logic; execCausing: InstructionState;	
 						  decodeEvent: std_logic; decodeCausing: InstructionState;
-						  pcNext, causingNext: Mword)
+						  pcNext: Mword)
 return InstructionState is
 	variable res: InstructionState := content;
 	variable newPC: Mword := (others=>'0');
@@ -510,7 +561,7 @@ begin
 		elsif commitCausing.controlInfo.newInterrupt = '1' then
 			res.basicInfo.ip := INT_BASE; -- TEMP!
 			res.basicInfo.intLevel := "00000001";		
-		elsif commitCausing.controlInfo.newException = '1' or not LATE_FETCH_LOCK then
+		elsif commitCausing.controlInfo.newException = '1' then--or not LATE_FETCH_LOCK then
 			-- TODO, FIX: exceptionCode sliced - shift left by ALIGN_BITS? or leave just base address
 			res.basicInfo.ip := EXC_BASE(MWORD_SIZE-1 downto commitCausing.controlInfo.exceptionCode'length)
 									& commitCausing.controlInfo.exceptionCode(
@@ -518,18 +569,34 @@ begin
 									& EXC_BASE(ALIGN_BITS-1 downto 0);	
 									--		INT_BASE;
 			res.basicInfo.systemLevel := "00000001";
-		else -- fetchLock	
-			res.basicInfo.ip := causingNext;
+			
+			elsif commitCausing.controlInfo.specialAction = '1' then
+				if commitCausing.operation.func = sysSync then
+					res.basicInfo.ip := commitCausing.target;
+				elsif commitCausing.operation.func = sysReplay then
+					res.basicInfo.ip := commitCausing.basicInfo.ip;
+				elsif commitCausing.operation.func = sysHalt then
+					res.basicInfo.ip := commitCausing.target; -- ???
+				elsif commitCausing.operation.func = sysRetI then
+						res.basicInfo.ip := X"00000020";  --TEMP!!
+				elsif commitCausing.operation.func = sysRetE then
+						res.basicInfo.ip := X"00000030";  --TEMP!!					
+				end if;
+				
+		--else -- fetchLock	
+		--	res.basicInfo.ip := causingNext;
 		end if;	
+		
+				res.basicInfo.ip := commitCausing.target;
 	elsif execEvent = '1' then		
 		res.basicInfo.ip := execCausing.target;
 	elsif decodeEvent = '1' then
 			if BRANCH_AT_DECODE then
 				res.basicInfo.ip := decodeCausing.target;	
 			end if;
-		if decodeCausing.controlInfo.newFetchLock = '1' then	
-			res.basicInfo.ip := causingNext;
-		end if;
+		--if decodeCausing.controlInfo.newFetchLock = '1' then	
+		--	res.basicInfo.ip := causingNext;
+		--end if;
 	else	-- Increment by the width of fetch group
 		res.basicInfo.ip := pcNext;
 	end if;	
@@ -542,15 +609,19 @@ end function;
 										commitEvent: std_logic; commitCausing: InstructionState;
 										execEvent: std_logic; execCausing: InstructionState;	
 										decodeEvent: std_logic; decodeCausing: InstructionState;
-										pcNext, causingNext: Mword)
+										pcNext: Mword)
 	return GeneralEventInfo is
 		variable res: GeneralEventInfo;
 	begin
 		res.affectedVec := (others => '0');
 		res.eventOccured := '1';
+			res.killPC := '0';
+			
 		res.causing := decodeCausing;
 	
 		if commitEvent = '1' then 
+			res.killPC := --isHalt(commitCausing) or '0';
+								'1';
 			res.causing := commitCausing;
 			res.affectedVec(0 to 4) := (others => '1');
 		elsif execEvent = '1' then
@@ -563,11 +634,11 @@ end function;
 			res.eventOccured := '0';
 		end if;
 		
-		res.newStagePC := newPCData( pcData,
-												commitEvent, commitCausing,
-												execEvent, execCausing,
-												decodeEvent, decodeCausing,
-												pcNext, causingNext);		
+		--res.newStagePC := newPCData( pcData,
+		--										commitEvent, commitCausing,
+		--										execEvent, execCausing,
+		--										decodeEvent, decodeCausing,
+		--										pcNext, causingNext);		
 		return res;
 	end function;
 

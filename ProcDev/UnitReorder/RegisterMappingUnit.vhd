@@ -68,12 +68,12 @@ entity RegisterMappingUnit is
 		prevStablePhysDests: out PhysNameArray(0 to PIPE_WIDTH-1);
 		stablePhysSources: out PhysNameArray(0 to 3*PIPE_WIDTH-1);
 		
-			sendingToWrite: in std_logic;
-			stageDataToWrite: in StageDataMulti;
+		--	sendingToWrite: in std_logic;
+		--	stageDataToWrite: in StageDataMulti;
 
-				stageDataToWritePre: in StageDataMulti;
+		--		stageDataToWritePre: in StageDataMulti;
 			
-			readyRegFlagsNext: out std_logic_vector(0 to 3*PIPE_WIDTH-1)		
+			readyRegFlagsNext: out std_logic_vector(0 to 3*PIPE_WIDTH-1) -- MAYBE IN THE FUTURE		
 	);
 end RegisterMappingUnit;
 
@@ -114,32 +114,32 @@ architecture Behavioral of RegisterMappingUnit is
 	end function;
 
 
-	signal setVecMW, failVecMW,
-				clearVecMW: std_logic_vector(0 to MAX_WIDTH-1) := (others=>'0'); 
-	signal selectSetVirtualMW, selectClearMW: RegNameArray(0 to MAX_WIDTH-1) := (others=>(others=>'0'));
-	signal selectSetPhysicalMW: PhysNameArray(0 to MAX_WIDTH-1) := (others=>(others=>'0'));
-	
-	signal readyTableNewest, readyTableStable: std_logic_vector(0 to 31) := (others => '1');
-	
+--	signal setVecMW, failVecMW,
+--				clearVecMW: std_logic_vector(0 to MAX_WIDTH-1) := (others=>'0'); 
+--	signal selectSetVirtualMW, selectClearMW: RegNameArray(0 to MAX_WIDTH-1) := (others=>(others=>'0'));
+--	signal selectSetPhysicalMW: PhysNameArray(0 to MAX_WIDTH-1) := (others=>(others=>'0'));
+--	
+--	--signal readyTableNewest, readyTableStable: std_logic_vector(0 to 31) := (others => '1');
+--	
 
-				signal selectSetVirtualPreMW: RegNameArray(0 to MAX_WIDTH-1) := (others=>(others=>'0'));
-
-
-		signal readyTableClearAllow: std_logic := '0';
-		signal readyTableClearSel: std_logic_vector(0 to PIPE_WIDTH-1) := (others => '0');
-		signal readyTableSetAllow: std_logic := '0';
-		signal readyTableSetSel,
-					readyTableFailSel: std_logic_vector(0 to PIPE_WIDTH-1) := (others => '0');
-		signal readyTableSetVirtualTags: RegNameArray(0 to PIPE_WIDTH-1) := (others => (others =>'0'));
-		signal readyTableSetPhysicalTags: PhysNameArray(0 to PIPE_WIDTH-1) := (others => (others =>'0'));
-
-			signal readyTableSetVirtualPreTags: RegNameArray(0 to PIPE_WIDTH-1) := (others => (others =>'0'));
-
-		signal readyRegsSig: std_logic_vector(0 to N_PHYSICAL_REGS-1) := (0 to 31 => '1', others=>'0');
+		--		signal selectSetVirtualPreMW: RegNameArray(0 to MAX_WIDTH-1) := (others=>(others=>'0'));
+--
+--
+--		signal readyTableClearAllow: std_logic := '0';
+--		signal readyTableClearSel: std_logic_vector(0 to PIPE_WIDTH-1) := (others => '0');
+--		signal readyTableSetAllow: std_logic := '1';
+--		signal readyTableSetSel,
+--					readyTableFailSel: std_logic_vector(0 to PIPE_WIDTH-1) := (others => '0');
+--		signal readyTableSetVirtualTags: RegNameArray(0 to PIPE_WIDTH-1) := (others => (others =>'0'));
+--		signal readyTableSetPhysicalTags: PhysNameArray(0 to PIPE_WIDTH-1) := (others => (others =>'0'));
+--
+--			signal readyTableSetVirtualPreTags: RegNameArray(0 to PIPE_WIDTH-1) := (others => (others =>'0'));
+--
+--		signal readyRegsSig: std_logic_vector(0 to N_PHYSICAL_REGS-1) := (0 to 31 => '1', others=>'0');
 
 		--signal newPhysDests: PhysNameArray(0 to PIPE_WIDTH-1) := (others=>(others=>'0'));
-			signal mapped: PhysNameArray(0 to 31) := (others => (others => '0')); -- TEMP
-			signal mappingRead: PhysNameArray(0 to WIDTH-1) := (others => (others => '0'));
+	--		signal mapped: PhysNameArray(0 to 31) := (others => (others => '0')); -- TEMP
+	--		signal mappingRead: PhysNameArray(0 to WIDTH-1) := (others => (others => '0'));
 	
 begin	
 
@@ -171,7 +171,7 @@ begin
 	READ_NEWEST: for i in 0 to selectNewestMW'length-1 generate
 		readNewestMW(i) <= newestMap(slv2u(selectNewestMW(i)));
 		
-		readyTableReadNewestMW(i) <= readyTableNewest(slv2u(selectNewestMW(i)));		
+		--readyTableReadNewestMW(i) <= readyTableNewest(slv2u(selectNewestMW(i)));		
 	end generate;
 
 	READ_STABLE: for i in 0 to selectStableMW'length-1 generate
@@ -199,6 +199,12 @@ begin
 				end if;
 
 				if sendingToCommit = '1' then -- and rewind = '0' then -- block when rewinding??
+				
+						--	report ":: " & integer'image(slv2u(commitMW)) & ", " &
+						--						integer'image(slv2u(stageDataToCommit.fullMask)) & ", " 							
+						--	&					integer'image(slv2u(getDestMask(stageDataToCommit))) & ", " 
+						--	& 					integer'image(slv2u(findOverriddenDests(stageDataToCommit)));
+									
 					for i in 0 to commitMW'length-1 loop
 						if commitMW(i) = '1' then
 							stableMap(slv2u(selectCommitMW(i))) <= writeCommitMW(i);
@@ -208,72 +214,74 @@ begin
 			--end if;				
 		end if;
 	end process;
-
-
-		-- for stable
-		readyTableSetAllow <= sendingToWrite;	
-		readyTableSetSel <= getPhysicalDestMask(stageDataToWrite) 
-						and not getExceptionMask(stageDataToWrite);
-			readyTableFailSel <= getPhysicalDestMask(stageDataToWrite)			
-						and getExceptionMask(stageDataToWrite);
-						
-		readyTableSetPhysicalTags <= getPhysicalDests(stageDataToWrite); -- for ready table
-		readyTableSetVirtualTags <= getVirtualDests(stageDataToWrite); -- for ready table
-
-			readyTableSetVirtualPreTags <= getVirtualDests(stageDataToWritePre); -- for ready table
-
-		-- for newest
-		readyTableClearAllow <= sendingToReserve;
-		readyTableClearSel <= getDestMask(stageDataToReserve);	
-
-	
-	setVecMW(0 to WIDTH-1) <= readyTableSetSel when readyTableSetAllow = '1' else (others => '0');
-		failVecMW(0 to WIDTH-1) <= readyTableFailSel when readyTableSetAllow = '1' else (others => '0');
-	
-	clearVecMW(0 to WIDTH-1) <= readyTableClearSel when readyTableClearAllow = '1' else (others => '0');
-	selectSetVirtualMW(0 to WIDTH-1) <= readyTableSetVirtualTags;
-	selectSetPhysicalMW(0 to WIDTH-1) <= readyTableSetPhysicalTags;
-		
-	selectClearMW(0 to WIDTH-1) <= getVirtualDests(stageDataToReserve);
-
-		selectSetVirtualPreMW(0 to WIDTH-1) <= readyTableSetVirtualPreTags;
-
-	SYNCHRONOUS_READY_TABLE: process(clk)
-	begin
-		if rising_edge(clk) then
-
-					for i in 0 to WIDTH-1 loop
-						mappingRead(i) <= newestMap(slv2u(selectSetVirtualPreMW(i)));
-					end loop;
-			
-				if rewind = '1' then
-					readyTableNewest <= readyTableStable;
-				else						
-					-- For newest table
-					for i in 0 to WIDTH-1 loop
-						if setVecMW(i) = '1' then
-							-- set 
-							if selectSetPhysicalMW(i) = --newestMap(slv2u(selectSetVirtualMW(i))) then
-																	mappingRead(i) then
-								--true then
-								readyTableNewest(slv2u(selectSetVirtualMW(i))) <= '1';
-							end if;
-						end if;
-						
-						if clearVecMW(i) = '1' then
-							-- clear
-							readyTableNewest(slv2u(selectClearMW(i))) <= '0';						
-						end if;
-					end loop;
-				end if;
-		end if;
-	end process;
-
-	READ_NEWEST_READY: for i in 0 to selectNewestMW'length-1 generate
-		readyTableReadNewestMW(i) <= readyTableNewest(slv2u(selectNewestMW(i)));
-	end generate;
-
-	--readyRegFlagsNext <= readyTableReadNewestMW(0 to 3*PIPE_WIDTH-1); -- CAREFUL: output suppression
+--
+--		-- for newest
+--		readyTableClearAllow <= sendingToReserve;
+--		readyTableClearSel <= getDestMask(stageDataToReserve);
+--
+--		selectClearMW(0 to WIDTH-1) <= getVirtualDests(stageDataToReserve);	
+--		clearVecMW(0 to WIDTH-1) <= readyTableClearSel when readyTableClearAllow = '1' else (others => '0');
+--	
+--		-- for stable
+--		readyTableSetSel <= getPhysicalDestMask(stageDataToWrite)
+--						and 		stageDataToWrite.fullMask
+--						and not getExceptionMask(stageDataToWrite);
+--		readyTableFailSel <= getPhysicalDestMask(stageDataToWrite)
+--						and 		stageDataToWrite.fullMask
+--						and getExceptionMask(stageDataToWrite);
+--						
+--		readyTableSetPhysicalTags <= getPhysicalDests(stageDataToWrite); -- for ready table
+--		readyTableSetVirtualTags <= getVirtualDests(stageDataToWrite); -- for ready table
+--
+--			readyTableSetVirtualPreTags <= getVirtualDests(stageDataToWritePre); -- for ready table
+--	
+--	setVecMW(0 to WIDTH-1) <= readyTableSetSel;-- when readyTableSetAllow = '1' else (others => '0');
+--		failVecMW(0 to WIDTH-1) <= readyTableFailSel;-- when readyTableSetAllow = '1' else (others => '0');
+--
+--
+--
+--	selectSetVirtualMW(0 to WIDTH-1) <= readyTableSetVirtualTags;
+--	selectSetPhysicalMW(0 to WIDTH-1) <= readyTableSetPhysicalTags;
+--		
+--
+--		selectSetVirtualPreMW(0 to WIDTH-1) <= readyTableSetVirtualPreTags;
+--
+--	SYNCHRONOUS_READY_TABLE: process(clk)
+--	begin
+--		if rising_edge(clk) then
+--
+--					for i in 0 to WIDTH-1 loop
+--						mappingRead(i) <= newestMap(slv2u(selectSetVirtualPreMW(i)));
+--					end loop;
+--			
+--				if rewind = '1' then
+--					readyTableNewest <= readyTableStable;
+--				else						
+--					-- For newest table
+--					for i in 0 to WIDTH-1 loop
+--						if setVecMW(i) = '1' then
+--							-- set 
+--							if selectSetPhysicalMW(i) = --newestMap(slv2u(selectSetVirtualMW(i))) then
+--																	mappingRead(i) then
+--								--true then
+--								readyTableNewest(slv2u(selectSetVirtualMW(i))) <= '1';
+--							end if;
+--						end if;
+--						
+--						if clearVecMW(i) = '1' then
+--							-- clear
+--							readyTableNewest(slv2u(selectClearMW(i))) <= '0';						
+--						end if;
+--					end loop;
+--				end if;
+--		end if;
+--	end process;
+--
+--	READ_NEWEST_READY: for i in 0 to selectNewestMW'length-1 generate
+--		readyTableReadNewestMW(i) <= readyTableNewest(slv2u(selectNewestMW(i)));
+--	end generate;
+--
+--	--readyRegFlagsNext <= readyTableReadNewestMW(0 to 3*PIPE_WIDTH-1); -- CAREFUL: output suppression
 
 end Behavioral;
 

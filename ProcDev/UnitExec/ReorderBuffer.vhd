@@ -66,6 +66,7 @@ entity ReorderBuffer is
 		prevSending: in std_logic;
 		acceptingOut: out std_logic;
 		
+			nextAccepting: in std_logic;
 		sendingOut: out std_logic; 
 		
 		outputData: out StageDataMulti
@@ -154,12 +155,14 @@ begin
 		
 	isSending <= stageData.fullMask(0)
 				and groupCompleted(stageData.data(0))
-				and not fromCommitted;
+				and not fromCommitted
+							and nextAccepting;
 
 		lateFetchLock <= '1' when LATE_FETCH_LOCK else '0';
 	fromCommitted <= execEventSignal and 	
 							(	execCausing.controlInfo.newInterrupt 
 							or execCausing.controlInfo.newException
+							or execCausing.controlInfo.specialAction
 							or (execCausing.controlInfo.hasFetchLock and lateFetchLock));
 						
 	-- TODO: allow accepting also when queue full but sending, that is freeing a place.

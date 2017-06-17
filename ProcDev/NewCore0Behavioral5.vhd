@@ -80,6 +80,10 @@ architecture Behavioral5 of NewCore0 is
 	signal robSending, robAccepting: std_logic := '0';
 	signal dataOutROB: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;					
 
+		signal sbAccepting, sbEmpty, sbSending: std_logic := '0';
+			signal dataFromSB: InstructionState := DEFAULT_INSTRUCTION_STATE;
+			
+		signal commitAccepting: std_logic := '0';
 		signal committingSig: std_logic := '0';
 
 		signal acceptingNewSQ, acceptingNewLQ, acceptingNewBQ: std_logic := '0';
@@ -87,14 +91,20 @@ architecture Behavioral5 of NewCore0 is
 
 			signal sendingFromBQ: std_logic := '0';
 			signal dataOutBQ: InstructionState := DEFAULT_INSTRUCTION_STATE;
+			signal dataOutBQV: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
 
 	-- back end interfaces
 	signal whichAcceptedCQ: std_logic_vector(0 to 3) := (others=>'0');	
 	signal anySendingFromCQ: std_logic := '0';
 	
-	signal dataCQOut: StageDataCommitQueue
-										:= (fullMask=>(others=>'0'), data=>(others=>defaultInstructionState));	
+	--signal dataCQOut: StageDataCommitQueue
+	--									:= (fullMask=>(others=>'0'), data=>(others=>defaultInstructionState));
+		signal cqBufferMask: std_logic_vector(0 to CQ_SIZE-1) := (others => '0');
+		signal cqBufferData: InstructionStateArray(0 to CQ_SIZE-1) := (others => DEFAULT_INSTRUCTION_STATE);
 	signal cqDataLivingOut: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
+
+		signal cqMaskOut: std_logic_vector(0 to INTEGER_WRITE_WIDTH-1) := (others => '0');
+		signal cqDataOut: InstructionStateArray(0 to INTEGER_WRITE_WIDTH-1) := (others => DEFAULT_INSTRUCTION_STATE);
 
 	signal cqPhysDestMask: std_logic_vector(0 to PIPE_WIDTH-1) := (others => '0');
 	signal cqPhysicalDests: PhysNameArray(0 to PIPE_WIDTH-1) := (others => (others => '0'));
@@ -123,9 +133,11 @@ architecture Behavioral5 of NewCore0 is
 						
 	signal outputA, outputB, outputC, outputD, outputE: InstructionSlot := DEFAULT_INSTRUCTION_SLOT;
 	signal outputOpPreB, outputOpPreC: InstructionState := DEFAULT_INSTRUCTION_STATE;
-						
-	-- CAREFUL: this is used to turn off dependence on iqAccepts
-	--constant	OMIT_IQ_ACCEPTS: std_logic := '0';	-- DEPREC	
+
+		signal sysStoreAllow: std_logic := '0';
+		signal sysStoreAddress: slv5 := (others => '0'); 
+		signal sysStoreValue: Mword := (others => '0');
+
 				
 	constant HAS_RESET: std_logic := '0';
 	constant HAS_EN: std_logic := '0';
@@ -183,13 +195,24 @@ begin
 		readyRegFlagsNextV => readyRegFlagsNextV,
 		
 		-- Interface from ROB
+		commitAccepting => commitAccepting,
 		sendingFromROB => robSending,	
 		robDataLiving => dataOutROB,
 		committing => committingSig,
 
 		---
 		sendingFromBQ => sendingFromBQ,
+			dataFromBQV => dataOutBQV,
 		dataFromBQ => dataOutBQ,
+
+				sendingFromSB => '0',
+				dataFromSB => dataFromSB,
+					sbEmpty => sbEmpty,
+				sbSending => sbSending,
+
+			 sysStoreAllow => sysStoreAllow,
+			 sysStoreAddress => sysStoreAddress,
+			 sysStoreValue => sysStoreValue,
 
 		-- Interface from committed stage
 		committedSending => committedSending,
@@ -425,6 +448,7 @@ begin
 		
 		acceptingNewBQ => acceptingNewBQ,
 		sendingOutBQ => sendingFromBQ,
+			dataOutBQV => dataOutBQV,
 		dataOutBQ => dataOutBQ,
 		prevSendingToBQ => renamedSending,
 		dataNewToBQ => compactedToBQ,
@@ -478,6 +502,10 @@ begin
 			memStoreAllow => memStoreAllow,
 			memStoreValue => memStoreValue,
 
+				sysStoreAllow => sysStoreAllow,
+				sysStoreAddress => sysStoreAddress,
+				sysStoreValue => sysStoreValue,
+
 			sysRegDataIn => sysRegData,
 			sysRegSendingIn => sysRegSending,
 
@@ -486,6 +514,13 @@ begin
 			
 			groupCtrInc => commitGroupCtrIncSig,
 
+				sbAccepting => sbAccepting,
+					sbEmpty => sbEmpty,
+					sbSendingOut => sbSending,
+					dataFromSB => dataFromSB,
+				
+				dataBQV => dataOutBQV,
+					
 			execOrIntEventSignalIn => execOrIntEventSignal,
 			execOrIntCausingIn => execOrIntCausing
 		);
@@ -501,19 +536,32 @@ begin
 
 
 	COMMIT_QUEUE: entity work.TestCQPart0(Implem)
+	generic map(
+		INPUT_WIDTH => 3,
+		QUEUE_SIZE => CQ_SIZE,
+		OUTPUT_SIZE => INTEGER_WRITE_WIDTH
+	)
 	port map(
 		clk => clk, reset => resetSig, en => enSig,
 		
 		execEventSignal => execOrIntEventSignal,
 		execCausing => execOrIntCausing,
 		
-		inputInstructions => execEnds,
+			maskIn => execSending(0 to 2),
+			dataIn => execEnds(0 to 2),
+		
+		--inputInstructions => execEnds,
 		whichAcceptedCQ => whichAcceptedCQ,
-		cqWhichSend => (0 => execSending(0), 1 => execSending(1), 2 => execSending(2), others => '0'),
+		--cqWhichSend => (0 => execSending(0), 1 => execSending(1), 2 => execSending(2), others => '0'),
 		anySending => anySendingFromCQ,
-		cqOut => cqDataLivingOut,
-		dataCQOut => dataCQOut -- CAREFUL: must remain, because used by forwarding network!
+			cqMaskOut => cqMaskOut,
+			cqDataOut => cqDataOut,
+				bufferMaskOut => cqBufferMask,
+				bufferDataOut => cqBufferData
 	);
+		
+			cqDataLivingOut.fullMask(0) <= cqMaskOut(0);
+			cqDataLivingOut.data(0) <= cqDataOut(0);
 		
 	INT_REG_MAPPING: block
 		signal physStable, physStableDelayed: PhysNameArray(0 to PIPE_WIDTH-1) := (others=>(others=>'0'));
@@ -540,11 +588,6 @@ begin
 					
 					prevStablePhysDests => physStable,  -- FOR MAPPING (to FREE LIST)
 					stablePhysSources => open,
-					
-					sendingToWrite => anySendingFromCQ,
-					stageDataToWrite => cqDataLivingOut,
-
-					stageDataToWritePre => cqDataLivingOut, -- TEMP!
 						
 					readyRegFlagsNext => readyRegFlagsNextV
 				);
@@ -566,7 +609,8 @@ begin
 				causingInstruction => execOrIntCausing,
 				
 				sendingToReserve => frontLastSending, 
-				takeAllow => frontLastSending or renameLockEnd,	-- FROM SEQ
+				takeAllow => frontLastSending,	-- FROM SEQ
+					auxTakeAllow => renameLockEnd,
 				stageDataToReserve => frontDataLastLiving,
 				
 				newPhysDests => newPhysDests,			-- TO SEQ
@@ -579,6 +623,9 @@ begin
 			);		
 
 			INT_READY_TABLE: entity work.ReadyRegisterTable(Behavioral)
+			generic map(
+				WRITE_WIDTH => INTEGER_WRITE_WIDTH
+			)
 			port map(
 				clk => clk, reset => resetSig, en => enSig, 
 				
@@ -588,9 +635,8 @@ begin
 				newPhysDests => newPhysDests,	-- FOR MAPPING
 				stageDataReserved => renamedDataLiving, --stageDataOutRename,
 				
-				sendingToWrite => anySendingFromCQ,
-				stageDataToWrite => cqDataLivingOut,
-				
+					writingMask => cqMaskOut,
+					writingData => cqDataOut,
 				readyRegFlagsNext => readyRegFlagsNext -- FOR IQs
 			);
 
@@ -602,23 +648,11 @@ begin
 				end if;
 			end process;
 
-			readyRegFlags <= readyRegFlags_2;
-			
---				INT_READY_TABLE_V: entity work.ReadyRegTableV(Behavioral)
---				port map(
---					clk => clk, reset => resetSig, en => enSig, 
---					sendingToReserve => frontLastSending,
---					stageDataToReserve => frontDataLastLiving,
---					--newPhysDests => newPhysDests,	-- FOR MAPPING
---					--stageDataReserved => renamedDataLiving, --stageDataOutRename,
---					sendingToWrite => anySendingFromCQ,
---					stageDataToWrite => cqDataLivingOut,
---					readyRegFlagsNext => readyRegFlagsNextV -- FOR IQs
---				);			
+			readyRegFlags <= readyRegFlags_2;		
 		end block;
 	
 		-- CAREFUL! This stage is needed to keep result tags 1 for cycle when writing to reg file,
-		--				so that "black hole" of inivisible readiness doesn't occur
+		--				so that "black hole" of invisible readiness doesn't occur
 		AFTER_CQ: entity work.GenericStageMulti(Behavioral) port map(
 			clk => clk, reset => resetSig, en => enSig,
 			
@@ -634,32 +668,27 @@ begin
 			lockCommand => '0'			
 		);
 			
-		-- Int register block	
-		cqPhysDestMask <= getPhysicalDestMask(cqDataLivingOut);
-		cqPhysicalDests <= getPhysicalDests(cqDataLivingOut);
-		cqInstructionResults <= getInstructionResults(cqDataLivingOut);
-				
+		-- Int register block
 			regsSelCE(0 to 1) <= regsSelC(0 to 1);
 			regsSelCE(2) <= regsSelE(2);
 			regsAllowCE <= regsAllowC or regsAllowE;
 			--regValsC <= regValsCE;
 			--regValsE <= regValsCE;
 				regValsC(0 to 1) <= regValsCE(0 to 1);
-				regValsE(2) <= regValsCE(2);
-		
-		TEMP_REG_FILE_INPUTS: for i in 0 to PIPE_WIDTH-1 generate
-			rfWriteVec(i) <= cqPhysDestMask(i);
-			rfSelectWrite(i) <= cqPhysicalDests(i);
-			rfWriteValues(i) <= cqInstructionResults(i);
-		end generate;		
+				regValsE(2) <= regValsCE(2);	
+
+			rfWriteVec(0 to INTEGER_WRITE_WIDTH-1) <= getArrayDestMask(cqDataOut, cqMaskOut);
+			rfSelectWrite(0 to INTEGER_WRITE_WIDTH-1) <= getArrayPhysicalDests(cqDataOut);
+			rfWriteValues(0 to INTEGER_WRITE_WIDTH-1) <= getArrayResults(cqDataOut);
 		
 		GPR_FILE_DISPATCH: entity work.RegisterFile0 (Behavioral)
 																	--(Implem)
-		generic map(WIDTH => 4, WRITE_WIDTH => PIPE_WIDTH)
+		generic map(WIDTH => 4, WRITE_WIDTH => INTEGER_WRITE_WIDTH)
 		port map(
 			clk => clk, reset => resetSig, en => enSig,
 				
-			writeAllow => anySendingFromCQ,
+			writeAllow => --anySendingFromCQ,
+								'1',
 			writeVec => rfWriteVec,
 			selectWrite => rfSelectWrite, -- NOTE: unneeded writing isn't harmful anyway
 			writeValues => rfWriteValues,
@@ -700,15 +729,20 @@ begin
 		prevSending => renamedSending,
 		acceptingOut => robAccepting,
 		
+			nextAccepting => commitAccepting and sbAccepting,
 		sendingOut => robSending, 
 		outputData => dataOutROB		
 	);
 	
-	writtenTags <= getWrittenTags(stageDataAfterCQ);
-	resultTags <= getResultTags(
-				execEnds, dataCQOut, dataOutIQA, dataOutIQB, dataOutIQC, dataOutIQD,	stageDataAfterCQ);
+	
+	WRITTEN_TAG_GEN: if CQ_SINGLE_OUTPUT generate
+		writtenTags <= getWrittenTags(stageDataAfterCQ);
+	end generate;
+	
+	resultTags <= getResultTags(execEnds, cqBufferData, dataOutIQA, dataOutIQB, dataOutIQC, dataOutIQD,
+																											DEFAULT_STAGE_DATA_MULTI);
 	nextResultTags <= getNextResultTags(execPreEnds, dataOutIQA, dataOutIQB, dataOutIQC, dataOutIQD);
-	resultVals <= getResultValues(execEnds, dataCQOut, stageDataAfterCQ);
+	resultVals <= getResultValues(execEnds, cqBufferData, DEFAULT_STAGE_DATA_MULTI);
 	
 		fni.writtenTags <= writtenTags;
 		fni.resultTags <= resultTags;

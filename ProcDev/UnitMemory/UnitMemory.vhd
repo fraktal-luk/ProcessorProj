@@ -38,7 +38,6 @@ use work.NewPipelineData.all;
 
 use work.GeneralPipeDev.all;
 
---use work.CommonRouting.all;
 use work.TEMP_DEV.all;
 
 use work.ProcLogicExec.all;
@@ -80,12 +79,23 @@ entity UnitMemory is
 			memStoreAllow: out std_logic;
 			memStoreValue: out Mword;
 			
+				sysStoreAllow: out std_logic;
+				sysStoreAddress: out slv5;
+				sysStoreValue: out Mword;
+			
 			sysRegDataIn: in InstructionState;
 			sysRegSendingIn: in std_logic;
 			
 			committing: in std_logic;
 			groupCtrNext: in SmallNumber;
 			groupCtrInc: in SmallNumber;
+			
+			sbAccepting: out std_logic;
+				sbEmpty: out std_logic;
+				sbSendingOut: out std_logic;
+				dataFromSB: out InstructionState;
+			
+			dataBQV: in StageDataMulti;
 			
 		execOrIntEventSignalIn: in std_logic;
 		execOrIntCausingIn: in InstructionState			
@@ -102,6 +112,7 @@ architecture Behavioral of UnitMemory is
 	
 	signal sendingOutSQ: std_logic  := '0';
 	signal dataOutSQ: InstructionState := DEFAULT_INSTRUCTION_STATE;
+		signal dataOutSQV: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
 	
 	signal sendingToDLQ, sendingFromDLQ, loadResultSending, isLoad: std_logic := '0';
 	signal dataToDLQ: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
@@ -127,6 +138,16 @@ architecture Behavioral of UnitMemory is
 				 storeAddressWrSig, storeValueWrSig: std_logic := '0';
 		signal dataToLoadUnitSig, storeAddressDataSig, storeValueDataSig: InstructionState
 					:= DEFAULT_INSTRUCTION_STATE;
+					
+	signal sbAcceptingV: std_logic_vector(0 to 3) := (others => '0');				
+		signal sbSending: std_logic := '0';
+	
+		signal sbMaskOut: std_logic_vector(0 to 0) := (others => '0');
+		signal sbDataOut: InstructionStateArray(0 to 0) := (others => DEFAULT_INSTRUCTION_STATE);
+	
+			signal sbFullMask: std_logic_vector(0 to SB_SIZE-1) := (others => '0');
+	
+	signal combinedQueueData: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
 ----------------	
 	signal ch0, ch1, ch2, ch3, ch4, ch5, ch6, ch7: std_logic := '0';
 begin
@@ -283,8 +304,38 @@ begin
 				
 				--acceptingOutSQ => execAcceptingESig,
 				sendingSQOut => sendingOutSQ, -- OUTPUT
+					dataOutV => dataOutSQV,
 				dataOutSQ => dataOutSQ -- OUTPUT
 			);
+
+				-- NOTE: all ops committed in 1 cycle are from the same group, so they'll always fit into one
+				combinedQueueData <= combineMulti(dataOutSQV, dataBQV);
+
+					STORE_BUFFER: entity work.TestCQPart0(WriteBuffer)
+					generic map(
+						INPUT_WIDTH => PIPE_WIDTH,
+						QUEUE_SIZE => SB_SIZE,
+						OUTPUT_SIZE => 1
+					)
+					port map(
+						clk => clk, reset => reset, en => en,
+						
+						whichAcceptedCQ => sbAcceptingV,
+						maskIn => combinedQueueData.fullMask,
+						dataIn => combinedQueueData.data,
+						
+						bufferMaskOut => sbFullMask,
+						bufferDataOut => open,
+						
+						anySending => sbSending,
+						cqMaskOut => sbMaskOut,
+						cqDataOut => sbDataOut,
+						
+						execEventSignal => '0',
+						execCausing => DEFAULT_INSTRUCTION_STATE
+					);
+					
+
 
 			MEM_LOAD_QUEUE: entity --work.LoadQueue(Behavioral)
 											work.MemoryUnit(Behavioral)
@@ -317,6 +368,7 @@ begin
 
 				--acceptingOutSQ => open,--acceptingLoadUnitOut, -- ! dont do multiple drivers!
 				sendingSQOut => open,--sendingOutLQ, --??
+					dataOutV => open,
 				dataOutSQ => open--dataOutLQ--?? 
 			);
 
@@ -377,13 +429,25 @@ begin
 				else stageDataAfterCache;
 
 				-- Mem interface
-				memStoreAddress <= dataOutSQ.argValues.arg1;
-				memStoreValue <= dataOutSQ.argValues.arg2;
+				memStoreAddress <= --dataOutSQ.argValues.arg1;
+											sbDataOut(0).argValues.arg1;
+				memStoreValue <= --dataOutSQ.argValues.arg2;
+											sbDataOut(0).argValues.arg2;
 		
 				memLoadAddress <= dataToLoadUnitSig.result; -- in LoadUnit
 		
 				memLoadAllow <= sendingToLoadUnitSig;
-				memStoreAllow <= sendingOutSQ;
-			
+				memStoreAllow <= --sendingOutSQ;
+										  sbSending when sbDataOut(0).operation = (Memory, store) else '0';
+										  
+				 sysStoreAllow <= sbSending when sbDataOut(0).operation = (System, sysMTC) else '0'; 
+				 sysStoreAddress <= sbDataOut(0).argValues.arg2(4 downto 0);
+				 sysStoreValue <= sbDataOut(0).argValues.arg1; 
+														-- ^ CAREFUL: address holds data, cause it's queue for addresses
+				 
+		sbAccepting <= sbAcceptingV(0);	
+			sbEmpty <= not sbFullMask(0);
+			sbSendingOut <= sbSending;
+			dataFromSB <= sbDataOut(0);
 end Behavioral;
 

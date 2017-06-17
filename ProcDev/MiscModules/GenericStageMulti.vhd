@@ -205,16 +205,19 @@ begin
 	KILLER: block
 		signal before: std_logic;
 		signal a, b: std_logic_vector(7 downto 0);
+		signal c: SmallNumber := (others => '0');
 	begin
 		a <= execCausing.groupTag;
 		b <= stageData.data(0).groupTag;	
 
-		IQ_KILLER: entity work.CompareBefore8 port map(
-			inA =>  a,
-			inB =>  b,
-			outC => before
-		);
-		
+--		IQ_KILLER: entity work.CompareBefore8 port map(
+--			inA =>  a,
+--			inB =>  b,
+--			outC => open --
+--						--before
+--		);
+			c <= subSN(a, b);
+		before <= c(7);
 		--before <= '0'; --
 					--tagBefore(a, b);			
 		flowDrive.kill <= killByTag(before, execEventSignal,
@@ -273,23 +276,25 @@ begin
 	KILLER: block
 		signal before: std_logic;
 		signal a, b: std_logic_vector(7 downto 0);
+		signal c: SmallNumber := (others => '0');
 	begin
 		a <= execCausing.groupTag;
 		b <= stageData.data(0).groupTag;	
 
-		IQ_KILLER: entity work.CompareBefore8 port map(
-			inA =>  a,
-			inB =>  b,
-			outC => before
-		);
-		
+--		IQ_KILLER: entity work.CompareBefore8 port map(
+--			inA =>  a,
+--			inB =>  b,
+--			outC => open --
+--						--before
+--		);
+			c <= subSN(a, b);
+		before <= c(7);
 		--before <= '0'; --
 					--tagBefore(a, b);			
 		flowDrive.kill <= killByTag(before, execEventSignal,
 										execCausing.controlInfo.newInterrupt); -- CAREFUL: no separat interrupt signal!
 										-- before and execEventSignal; 	
-	end block;	
-			-- CAREFUL: in this architecture 'isNew' is irrelevant because clearing vacating slot;
+	end block;			-- CAREFUL: in this architecture 'isNew' is irrelevant because clearing vacating slot;
 			--				second difference from SingleTagged
 		stageEvents <= stageMultiEvents(stageData, flowResponse.isNew or '1');
 	
@@ -314,12 +319,20 @@ architecture LastEffective of GenericStageMulti is
 														StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
 	signal partialKillMask: std_logic_vector(0 to PIPE_WIDTH-1) := (others => '0');
 	signal stageEvents: StageMultiEventInfo;	
+	
+		signal evtPhase0, evtPhase1, evtPhase2, evtWaiting: std_logic := '0';
 begin
 	stageDataNew <= stageDataIn;										
 	stageDataNext <= stageMultiNext(stageDataLiving, stageDataNew,
 								flowResponse.living, flowResponse.sending, flowDrive.prevSending);			
-	stageDataLiving <= stageMultiHandleKill(stageData, flowDrive.kill, partialKillMask);
-
+	--stageDataLiving <= stageMultiHandleKill(stageData, flowDrive.kill, partialKillMask);
+		stageDataLiving.fullMask <= stageData.fullMask;
+		stageDataLiving.data(0) <= work.TEMP_DEV.setException2(
+								stageData.data(0),
+								execCausing,
+								execCausing.controlInfo.hasInterrupt, execCausing.controlInfo.hasReset, flowResponse.isNew,
+								evtPhase0, evtPhase1, evtPhase2);
+	
 	PIPE_CLOCKED: process(clk) 	
 	begin
 		if rising_edge(clk) then
@@ -330,9 +343,28 @@ begin
 
 				logMulti(stageData.data, stageData.fullMask, stageDataLiving.fullMask, flowResponse);
 				checkMulti(stageData, stageDataNext, flowDrive, flowResponse);
+				
+					if evtPhase0 = '1' and evtPhase1 = '0' then
+						evtWaiting <= '1';
+					elsif evtPhase1 = '1' then
+						evtWaiting <= '0';
+						--evtPhase1 <= '0';
+						evtPhase2 <= '1';
+					elsif evtPhase2 = '1' then
+						evtPhase2 <= '0';
+					end if;
+					
 			end if;
 		end if;
 	end process;
+
+			evtPhase0 <= execCausing.controlInfo.hasInterrupt or execCausing.controlInfo.hasReset
+					  or (flowResponse.isNew 
+							and (		stageData.data(0).controlInfo.hasException 
+									or stageData.data(0).controlInfo.specialAction));
+			evtPhase1 <= (evtPhase0 and not lockCommand)
+						or  (evtWaiting and not lockCommand);
+									
 
 	SIMPLE_SLOT_LOGIC: SimplePipeLogic port map(
 		clk => clk, reset => reset, en => en,
@@ -340,14 +372,16 @@ begin
 		flowResponse => flowResponse
 	);
 		-- TODO: move to visible package! 
-		stageEvents.causing <= work.TEMP_DEV.setException(stageData.data(0),
-					execCausing.controlInfo.hasInterrupt, execCausing.controlInfo.hasReset, flowResponse.isNew);
+		stageEvents.causing <= work.TEMP_DEV.setException(--stageData.data(0),
+																			stageDataLiving.data(0),
+					execCausing.controlInfo.hasInterrupt, execCausing.controlInfo.hasReset, flowResponse.isNew,
+					evtPhase0, evtPhase1, evtPhase2);
 		stageEvents.eventOccured <= stageEvents.causing.controlInfo.newEvent;
 		
 	flowDrive.prevSending <= prevSending;
 	flowDrive.nextAccepting <= nextAccepting;
 	--flowDrive.kill <= execEventSignal;
-	flowDrive.lockAccept <= lockCommand;
+	--flowDrive.lockAccept <= lockCommand;
 
 	acceptingOut <= flowResponse.accepting;		
 	sendingOut <= flowResponse.sending;

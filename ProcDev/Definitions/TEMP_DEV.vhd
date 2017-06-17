@@ -70,24 +70,31 @@ function getIncrementedAddress(ins: InstructionState) return Mword;
 function getAddressIncrement(ins: InstructionState) return Mword;
 
 -- What would be next in flow without exceptions - that is next one or jump target 
-function getNormalTargetAddress(ins: InstructionState; causingNext: Mword) return Mword;
+function getNormalTargetAddress(ins: InstructionState) return Mword;
 
 -- Address to go to if exception happens
 function getHandlerAddress(ins: InstructionState) return Mword;
 
 -- Jump target, increment if not jump 
-function getLinkInfoNormal(ins: InstructionState; causingNext: Mword) return InstructionBasicInfo;
+function getLinkInfoNormal(ins: InstructionState) return InstructionBasicInfo;
 -- Handler address and system state
-function getExceptionTarget(ins: InstructionState; causingNext: Mword) return InstructionBasicInfo;
+function getExceptionTarget(ins: InstructionState) return InstructionBasicInfo;
 -- Target, which may be exception handler call
-function getLinkInfoSuper(ins: InstructionState; causingNext: Mword) return InstructionBasicInfo;
+function getLinkInfoSuper(ins: InstructionState) return InstructionBasicInfo;
 
 
 function clearTempControlInfoSimple(ins: InstructionState) return InstructionState;
 function clearTempControlInfoMulti(sd: StageDataMulti) return StageDataMulti;
 
-function setException(ins: InstructionState; intSignal, resetSignal, isNew: std_logic)
+function setException(ins: InstructionState;
+							 intSignal, resetSignal, isNew, phase0, phase1, phase2: std_logic)
 return InstructionState;
+
+function setException2(ins, causing: InstructionState;
+							  intSignal, resetSignal, isNew, phase0, phase1, phase2: std_logic)
+return InstructionState;
+
+function isHalt(ins: InstructionState) return std_logic;
 
 function clearEmptyResultTags(insVec: InstructionStateArray; fullMask: std_logic_vector)
 return InstructionStateArray;
@@ -349,7 +356,7 @@ end function;
 --			but this would be very complex.
 
 -- "Normal target" is sequential/branch, without exceptions
-function getNormalTargetAddress(ins: InstructionState; causingNext: Mword) return Mword is
+function getNormalTargetAddress(ins: InstructionState) return Mword is
 begin
 	if ins.controlInfo.hasBranch = '1' then
 		return ins.target;
@@ -370,16 +377,17 @@ begin
 end function;
 
 
-function getLinkInfoNormal(ins: InstructionState; causingNext: Mword) return InstructionBasicInfo is
+function getLinkInfoNormal(ins: InstructionState) return InstructionBasicInfo is
 	variable res: InstructionBasicInfo := ins.basicInfo;
 begin
 	-- get next adr considering possible jump 
-	res.ip := getNormalTargetAddress(ins, causingNext);
+	--res.ip := getNormalTargetAddress(ins, causingNext);
+		res.ip := ins.result;
 	return res;
 end function;
 
 
-function getExceptionTarget(ins: InstructionState; causingNext: Mword) return InstructionBasicInfo is
+function getExceptionTarget(ins: InstructionState) return InstructionBasicInfo is
 	variable res: InstructionBasicInfo := ins.basicInfo;
 begin
 	-- get handler adr and system level 
@@ -389,16 +397,16 @@ begin
 end function;
 
 
-function getLinkInfoSuper(ins: InstructionState; causingNext: Mword) return InstructionBasicInfo is
+function getLinkInfoSuper(ins: InstructionState) return InstructionBasicInfo is
 	variable res: InstructionBasicInfo := ins.basicInfo;
 begin
 	if ins.controlInfo.hasException = '1' then 
-		return getExceptionTarget(ins, causingNext);
+		return getExceptionTarget(ins);
 	-- > NOTE, TODO: Interupt chaining can be implemented in a simple way: when another interrupt appears, 
 	--		jump to handler directly from currently running handler, but don't set ILR.
 	--		ILR will remain from the first interrupt in chain, just like in tail function call
 	else
-		return getLinkInfoNormal(ins, causingNext);
+		return getLinkInfoNormal(ins);
 	end if;
 end function;
 
@@ -425,7 +433,44 @@ begin
 end function;
 
 	
-function setException(ins: InstructionState; intSignal, resetSignal, isNew: std_logic)
+function setException(ins: InstructionState;
+							 intSignal, resetSignal, isNew, phase0, phase1, phase2: std_logic)
+return InstructionState is
+	variable res: InstructionState := ins;
+		variable lateFetchLock: std_logic := '0';
+begin
+		if LATE_FETCH_LOCK then
+			lateFetchLock := '1';
+		end if;	
+			
+	--res.controlInfo.newEvent := ((res.controlInfo.hasException 
+	--										or res.controlInfo.specialAction
+	--										--		or (res.controlInfo.hasFetchLock and lateFetchLock)
+	--										)
+	--										and isNew) 
+	--								or intSignal or resetSignal;
+	--res.controlInfo.hasEvent := res.controlInfo.hasEvent or res.controlInfo.newEvent;
+
+	--res.controlInfo.newException := res.controlInfo.hasException and isNew; 
+
+	--res.controlInfo.newInterrupt := intSignal;
+	--res.controlInfo.hasInterrupt := intSignal;
+	-- ^ Interrupts delayed by 1 cycle if exception being committed!
+	
+	--res.controlInfo.newReset := resetSignal;
+	--res.controlInfo.hasReset := resetSignal;
+		
+	-- ...?	
+		res.controlInfo.phase0 := phase0;
+		res.controlInfo.phase1 := phase1;
+		res.controlInfo.phase2 := phase2;
+
+	return res;
+end function;	
+
+
+function setException2(ins, causing: InstructionState;
+							  intSignal, resetSignal, isNew, phase0, phase1, phase2: std_logic)
 return InstructionState is
 	variable res: InstructionState := ins;
 		variable lateFetchLock: std_logic := '0';
@@ -435,7 +480,9 @@ begin
 		end if;	
 			
 	res.controlInfo.newEvent := ((res.controlInfo.hasException 
-													or (res.controlInfo.hasFetchLock and lateFetchLock))
+											or res.controlInfo.specialAction
+											--		or (res.controlInfo.hasFetchLock and lateFetchLock)
+											)
 											and isNew) 
 									or intSignal or resetSignal;
 	res.controlInfo.hasEvent := res.controlInfo.hasEvent or res.controlInfo.newEvent;
@@ -443,16 +490,43 @@ begin
 	res.controlInfo.newException := res.controlInfo.hasException and isNew; 
 
 	res.controlInfo.newInterrupt := intSignal;
-	res.controlInfo.hasInterrupt := intSignal;
+	res.controlInfo.hasInterrupt := res.controlInfo.hasInterrupt or intSignal;
 	-- ^ Interrupts delayed by 1 cycle if exception being committed!
 	
 	res.controlInfo.newReset := resetSignal;
 	res.controlInfo.hasReset := resetSignal;
 		
 	-- ...?	
-	return res;
-end function;	
+	if phase1 = '1' then
+			res.result := res.target;
+		res.target := causing.target;
+	end if;
+	
+	if phase2 = '1' then
+		res.controlInfo.newException := '0';
+		res.controlInfo.newInterrupt := '0';
+		res.controlInfo.newReset := '0';
+		res.controlInfo.newEvent := '0';	
 
+			res.controlInfo.hasException := '0';
+			res.controlInfo.hasInterrupt := '0';
+			res.controlInfo.hasReset := '0';
+			res.controlInfo.hasEvent := '0';	
+			res.controlInfo.specialAction := '0';			
+	end if;
+	
+	return res;
+end function;
+
+
+function isHalt(ins: InstructionState) return std_logic is
+	variable res: std_logic := '0';
+begin
+	if ins.operation = (System, sysHalt) and ins.controlInfo.hasInterrupt = '0' then 
+		res := '1';
+	end if;
+	return res;
+end function;
 
 function clearEmptyResultTags(insVec: InstructionStateArray; fullMask: std_logic_vector)
 return InstructionStateArray is

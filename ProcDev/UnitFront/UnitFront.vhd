@@ -68,8 +68,6 @@ entity UnitFront is
 		lastSending: out std_logic;
 		-------
 		killVector: in std_logic_vector(0 to N_EVENT_AREAS-1)
-
-		--fetchLockCommand: in std_logic
 	);
 end UnitFront;
 
@@ -136,7 +134,7 @@ begin
 			
 			execEventSignal => killVector(1),
 			execCausing => DEFAULT_INSTRUCTION_STATE,
-			lockCommand => '0' --fetchLockCommand		
+			lockCommand => '0'		
 		);	
 		
 		stageDataOutFetch <= f0output.data(0);
@@ -229,15 +227,15 @@ begin
 					
 			NEW_TARGET_ADDER: entity work.IntegerAdder
 			port map(
-				inA => newDecoded.data(0).basicInfo.ip,
-				inB => newDecoded.data(0).constantArgs.imm,
+				inA => newDecoded.data(i).basicInfo.ip,
+				inB => newDecoded.data(i).constantArgs.imm,
 				output => targets(i)
 			);
 			
 			NEW_LINK_ADDER: entity work.IntegerAdder
 			port map(
-				inA => newDecoded.data(0).basicInfo.ip,
-				inB => getAddressIncrement(newDecoded.data(0)),
+				inA => newDecoded.data(i).basicInfo.ip,
+				inB => getAddressIncrement(newDecoded.data(i)),
 				output => links(i)
 			);			
 		end generate;

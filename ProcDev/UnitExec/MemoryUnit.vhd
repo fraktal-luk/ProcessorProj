@@ -80,6 +80,7 @@ entity MemoryUnit is
 		
 		nextAccepting: in std_logic;		
 		sendingSQOut: out std_logic;
+			dataOutV: out StageDataMulti;
 		dataOutSQ: out InstructionState
 	);
 end MemoryUnit;
@@ -140,7 +141,7 @@ begin
 					
 			sendingSQ <= isNonzero(sqOutData.fullMask);
 			dataOutSQ <= sqOutData.data(0); -- CAREFUL, TEMP!
-			
+				dataOutV <= sqOutData;
 			contentData <= extractData(content);
 			
 			process (clk)
@@ -157,7 +158,7 @@ begin
 				end if;
 			end process;
 					
-			SLOT_BUFF: entity work.BufferPipeLogic(Behavioral)
+			SLOT_BUFF: entity work.BufferPipeLogic(BehavioralDirect)
 			generic map(
 				CAPACITY => QUEUE_SIZE, -- PIPE_WIDTH*2*2
 				MAX_OUTPUT => PIPE_WIDTH,
@@ -176,14 +177,19 @@ begin
 					KILLERS: for i in 0 to QUEUE_SIZE-1 generate
 						signal before: std_logic;
 						signal a, b: std_logic_vector(7 downto 0);
+						signal c: SmallNumber := (others => '0');						
 					begin
 						a <= execCausing.groupTag;
 						b <= content(i).ins.groupTag;
-						IQ_KILLER: entity work.CompareBefore8 port map(
-							inA =>  a,
-							inB =>  b,
-							outC => before
-						);		
+--						IQ_KILLER: entity work.CompareBefore8 port map(
+--							inA =>  a,
+--							inB =>  b,
+--							outC => --before
+--										open
+--						);		
+						
+						c <= subSN(a, b);
+						before <= c(7);
 						killMask(i) <= killByTag(before, execEventSignal, '0') -- before and execEventSignal
 												and fullMask(i);									
 					end generate;

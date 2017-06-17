@@ -36,9 +36,25 @@ package NewPipelineData is
 	constant BRANCH_AT_DECODE: boolean := false;
 	
 	 -- System reg writing goes through BQ/ through special temp register
-	constant USE_BQ_FOR_MTC: boolean := false;
+	constant USE_BQ_FOR_MTC: boolean := true;--false;
 	
-	constant LATE_FETCH_LOCK: boolean := false; -- Fetch lock not causing decode event, but only when committed
+	constant LATE_FETCH_LOCK: boolean 
+				:= true; --false; -- Fetch lock not causing decode event, but only when committed
+	
+	constant CQ_SINGLE_OUTPUT: boolean := --false;--
+														true;
+	constant CQ_THREE_OUTPUTS: boolean := not CQ_SINGLE_OUTPUT;
+	
+	function getIntegerWriteWidth(so: boolean) return integer is
+	begin
+		if so then
+			return 1;
+		else
+			return 3;
+		end if;	
+	end function;
+	
+	constant INTEGER_WRITE_WIDTH: integer := getIntegerWriteWidth(CQ_SINGLE_OUTPUT);
 	
 	-- TODO: eliminate, change to chained implementation
 	constant N_EVENT_AREAS: natural := 8;-- How many distinct stages or groups of stages have own event signals
@@ -59,11 +75,18 @@ package NewPipelineData is
 	
 	constant CQ_SIZE: natural := PIPE_WIDTH * 3;
 	
-		constant ROB_SIZE: natural := 8; -- ??
+	constant SB_SIZE: natural := 4;
+	
+	constant ROB_SIZE: natural := 8; -- ??
 	
 		-- If true, physical registers are allocated even for empty slots in instruction group
 		--		and later freed from them.
 		constant ALLOC_REGS_ALWAYS: boolean := false;
+
+		constant INITIAL_GROUP_TAG: SmallNumber := (others => '0');
+															-- i2slv(-PIPE_WIDTH, SMALL_NUMBER_SIZE)
+		constant USE_GPR_TAG: boolean := true;
+
 		
 		-- Allows to raise 'lockSend' for instruction before Exec when source which was 'readyNext'
 		--	doesn't show in 'ready'	when expected	
@@ -72,6 +95,9 @@ package NewPipelineData is
 	constant N_RES_TAGS: natural := 4-1 + CQ_SIZE; -- + PIPE_WIDTH; -- + 3*PIPE_WIDTH; 
 						-- Above: num subpipe results + CQ slots + max commited slots + pre-IQ red ports
 	constant N_NEXT_RES_TAGS: natural := 2; 
+
+
+
 	
 	constant zerosPW: std_logic_vector(0 to PIPE_WIDTH-1) := (others=>'0');	
 	------
@@ -82,14 +108,58 @@ package NewPipelineData is
 	
 	constant FREE_LIST_SIZE: natural := 64; -- ??
 	
-	subtype PhysName is slv6;
+	constant PHYS_NAME_SIZE: integer := 6;
+	subtype PhysName is --slv6;
+								std_logic_vector(PHYS_NAME_SIZE-1 downto 0);
 	type PhysNameArray is array(natural range <>) of PhysName;
 
+	constant TAG_SIZE: integer := 8;
+	subtype InsTag is std_logic_vector(TAG_SIZE-1 downto 0);
+	
+	function getTagHigh(tag: std_logic_vector) return std_logic_vector is
+		variable res: std_logic_vector(tag'high-LOG2_PIPE_WIDTH downto 0) := (others => '0');
+	begin
+		res := tag(tag'high downto LOG2_PIPE_WIDTH);
+		return res;
+	end function;
 
-subtype SmallNumber is byte;
-type SmallNumberArray is array(integer range <>) of SmallNumber;
-constant SMALL_NUMBER_SIZE: natural := SmallNumber'length;
+	function getTagLow(tag: std_logic_vector) return std_logic_vector is
+		variable res: std_logic_vector(LOG2_PIPE_WIDTH-1 downto 0) := (others => '0');
+	begin
+		res := tag(LOG2_PIPE_WIDTH-1 downto 0);
+		return res;
+	end function;
 
+	function clearTagLow(tag: std_logic_vector) return std_logic_vector is
+		variable res: std_logic_vector(tag'high downto 0) := (others => '0');
+	begin
+		res := tag;
+		res(LOG2_PIPE_WIDTH-1 downto 0) := (others => '0');
+		return res;
+	end function;	
+
+	function alignAddress(adr: std_logic_vector) return std_logic_vector is
+		variable res: std_logic_vector(adr'high downto 0) := (others => '0');
+	begin
+		res := adr;
+		res(ALIGN_BITS-1 downto 0) := (others => '0');
+		return res;
+	end function;
+
+	function clearLowBits(vec: std_logic_vector; n: integer) return std_logic_vector is
+		variable res: std_logic_vector(vec'high downto 0) := (others => '0');
+	begin
+		res := vec;
+		res(n-1 downto 0) := (others => '0');
+		return res;
+	end function;
+	
+	function getLowBits(vec: std_logic_vector; n: integer) return std_logic_vector is
+		variable res: std_logic_vector(n-1 downto 0) := (others => '0');
+	begin
+		res(n-1 downto 0) := vec(n-1 downto 0);
+		return res;
+	end function;
 
 constant PROCESSOR_ID: Mword := X"001100aa";
 
@@ -106,6 +176,9 @@ type ExecFunc is (unknown,
 										
 										jump,
 										
+										sysRetI, sysRetE,
+										sysHalt,
+										sysSync, sysReplay,
 										sysMTC, sysMFC, -- move to/from control
 										sysUndef
 							);	
@@ -142,6 +215,8 @@ type InstructionControlInfo is record
 	hasBranch: std_logic;
 	hasReturn: std_logic;
 	hasFetchLock: std_logic;
+		specialAction: std_logic;
+		phase0, phase1, phase2: std_logic;
 	exceptionCode: SmallNumber; -- Set when exception occurs, remains cause exception can be only 1 per op
 end record;
 
@@ -156,8 +231,6 @@ type InstructionClassInfo is record
 	system: std_logic; -- ??
 	--memory: std_logic; -- ??
 	fetchLock: std_logic;
-	--renameLock: std_logic; -- prob. cannot be here; maybe should in controlInfo
-	--		short: std_logic;
 	undef: std_logic;
 	illegal: std_logic;
 	privilege: SmallNumber;
@@ -232,10 +305,6 @@ type InstructionState is record
 end record;
 
 type InstructionStateArray is array(integer range <>) of InstructionState;
-	
-	constant INITIAL_GROUP_TAG: SmallNumber := (others => '0');
-															-- i2slv(-PIPE_WIDTH, SMALL_NUMBER_SIZE)
-	constant USE_GPR_TAG: boolean := false;
 	
 	
 -- Number of words proper for fetch group size
@@ -378,6 +447,7 @@ end record;
 
 type GeneralEventInfo is record
 	eventOccured: std_logic;
+		killPC: std_logic;
 	causing: InstructionState;
 	affectedVec --, causingVec
 		: std_logic_vector(0 to 4);	
@@ -477,7 +547,10 @@ begin
 												hasReturn => '0',												
 												newFetchLock => '0',
 												hasFetchLock => '0',
-												
+													specialAction => '0',
+													phase0 => '0',
+													phase1 => '0',
+													phase2 => '0',
 												exceptionCode => (others=>'0')
 												);
 end function;

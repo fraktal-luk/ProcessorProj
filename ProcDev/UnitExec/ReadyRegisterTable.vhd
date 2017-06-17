@@ -43,6 +43,9 @@ use work.TEMP_DEV.all;
 
 
 entity ReadyRegisterTable is
+	generic(
+		WRITE_WIDTH: integer := 1
+	);
 	port(
 		clk: in std_logic;
 		reset: in std_logic;
@@ -55,8 +58,10 @@ entity ReadyRegisterTable is
 	
 		stageDataReserved: in StageDataMulti;
 
-		sendingToWrite: in std_logic;
-		stageDataToWrite: in StageDataMulti;
+		--sendingToWrite: in std_logic;
+		--stageDataToWrite: in StageDataMulti;
+			writingMask: in std_logic_vector(0 to WRITE_WIDTH-1);
+			writingData: in InstructionStateArray(0 to WRITE_WIDTH-1);
 		
 		readyRegFlagsNext: out std_logic_vector(0 to 3*PIPE_WIDTH-1)
 	);
@@ -65,28 +70,31 @@ end ReadyRegisterTable;
 
 
 architecture Behavioral of ReadyRegisterTable is
-		constant WIDTH: natural := PIPE_WIDTH;
+		constant WIDTH: natural := WRITE_WIDTH;
 
 		signal readyTableClearAllow: std_logic := '0';
 		signal readyTableClearSel: std_logic_vector(0 to PIPE_WIDTH-1) := (others => '0');
-		signal readyTableSetAllow: std_logic := '0';
-		signal readyTableSetSel: std_logic_vector(0 to PIPE_WIDTH-1) := (others => '0');
-		signal readyTableSetTags: PhysNameArray(0 to PIPE_WIDTH-1) := (others => (others =>'0'));
+		--signal readyTableSetAllow: std_logic := '0';
+		--signal readyTableSetSel: std_logic_vector(0 to PIPE_WIDTH-1) := (others => '0');
+		--signal readyTableSetTags: PhysNameArray(0 to PIPE_WIDTH-1) := (others => (others =>'0'));
 		
 		signal readyRegsSig: std_logic_vector(0 to N_PHYSICAL_REGS-1) := (0 to 31 => '1', others=>'0');
 
-		--signal newPhysDests: PhysNameArray(0 to PIPE_WIDTH-1) := (others=>(others=>'0'));		
+		--signal newPhysDests: PhysNameArray(0 to PIPE_WIDTH-1) := (others=>(others=>'0'));
+			signal altMask: std_logic_vector(0 to WRITE_WIDTH-1) := (others => '0');
+			signal altDests: PhysNameArray(0 to WRITE_WIDTH-1) := (others => (others => '0'));
 begin		
-		readyTableSetAllow <= sendingToWrite;  -- for ready table	
-		readyTableSetSel <= getPhysicalDestMask(stageDataToWrite) 
-						and not getExceptionMask(stageDataToWrite);
-		readyTableSetTags <= getPhysicalDests(stageDataToWrite); -- for ready table
+		--readyTableSetAllow <= sendingToWrite;  -- for ready table	
+		--readyTableSetSel <= getPhysicalDestMask(stageDataToWrite) 
+		--				and not getExceptionMask(stageDataToWrite);
+		--readyTableSetTags <= getPhysicalDests(stageDataToWrite); -- for ready table
 
 		readyTableClearAllow <= sendingToReserve; -- for ready table
 		readyTableClearSel <= getDestMask(stageDataToReserve);	-- for ready table		
 		
 		--newPhysDests <= getPhysicalDests(stageDataToReserve);
-
+			altMask <= getArrayDestMask(writingData, writingMask);
+			altDests <= getArrayPhysicalDests(writingData);
 		
 		IMPL: block
 			signal content: std_logic_vector(0 to N_PHYSICAL_REGS-1) := (0 to 31 => '1', others => '0');
@@ -96,17 +104,26 @@ begin
 					if rising_edge(clk) then
 						--if reset = '1' then
 						--elsif en = '1' then
-							if readyTableSetAllow = '1' then
-								for i in 0 to WIDTH-1 loop
-									if readyTableSetSel(i) = '1' then
-										-- set 
-										content(slv2u(readyTableSetTags(i))) <= '1';
-									end if;
-								end loop;
-							end if;
-
+--							if false then--CQ_SINGLE_OUTPUT then
+--								if readyTableSetAllow = '1' then
+--									for i in 0 to WIDTH-1 loop
+--										if readyTableSetSel(i) = '1' then
+--											-- set 
+--											content(slv2u(readyTableSetTags(i))) <= '1';
+--										end if;
+--									end loop;
+--								end if;
+							--else-- CQ_THREE_OUTPUTS then
+									for i in 0 to altMask'length-1 loop
+										if altMask(i) = '1' then
+											-- set 
+											content(slv2u(altDests(i))) <= '1';
+										end if;
+									end loop;	
+							--end if;
+							
 							if readyTableClearAllow = '1' then							
-								for i in 0 to WIDTH-1 loop								
+								for i in 0 to PIPE_WIDTH-1 loop								
 									if readyTableClearSel(i) = '1' then
 										-- clear
 										content(slv2u(newPhysDests(i))) <= '0';						

@@ -115,11 +115,11 @@ begin
 		
 	nFullNext := nLiving + nReceiving - nSending;
 	-- full, fullMask - agree?
-	assert countOnes(sd.fullMask) = nFull;
-		assert countOnes(sd.fullMask(0 to nFull-1)) = nFull; -- checking continuity
+	assert countOnes(sd.fullMask) = nFull report "ywwwy";
+		assert countOnes(sd.fullMask(0 to nFull-1)) = nFull report "vgh"; -- checking continuity
 	-- next full, fullMaskNext - agree?
-	assert countOnes(sdn.fullMask) = nFullNext;
-		assert countOnes(sdn.fullMask(0 to nFullNext-1)) = nFullNext;
+	assert countOnes(sdn.fullMask) = nFullNext report "juuj";
+		assert countOnes(sdn.fullMask(0 to nFullNext-1)) = nFullNext report "jdss";
 	-- number of killed agrees?
 		--??
 	-- number of new agrees?
@@ -130,8 +130,9 @@ begin
 		-- Get those that are living. Some of them will be shifted out (nSending),
 		--	some remain. [nSending to nLiving-1] should be found in [0 to nLiving-nSending-1] in new array.
 		-- 
-	nCommon := nLiving - nSending;	
-	for i in 0 to nCommon - 1 loop
+	nCommon := nLiving - nSending;
+	
+	for i in 0 to nCommon - 1 loop	
 		sdShifted.fullMask(i) := sd.fullMask(i + nSending);
 		sdShifted.data(i) := sd.data(i + nSending);		
 	end loop;
@@ -140,17 +141,18 @@ begin
 	for i in 0 to nCommon-1 loop
 		-- Check if fullMask is continuous:
 		nF1 := countOnes(sdShifted.data(i).fullMask);
-		assert countOnes(sdShifted.data(i).fullMask(0 to nF1-1)) = nF1;
+		assert countOnes(sdShifted.data(i).fullMask(0 to nF1-1)) = nF1 report "yyyu:";
 
 		nF2 := countOnes(sdn.data(i).fullMask);
-		assert countOnes(sdn.data(i).fullMask(0 to nF2-1)) = nF2;
+		assert countOnes(sdn.data(i).fullMask(0 to nF2-1)) = nF2 report "f6";
 	
-		if (i = nCommon-1) and (nFull /= nLiving) then -- Some slots may have been killed
+		if (i = nCommon-1) then -- and (nFull /= nLiving) then
+									-- Some slots may have been killed
 			-- In this case check if new mask is a contained in the beginning of old
-			assert sdn.data(i).fullMask = (sdShifted.data(i).fullMask and sdn.data(i).fullMask);
+			assert sdn.data(i).fullMask = (sdShifted.data(i).fullMask and sdn.data(i).fullMask) report "yy";
 				--assert nF2 <= nF1; -- Or like this?
 		else
-			assert sdn.data(i).fullMask = sdShifted.data(i).fullMask;
+			assert sdn.data(i).fullMask = sdShifted.data(i).fullMask report "jnhhh";
 				--assert nF1 = nF2; -- Or like this?
 		end if;
 		
@@ -158,9 +160,9 @@ begin
 			if sdn.data(i).fullMask(j) = '0' then
 				exit;
 			end if;	
-			assert sd.data(i).data(j).numberTag = sd.data(i).data(j).numberTag;
+			assert sd.data(i).data(j).numberTag = sd.data(i).data(j).numberTag report "koho";
 								-- TODO: is this the right tag field?
-			assert sd.data(i).data(j).basicInfo.ip = sd.data(i).data(j).basicInfo.ip;
+			assert sd.data(i).data(j).basicInfo.ip = sd.data(i).data(j).basicInfo.ip report "jor";
 		end loop;
 	end loop;
 	
@@ -218,7 +220,7 @@ begin
 	--				It's to prevent reading of fake results from empty slots
 	res := content;
 		
-	if sending = '1' then		
+	if sending = '1' then	
 		-- shift by 1
 		res.fullMask(0 to ROB_SIZE-2) := res.fullMask(1 to ROB_SIZE-1);
 		res.fullMask(ROB_SIZE-1) := '0'; -- CAREFUL, TODO: This may be incorrect (?) if we allow receiving
@@ -291,6 +293,11 @@ begin
 			if execEnds(i).controlInfo.hasException = '1' then	
 				res.data(index).data(indL).controlInfo.hasException := '1';
 				res.data(index).data(indL).controlInfo.hasEvent := '1';
+				for k in 0 to PIPE_WIDTH-1 loop
+					if k > indL then
+						res.data(index).fullMask(k) := '0';
+					end if;
+				end loop;
 			end if;		
 			res.data(index).data(indL).controlInfo.completed := '1';
 		end if;
@@ -315,11 +322,25 @@ begin
 				if execEnds2(i).controlInfo.hasException = '1' then	
 					res.data(index).data(indL).controlInfo.hasException := '1';
 					res.data(index).data(indL).controlInfo.hasEvent := '1';
+					for k in 0 to PIPE_WIDTH-1 loop
+						if k > indL then
+							res.data(index).fullMask(k) := '0';
+						end if;
+					end loop;					
 				end if;
 				res.data(index).data(indL).controlInfo.completed2 := '1';
 				
 					if execEnds2(i).controlInfo.hasBranch = '1' then
 						res.data(index).data(indL).controlInfo.hasBranch := '1';
+					end if;
+
+					if execEnds2(i).controlInfo.specialAction = '1' then
+						res.data(index).data(indL).controlInfo.specialAction := '1';
+						for k in 0 to PIPE_WIDTH-1 loop
+							if k > indL then
+								res.data(index).fullMask(k) := '0';
+							end if;
+						end loop;						
 					end if;
 					
 				
