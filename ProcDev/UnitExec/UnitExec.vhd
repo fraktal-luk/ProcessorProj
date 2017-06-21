@@ -85,8 +85,6 @@ entity UnitExec is
 			
 		sysRegSelect: out slv5;
 		sysRegIn: in Mword;
-		sysRegWriteSelOut: out slv5;
-		sysRegWriteValueOut: out Mword;
 				
 		sysRegDataOut: out InstructionState;
 		sysRegSending: out std_logic;
@@ -103,19 +101,14 @@ end UnitExec;
 architecture Implem of UnitExec is
 	signal resetSig, enSig: std_logic := '0';
 	signal execEventSignal, eventSignal: std_logic := '0';
-	signal execCausing, intCausing: InstructionState := defaultInstructionState;
+	signal execCausing: InstructionState := defaultInstructionState;
 	signal activeCausing: InstructionState := defaultInstructionState;
 	
-	signal sysRegValue: Mword := (others => '0');
-	signal sysRegReadSel, sysRegWriteSel: slv5 := (others => '0');
-	
-	signal sysRegWriteValueStore: Mword := (others => '0');
-	signal sysRegWriteSelStore: slv5 := (others => '0');
-	
-	signal execEndsSig, execEnds2Sig: InstructionStateArray(0 to 3) := (others => defaultInstructionState);
+	signal sysRegValue, sysRegValueReg: Mword := (others => '0');
+	signal sysRegReadSel: slv5 := (others => '0');
 
-	signal execSending2Sig: std_logic_vector(0 to 3) := (others => '0');
-		
+		signal sysRegData: InstructionState := DEFAULT_INSTRUCTION_STATE;
+
 	signal dataA0, dataB0, dataB1, dataB2, dataC0, dataC1, dataC2, dataD0: InstructionState
 					:= DEFAULT_INSTRUCTION_STATE;
 
@@ -141,7 +134,8 @@ begin
 					
 					dataA0 <= outputDataA.data(0);
 					
-					SUBPIPE_A: entity work.SimpleAlu(Behavioral)
+					SUBPIPE_A: entity work.--SimpleAlu(Behavioral)
+													GenericStageMulti(BasicAlu)
 					port map(
 						clk => clk, reset => resetSig, en => enSig,
 						
@@ -189,7 +183,8 @@ begin
 					
 					dataD0 <= outputDataD.data(0);
 					
-					SUBPIPE_D: entity work.BranchUnit(Behavioral)
+					SUBPIPE_D: entity work.--BranchUnit(Behavioral)
+													GenericStageMulti(BranchUnit)
 					port map(
 						clk => clk, reset => resetSig, en => enSig,
 						
@@ -205,14 +200,10 @@ begin
 						execCausing => activeCausing,
 						lockCommand => '0',
 						
-						stageEventsOut => eventsD,
-						
-						sysRegSel => sysRegreadSel,
-						sysRegValue => sysRegValue,
-						
-						sysRegWriteSel => sysRegWriteSelStore,
-						sysRegWriteValue => sysRegWriteValueStore
+						stageEventsOut => eventsD						
 					);	
+
+				sysRegReadSel <= dataIQD.constantArgs.c1;
 
 -----------------------------------
 	BQ_BLOCK: block
@@ -239,13 +230,20 @@ begin
 			res.argValues.arg2(4 downto 0) := ins.constantArgs.c0;
 			res.argValues.arg2(MWORD_SIZE-1 downto 5) := (others => '0');
 			return res;
-		end function;		
-	begin
-		storeTargetDataSig <= trgToResult(dataD0);
-		
-			storeTargetDataSRSig <= trgToSR(dataD0);
+		end function;
 
-		
+		function setInsResult(ins: InstructionState; result: Mword) return InstructionState is
+			variable res: InstructionState := ins;
+		begin
+			res.result := result;
+			return res;
+		end function;
+	begin
+		sysRegData <= setInsResult(dataD0, sysRegValueReg);
+	
+		storeTargetDataSig <= trgToResult(dataD0);		
+		storeTargetDataSRSig <= trgToSR(dataD0);
+
 		storeTargetWrSig <= execSendingD and
 										((dataD0.controlInfo.hasBranch and dataD0.classInfo.branchReg)
 									or   dataD0.controlInfo.hasReturn
@@ -270,8 +268,7 @@ begin
 				storeValueWr => storeTargetWrSig,
 
 				storeAddressDataIn => storeTargetDataSig,
-				storeValueDataIn => --DEFAULT_INSTRUCTION_STATE,-- storeValueDataSig,
-											storeTargetDataSRSig,
+				storeValueDataIn => storeTargetDataSRSig,
 				
 					committing => committing,
 					groupCtrNext => groupCtrNext,
@@ -282,16 +279,23 @@ begin
 				
 				nextAccepting => '1',
 				
-				--acceptingOutSQ => execAcceptingESig,
 				sendingSQOut => sendingOutBQ, -- OUTPUT
 					dataOutV => dataOutBQV,
 				dataOutSQ => dataOutBQ -- OUTPUT
 			);
+			
+			SYS_REG_FF: process(clk)
+			begin
+				if rising_edge(clk) then
+					sysRegValueReg <= sysRegValue;
+				end if;
+			end process;
+			
 	end block;
 -------------------------------------
 
 		-- Data from sysreg reads goes to load pipe
-		sysRegDataOut <= dataD0;
+		sysRegDataOut <= sysRegData;
 		sysRegSending <= execSendingD when dataD0.operation = (System, sysMfc) else '0';
 		-- CAREFUL: Don't send the same thing from both subpipes:
 		execSendingEffectiveD <= execSendingD when dataD0.operation /= (System, sysMfc) else '0';
@@ -317,9 +321,5 @@ begin
 				
 	execEvent <= execEventSignal;
 	execCausingOut <= execCausing;
-
-		sysRegWriteSelOut <= sysRegWriteSelStore;
-		sysRegWriteValueOut <= sysRegWriteValueStore;
-
 end Implem;
 

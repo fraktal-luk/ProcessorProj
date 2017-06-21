@@ -88,7 +88,7 @@ architecture Implem of ReorderBuffer is
 	signal isSending: std_logic := '0';
 	
 		signal fromCommitted: std_logic := '0';
-		signal lateFetchLock: std_logic := '0';
+		signal lateFetchLock: std_logic := '0'; -- DEPREC
 	
 	constant ROB_HAS_RESET: std_logic := '0';
 	constant ROB_HAS_EN: std_logic := '0';
@@ -158,12 +158,12 @@ begin
 				and not fromCommitted
 							and nextAccepting;
 
-		lateFetchLock <= '1' when LATE_FETCH_LOCK else '0';
+	--	lateFetchLock <= '1' when LATE_FETCH_LOCK else '0';
 	fromCommitted <= execEventSignal and 	
 							(	execCausing.controlInfo.newInterrupt 
 							or execCausing.controlInfo.newException
 							or execCausing.controlInfo.specialAction
-							or (execCausing.controlInfo.hasFetchLock and lateFetchLock));
+							or '0');--(execCausing.controlInfo.hasFetchLock and lateFetchLock));
 						
 	-- TODO: allow accepting also when queue full but sending, that is freeing a place.
 	acceptingOut <= --'1' when binFlowNum(flowResponse.full) < ROB_SIZE else '0';

@@ -38,7 +38,6 @@ use work.NewPipelineData.all;
 
 use work.GeneralPipeDev.all;
 
---use work.CommonRouting.all;
 use work.TEMP_DEV.all;
 
 use work.ProcLogicIQ.all;
@@ -55,7 +54,6 @@ entity UnitIQ is
 		reset: in std_logic;
 		en: in std_logic;		
 
-		--prevSending: in SmallNumber;
 		prevSendingOK: in std_logic;		
 		nextAccepting: in std_logic; -- from exec			
 		newData: in StageDataMulti;			
@@ -72,7 +70,6 @@ entity UnitIQ is
 		readyRegFlags: in std_logic_vector(0 to 3*PIPE_WIDTH-1);			
 		regValues: in MwordArray(0 to 2);
 			
-		--accepting: out SmallNumber;
 			acceptingVec: out std_logic_vector(0 to PIPE_WIDTH-1);		
 		dataOutIQ: out InstructionState;
 			sendingOut: out std_logic
@@ -97,21 +94,19 @@ architecture Behavioral of UnitIQ is
 
 		signal writtenTagsZ: PhysNameArray(0 to PIPE_WIDTH-1) := (others => (others => '0'));		
 
-	constant HAS_RESET_IQ: std_logic := '0'; --'1';
-	constant HAS_EN_IQ: std_logic := '0'; --'1';	
+	constant HAS_RESET_IQ: std_logic := '0';
+	constant HAS_EN_IQ: std_logic := '0';	
 begin	
 	resetSig <= reset and HAS_RESET_IQ;
 	enSig <= en or not HAS_EN_IQ;
 		
 	-- The queue	
-	QUEUE_MAIN_LOGIC: entity work.SubunitIQBuffer(--Behavioral) --
-																	Implem)
+	QUEUE_MAIN_LOGIC: entity work.SubunitIQBuffer(Implem)
 	generic map(
 		IQ_SIZE => IQ_SIZE
 	)
 	port map(
 	 	clk => clk, reset => resetSig, en => enSig,
-	 	--prevSending => prevSending,
 	 	prevSendingOK => prevSendingOK,
 	 	newData => newData,
 	 	nextAccepting => dispatchAccepting,
@@ -120,7 +115,6 @@ begin
 		aiArray => aiArray,
 			aiNew => aiNew,
 		readyRegFlags => readyRegFlags,
-		--accepting => accepting,
 			acceptingVec => acceptingVec,
 		queueSending => queueSending,
 		iqDataOut => iqData,
@@ -131,12 +125,9 @@ begin
 		generic map(IQ_SIZE => PIPE_WIDTH)
 		port map(
 			queueData => newData.data,
-			resultTags => --resultTags,
-								fni.resultTags,
-			nextResultTags => --nextResultTags,
-									fni.nextResultTags,
-			writtenTags => --writtenTags,
-									fni.writtenTags,
+			resultTags => fni.resultTags,
+			nextResultTags => fni.nextResultTags,
+			writtenTags => fni.writtenTags,
 			aiArray => aiNew
 		);
 		
@@ -144,10 +135,8 @@ begin
 	generic map(IQ_SIZE => IQ_SIZE)
 	port map(
 		queueData => iqData,
-		resultTags => --resultTags,
-							fni.resultTags,
-		nextResultTags => --nextResultTags,
-								fni.nextResultTags,
+		resultTags => fni.resultTags,
+		nextResultTags => fni.nextResultTags,
 		writtenTags => writtenTagsZ,
 		aiArray => aiArray
 	);
@@ -160,10 +149,8 @@ begin
 	 	nextAccepting => nextAccepting,
 		execEventSignal => execEventSignal,
 		execCausing => execCausing,
-		resultTags => --resultTags,
-							fni.resultTags,
-		resultVals => --resultVals,
-							fni.resultValues,
+		resultTags => fni.resultTags,
+		resultVals => fni.resultValues,
 		regValues => regValues,
 	 	stageDataIn => toDispatch,		
 		acceptingOut => dispatchAccepting,

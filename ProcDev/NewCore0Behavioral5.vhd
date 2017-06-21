@@ -45,9 +45,6 @@ architecture Behavioral5 of NewCore0 is
 			execAcceptingA, execAcceptingB, execAcceptingC, execAcceptingD, execAcceptingE: std_logic := '0'; 
 	
 	-- forw network
-	signal resultTags: PhysNameArray(0 to N_RES_TAGS-1) := (others=>(others=>'0'));
-	signal nextResultTags: PhysNameArray(0 to N_NEXT_RES_TAGS-1) := (others=>(others=>'0'));
-	signal resultVals: MwordArray(0 to N_RES_TAGS-1) := (others=>(others=>'0'));	
 	-- writtenTags indicate registers written to GPR file in last cycle, so they can be read from there
 	--		rather than from forw. network, but readyRegFlags are not available in the 1st cycle after WB.
 	signal writtenTags: PhysNameArray(0 to PIPE_WIDTH-1) := (others => (others => '0'));
@@ -63,13 +60,13 @@ architecture Behavioral5 of NewCore0 is
 	signal memStoreAllow, memLoadAllow, memLoadReady: std_logic := '0';
 		
 	-- Sys reg interface	
-	signal sysRegReadSel, sysRegWriteSel: slv5 := (others => '0');
-	signal sysRegReadValue, sysRegWriteValue: Mword := (others => '0');
+	signal sysRegReadSel: slv5 := (others => '0');
+	signal sysRegReadValue: Mword := (others => '0');
 	
 	-- evt
-	signal execEventSignal, intSig, execOrIntEventSignal: std_logic := '0';						
+	signal execEventSignal, execOrIntEventSignal: std_logic := '0';					
 	-- This will take the value of operation that causes jump or exception
-	signal execCausing, intCausing, execOrIntCausing: InstructionState := defaultInstructionState;																			
+	signal execCausing, execOrIntCausing: InstructionState := defaultInstructionState;																		
 
 	-- Hidden to some degree, but may be useful for sth
 	signal renameCtrSig, renameCtrNextSig, commitCtrSig, commitCtrNextSig: SmallNumber := (others=>'0');
@@ -97,18 +94,12 @@ architecture Behavioral5 of NewCore0 is
 	signal whichAcceptedCQ: std_logic_vector(0 to 3) := (others=>'0');	
 	signal anySendingFromCQ: std_logic := '0';
 	
-	--signal dataCQOut: StageDataCommitQueue
-	--									:= (fullMask=>(others=>'0'), data=>(others=>defaultInstructionState));
 		signal cqBufferMask: std_logic_vector(0 to CQ_SIZE-1) := (others => '0');
 		signal cqBufferData: InstructionStateArray(0 to CQ_SIZE-1) := (others => DEFAULT_INSTRUCTION_STATE);
 	signal cqDataLivingOut: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
 
 		signal cqMaskOut: std_logic_vector(0 to INTEGER_WRITE_WIDTH-1) := (others => '0');
 		signal cqDataOut: InstructionStateArray(0 to INTEGER_WRITE_WIDTH-1) := (others => DEFAULT_INSTRUCTION_STATE);
-
-	signal cqPhysDestMask: std_logic_vector(0 to PIPE_WIDTH-1) := (others => '0');
-	signal cqPhysicalDests: PhysNameArray(0 to PIPE_WIDTH-1) := (others => (others => '0'));
-	signal cqInstructionResults: MwordArray(0 to PIPE_WIDTH-1) := (others => (others => '0'));
 
 	signal rfWriteVec: std_logic_vector(0 to 3) := (others => '0');
 	signal rfSelectWrite: PhysNameArray(0 to 3) := (others => (others => '0'));
@@ -137,15 +128,12 @@ architecture Behavioral5 of NewCore0 is
 		signal sysStoreAllow: std_logic := '0';
 		signal sysStoreAddress: slv5 := (others => '0'); 
 		signal sysStoreValue: Mword := (others => '0');
-
-				
+			
 	constant HAS_RESET: std_logic := '0';
 	constant HAS_EN: std_logic := '0';
 begin
 	resetSig <= reset and HAS_RESET;
 	enSig <= en or not HAS_EN;
-	
-	intSig <= '0'; -- CAREFUL!
 	
 	SEQUENCING_PART: entity work.UnitSequencer(Behavioral)
 	port map (
@@ -154,8 +142,6 @@ begin
 		-- sys reg interface
 		sysRegReadSel => sysRegReadSel,
 		sysRegReadValue => sysRegReadValue,	
-		sysRegWriteSel => sysRegWriteSel,
-		sysRegWriteValue => sysRegWriteValue,
 
 		-- Icache interface
 		iadr => iadr,
@@ -218,11 +204,9 @@ begin
 		committedSending => committedSending,
 		committedDataOut => committedDataOut,
 		renameLockEndOut => renameLockEnd,
-		
-		
+				
 		commitGroupCtrOut => commitGroupCtrSig,
-		commitGroupCtrNextOut => commitGroupCtrNextSig,
-		
+		commitGroupCtrNextOut => commitGroupCtrNextSig,	
 		commitGroupCtrIncOut => commitGroupCtrIncSig
 	);
 		
@@ -438,8 +422,8 @@ begin
 			
 		sysRegSelect => sysRegReadSel,
 		sysRegIn => sysRegReadValue,
-		sysRegWriteSelOut => sysRegWriteSel,
-		sysRegWriteValueOut => sysRegWriteValue,
+		--sysRegWriteSelOut => sysRegWriteSel,
+		--sysRegWriteValueOut => sysRegWriteValue,
 
 		sysRegDataOut => sysRegData,
 		sysRegSending => sysRegSending,
@@ -531,10 +515,6 @@ begin
 			execEnds2 <= getExecEnds2(outputA, outputB, outputC, outputD, outputE);
 			execPreEnds <= getExecPreEnds(outputOpPreB, outputOpPreC);
 
-		--cc0 <= '1' when execPreEnds_C = execPreEnds else '0';
-		--cc1 <= '1' when execEnds2_C = execEnds2 else '0';
-
-
 	COMMIT_QUEUE: entity work.TestCQPart0(Implem)
 	generic map(
 		INPUT_WIDTH => 3,
@@ -550,9 +530,7 @@ begin
 			maskIn => execSending(0 to 2),
 			dataIn => execEnds(0 to 2),
 		
-		--inputInstructions => execEnds,
 		whichAcceptedCQ => whichAcceptedCQ,
-		--cqWhichSend => (0 => execSending(0), 1 => execSending(1), 2 => execSending(2), others => '0'),
 		anySending => anySendingFromCQ,
 			cqMaskOut => cqMaskOut,
 			cqDataOut => cqDataOut,
@@ -672,8 +650,6 @@ begin
 			regsSelCE(0 to 1) <= regsSelC(0 to 1);
 			regsSelCE(2) <= regsSelE(2);
 			regsAllowCE <= regsAllowC or regsAllowE;
-			--regValsC <= regValsCE;
-			--regValsE <= regValsCE;
 				regValsC(0 to 1) <= regValsCE(0 to 1);
 				regValsE(2) <= regValsCE(2);	
 
@@ -739,15 +715,11 @@ begin
 		writtenTags <= getWrittenTags(stageDataAfterCQ);
 	end generate;
 	
-	resultTags <= getResultTags(execEnds, cqBufferData, dataOutIQA, dataOutIQB, dataOutIQC, dataOutIQD,
-																											DEFAULT_STAGE_DATA_MULTI);
-	nextResultTags <= getNextResultTags(execPreEnds, dataOutIQA, dataOutIQB, dataOutIQC, dataOutIQD);
-	resultVals <= getResultValues(execEnds, cqBufferData, DEFAULT_STAGE_DATA_MULTI);
-	
 		fni.writtenTags <= writtenTags;
-		fni.resultTags <= resultTags;
-		fni.nextResultTags <= nextResultTags;
-		fni.resultValues <= resultVals;
+		fni.resultTags <= getResultTags(execEnds, cqBufferData, dataOutIQA, dataOutIQB, dataOutIQC, dataOutIQD,
+																											DEFAULT_STAGE_DATA_MULTI);
+		fni.nextResultTags <= getNextResultTags(execPreEnds, dataOutIQA, dataOutIQB, dataOutIQC, dataOutIQD);
+		fni.resultValues <= getResultValues(execEnds, cqBufferData, DEFAULT_STAGE_DATA_MULTI);
 	
 	dadr <= memLoadAddress;
 	doutadr <= memStoreAddress;

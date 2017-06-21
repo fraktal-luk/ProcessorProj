@@ -419,7 +419,7 @@ begin
 	res.controlInfo.newException := '0';
 	res.controlInfo.newBranch := '0';
 	res.controlInfo.newReturn := '0';
-	res.controlInfo.newFetchLock := '0';	
+	--res.controlInfo.newFetchLock := '0';	
 	return res;
 end function;
 
@@ -437,11 +437,11 @@ function setException(ins: InstructionState;
 							 intSignal, resetSignal, isNew, phase0, phase1, phase2: std_logic)
 return InstructionState is
 	variable res: InstructionState := ins;
-		variable lateFetchLock: std_logic := '0';
+	--	variable lateFetchLock: std_logic := '0';
 begin
-		if LATE_FETCH_LOCK then
-			lateFetchLock := '1';
-		end if;	
+	--	if LATE_FETCH_LOCK then
+	--		lateFetchLock := '1';
+	--	end if;	
 			
 	--res.controlInfo.newEvent := ((res.controlInfo.hasException 
 	--										or res.controlInfo.specialAction
@@ -473,15 +473,14 @@ function setException2(ins, causing: InstructionState;
 							  intSignal, resetSignal, isNew, phase0, phase1, phase2: std_logic)
 return InstructionState is
 	variable res: InstructionState := ins;
-		variable lateFetchLock: std_logic := '0';
+	--	variable lateFetchLock: std_logic := '0';
 begin
-		if LATE_FETCH_LOCK then
-			lateFetchLock := '1';
-		end if;	
+--		if LATE_FETCH_LOCK then
+--			lateFetchLock := '1';
+--		end if;	
 			
 	res.controlInfo.newEvent := ((res.controlInfo.hasException 
 											or res.controlInfo.specialAction
-											--		or (res.controlInfo.hasFetchLock and lateFetchLock)
 											)
 											and isNew) 
 									or intSignal or resetSignal;

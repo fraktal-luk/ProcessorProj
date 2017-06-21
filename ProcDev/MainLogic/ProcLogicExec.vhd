@@ -93,7 +93,6 @@ package body ProcLogicExec is
 
 	function resolveBranchCondition(av: InstructionArgValues; ca: InstructionConstantArgs) return std_logic is
 		variable isZero: std_logic;
-		--variable zeros: Mword := (others=>'0');
 	begin
 		isZero := not isNonzero(av.arg0);
 			
@@ -128,7 +127,7 @@ package body ProcLogicExec is
 --				elsif 
 				if 
 					ins.operation.func = sysMfc then			
-					res.result := sysRegValue;
+					--res.result := sysRegValue;
 				elsif ins.operation.func = sysMtc then
 					res.result := ins.argValues.arg0;
 					if USE_BQ_FOR_MTC then
@@ -141,9 +140,7 @@ package body ProcLogicExec is
 					res.controlInfo.specialAction := '1';
 					res.controlInfo.hasEvent := '1';
 				elsif ins.operation.func = sysUndef then
-					--res.controlInfo.newException := '1';
 					res.controlInfo.hasException := '1';				
-					--res.controlInfo.newEvent := '1';
 					res.controlInfo.hasEvent := '1';					
 				else
 						
@@ -153,8 +150,7 @@ package body ProcLogicExec is
 			-- Return address
 			-- CAREFUL, TODO: when introducing 16b instructions, it won't be always 4 bytes ahead!
 			--	4B problem
-			res.result := --i2slv(slv2u(ins.basicInfo.ip) + 4, MWORD_SIZE);
-								linkAddress;
+			res.result := linkAddress;
 			if ins.classInfo.branchCond = '1' then
 				branchTaken := resolveBranchCondition(ins.argValues, ins.constantArgs);
 				if res.controlInfo.hasBranch = '1' and branchTaken = '0' then

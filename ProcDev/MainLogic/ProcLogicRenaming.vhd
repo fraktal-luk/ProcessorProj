@@ -62,7 +62,7 @@ return StageDataMulti;
 
 
 -- TODO: use effective mask rather than full mask in this functions!
-function fetchLockCommitting(sd: StageDataMulti; effective: std_logic_vector) return std_logic;
+--function fetchLockCommitting(sd: StageDataMulti; effective: std_logic_vector) return std_logic;
 function getSysRegWriteAllow(sd: StageDataMulti; effective: std_logic_vector) return std_logic;
 -- CAREFUL: this seems not used and would choose the last value in group
 function getSysRegWriteSel(sd: StageDataMulti) return slv5;
@@ -322,17 +322,17 @@ begin
 end function;
 
 
-	function fetchLockCommitting(sd: StageDataMulti; effective: std_logic_vector) return std_logic is
-	begin
-		for i in sd.fullMask'range loop
-			if --sd.fullMask(i) = '1' 
-						effective(i) = '1'
-				and sd.data(i).classInfo.fetchLock = '1' then
-				return '1';
-			end if;
-		end loop;
-		return '0';
-	end function;
+--	function fetchLockCommitting(sd: StageDataMulti; effective: std_logic_vector) return std_logic is
+--	begin
+--		for i in sd.fullMask'range loop
+--			if --sd.fullMask(i) = '1' 
+--						effective(i) = '1'
+--				and sd.data(i).classInfo.fetchLock = '1' then
+--				return '1';
+--			end if;
+--		end loop;
+--		return '0';
+--	end function;
 	
 	function getSysRegWriteAllow(sd: StageDataMulti; effective: std_logic_vector) return std_logic is
 	begin

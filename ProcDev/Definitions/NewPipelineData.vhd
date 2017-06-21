@@ -30,7 +30,7 @@ package NewPipelineData is
 	
 	constant HBUFFER_SIZE: natural := PIPE_WIDTH * 4;
 	
-	constant PROPAGATE_MODE: boolean := true; -- Int/exc level marked in instruction throughout pipeline
+	constant PROPAGATE_MODE: boolean := false;--true; -- Int/exc level marked in instruction throughout pipeline
 	
 	constant EARLY_TARGET_ENABLE: boolean := true; -- Calc branch targets in front pipe
 	constant BRANCH_AT_DECODE: boolean := false;
@@ -206,7 +206,7 @@ type InstructionControlInfo is record
 	newException: std_logic;
 	newBranch: std_logic;
 	newReturn: std_logic; -- going to normal next, as in cancelling a branch
-	newFetchLock: std_logic;
+	--newFetchLock: std_logic;
 	-- Persistent data:
 	hasEvent: std_logic; -- Persistent
 		hasReset: std_logic;
@@ -214,7 +214,7 @@ type InstructionControlInfo is record
 	hasException: std_logic;
 	hasBranch: std_logic;
 	hasReturn: std_logic;
-	hasFetchLock: std_logic;
+	--hasFetchLock: std_logic;
 		specialAction: std_logic;
 		phase0, phase1, phase2: std_logic;
 	exceptionCode: SmallNumber; -- Set when exception occurs, remains cause exception can be only 1 per op
@@ -230,7 +230,7 @@ type InstructionClassInfo is record
 		branchLink: std_logic;
 	system: std_logic; -- ??
 	--memory: std_logic; -- ??
-	fetchLock: std_logic;
+	--fetchLock: std_logic;
 	undef: std_logic;
 	illegal: std_logic;
 	privilege: SmallNumber;
@@ -449,14 +449,7 @@ type GeneralEventInfo is record
 	eventOccured: std_logic;
 		killPC: std_logic;
 	causing: InstructionState;
-	affectedVec --, causingVec
-		: std_logic_vector(0 to 4);	
-	--fromExec, fromInt: std_logic;	
-	
-	-- New style:
-	-- lateEvent, execEvent, [events from respective front stages]: std_logic  ??
-	-- lateCausing, execCausing, [causing instuctions from front stages]: InstructionState
-	newStagePC: InstructionState;	
+	affectedVec: std_logic_vector(0 to 4);		
 end record;
 
  
@@ -545,8 +538,8 @@ begin
 												hasBranch => '0',
 												newReturn => '0',
 												hasReturn => '0',												
-												newFetchLock => '0',
-												hasFetchLock => '0',
+												--newFetchLock => '0',
+												--hasFetchLock => '0',
 													specialAction => '0',
 													phase0 => '0',
 													phase1 => '0',
@@ -568,7 +561,7 @@ begin
 											--memory: std_logic; -- ??
 												-- ?? load => '0',
 												-- ?? store => '0',
-											fetchLock => '0',
+											--fetchLock => '0',
 											--renameLock => '0',
 											
 											undef => '0', --?

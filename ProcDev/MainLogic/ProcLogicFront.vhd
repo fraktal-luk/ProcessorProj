@@ -28,7 +28,8 @@ package ProcLogicFront is
 function getInstructionClassInfo(ins: InstructionState) return InstructionClassInfo;
 
 -- Writes target to the 'target' field
-function setBranchTarget(ins: InstructionState) return InstructionState;
+-- REMOVE
+--function setBranchTarget(ins: InstructionState) return InstructionState;
 
 function instructionFromWord(w: word) return InstructionState;
 
@@ -103,19 +104,6 @@ package body ProcLogicFront is
 function getInstructionClassInfo(ins: InstructionState) return InstructionClassInfo is
 	variable ci: InstructionClassInfo := defaultClassInfo;
 begin
-	-- TODO: determine:
-	--			illegal/undefined (incl. privilege level) 
-	-- 		? what kind?
-		-- Proposition: if condition is 'none', set "branch confirmed" 
-		--				// or use "speculated"? Fact of being sure don't change anyth when constant jump?
-		
-		-- If branch upon r0, result also sure
-		
-		-- If branch conditionally, not on r0, need to speculate
-			
-	--			other special conditions: fetchLock? halt? etc...
-
-
 			if ins.operation.func = sysUndef then
 				ci.undef := '1';
 			end if;
@@ -141,10 +129,7 @@ begin
 			ci.branchAlways := '0';
 			ci.branchCond := '0';
 
-			if 	 	(ins.operation.func = jump and ins.constantArgs.c1 = COND_NONE)
-				--or		ins.operation.func = sysRetE
-				--or 	ins.operation.func = sysRetI
-			then
+			if 	 	(ins.operation.func = jump and ins.constantArgs.c1 = COND_NONE) then
 				ci.branchAlways := '1';
 			elsif (ins.operation.func = jump and ins.constantArgs.c1 /= COND_NONE) then 
 				ci.branchCond := '1';	
@@ -161,29 +146,22 @@ begin
 			end if;
 			
 			if  (ins.operation.func = sysMTC) then
-				--res.writeSysSel := '1';
-				ci.fetchLock := '1';
-			else
-				ci.fetchLock := '0';
 			end if;
 
 			if (ins.operation.func = sysMFC) then
-				--res.readSysSel := '1';
 			end if;
-
-
 				
 	return ci;
 end function;
 
 -- TODO, CAREFUL: inspect other possible paths, like "jump to next" for some instructions?
-function setBranchTarget(ins: InstructionState) return InstructionState is
-	variable res: InstructionState := ins;
-begin
-	-- NOTE: jump relative to this instruction, not next one
-	res.target := i2slv(slv2s(ins.constantArgs.imm) + slv2s(ins.basicInfo.ip), MWORD_SIZE);		
-	return res;
-end function;	
+--function setBranchTarget(ins: InstructionState) return InstructionState is
+--	variable res: InstructionState := ins;
+--begin
+--	-- NOTE: jump relative to this instruction, not next one
+--	res.target := i2slv(slv2s(ins.constantArgs.imm) + slv2s(ins.basicInfo.ip), MWORD_SIZE);		
+--	return res;
+--end function;	
 
 
 function instructionFromWord(w: word) return InstructionState is
@@ -206,11 +184,8 @@ begin
 					res.virtualDestArgs);
 	
 	res.classInfo := getInstructionClassInfo(res);	
-				
-	-- TODO: other control flow considerations: detect exceptions etc.! 
-	--...
+
 				-- TEMP: code for predicting every regular jump (even "branch never"!) as taken
---				if res.operation.func = jump then
 				if ((res.classInfo.branchAlways or res.classInfo.branchCond)
 					and not res.classInfo.branchReg)	= '1' and BRANCH_AT_DECODE then
 					res.controlInfo.newEvent := '1';
@@ -220,30 +195,10 @@ begin
 				end if;
 	
 		if res.classInfo.undef = '1' then
-			--res.controlInfo.newEvent := '1';
-			--res.controlInfo.hasEvent := '1';			
-					--res.controlInfo.exception := '1';
-			--res.controlInfo.newException := '1';
-			--res.controlInfo.hasException := '1';
 			res.controlInfo.exceptionCode := i2slv(ExceptionType'pos(undefinedInstruction), SMALL_NUMBER_SIZE);
 		end if;
 		
-		-- CAREFUL! Indicate that fetch lock must be applied
-		if res.classInfo.fetchLock = '1' then
-			if not LATE_FETCH_LOCK then
-				res.controlInfo.newEvent := '1';
-				res.controlInfo.hasEvent := '1';				
-			end if;	
-			res.controlInfo.newFetchLock := '1';
-			res.controlInfo.hasFetchLock := '1';
-			--	res.controlInfo.hasException := '1';
-		end if;
-		
-		
-		res.target := (others => '0');
-		-- TEMP!
-		--res := setBranchTarget(res); 
-		
+		res.target := (others => '0');		
 	return res;
 end function;
 
@@ -524,7 +479,7 @@ begin
 									--		INT_BASE;
 			res.basicInfo.systemLevel := "00000001";
 			
-			elsif commitCausing.controlInfo.specialAction = '1' then
+		elsif commitCausing.controlInfo.specialAction = '1' then
 				if commitCausing.operation.func = sysSync then
 					res.basicInfo.ip := commitCausing.target;
 				elsif commitCausing.operation.func = sysReplay then
@@ -535,10 +490,7 @@ begin
 						res.basicInfo.ip := X"00000020";  --TEMP!!
 				elsif commitCausing.operation.func = sysRetE then
 						res.basicInfo.ip := X"00000030";  --TEMP!!					
-				end if;
-				
-		--else -- fetchLock	
-		--	res.basicInfo.ip := causingNext;
+				end if;				
 		end if;		
 	
 	return res;
@@ -554,49 +506,14 @@ return InstructionState is
 	variable res: InstructionState := content;
 	variable newPC: Mword := (others=>'0');
 begin
-	if commitEvent = '1' then -- when from exec or front	
-		if commitCausing.controlInfo.newReset = '1' then -- TEMP!
-			res.basicInfo.ip := (others => '0');
-			res.basicInfo.intLevel := "00000000";				
-		elsif commitCausing.controlInfo.newInterrupt = '1' then
-			res.basicInfo.ip := INT_BASE; -- TEMP!
-			res.basicInfo.intLevel := "00000001";		
-		elsif commitCausing.controlInfo.newException = '1' then--or not LATE_FETCH_LOCK then
-			-- TODO, FIX: exceptionCode sliced - shift left by ALIGN_BITS? or leave just base address
-			res.basicInfo.ip := EXC_BASE(MWORD_SIZE-1 downto commitCausing.controlInfo.exceptionCode'length)
-									& commitCausing.controlInfo.exceptionCode(
-													commitCausing.controlInfo.exceptionCode'length-1 downto ALIGN_BITS)
-									& EXC_BASE(ALIGN_BITS-1 downto 0);	
-									--		INT_BASE;
-			res.basicInfo.systemLevel := "00000001";
-			
-			elsif commitCausing.controlInfo.specialAction = '1' then
-				if commitCausing.operation.func = sysSync then
-					res.basicInfo.ip := commitCausing.target;
-				elsif commitCausing.operation.func = sysReplay then
-					res.basicInfo.ip := commitCausing.basicInfo.ip;
-				elsif commitCausing.operation.func = sysHalt then
-					res.basicInfo.ip := commitCausing.target; -- ???
-				elsif commitCausing.operation.func = sysRetI then
-						res.basicInfo.ip := X"00000020";  --TEMP!!
-				elsif commitCausing.operation.func = sysRetE then
-						res.basicInfo.ip := X"00000030";  --TEMP!!					
-				end if;
-				
-		--else -- fetchLock	
-		--	res.basicInfo.ip := causingNext;
-		end if;	
-		
-				res.basicInfo.ip := commitCausing.target;
+	if commitEvent = '1' then -- when from exec or front
+		res.basicInfo.ip := commitCausing.target;
 	elsif execEvent = '1' then		
 		res.basicInfo.ip := execCausing.target;
 	elsif decodeEvent = '1' then
 			if BRANCH_AT_DECODE then
 				res.basicInfo.ip := decodeCausing.target;	
 			end if;
-		--if decodeCausing.controlInfo.newFetchLock = '1' then	
-		--	res.basicInfo.ip := causingNext;
-		--end if;
 	else	-- Increment by the width of fetch group
 		res.basicInfo.ip := pcNext;
 	end if;	
@@ -634,11 +551,6 @@ end function;
 			res.eventOccured := '0';
 		end if;
 		
-		--res.newStagePC := newPCData( pcData,
-		--										commitEvent, commitCausing,
-		--										execEvent, execCausing,
-		--										decodeEvent, decodeCausing,
-		--										pcNext, causingNext);		
 		return res;
 	end function;
 
@@ -695,5 +607,5 @@ begin
 	
 	return res;
 end function;
- 
+
 end ProcLogicFront;

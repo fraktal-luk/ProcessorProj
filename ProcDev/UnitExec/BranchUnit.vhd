@@ -67,13 +67,10 @@ entity BranchUnit is
 		execCausing: in InstructionState;
 		lockCommand: in std_logic;
 		
-		stageEventsOut: out StageMultiEventInfo;
-
-			sysRegSel: out slv5;
-			sysRegValue: in Mword;
-			
-			sysRegWriteSel: out slv5;
-			sysRegWriteValue: out Mword
+		stageEventsOut: out StageMultiEventInfo
+		-- NOTE: up to here the ports are equiv. to GenericStageMulti
+		--	sysRegSel: out slv5;
+		--	sysRegValue: in Mword
 	);
 end BranchUnit;
 
@@ -81,10 +78,6 @@ end BranchUnit;
 architecture Behavioral of BranchUnit is
 	signal inputData: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
 	signal branchResolved: InstructionState := DEFAULT_INSTRUCTION_STATE;
-	signal branchTarget, branchLink: Mword := (others => '0');
-
-	signal sysRegWriteSelStore: slv5 := (others => '0');
-	signal sysRegWriteValueStore: Mword := (others => '0');
 begin
 	inputData.data(0) <= branchResolved;
 	inputData.fullMask <= stageDataIn.fullMask;
@@ -94,7 +87,7 @@ begin
 		clk => clk, reset => reset, en => en,
 		
 		prevSending => prevSending,
-		nextAccepting => nextAccepting, --flowResponseAPost.accepting,
+		nextAccepting => nextAccepting,
 		
 		stageDataIn => inputData, 
 		acceptingOut => acceptingOut,
@@ -108,46 +101,10 @@ begin
 		stageEventsOut => stageEventsOut					
 	);
 
-	-- This is for system register unit
-	SYNCHRONOUS: process(clk) 	
-	begin
-		if rising_edge(clk) then
-			if reset = '1' then
-				
-			elsif en = '1' then
-				if prevSending = '1'
-					and stageDataIn.data(0).operation.unit = System
-					and stageDataIn.data(0).operation.func = sysMtc
-				then
-					sysRegWriteValueStore <= stageDataIn.data(0).argValues.arg0;
-					sysRegWriteSelStore <= stageDataIn.data(0).constantArgs.c0;
-				end if;
-			
-			end if;
-		end if;
-	end process;
-
 	branchResolved <= basicBranch(setInstructionTarget(stageDataIn.data(0),
-			stageDataIn.data(0).constantArgs.imm),--branchTarget),
-											sysRegValue, stageDataIn.data(0).result);
-
-	NEW_TARGET_ADDER: entity work.IntegerAdder
-	port map(
-		inA => (others => '0'),--stageDataIn.data(0).basicInfo.ip,
-		inB => stageDataIn.data(0).constantArgs.imm,
-		output => branchTarget
-	);
-	
-	NEW_LINK_ADDER: entity work.IntegerAdder
-	port map(
-		inA => (others => '0'),--stageDataIn.data(0).basicInfo.ip,
-		inB => getAddressIncrement(stageDataIn.data(0)),
-		output => branchLink
-	);
-
-	sysRegSel <= stageDataIn.data(0).constantArgs.c1;
-		
-	sysRegWriteValue <= sysRegWriteValueStore;
-	sysRegWriteSel <= sysRegWriteSelStore;
+			stageDataIn.data(0).constantArgs.imm),
+											(others => '0'),--sysRegValue,
+											stageDataIn.data(0).result);
+	--sysRegSel <= stageDataIn.data(0).constantArgs.c1;
 end Behavioral;
 

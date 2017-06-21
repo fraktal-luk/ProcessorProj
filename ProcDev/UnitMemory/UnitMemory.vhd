@@ -104,7 +104,7 @@ end UnitMemory;
 
 
 architecture Behavioral of UnitMemory is
-	signal inputDataLoadUnit, outputDataLoadUnit: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;	
+	signal inputDataLoadUnit: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
 	signal eventSignal: std_logic := '0';	
 	signal activeCausing: InstructionState := defaultInstructionState;
 	
@@ -167,7 +167,8 @@ begin
 				signal acceptingMem0, acceptingMem1,
 						 sendingMem0, sendingMem1: std_logic := '0';
 			begin
-				STAGE_AGU: entity work.SimpleAlu(BehavioralAGU)
+				STAGE_AGU: entity work.--SimpleAlu(BehavioralAGU)
+												GenericStageMulti(BasicAgu)
 				port map(
 					clk => clk, reset => reset, en => en,
 					
@@ -187,7 +188,7 @@ begin
 				);
 			
 				addressingData <= stageDataOutAGU.data(0);
-				sendingAddressingSig <= sendingAGU;		-- TODO: erase "Sig" when sendingAddressing input is out		
+				sendingAddressingSig <= sendingAGU;	
 			end block;
 				
 			-- Store data unit.
@@ -302,7 +303,6 @@ begin
 				
 				nextAccepting => '1',
 				
-				--acceptingOutSQ => execAcceptingESig,
 				sendingSQOut => sendingOutSQ, -- OUTPUT
 					dataOutV => dataOutSQV,
 				dataOutSQ => dataOutSQ -- OUTPUT
@@ -334,11 +334,8 @@ begin
 						execEventSignal => '0',
 						execCausing => DEFAULT_INSTRUCTION_STATE
 					);
-					
 
-
-			MEM_LOAD_QUEUE: entity --work.LoadQueue(Behavioral)
-											work.MemoryUnit(Behavioral)
+			MEM_LOAD_QUEUE: entity work.MemoryUnit(Behavioral)
 			generic map(
 				QUEUE_SIZE => LQ_SIZE
 			)											
@@ -352,10 +349,10 @@ begin
 					dataIn => dataNewToLQ,
 				
 				storeAddressWr => sendingToLoadUnitSig, --?
-				storeValueWr => '0', --!!
+				storeValueWr => '0',
 
 				storeAddressDataIn => dataToLoadUnitSig, --?
-				storeValueDataIn => DEFAULT_INSTRUCTION_STATE,--!!
+				storeValueDataIn => DEFAULT_INSTRUCTION_STATE,
 
 					committing => committing,
 					groupCtrNext => groupCtrNext,
@@ -366,10 +363,9 @@ begin
 
 				nextAccepting => '1',
 
-				--acceptingOutSQ => open,--acceptingLoadUnitOut, -- ! dont do multiple drivers!
-				sendingSQOut => open,--sendingOutLQ, --??
+				sendingSQOut => open,
 					dataOutV => open,
-				dataOutSQ => open--dataOutLQ--?? 
+				dataOutSQ => open 
 			);
 
 			-- Sending to Delayed Load Queue: when load miss or load and sending from sys reg
@@ -420,8 +416,7 @@ begin
 				execAcceptingC <= execAcceptingCSig;
 				execAcceptingE <= '1'; --???  -- execAcceptingESig;
 
-			loadResultSending <= sendingFromSysReg or sendingFromDLQ 
-						or (sendingMem0);-- and memLoadReady);
+			loadResultSending <= sendingFromSysReg or sendingFromDLQ or sendingMem0;
 					-- CAREFUL, TODO: ^ memLoadReady needed to ack that not a miss? But would block when a store!
 			loadResultData <=
 					  sysRegReadData when sendingFromSysReg = '1'
@@ -429,16 +424,13 @@ begin
 				else stageDataAfterCache;
 
 				-- Mem interface
-				memStoreAddress <= --dataOutSQ.argValues.arg1;
-											sbDataOut(0).argValues.arg1;
-				memStoreValue <= --dataOutSQ.argValues.arg2;
-											sbDataOut(0).argValues.arg2;
+				memStoreAddress <= sbDataOut(0).argValues.arg1;
+				memStoreValue <= sbDataOut(0).argValues.arg2;
 		
 				memLoadAddress <= dataToLoadUnitSig.result; -- in LoadUnit
 		
 				memLoadAllow <= sendingToLoadUnitSig;
-				memStoreAllow <= --sendingOutSQ;
-										  sbSending when sbDataOut(0).operation = (Memory, store) else '0';
+				memStoreAllow <= sbSending when sbDataOut(0).operation = (Memory, store) else '0';
 										  
 				 sysStoreAllow <= sbSending when sbDataOut(0).operation = (System, sysMTC) else '0'; 
 				 sysStoreAddress <= sbDataOut(0).argValues.arg2(4 downto 0);

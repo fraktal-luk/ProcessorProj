@@ -612,14 +612,14 @@ begin
 		res.controlInfo.newException := '0';
 		res.controlInfo.newBranch := '0';
 		res.controlInfo.newReturn := '0';
-		res.controlInfo.newFetchLock := '0';
+		--res.controlInfo.newFetchLock := '0';
 
 		--	res.controlInfo.hasEvent := '0';
 		res.controlInfo.hasInterrupt := '0';
 		--	res.controlInfo.hasException := '0';
 		--	res.controlInfo.hasBranch := '0';
 		res.controlInfo.hasReturn := '0';
-		res.controlInfo.hasFetchLock := '0';
+		--res.controlInfo.hasFetchLock := '0';
 		
 		res.controlInfo.exceptionCode := (others => '0');
 	

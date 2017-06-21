@@ -59,9 +59,6 @@ entity UnitSequencer is
 		sysRegReadSel: in slv5;
 		sysRegReadValue: out Mword;
 	
-		sysRegWriteSel: in slv5;
-		sysRegWriteValue: in Mword;		
-	
 		-- Event/state interface						
 		intSignal: in std_logic;
 		execEventSignal: in std_logic;
@@ -314,14 +311,18 @@ begin
 					--				In any case, the requirement is that younger instructions must take effect later
 					--				and override earlier content.
 
-					-- Write currentState (control flow may be just changing it)					
-					if sendingToPC = '1' then
-						currentState <= X"0000" & newTargetInfo.systemLevel & newTargetInfo.intLevel;						
-					end if;
-					
 					-- Write from system write instruction
 					if sysRegWriteAllow = '1' then
 						sysRegArray(slv2u(srWriteSel)) <= srWriteVal;
+					end if;
+
+					-- Write currentState (control flow may be just changing it)					
+					if sendingToPC = '1' then
+						--currentState <= X"0000" & newTargetInfo.systemLevel & newTargetInfo.intLevel;
+					end if;
+					
+					if eiEvents.causing.controlInfo.phase1 = '1' then
+						currentState <= X"0000" & TMP_targetIns.basicInfo.systemLevel & TMP_targetIns.basicInfo.intLevel;
 					end if;
 					
 					-- NOTE: writing to link registers after sys reg writing gives priority to the former,
@@ -352,21 +353,6 @@ begin
 		sysRegReadValue <= sysRegArray(slv2u(sysRegReadSel));							
 	end block;
 
-	-- DEPREC??
-	fetchLockRequest <= generalEvents.eventOccured and generalEvents.causing.controlInfo.newFetchLock;
-
-		FRONT_SEQ_SYNCHRONOUS: process(clk) 	
-		begin
-			if rising_edge(clk) then
-				if fetchLockRequest = '1' then
-					fetchLockState <= '1';
-				elsif (fetchLockCommit or generalEvents.eventOccured) = '1' then
-					fetchLockState <= '0';
-				end if;				
-			end if;	
-		end process;
-
-	fetchLockCommit <= fetchLockCommitting(stageDataToCommit, effectiveMask);
 
 	iadr <= stageDataOutPC.basicInfo.ip and i2slv(-PIPE_WIDTH*4, MWORD_SIZE); -- Clearing low bits				
 	iadrvalid <= sendingOutPC;
@@ -515,7 +501,7 @@ begin
 			interruptCause.controlInfo.hasInterrupt <= intSignal;
 			interruptCause.controlInfo.hasReset <= start;
 				interruptCause.target <= TMP_targetIns.basicInfo.ip;
-
+									
 			dataToLastEffective.fullMask(0) <= sendingToCommit;
 			dataToLastEffective.data(0) <= insToLastEffective;
 
