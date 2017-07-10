@@ -83,8 +83,11 @@ entity UnitMemory is
 				sysStoreAddress: out slv5;
 				sysStoreValue: out Mword;
 			
-			sysRegDataIn: in InstructionState;
-			sysRegSendingIn: in std_logic;
+					sysLoadAllow: out std_logic;
+					sysLoadVal: in Mword;
+			
+			--sysRegDataIn: in InstructionState; -- DEPREC
+			--sysRegSendingIn: in std_logic; -- DEPREC
 			
 			committing: in std_logic;
 			groupCtrNext: in SmallNumber;
@@ -97,7 +100,9 @@ entity UnitMemory is
 			
 			dataBQV: in StageDataMulti;
 			
+		lateEventSignal: in std_logic;	
 		execOrIntEventSignalIn: in std_logic;
+			execCausing: in InstructionState;
 		execOrIntCausingIn: in InstructionState			
 	);
 end UnitMemory;
@@ -117,7 +122,7 @@ architecture Behavioral of UnitMemory is
 	signal sendingToDLQ, sendingFromDLQ, loadResultSending, isLoad: std_logic := '0';
 	signal dataToDLQ: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
 	
-	signal stageDataAfterCache, loadResultData, dataFromDLQ:
+	signal stageDataAfterCache, stageDataAfterSysRegs, loadResultData, dataFromDLQ:
 					InstructionState := defaultInstructionState;
 	signal sendingMem0, sendingMem1: std_logic := '0';
 
@@ -134,7 +139,7 @@ architecture Behavioral of UnitMemory is
 	signal addressingData: InstructionState := DEFAULT_INSTRUCTION_STATE;
 	signal sendingAddressingSig: std_logic := '0';	
 	
-		signal sendingToLoadUnitSig, sendingAddressToSQSig,
+		signal sendingToLoadUnitSig, sendingAddressToSQSig,  sendingToMfcSig,
 				 storeAddressWrSig, storeValueWrSig: std_logic := '0';
 		signal dataToLoadUnitSig, storeAddressDataSig, storeValueDataSig: InstructionState
 					:= DEFAULT_INSTRUCTION_STATE;
@@ -255,6 +260,7 @@ begin
 				);
 
 				stageDataAfterCache <= setExecState(stageDataOutMem0.data(0), memLoadValue, '0', "0000");
+				stageDataAfterSysRegs <= setExecState(stageDataOutMem0.data(0), sysLoadVal, '0', "0000");
 
 					outputC.ins <= clearTempControlInfoSimple(outputData.data(0));
 					outputC.full <= loadUnitSendingSig;
@@ -263,6 +269,9 @@ begin
 			end block;		
 		
 		sendingToLoadUnitSig <= sendingAddressingSig when addressingData.operation.func = load else '0';
+			sendingToMfcSig <= sendingAddressingSig when addressingData.operation = (System, sysMFC) else '0';
+		
+		
 		sendingAddressToSQSig <= sendingAddressingSig when addressingData.operation.func = store else '0';
 				
 		dataToLoadUnitSig <= addressingData;
@@ -298,8 +307,10 @@ begin
 					groupCtrNext => groupCtrNext,
 						groupCtrInc => groupCtrInc,
 						
+					lateEventSignal => lateEventSignal,	
 				execEventSignal => eventSignal,
-				execCausing => activeCausing,
+				execCausing => --activeCausing,
+									execCausing,
 				
 				nextAccepting => '1',
 				
@@ -310,6 +321,8 @@ begin
 
 				-- NOTE: all ops committed in 1 cycle are from the same group, so they'll always fit into one
 				combinedQueueData <= combineMulti(dataOutSQV, dataBQV);
+											--combineMulti(dataOutSQV, DEFAULT_STAGE_DATA_MULTI);
+											--dataOutSQV;
 
 					STORE_BUFFER: entity work.TestCQPart0(WriteBuffer)
 					generic map(
@@ -358,8 +371,10 @@ begin
 					groupCtrNext => groupCtrNext,
 						groupCtrInc => groupCtrInc,
 
+					lateEventSignal => lateEventSignal,
 				execEventSignal => eventSignal,
-				execCausing => activeCausing,
+				execCausing => --activeCausing,
+									execCausing,
 
 				nextAccepting => '1',
 
@@ -368,9 +383,19 @@ begin
 				dataOutSQ => open 
 			);
 
+	
+				TMP_SYS_REG: process(clk)
+				begin
+					if rising_edge(clk) then
+						sendingFromSysReg <= sendingToMfcSig;
+						
+					end if;
+				end process;
+
+
 			-- Sending to Delayed Load Queue: when load miss or load and sending from sys reg
-			sendingFromSysReg <= sysRegSendingIn;
-			sysRegReadData <= sysRegDataIn;
+			--sendingFromSysReg <= sysRegSendingIn;
+			--sysRegReadData <= sysRegDataIn;
 			
 			isLoad <= '1' when stageDataAfterCache.operation.func = load else '0';
 			
@@ -402,8 +427,10 @@ begin
 					committing => committing,
 					groupCtrNext => groupCtrNext,
 					
+					lateEventSignal => lateEventSignal,
 				execEventSignal => eventSignal,
-				execCausing => activeCausing,
+				execCausing => --activeCausing,
+									execCausing,
 				
 				nextAccepting => not sendingFromSysReg,
 				
@@ -419,7 +446,7 @@ begin
 			loadResultSending <= sendingFromSysReg or sendingFromDLQ or sendingMem0;
 					-- CAREFUL, TODO: ^ memLoadReady needed to ack that not a miss? But would block when a store!
 			loadResultData <=
-					  sysRegReadData when sendingFromSysReg = '1'
+					  stageDataAfterSysRegs when sendingFromSysReg = '1'
 				else dataFromDLQ when sendingFromDLQ = '1'
 				else stageDataAfterCache;
 
@@ -431,10 +458,16 @@ begin
 		
 				memLoadAllow <= sendingToLoadUnitSig;
 				memStoreAllow <= sbSending when sbDataOut(0).operation = (Memory, store) else '0';
-										  
-				 sysStoreAllow <= sbSending when sbDataOut(0).operation = (System, sysMTC) else '0'; 
-				 sysStoreAddress <= sbDataOut(0).argValues.arg2(4 downto 0);
-				 sysStoreValue <= sbDataOut(0).argValues.arg1; 
+									
+					sysLoadAllow <= sendingToMfcSig;
+									
+				 sysStoreAllow <= sbSending when sbDataOut(0).operation = (System, sysMTC) 
+															--sbDataOut(0).classInfo.mtc = '1'
+															else '0'; 
+				 sysStoreAddress <= sbDataOut(0).argValues.--arg2(4 downto 0);
+																			arg1(4 downto 0);
+				 sysStoreValue <= sbDataOut(0).argValues.--arg1;
+																		 arg2;
 														-- ^ CAREFUL: address holds data, cause it's queue for addresses
 				 
 		sbAccepting <= sbAcceptingV(0);	

@@ -38,7 +38,7 @@ constant ISSUE_ROUTING_TABLE: ExecUnitToNaturalTable := (
 		Divide => 0,
 		Jump => 3,
 		Memory => 2,
-		System => 3);
+		System => 3 + 1);
 
 	-- TODO: automatically handle 32/64b config
 	function TEMP_addMword(a, b: Mword) return Mword;
@@ -86,20 +86,25 @@ function getLinkInfoSuper(ins: InstructionState) return InstructionBasicInfo;
 function clearTempControlInfoSimple(ins: InstructionState) return InstructionState;
 function clearTempControlInfoMulti(sd: StageDataMulti) return StageDataMulti;
 
-function setException(ins: InstructionState;
-							 intSignal, resetSignal, isNew, phase0, phase1, phase2: std_logic)
+function setPhase(ins: InstructionState;
+							 phase0, phase1, phase2: std_logic)
 return InstructionState;
 
 function setException2(ins, causing: InstructionState;
 							  intSignal, resetSignal, isNew, phase0, phase1, phase2: std_logic)
 return InstructionState;
 
-function isHalt(ins: InstructionState) return std_logic;
+function setLateTargetAndLink(ins: InstructionState; target: Mword; link: Mword; phase1: std_logic)
+return InstructionState;
+
 
 function clearEmptyResultTags(insVec: InstructionStateArray; fullMask: std_logic_vector)
 return InstructionStateArray;
 
 function trgForBQ(insVec: StageDataMulti) return StageDataMulti;
+function trgToResult(ins: InstructionState) return InstructionState;
+function trgToSR(ins: InstructionState) return InstructionState;
+function setInsResult(ins: InstructionState; result: Mword) return InstructionState;
 
 
 function findForALU(iv: InstructionStateArray) return std_logic_vector;
@@ -280,8 +285,6 @@ end function;
 			return res;
 		end function;
 
---------------------------------------
- 
 
 	-- CAREFUL! In this version (ci = ai - bi, no negatio on return) "10...0" WILL be after "0...0"!
 	--				Generally, "0..01" to "10..0" will be.
@@ -358,12 +361,7 @@ end function;
 -- "Normal target" is sequential/branch, without exceptions
 function getNormalTargetAddress(ins: InstructionState) return Mword is
 begin
-	if ins.controlInfo.hasBranch = '1' then
-		return ins.target;
-	else 
-		return --causingNext;
-					ins.target; -- CAREFUL: designed to be the same when non-branch!
-	end if;
+	return ins.target;
 end function;
 
 function getHandlerAddress(ins: InstructionState) return Mword is
@@ -380,9 +378,7 @@ end function;
 function getLinkInfoNormal(ins: InstructionState) return InstructionBasicInfo is
 	variable res: InstructionBasicInfo := ins.basicInfo;
 begin
-	-- get next adr considering possible jump 
-	--res.ip := getNormalTargetAddress(ins, causingNext);
-		res.ip := ins.result;
+	res.ip := ins.result;
 	return res;
 end function;
 
@@ -415,11 +411,10 @@ function clearTempControlInfoSimple(ins: InstructionState) return InstructionSta
 	variable res: InstructionState := ins;
 begin
 	res.controlInfo.newEvent := '0';
-	res.controlInfo.newInterrupt := '0';
-	res.controlInfo.newException := '0';
+	--res.controlInfo.newInterrupt := '0';
+	--res.controlInfo.newException := '0';
 	res.controlInfo.newBranch := '0';
-	res.controlInfo.newReturn := '0';
-	--res.controlInfo.newFetchLock := '0';	
+	--res.controlInfo.newReturn := '0';
 	return res;
 end function;
 
@@ -433,38 +428,14 @@ begin
 end function;
 
 	
-function setException(ins: InstructionState;
-							 intSignal, resetSignal, isNew, phase0, phase1, phase2: std_logic)
+function setPhase(ins: InstructionState;
+							 phase0, phase1, phase2: std_logic)
 return InstructionState is
 	variable res: InstructionState := ins;
-	--	variable lateFetchLock: std_logic := '0';
-begin
-	--	if LATE_FETCH_LOCK then
-	--		lateFetchLock := '1';
-	--	end if;	
-			
-	--res.controlInfo.newEvent := ((res.controlInfo.hasException 
-	--										or res.controlInfo.specialAction
-	--										--		or (res.controlInfo.hasFetchLock and lateFetchLock)
-	--										)
-	--										and isNew) 
-	--								or intSignal or resetSignal;
-	--res.controlInfo.hasEvent := res.controlInfo.hasEvent or res.controlInfo.newEvent;
-
-	--res.controlInfo.newException := res.controlInfo.hasException and isNew; 
-
-	--res.controlInfo.newInterrupt := intSignal;
-	--res.controlInfo.hasInterrupt := intSignal;
-	-- ^ Interrupts delayed by 1 cycle if exception being committed!
-	
-	--res.controlInfo.newReset := resetSignal;
-	--res.controlInfo.hasReset := resetSignal;
-		
-	-- ...?	
-		res.controlInfo.phase0 := phase0;
-		res.controlInfo.phase1 := phase1;
-		res.controlInfo.phase2 := phase2;
-
+begin	
+	res.controlInfo.phase0 := phase0;
+	res.controlInfo.phase1 := phase1;
+	res.controlInfo.phase2 := phase2;
 	return res;
 end function;	
 
@@ -473,59 +444,50 @@ function setException2(ins, causing: InstructionState;
 							  intSignal, resetSignal, isNew, phase0, phase1, phase2: std_logic)
 return InstructionState is
 	variable res: InstructionState := ins;
-	--	variable lateFetchLock: std_logic := '0';
 begin
---		if LATE_FETCH_LOCK then
---			lateFetchLock := '1';
---		end if;	
-			
 	res.controlInfo.newEvent := ((res.controlInfo.hasException 
 											or res.controlInfo.specialAction
 											)
 											and isNew) 
 									or intSignal or resetSignal;
-	res.controlInfo.hasEvent := res.controlInfo.hasEvent or res.controlInfo.newEvent;
 
-	res.controlInfo.newException := res.controlInfo.hasException and isNew; 
-
-	res.controlInfo.newInterrupt := intSignal;
 	res.controlInfo.hasInterrupt := res.controlInfo.hasInterrupt or intSignal;
 	-- ^ Interrupts delayed by 1 cycle if exception being committed!
 	
-	res.controlInfo.newReset := resetSignal;
 	res.controlInfo.hasReset := resetSignal;
 		
-	-- ...?	
 	if phase1 = '1' then
 			res.result := res.target;
-		res.target := causing.target;
+		--res.target := causing.target;
 	end if;
 	
 	if phase2 = '1' then
-		res.controlInfo.newException := '0';
-		res.controlInfo.newInterrupt := '0';
-		res.controlInfo.newReset := '0';
 		res.controlInfo.newEvent := '0';	
 
 			res.controlInfo.hasException := '0';
 			res.controlInfo.hasInterrupt := '0';
 			res.controlInfo.hasReset := '0';
-			res.controlInfo.hasEvent := '0';	
+			--res.controlInfo.hasEvent := '0';	
 			res.controlInfo.specialAction := '0';			
 	end if;
 	
 	return res;
 end function;
 
-
-function isHalt(ins: InstructionState) return std_logic is
-	variable res: std_logic := '0';
+function setLateTargetAndLink(ins: InstructionState; target: Mword; link: Mword; phase1: std_logic)
+return InstructionState is
+	variable res: InstructionState := ins;
 begin
-	if ins.operation = (System, sysHalt) and ins.controlInfo.hasInterrupt = '0' then 
-		res := '1';
-	end if;
+
+	if phase1 = '1' then
+		res.result := link;
+		res.target := target;
+	end if;	
+	
 	return res;
 end function;
+
+
 
 function clearEmptyResultTags(insVec: InstructionStateArray; fullMask: std_logic_vector)
 return InstructionStateArray is
@@ -586,6 +548,34 @@ begin
 	return res;
 end function;	
 	
+		
+		function trgToResult(ins: InstructionState) return InstructionState is
+			variable res: InstructionState := ins;
+		begin
+			-- CAREFUL! Here we use 'result' because it is the field copied to arg1 in mem queue!
+			-- TODO: regularize usage of such fields, maybe remove 'target' from InstructionState?
+			res.result := ins.target;
+			return res;
+		end function;
+		
+		function trgToSR(ins: InstructionState) return InstructionState is
+			variable res: InstructionState := ins;
+		begin
+			-- CAREFUL! Here we use 'result' because it is the field copied to arg1 in mem queue!
+			-- TODO: regularize usage of such fields, maybe remove 'target' from InstructionState?
+			res.argValues.arg2(4 downto 0) := ins.constantArgs.c0;
+			res.argValues.arg2(MWORD_SIZE-1 downto 5) := (others => '0');
+			return res;
+		end function;
+
+		function setInsResult(ins: InstructionState; result: Mword) return InstructionState is
+			variable res: InstructionState := ins;
+		begin
+			res.result := result;
+			return res;
+		end function;
+
+
 	
 function getStoreAddressPart(ins: InstructionState)
 return InstructionState is
@@ -687,7 +677,9 @@ function findStores(insv: StageDataMulti) return std_logic_vector is
 	variable res: std_logic_vector(0 to PIPE_WIDTH-1) := (others => '0');
 begin
 	for i in 0 to PIPE_WIDTH-1 loop
-		if insv.data(i).operation = (Memory, store) then
+		if 	insv.data(i).operation = (Memory, store) 
+			or	insv.data(i).operation = (System, sysMTC)
+		then
 			res(i) := '1';
 		end if;
 	end loop;
@@ -698,7 +690,9 @@ function findLoads(insv: StageDataMulti) return std_logic_vector is
 	variable res: std_logic_vector(0 to PIPE_WIDTH-1) := (others => '0');
 begin
 	for i in 0 to PIPE_WIDTH-1 loop
-		if insv.data(i).operation = (Memory, load) then
+		if 	insv.data(i).operation = (Memory, load)
+			or	insv.data(i).operation = (System, sysMFC)
+		then
 			res(i) := '1';
 		end if;
 	end loop;

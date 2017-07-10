@@ -64,7 +64,7 @@ architecture Behavioral5 of NewCore0 is
 	signal sysRegReadValue: Mword := (others => '0');
 	
 	-- evt
-	signal execEventSignal, execOrIntEventSignal: std_logic := '0';					
+	signal execEventSignal, execOrIntEventSignal, lateEventSignal: std_logic := '0';					
 	-- This will take the value of operation that causes jump or exception
 	signal execCausing, execOrIntCausing: InstructionState := defaultInstructionState;																		
 
@@ -161,6 +161,7 @@ begin
 		-- Events out
 		execOrIntEventSignalOut => execOrIntEventSignal,
 		execOrIntCausingOut => execOrIntCausing,
+			lateEventOut => lateEventSignal,
 		killVecOut => killVec,
 		-- Data from front pipe interface		
 		renameAccepting => renameAccepting, -- to frontend
@@ -420,13 +421,13 @@ begin
 			
 		outputOpPreB => outputOpPreB,
 			
-		sysRegSelect => sysRegReadSel,
-		sysRegIn => sysRegReadValue,
+		--sysRegSelect => open,--sysRegReadSel,
+		--sysRegIn => sysRegReadValue,
 		--sysRegWriteSelOut => sysRegWriteSel,
 		--sysRegWriteValueOut => sysRegWriteValue,
 
-		sysRegDataOut => sysRegData,
-		sysRegSending => sysRegSending,
+		--sysRegDataOut => sysRegData,
+		--sysRegSending => sysRegSending,
 		
 		whichAcceptedCQ => whichAcceptedCQ,
 		
@@ -445,6 +446,7 @@ begin
 		execEvent => execEventSignal,
 		execCausingOut => execCausing,
 				
+			lateEventSignal => lateEventSignal,
 		execOrIntEventSignalIn => execOrIntEventSignal,
 		execOrIntCausingIn => execOrIntCausing
 	);	
@@ -486,12 +488,15 @@ begin
 			memStoreAllow => memStoreAllow,
 			memStoreValue => memStoreValue,
 
+					sysLoadAllow => open,
+						sysLoadVal => sysRegReadValue,
+
 				sysStoreAllow => sysStoreAllow,
 				sysStoreAddress => sysStoreAddress,
 				sysStoreValue => sysStoreValue,
 
-			sysRegDataIn => sysRegData,
-			sysRegSendingIn => sysRegSending,
+			--sysRegDataIn => sysRegData,
+			--sysRegSendingIn => sysRegSending,
 
 			committing => committingSig,
 			groupCtrNext => commitGroupCtrNextSig,
@@ -505,9 +510,13 @@ begin
 				
 				dataBQV => dataOutBQV,
 					
+				lateEventSignal => lateEventSignal,	
 			execOrIntEventSignalIn => execOrIntEventSignal,
+				execCausing => execCausing,
 			execOrIntCausingIn => execOrIntCausing
 		);
+
+				sysRegReadSel <= memLoadAddress(4 downto 0);
 
 			execSending <= getExecSending(outputA, outputB, outputC, outputD, outputE);
 			execSending2 <= getExecSending2(outputA, outputB, outputC, outputD, outputE);
@@ -688,7 +697,7 @@ begin
 	port map(
 		clk => clk, reset => resetSig, en => enSig,
 		
-		intSignal => '0',
+		lateEventSignal => lateEventSignal,
 		execEventSignal => execOrIntEventSignal,
 		execCausing => execOrIntCausing,
 		

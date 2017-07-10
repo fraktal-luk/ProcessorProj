@@ -75,6 +75,7 @@ entity MemoryUnit is
 		groupCtrNext: in SmallNumber;
 		groupCtrInc: in SmallNumber;
 
+		lateEventSignal: in std_logic;
 		execEventSignal: in std_logic;
 		execCausing: in InstructionState;
 		
@@ -190,7 +191,7 @@ begin
 						
 						c <= subSN(a, b);
 						before <= c(7);
-						killMask(i) <= killByTag(before, execEventSignal, '0') -- before and execEventSignal
+						killMask(i) <= killByTag(before, execEventSignal, lateEventSignal) -- before and execEventSignal
 												and fullMask(i);									
 					end generate;
 					

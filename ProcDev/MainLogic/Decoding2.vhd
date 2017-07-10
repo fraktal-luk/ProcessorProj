@@ -132,9 +132,11 @@ package Decoding2 is
 					((others=>none), none, '0', '0', '0');			
 			
 				constant fmtMFC_TEMP: ArgFormatStruct := 
-					((d0=>qa, c1=>qd, others=>none), none, '0','0','0');
+																		fmtLoadImm;
+					--((d0=>qa, c1=>qd, others=>none), none, '0','0','0');
 				constant fmtMTC_TEMP: ArgFormatStruct := 
-					((s0=>qb, c0=>qc, others=>none), none, '0','0','0');			
+																		fmtStoreImm;
+					--((s0=>qb, c0=>qc, others=>none), none, '0','0','0');			
 		
 		constant undefInsDef: InsDefNewW := (opcode2slv(ext2), opcont2slv(ext2, undef),
 																				System, sysUndef, fmtUndef);

@@ -44,6 +44,8 @@ use work.ProcLogicFront.all;
 
 use work.BasicCheck.all;
 
+use work.TEMP_DEV.all;
+
 
 entity GenericStageMulti is
 	port(
@@ -212,7 +214,8 @@ begin
 		c <= subSN(a, b);
 		before <= c(7);
 		flowDrive.kill <= killByTag(before, execEventSignal,
-										execCausing.controlInfo.newInterrupt);
+										execCausing.controlInfo.--newInterrupt);
+																		hasInterrupt);
 										-- before and execEventSignal; 	
 	end block;	
 
@@ -230,91 +233,31 @@ begin
 	stageEventsOut <= stageEvents;
 end SingleTagged;
 
--- DEPREC
-architecture Branch of GenericStageMulti is
-	signal flowDrive: FlowDriveSimple := (others=>'0');
-	signal flowResponse: FlowResponseSimple := (others=>'0');		
-	signal stageData, stageDataLiving, stageDataNext, stageDataNew:
-														StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
-	signal partialKillMask: std_logic_vector(0 to PIPE_WIDTH-1) := (others => '0');
-	signal stageEvents: StageMultiEventInfo;	
-begin
-	stageDataNew <= stageDataIn;										
-	stageDataNext <= stageMultiNextCl(stageDataLiving, stageDataNew, -- CAREFUL: diffrence from SingleTagged
-								flowResponse.living, flowResponse.sending, flowDrive.prevSending, true);			
-	stageDataLiving <= stageMultiHandleKill(stageData, flowDrive.kill, partialKillMask);
-
-	PIPE_CLOCKED: process(clk) 	
-	begin
-		if rising_edge(clk) then
-			if reset = '1' then
-				
-			elsif en = '1' then	
-				stageData <= stageDataNext;
-
-				logMulti(stageData.data, stageData.fullMask, stageDataLiving.fullMask, flowResponse);
-				checkMulti(stageData, stageDataNext, flowDrive, flowResponse);
-			end if;
-		end if;
-	end process;
-
-	SIMPLE_SLOT_LOGIC: SimplePipeLogic port map(
-		clk => clk, reset => reset, en => en,
-		flowDrive => flowDrive,
-		flowResponse => flowResponse
-	);
-	
-	KILLER: block
-		signal before: std_logic;
-		signal a, b: std_logic_vector(7 downto 0);
-		signal c: SmallNumber := (others => '0');
-	begin
-		a <= execCausing.groupTag;
-		b <= stageData.data(0).groupTag;	
-
---		IQ_KILLER: entity work.CompareBefore8 port map(
---			inA =>  a,
---			inB =>  b,
---			outC => open --
---						--before
---		);
-			c <= subSN(a, b);
-		before <= c(7);
-		--before <= '0'; --
-					--tagBefore(a, b);			
-		flowDrive.kill <= killByTag(before, execEventSignal,
-										execCausing.controlInfo.newInterrupt); -- CAREFUL: no separat interrupt signal!
-										-- before and execEventSignal; 	
-	end block;			-- CAREFUL: in this architecture 'isNew' is irrelevant because clearing vacating slot;
-			--				second difference from SingleTagged
-		stageEvents <= stageMultiEvents(stageData, flowResponse.isNew or '1');
-	
-	flowDrive.prevSending <= prevSending;
-	flowDrive.nextAccepting <= nextAccepting;
-	--flowDrive.kill <= execEventSignal;
-	flowDrive.lockAccept <= lockCommand;
-
-	acceptingOut <= flowResponse.accepting;		
-	sendingOut <= flowResponse.sending;
-	stageDataOut <= stageDataLiving; -- TODO: clear temp ctrl info?
-	
-	stageEventsOut <= stageEvents;
-end Branch;
-
-
 
 architecture LastEffective of GenericStageMulti is
 	signal flowDrive: FlowDriveSimple := (others=>'0');
 	signal flowResponse: FlowResponseSimple := (others=>'0');		
-	signal stageData, stageDataLiving, stageDataNext, stageDataNew:
+	signal stageData, stageDataLiving, stageDataNext, stageDataNew, sdLiving2:
 														StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
 	signal partialKillMask: std_logic_vector(0 to PIPE_WIDTH-1) := (others => '0');
 	signal stageEvents: StageMultiEventInfo;	
 	
 		signal evtPhase0, evtPhase1, evtPhase2, evtWaiting: std_logic := '0';
 begin
-	stageDataNew <= stageDataIn;										
-	stageDataNext <= stageMultiNext(stageDataLiving, stageDataNew,
+
+	sdLiving2.fullMask <= stageDataLiving.fullMask;
+	sdLiving2.data(0)	<=	setLateTargetAndLink(
+									stageDataLiving.data(0),
+									execCausing.target,
+									stageDataLiving.data(0).target,
+									evtPhase1
+								);
+
+
+	stageDataNew <= stageDataIn;								
+	stageDataNext <= stageMultiNext(
+								sdLiving2,
+								stageDataNew,
 								flowResponse.living, flowResponse.sending, flowDrive.prevSending);			
 	--stageDataLiving <= stageMultiHandleKill(stageData, flowDrive.kill, partialKillMask);
 		stageDataLiving.fullMask <= stageData.fullMask;
@@ -363,10 +306,9 @@ begin
 		flowResponse => flowResponse
 	);
 		-- TODO: move to visible package! 
-		stageEvents.causing <= work.TEMP_DEV.setException(--stageData.data(0),
-																			stageDataLiving.data(0),
-					execCausing.controlInfo.hasInterrupt, execCausing.controlInfo.hasReset, flowResponse.isNew,
-					evtPhase0, evtPhase1, evtPhase2);
+		stageEvents.causing <= work.TEMP_DEV.setPhase(--stageData.data(0),
+																stageDataLiving.data(0),
+																evtPhase0, evtPhase1, evtPhase2);
 		stageEvents.eventOccured <= stageEvents.causing.controlInfo.newEvent;
 		
 	flowDrive.prevSending <= prevSending;
@@ -448,7 +390,8 @@ begin
 					c <= subSN(a, b);
 					before <= c(7);
 					flowDrive.kill <= killByTag(before, execEventSignal,
-													execCausing.controlInfo.newInterrupt);
+													execCausing.controlInfo.--newInterrupt);
+																				   hasInterrupt);
 													-- before and execEventSignal; 	
 				end block;	
 
@@ -533,7 +476,8 @@ begin
 					c <= subSN(a, b);
 					before <= c(7);
 					flowDrive.kill <= killByTag(before, execEventSignal,
-													execCausing.controlInfo.newInterrupt);
+													execCausing.controlInfo.--newInterrupt);
+																					hasInterrupt);
 													-- before and execEventSignal; 	
 				end block;	
 
@@ -624,7 +568,8 @@ begin
 					c <= subSN(a, b);
 					before <= c(7);
 					flowDrive.kill <= killByTag(before, execEventSignal,
-													execCausing.controlInfo.newInterrupt);
+													execCausing.controlInfo.--newInterrupt);
+																					hasInterrupt);
 													-- before and execEventSignal; 	
 				end block;			-- CAREFUL: in this architecture 'isNew' is irrelevant because clearing vacating slot;
 						--				second difference from SingleTagged

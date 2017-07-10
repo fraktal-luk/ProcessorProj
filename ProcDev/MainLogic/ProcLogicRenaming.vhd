@@ -69,6 +69,25 @@ function getSysRegWriteSel(sd: StageDataMulti) return slv5;
 -- CAREFUL: this seems not used and would choose the last value in group
 function getSysRegWriteValue(sd: StageDataMulti) return Mword;
 
+
+function TMP_handleSpecial(sd: StageDataMulti) return StageDataMulti is
+	variable res: StageDataMulti := sd;
+	variable found: boolean := false;
+begin
+	-- If found special instruction, kill next ones
+	for i in 0 to PIPE_WIDTH-1 loop
+		if found then
+			res.fullMask(i) := '0';
+		end if;
+
+		if res.data(i).controlInfo.specialAction = '1' then
+			found := true;
+		end if;
+	end loop;
+	
+	return res;
+end function;
+
 end ProcLogicRenaming;
 
 

@@ -27,10 +27,6 @@ package ProcLogicFront is
 
 function getInstructionClassInfo(ins: InstructionState) return InstructionClassInfo;
 
--- Writes target to the 'target' field
--- REMOVE
---function setBranchTarget(ins: InstructionState) return InstructionState;
-
 function instructionFromWord(w: word) return InstructionState;
 
 function decodeInstruction(inputState: InstructionState) return InstructionState;
@@ -68,11 +64,11 @@ return StageDataHbuffer;
 function newFromHbuffer(content: InstructionStateArray; fullMask: std_logic_vector)
 return HbuffOutData;
 
-function getLatePCData(content: InstructionState;
-						  commitEvent: std_logic; commitCausing: InstructionState;
-						  execEvent: std_logic; execCausing: InstructionState;	
-						  decodeEvent: std_logic; decodeCausing: InstructionState;
-						  pcNext: Mword)
+function getLatePCData(--content: InstructionState;
+						  commitEvent: std_logic; commitCausing: InstructionState)
+						  --execEvent: std_logic; execCausing: InstructionState;	
+						  --decodeEvent: std_logic; decodeCausing: InstructionState;
+						  --pcNext: Mword)
 return InstructionState;
 
 function newPCData(content: InstructionState;
@@ -104,10 +100,6 @@ package body ProcLogicFront is
 function getInstructionClassInfo(ins: InstructionState) return InstructionClassInfo is
 	variable ci: InstructionClassInfo := defaultClassInfo;
 begin
-			if ins.operation.func = sysUndef then
-				ci.undef := '1';
-			end if;
-
 				-- Which clusters?
 				-- TEMP!
 				ci.mainCluster := '1';
@@ -126,6 +118,12 @@ begin
 					ci.secCluster := '1';
 				end if;
 
+			if ins.operation.func = sysUndef then
+				--ci.undef := '1';
+				ci.mainCluster := '0';
+				ci.secCluster := '0';
+			end if;
+
 			ci.branchAlways := '0';
 			ci.branchCond := '0';
 
@@ -142,26 +140,19 @@ begin
 			
 			-- TODO: complete this!
 			if  ins.operation.unit = System then
-				ci.system := '1';
+				--ci.system := '1';
 			end if;
 			
 			if  (ins.operation.func = sysMTC) then
+				ci.mtc := '1';
 			end if;
 
 			if (ins.operation.func = sysMFC) then
+				ci.mfc := '1';
 			end if;
 				
 	return ci;
 end function;
-
--- TODO, CAREFUL: inspect other possible paths, like "jump to next" for some instructions?
---function setBranchTarget(ins: InstructionState) return InstructionState is
---	variable res: InstructionState := ins;
---begin
---	-- NOTE: jump relative to this instruction, not next one
---	res.target := i2slv(slv2s(ins.constantArgs.imm) + slv2s(ins.basicInfo.ip), MWORD_SIZE);		
---	return res;
---end function;	
 
 
 function instructionFromWord(w: word) return InstructionState is
@@ -189,14 +180,30 @@ begin
 				if ((res.classInfo.branchAlways or res.classInfo.branchCond)
 					and not res.classInfo.branchReg)	= '1' and BRANCH_AT_DECODE then
 					res.controlInfo.newEvent := '1';
-					res.controlInfo.hasEvent := '1';
+					--res.controlInfo.hasEvent := '1';
 					res.controlInfo.newBranch := '1';
 					res.controlInfo.hasBranch := '1';					
 				end if;
+
+
+				if res.operation.unit = System and
+						(	res.operation.func = sysRetI or res.operation.func = sysRetE
+						or res.operation.func = sysSync or res.operation.func = sysReplay
+						or res.operation.func = sysHalt) then 		
+					res.controlInfo.specialAction := '1';
+					
+						-- CAREFUL: Those ops don't get issued, they are handled at retirement
+						res.classInfo.mainCluster := '0';
+						res.classInfo.secCluster := '0';
+				end if;	
 	
-		if res.classInfo.undef = '1' then
+		if --res.classInfo.undef = '1' then
+			res.operation.func = sysUndef then
+			res.controlInfo.hasException := '1';
 			res.controlInfo.exceptionCode := i2slv(ExceptionType'pos(undefinedInstruction), SMALL_NUMBER_SIZE);
 		end if;
+		
+		
 		
 		res.target := (others => '0');		
 	return res;
@@ -455,13 +462,13 @@ begin
 	return ret;
 end function;
 
-function getLatePCData(content: InstructionState;
-						  commitEvent: std_logic; commitCausing: InstructionState;
-						  execEvent: std_logic; execCausing: InstructionState;	
-						  decodeEvent: std_logic; decodeCausing: InstructionState;
-						  pcNext: Mword)
+function getLatePCData(--content: InstructionState;
+						  commitEvent: std_logic; commitCausing: InstructionState)
+						  --execEvent: std_logic; execCausing: InstructionState;	
+						  --decodeEvent: std_logic; decodeCausing: InstructionState;
+						  --pcNext: Mword)
 return InstructionState is
-	variable res: InstructionState := content;
+	variable res: InstructionState := DEFAULT_INSTRUCTION_STATE;-- content;
 	variable newPC: Mword := (others=>'0');
 begin
 		if commitCausing.controlInfo.hasReset = '1' then -- TEMP!
@@ -470,7 +477,7 @@ begin
 		elsif commitCausing.controlInfo.hasInterrupt = '1' then
 			res.basicInfo.ip := INT_BASE; -- TEMP!
 			res.basicInfo.intLevel := "00000001";		
-		elsif commitCausing.controlInfo.hasException = '1' then--or not LATE_FETCH_LOCK then
+		elsif commitCausing.controlInfo.hasException = '1' then
 			-- TODO, FIX: exceptionCode sliced - shift left by ALIGN_BITS? or leave just base address
 			res.basicInfo.ip := EXC_BASE(MWORD_SIZE-1 downto commitCausing.controlInfo.exceptionCode'length)
 									& commitCausing.controlInfo.exceptionCode(
@@ -537,8 +544,7 @@ end function;
 		res.causing := decodeCausing;
 	
 		if commitEvent = '1' then 
-			res.killPC := --isHalt(commitCausing) or '0';
-								'1';
+			res.killPC := '1';
 			res.causing := commitCausing;
 			res.affectedVec(0 to 4) := (others => '1');
 		elsif execEvent = '1' then

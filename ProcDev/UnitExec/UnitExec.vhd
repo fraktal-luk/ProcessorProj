@@ -72,6 +72,8 @@ entity UnitExec is
 			prevSendingToBQ: in std_logic;
 			dataNewToBQ: in StageDataMulti;
 			
+			lateEventSignal: in std_logic; 
+			
 			committing: in std_logic;
 			
 			groupCtrNext: in SmallNumber;
@@ -83,11 +85,11 @@ entity UnitExec is
 			
 		outputOpPreB: out InstructionState;
 			
-		sysRegSelect: out slv5;
-		sysRegIn: in Mword;
+		--sysRegSelect: out slv5;
+		--sysRegIn: in Mword;
 				
-		sysRegDataOut: out InstructionState;
-		sysRegSending: out std_logic;
+		--sysRegDataOut: out InstructionState;
+		--sysRegSending: out std_logic;
 
 		execEvent: out std_logic;
 		execCausingOut: out InstructionState;
@@ -134,8 +136,7 @@ begin
 					
 					dataA0 <= outputDataA.data(0);
 					
-					SUBPIPE_A: entity work.--SimpleAlu(Behavioral)
-													GenericStageMulti(BasicAlu)
+					SUBPIPE_A: entity work.GenericStageMulti(BasicAlu)
 					port map(
 						clk => clk, reset => resetSig, en => enSig,
 						
@@ -175,16 +176,15 @@ begin
 				
 ------------------------------------------------
 -- Branch/System
-					sysRegSelect <= sysRegReadSel;
-					sysRegValue <= sysRegIn;
+					--sysRegSelect <= sysRegReadSel;
+					--sysRegValue <= sysRegIn;
 
 					inputDataD.data(0) <= dataIQD;
 					inputDataD.fullMask(0) <= sendingIQD;
 					
 					dataD0 <= outputDataD.data(0);
 					
-					SUBPIPE_D: entity work.--BranchUnit(Behavioral)
-													GenericStageMulti(BranchUnit)
+					SUBPIPE_D: entity work.GenericStageMulti(BranchUnit)
 					port map(
 						clk => clk, reset => resetSig, en => enSig,
 						
@@ -203,7 +203,7 @@ begin
 						stageEventsOut => eventsD						
 					);	
 
-				sysRegReadSel <= dataIQD.constantArgs.c1;
+				--sysRegReadSel <= dataIQD.constantArgs.c1;
 
 -----------------------------------
 	BQ_BLOCK: block
@@ -211,33 +211,7 @@ begin
 		signal storeTargetDataSig: InstructionState := DEFAULT_INSTRUCTION_STATE;
 			signal storeTargetDataSRSig: InstructionState := DEFAULT_INSTRUCTION_STATE;
 		
-		signal storingForMTC: std_logic := '0';
-		
-		function trgToResult(ins: InstructionState) return InstructionState is
-			variable res: InstructionState := ins;
-		begin
-			-- CAREFUL! Here we use 'result' because it is the field copied to arg1 in mem queue!
-			-- TODO: regularize usage of such fields, maybe remove 'target' from InstructionState?
-			res.result := ins.target;
-			return res;
-		end function;
-		
-		function trgToSR(ins: InstructionState) return InstructionState is
-			variable res: InstructionState := ins;
-		begin
-			-- CAREFUL! Here we use 'result' because it is the field copied to arg1 in mem queue!
-			-- TODO: regularize usage of such fields, maybe remove 'target' from InstructionState?
-			res.argValues.arg2(4 downto 0) := ins.constantArgs.c0;
-			res.argValues.arg2(MWORD_SIZE-1 downto 5) := (others => '0');
-			return res;
-		end function;
-
-		function setInsResult(ins: InstructionState; result: Mword) return InstructionState is
-			variable res: InstructionState := ins;
-		begin
-			res.result := result;
-			return res;
-		end function;
+		--signal storingForMTC: std_logic := '0';
 	begin
 		sysRegData <= setInsResult(dataD0, sysRegValueReg);
 	
@@ -245,11 +219,14 @@ begin
 		storeTargetDataSRSig <= trgToSR(dataD0);
 
 		storeTargetWrSig <= execSendingD and
-										((dataD0.controlInfo.hasBranch and dataD0.classInfo.branchReg)
-									or   dataD0.controlInfo.hasReturn
-									or   storingForMTC);
+										((dataD0.controlInfo.hasBranch and --dataD0.classInfo.branchReg)
+																					  not dataD0.constantArgs.immSel)
+									or   dataD0.controlInfo.hasReturn);
+									--or   storingForMTC);
 									
-			storingForMTC <= '1' when dataD0.operation.func = sysMtc and USE_BQ_FOR_MTC else '0';						
+			--storingForMTC <= '0';-- and '1' when 	--	 dataD0.operation.func = sysMtc
+										--			 dataD0.classInfo.mtc = '1'
+										--		and USE_BQ_FOR_MTC else '0';						
 									
 			BRANCH_QUEUE: entity work.MemoryUnit(Behavioral)
 			generic map(
@@ -274,8 +251,10 @@ begin
 					groupCtrNext => groupCtrNext,
 						groupCtrInc => groupCtrInc,
 						
+				lateEventSignal => lateEventSignal,
 				execEventSignal => eventSignal,
-				execCausing => activeCausing,
+				execCausing => --activeCausing,
+									execCausing,
 				
 				nextAccepting => '1',
 				
@@ -295,10 +274,12 @@ begin
 -------------------------------------
 
 		-- Data from sysreg reads goes to load pipe
-		sysRegDataOut <= sysRegData;
-		sysRegSending <= execSendingD when dataD0.operation = (System, sysMfc) else '0';
+		--sysRegDataOut <= sysRegData;
+		--sysRegSending <= execSendingD when --dataD0.operation = (System, sysMfc) else '0';
+		--											  dataD0.classInfo.mfc = '1' else '0';
 		-- CAREFUL: Don't send the same thing from both subpipes:
-		execSendingEffectiveD <= execSendingD when dataD0.operation /= (System, sysMfc) else '0';
+		execSendingEffectiveD <= execSendingD;-- when --dataD0.operation /= (System, sysMfc) else '0';
+															--	 dataD0.classInfo.mfc = '0' else '0';	
 
 		execEventSignal <= eventsD.eventOccured;
 		execCausing <= eventsD.causing;

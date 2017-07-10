@@ -50,7 +50,7 @@ entity ReorderBuffer is
 		reset: in std_logic;
 		en: in std_logic;
 		
-		intSignal: in std_logic;
+		lateEventSignal: in std_logic;
 		execEventSignal: in std_logic;
 		execCausing: in InstructionState; -- Redundant cause we have inputs from all Exec ends? 
 		
@@ -84,11 +84,10 @@ architecture Implem of ReorderBuffer is
 	signal flowResponse: FlowResponseBuffer := (others => (others=> '0'));
 
 	signal resetSig, enSig: std_logic := '0';	
-	
 	signal isSending: std_logic := '0';
-	
-		signal fromCommitted: std_logic := '0';
-		signal lateFetchLock: std_logic := '0'; -- DEPREC
+	signal fromCommitted: std_logic := '0';
+		
+	signal numKilled: SmallNumber := (others => '0');
 	
 	constant ROB_HAS_RESET: std_logic := '0';
 	constant ROB_HAS_EN: std_logic := '0';
@@ -97,13 +96,13 @@ begin
 	enSig <= en or not ROB_HAS_EN;
 	
 	-- This is before shifting!
-	stageDataLiving <= killInROB(stageData, commitGroupCtr, execCausing.groupTag,
-												execEventSignal, fromCommitted);
+	stageDataLiving <= stageData;
 	
-		-- TODO: add execEnds2, execReady2
 	stageDataUpdated <= setCompleted(stageDataLiving, commitGroupCtr,
+																		--(others => '0'),
 												execEnds, execReady,
-												execEnds2, execReady2);
+												execEnds2, execReady2,
+												execEventSignal, fromCommitted);
 	
 	-- CAREFUL! fullMask before kills is used along with fullMask after killing!
 	stageDataNext <= stageROBNext(stageDataUpdated, stageData.fullMask, inputData, 
@@ -113,15 +112,11 @@ begin
 											
 	ROB_SYNCHRONOUS: process (clk)
 	begin
-		if rising_edge(clk) then
-			if resetSig = '1' then
-			
-			elsif enSig = '1' then
-				stageData <= stageDataNext;
-				
-				logROB(stageData, stageDataLiving, flowResponse);
-				checkROB(stageData, stageDataNext, flowDrive, flowResponse);
-			end if;
+		if rising_edge(clk) then			
+			stageData <= stageDataNext;
+	
+			logROB(stageData, stageDataLiving, flowResponse);
+			checkROB(stageData, stageDataNext, flowDrive, flowResponse);
 		end if;		
 	end process;
 	
@@ -143,27 +138,19 @@ begin
 	flowDrive.nextAccepting <= num2flow(1) when isSending = '1'
 								else  (others => '0');
 	
-	flowDrive.kill <=
-				i2slv((
-					slv2s(flowResponse.full)
-					+	integer(slv2u(tagHigh(commitGroupCtr)))
-					- 	integer(slv2u(tagHigh(execCausing.groupTag)))
-						) mod 2**(SMALL_NUMBER_SIZE - LOG2_PIPE_WIDTH), --(256/PIPE_WIDTH
-					SMALL_NUMBER_SIZE)
-				when execEventSignal = '1'
-		else (others => '0');
+		numKilled <= getNumKilled(flowResponse.full, --execCausing.groupTag,
+																		execEnds2(3).groupTag,
+																		commitGroupCtr, execEventSignal);
+	
+	flowDrive.kill <= numKilled;							
+		flowDrive.killAll <= fromCommitted;
 		
 	isSending <= stageData.fullMask(0)
 				and groupCompleted(stageData.data(0))
 				and not fromCommitted
 							and nextAccepting;
 
-	--	lateFetchLock <= '1' when LATE_FETCH_LOCK else '0';
-	fromCommitted <= execEventSignal and 	
-							(	execCausing.controlInfo.newInterrupt 
-							or execCausing.controlInfo.newException
-							or execCausing.controlInfo.specialAction
-							or '0');--(execCausing.controlInfo.hasFetchLock and lateFetchLock));
+	fromCommitted <= lateEventSignal;
 						
 	-- TODO: allow accepting also when queue full but sending, that is freeing a place.
 	acceptingOut <= --'1' when binFlowNum(flowResponse.full) < ROB_SIZE else '0';

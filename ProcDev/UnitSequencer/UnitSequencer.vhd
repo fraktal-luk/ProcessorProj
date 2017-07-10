@@ -67,6 +67,8 @@ entity UnitSequencer is
 		
 		execOrIntEventSignalOut: out std_logic;
 		execOrIntCausingOut: out InstructionState;
+			
+			lateEventOut: out std_logic;
 		
 		killVecOut: out std_logic_vector(0 to N_EVENT_AREAS-1);
 
@@ -220,6 +222,7 @@ begin
 											pcNext
 										);
 
+			lateEventOut <= TMP_phase0;
 		execOrIntEventSignal <= execEventSignal or TMP_phase0;
 		execOrIntCausing <= eiEvents.causing when TMP_phase0 = '1' else execCausing;
 		
@@ -305,6 +308,9 @@ begin
 		CLOCKED: process(clk)
 		begin					
 			if rising_edge(clk) then
+				-- Reading sys regs
+				sysRegReadValue <= sysRegArray(slv2u(sysRegReadSel));			
+			
 					-- CAREFUL: writing to currentState BEFORE normal sys reg write gives priority to the latter;
 					--				otherwise explicit setting of currentState wouldn't work.
 					--				So maybe other sys regs should have it done the same way, not conversely? 
@@ -316,11 +322,7 @@ begin
 						sysRegArray(slv2u(srWriteSel)) <= srWriteVal;
 					end if;
 
-					-- Write currentState (control flow may be just changing it)					
-					if sendingToPC = '1' then
-						--currentState <= X"0000" & newTargetInfo.systemLevel & newTargetInfo.intLevel;
-					end if;
-					
+					-- Writing specialized fields on events
 					if eiEvents.causing.controlInfo.phase1 = '1' then
 						currentState <= X"0000" & TMP_targetIns.basicInfo.systemLevel & TMP_targetIns.basicInfo.intLevel;
 					end if;
@@ -350,7 +352,6 @@ begin
 		end process;
 		
 		currentStateSig <= currentState;
-		sysRegReadValue <= sysRegArray(slv2u(sysRegReadSel));							
 	end block;
 
 
@@ -376,14 +377,16 @@ begin
 		end generate;
 	
 		stageDataRenameIn <= 
-			setArgStatus(
-				baptizeAll(
-					renameRegs2(
-						frontDataLastLiving, takeVec, reserveSelSig, newPhysSources, newPhysDests
+			TMP_handleSpecial(
+				setArgStatus(
+					baptizeAll(
+						renameRegs2(
+							frontDataLastLiving, takeVec, reserveSelSig, newPhysSources, newPhysDests
+						),
+						newNumberTags, renameGroupCtrNext, newGprTags
 					),
-					newNumberTags, renameGroupCtrNext, newGprTags
-				),
-				readyRegFlagsNextV
+					readyRegFlagsNextV
+				)	
 			);
 	
 		SUBUNIT_RENAME: entity work.GenericStageMulti(Renaming)
@@ -491,17 +494,12 @@ begin
 			stageDataToCommit <= recreateGroup(robDataLiving, dataFromBQV, dataFromLastEffective.data(0).target);
 			insToLastEffective <= getLastEffective(stageDataToCommit);		
 				
-				TMP_targetIns <= getLatePCData(
-											stageDataOutPC,
-											'1', eiEvents.causing,
-											execEventSignal, execCausing,
-											stage0EventInfo.eventOccured, stage0EventInfo.causing,
-											pcNext);
+				TMP_targetIns <= getLatePCData('1', eiEvents.causing);
 											
-			interruptCause.controlInfo.hasInterrupt <= intSignal;
-			interruptCause.controlInfo.hasReset <= start;
+				interruptCause.controlInfo.hasInterrupt <= intSignal;
+				interruptCause.controlInfo.hasReset <= start;
 				interruptCause.target <= TMP_targetIns.basicInfo.ip;
-									
+
 			dataToLastEffective.fullMask(0) <= sendingToCommit;
 			dataToLastEffective.data(0) <= insToLastEffective;
 

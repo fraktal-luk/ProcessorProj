@@ -104,8 +104,10 @@ begin
 		srcVecA <= (findByNumber(issueRouteVec, 0) or whichBranchLink(renamedDataLiving))
 																							and renamedDataLiving.fullMask;
 		srcVecB <= findByNumber(issueRouteVec, 1) and renamedDataLiving.fullMask;
-		srcVecC <= findByNumber(issueRouteVec, 2) and renamedDataLiving.fullMask;
-		srcVecD <= findByNumber(issueRouteVec, 3) and renamedDataLiving.fullMask;
+		srcVecC <= (findByNumber(issueRouteVec, 2)
+								or storeVec or loadVec) and renamedDataLiving.fullMask;
+		srcVecD <= (findByNumber(issueRouteVec, 3)
+								and not storeVec and not loadVec) and renamedDataLiving.fullMask;
 		srcVecE <= storeVec and renamedDataLiving.fullMask;
 
 		dataToA <= routeToIQ2(prepareForAlu(renamedDataLiving, whichBranchLink(renamedDataLiving)), srcVecA);

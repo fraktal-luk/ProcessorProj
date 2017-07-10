@@ -36,13 +36,10 @@ package NewPipelineData is
 	constant BRANCH_AT_DECODE: boolean := false;
 	
 	 -- System reg writing goes through BQ/ through special temp register
-	constant USE_BQ_FOR_MTC: boolean := true;--false;
+	--constant USE_BQ_FOR_MTC: boolean := true;--false;
 	
-	constant LATE_FETCH_LOCK: boolean 
-				:= true; --false; -- Fetch lock not causing decode event, but only when committed
 	
-	constant CQ_SINGLE_OUTPUT: boolean := --false;--
-														true;
+	constant CQ_SINGLE_OUTPUT: boolean := (LOG2_PIPE_WIDTH = 0);
 	constant CQ_THREE_OUTPUTS: boolean := not CQ_SINGLE_OUTPUT;
 	
 	function getIntegerWriteWidth(so: boolean) return integer is
@@ -96,8 +93,6 @@ package NewPipelineData is
 						-- Above: num subpipe results + CQ slots + max commited slots + pre-IQ red ports
 	constant N_NEXT_RES_TAGS: natural := 2; 
 
-
-
 	
 	constant zerosPW: std_logic_vector(0 to PIPE_WIDTH-1) := (others=>'0');	
 	------
@@ -109,57 +104,19 @@ package NewPipelineData is
 	constant FREE_LIST_SIZE: natural := 64; -- ??
 	
 	constant PHYS_NAME_SIZE: integer := 6;
-	subtype PhysName is --slv6;
-								std_logic_vector(PHYS_NAME_SIZE-1 downto 0);
+	subtype PhysName is std_logic_vector(PHYS_NAME_SIZE-1 downto 0);
 	type PhysNameArray is array(natural range <>) of PhysName;
 
 	constant TAG_SIZE: integer := 8;
 	subtype InsTag is std_logic_vector(TAG_SIZE-1 downto 0);
-	
-	function getTagHigh(tag: std_logic_vector) return std_logic_vector is
-		variable res: std_logic_vector(tag'high-LOG2_PIPE_WIDTH downto 0) := (others => '0');
-	begin
-		res := tag(tag'high downto LOG2_PIPE_WIDTH);
-		return res;
-	end function;
 
-	function getTagLow(tag: std_logic_vector) return std_logic_vector is
-		variable res: std_logic_vector(LOG2_PIPE_WIDTH-1 downto 0) := (others => '0');
-	begin
-		res := tag(LOG2_PIPE_WIDTH-1 downto 0);
-		return res;
-	end function;
-
-	function clearTagLow(tag: std_logic_vector) return std_logic_vector is
-		variable res: std_logic_vector(tag'high downto 0) := (others => '0');
-	begin
-		res := tag;
-		res(LOG2_PIPE_WIDTH-1 downto 0) := (others => '0');
-		return res;
-	end function;	
-
-	function alignAddress(adr: std_logic_vector) return std_logic_vector is
-		variable res: std_logic_vector(adr'high downto 0) := (others => '0');
-	begin
-		res := adr;
-		res(ALIGN_BITS-1 downto 0) := (others => '0');
-		return res;
-	end function;
-
-	function clearLowBits(vec: std_logic_vector; n: integer) return std_logic_vector is
-		variable res: std_logic_vector(vec'high downto 0) := (others => '0');
-	begin
-		res := vec;
-		res(n-1 downto 0) := (others => '0');
-		return res;
-	end function;
-	
-	function getLowBits(vec: std_logic_vector; n: integer) return std_logic_vector is
-		variable res: std_logic_vector(n-1 downto 0) := (others => '0');
-	begin
-		res(n-1 downto 0) := vec(n-1 downto 0);
-		return res;
-	end function;
+	function getTagHigh(tag: std_logic_vector) return std_logic_vector;
+	function getTagLow(tag: std_logic_vector) return std_logic_vector;
+	function clearTagLow(tag: std_logic_vector) return std_logic_vector;	
+	function clearTagHigh(tag: std_logic_vector) return std_logic_vector;	
+	function alignAddress(adr: std_logic_vector) return std_logic_vector;
+	function clearLowBits(vec: std_logic_vector; n: integer) return std_logic_vector;
+	function getLowBits(vec: std_logic_vector; n: integer) return std_logic_vector;
 
 constant PROCESSOR_ID: Mword := X"001100aa";
 
@@ -201,20 +158,18 @@ type InstructionControlInfo is record
 		completed2: std_logic;
 	-- Momentary data:
 	newEvent: std_logic; -- True if any new event appears
-		newReset: std_logic;
-	newInterrupt: std_logic;
-	newException: std_logic;
+	--	newReset: std_logic;
+	--newInterrupt: std_logic;
+	--newException: std_logic;
 	newBranch: std_logic;
-	newReturn: std_logic; -- going to normal next, as in cancelling a branch
-	--newFetchLock: std_logic;
+	--newReturn: std_logic; -- going to normal next, as in cancelling a branch
 	-- Persistent data:
-	hasEvent: std_logic; -- Persistent
+	--hasEvent: std_logic; -- Persistent
 		hasReset: std_logic;
 	hasInterrupt: std_logic;
 	hasException: std_logic;
 	hasBranch: std_logic;
 	hasReturn: std_logic;
-	--hasFetchLock: std_logic;
 		specialAction: std_logic;
 		phase0, phase1, phase2: std_logic;
 	exceptionCode: SmallNumber; -- Set when exception occurs, remains cause exception can be only 1 per op
@@ -228,12 +183,14 @@ type InstructionClassInfo is record
 	branchCond: std_logic;
 	branchReg: std_logic;
 		branchLink: std_logic;
-	system: std_logic; -- ??
+		mtc: std_logic;
+		mfc: std_logic;
+	--system: std_logic; -- ??
 	--memory: std_logic; -- ??
 	--fetchLock: std_logic;
-	undef: std_logic;
-	illegal: std_logic;
-	privilege: SmallNumber;
+	--undef: std_logic;
+	--illegal: std_logic;
+	--privilege: SmallNumber;
 end record;
 
 type InstructionConstantArgs is record
@@ -498,6 +455,60 @@ end NewPipelineData;
 
 package body NewPipelineData is
 
+	function getTagHigh(tag: std_logic_vector) return std_logic_vector is
+		variable res: std_logic_vector(tag'high-LOG2_PIPE_WIDTH downto 0) := (others => '0');
+	begin
+		res := tag(tag'high downto LOG2_PIPE_WIDTH);
+		return res;
+	end function;
+
+	function getTagLow(tag: std_logic_vector) return std_logic_vector is
+		variable res: std_logic_vector(LOG2_PIPE_WIDTH-1 downto 0) := (others => '0');
+	begin
+		res := tag(LOG2_PIPE_WIDTH-1 downto 0);
+		return res;
+	end function;
+
+	function clearTagLow(tag: std_logic_vector) return std_logic_vector is
+		variable res: std_logic_vector(tag'high downto 0) := (others => '0');
+	begin
+		res := tag;
+		res(LOG2_PIPE_WIDTH-1 downto 0) := (others => '0');
+		return res;
+	end function;	
+
+	function clearTagHigh(tag: std_logic_vector) return std_logic_vector is
+		variable res: std_logic_vector(tag'high downto 0) := (others => '0');
+	begin
+		res := tag;
+		res(tag'high downto LOG2_PIPE_WIDTH) := (others => '0');
+		return res;
+	end function;
+
+	function alignAddress(adr: std_logic_vector) return std_logic_vector is
+		variable res: std_logic_vector(adr'high downto 0) := (others => '0');
+	begin
+		res := adr;
+		res(ALIGN_BITS-1 downto 0) := (others => '0');
+		return res;
+	end function;
+
+	function clearLowBits(vec: std_logic_vector; n: integer) return std_logic_vector is
+		variable res: std_logic_vector(vec'high downto 0) := (others => '0');
+	begin
+		res := vec;
+		res(n-1 downto 0) := (others => '0');
+		return res;
+	end function;
+	
+	function getLowBits(vec: std_logic_vector; n: integer) return std_logic_vector is
+		variable res: std_logic_vector(n-1 downto 0) := (others => '0');
+	begin
+		res(n-1 downto 0) := vec(n-1 downto 0);
+		return res;
+	end function;
+
+
 function binFlowNum(flow: PipeFlow) return natural is
 	variable vec: std_logic_vector(PipeFlow'length-1 downto 0) := flow;
 begin
@@ -527,19 +538,17 @@ begin
 												completed => '0',
 													completed2 => '0',
 												newEvent => '0',
-													newReset => '0',
-												hasEvent => '0',
-												newInterrupt => '0',
+													--newReset => '0',
+												--hasEvent => '0',
+												--newInterrupt => '0',
 												hasInterrupt => '0',
 													hasReset => '0',
-												newException => '0',
+												--newException => '0',
 												hasException => '0',
 												newBranch => '0',
 												hasBranch => '0',
-												newReturn => '0',
+												--newReturn => '0',
 												hasReturn => '0',												
-												--newFetchLock => '0',
-												--hasFetchLock => '0',
 													specialAction => '0',
 													phase0 => '0',
 													phase1 => '0',
@@ -557,16 +566,13 @@ begin
 											branchCond => '0',
 											branchReg => '0',
 												branchLink => '0',
-											system => '0',
-											--memory: std_logic; -- ??
-												-- ?? load => '0',
-												-- ?? store => '0',
-											--fetchLock => '0',
-											--renameLock => '0',
-											
-											undef => '0', --?
-											illegal => '0',
-											privilege => (others=>'1'));	
+												mtc => '0',
+												mfc => '0'
+											--system => '0',											
+											--undef => '0', --?
+											--illegal => '0',
+											--privilege => (others=>'1')
+											);	
 end function;
 
 function defaultConstantArgs return InstructionConstantArgs is
@@ -664,9 +670,7 @@ end function;
 		res.physicalDestArgs := defaultPhysicalDestArgs;
 		res.numberTag := (others => '1');
 		res.gprTag := (others => '0');
-		res.groupTag := --(others => '1');
-							 --(others => '0');
-								INITIAL_GROUP_TAG;
+		res.groupTag := INITIAL_GROUP_TAG;
 		res.argValues := defaultArgValues;
 		res.result := (others => '0');
 		res.target := (others => '0');
