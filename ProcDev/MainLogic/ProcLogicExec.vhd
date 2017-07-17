@@ -46,6 +46,8 @@ package ProcLogicExec is
 								result: Mword)
 	return InstructionState;
 
+	function executeAlu(ins: InstructionState) return InstructionState;
+
 end ProcLogicExec;
 
 
@@ -162,5 +164,114 @@ package body ProcLogicExec is
 		res.result := result;
 		return res; 
 	end function;
-	 
+	
+	function executeAlu(ins: InstructionState) return InstructionState is
+		variable res: InstructionState := ins;
+		variable result: Mword := (others => '0');
+		variable arg0, arg1, arg2: Mword := (others => '0');
+		variable c0, c1: slv5 := (others => '0');
+		variable resultExt: std_logic_vector(MWORD_SIZE downto 0) := (others => '0');
+		variable ov, carry: std_logic := '0';
+		variable shH, shL: integer := 0;
+		variable shNum, shTemp: SmallNumber := (others => '0');
+			variable tempBits: std_logic_vector(95 downto 0) := (others => '0'); -- TEMP! for 32b only
+			variable shiftedBytes: std_logic_vector(39 downto 0) := (others => '0');
+	begin
+		arg0 := ins.argValues.arg0;
+		arg1 := ins.argValues.arg1;
+		arg2 := ins.argValues.arg2;
+	
+		c0 := ins.constantArgs.c0;
+		c1 := ins.constantArgs.c1;	
+	
+		shTemp(4 downto 0) := c0; -- CAREFUL, TODO: handle the issue of 1-32 vs 0-31	
+		if ins.operation.func = logicShl then
+			shNum := subSN(shNum, shTemp);
+			
+			--	report integer'image(slv2u(shNum));
+			--	report integer'image(slv2s(shNum(5 downto 3)));
+		else
+			shNum := shTemp;
+		end if;
+	
+		shH := slv2s(shNum(5 downto 3));
+				--0;
+		shL := slv2u(shNum(2 downto 0));
+	
+		if ins.operation.func = arithShra then
+			tempBits(95 downto 64) := (others => arg0(MWORD_SIZE-1));	
+		end if;
+		tempBits(63 downto 32) := arg0;
+	
+			shiftedBytes := tempBits(71 + 8*shH downto 32 + 8*shH);
+			
+	
+		-- Shifting: divide into byte part and intra-byte part
+		--	shift left by 8*H + L
+		-- must be universal: the H part also negative
+		-- shift right by 3: 8*(-1) + 5
+		--	Let's treat the number as 64 bit: [arg0 & 0x00000000] and mux relative to right bound.
+		-- sh right 20 -> move window left by 2*8 + 4
+		-- sh right 31 -> move window left by 3*8 + 7
+		-- sh left   2 -> move window right by -1*8 + 6
+		-- sh left  15 -> move window right by -2*8 + 1
+		
+		-- So, for shift left, number is negative, for right is positive
+		-- Most negative byte count is -4, giving -4*8 + 0 = -32
+		-- Most positive byte count is 3, giving 3*8 + 7 = 31
+		
+	
+		case ins.operation.func is 
+			when arithAdd => 
+				resultExt := addMwordExt(arg0, arg1);
+				if
+					(arg0(MWORD_SIZE-1) = arg1(MWORD_SIZE-1)) and
+					(arg0(MWORD_SIZE-1) /= resultExt(MWORD_SIZE-1))				
+				then
+					ov := '1';
+				end if;
+				carry := resultExt(MWORD_SIZE);
+				result := resultExt(MWORD_SIZE-1 downto 0);
+			when arithSub =>
+				resultExt := subMwordExt(arg0, arg1);
+				if
+					(arg0(MWORD_SIZE-1) /= arg1(MWORD_SIZE-1)) and
+					(arg0(MWORD_SIZE-1) /= resultExt(MWORD_SIZE-1))				
+				then
+					ov := '1';
+				end if;
+				carry := resultExt(MWORD_SIZE); -- CAREFUL, with subtraction carry is different, keep in mind
+				result := resultExt(MWORD_SIZE-1 downto 0);	
+
+			when logicAnd =>
+				result := arg0 and arg1;				
+			when logicOr =>
+				result := arg0 or arg1;
+				
+--				when arithShra => 
+--					--result := (others => arg0(MWORD_SIZE-1)); -- Sign injection
+--					--result(MWORD_SIZE-1 - sh downto 0) := arg0(MWORD_SIZE-1 downto sh);
+--				
+--				when logicShrl =>
+--					result(MWORD_SIZE-1 - shL downto 0) := arg0(MWORD_SIZE-1 downto shL);
+--				when logicShl =>
+--					result(MWORD_SIZE-1 downto shL) := arg0(MWORD_SIZE-1 - shL downto 0);				
+--				
+			when others => 
+				result := shiftedBytes(31 + shL downto shL);
+			
+				--report "Unknown alu operation" severity error;
+		end case;
+		
+		if ov = '1' then
+			res.controlInfo.newEvent := '1';
+			res.controlInfo.hasException := '1';
+			res.controlInfo.exceptionCode := (0 => '1', others => '0'); -- ???
+		end if;
+		
+		res.result := result;
+		
+		return res;
+	end function;
+	
 end ProcLogicExec;

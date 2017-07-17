@@ -342,7 +342,9 @@ architecture BasicAlu of GenericStageMulti is
 	signal aluOut: InstructionState := defaultInstructionState;				
 	signal aluResult: Mword := (others => '0');
 	signal aluCarry: std_logic := '0';
-	signal aluException: std_logic_vector(3 downto 0) := (others => '0');	
+	signal aluException: std_logic_vector(3 downto 0) := (others => '0');
+		signal aluOut2: InstructionState := DEFAULT_INSTRUCTION_STATE;
+		signal ch: std_logic := '0';
 begin
 	inputData.data(0) <= aluOut; -- Output of ALU
 	inputData.fullMask <= stageDataIn.fullMask;
@@ -409,14 +411,18 @@ begin
 				stageEventsOut <= stageEvents;
 			end block;
 
-	INT_ALU: entity work.IntegerAlu
-	port map(
-		inputInstruction => stageDataIn.data(0),
-		result => aluResult,
-		exc => aluException
-	);
+--	INT_ALU: entity work.IntegerAlu
+--	port map(
+--		inputInstruction => stageDataIn.data(0),
+--		result => aluResult,
+--		exc => aluException
+--	);
 	
-	aluOut <= setExecState(stageDataIn.data(0), aluResult, '0', aluException);
+	--aluOut2 <= setExecState(stageDataIn.data(0), aluResult, '0', aluException);
+	
+		aluOut <= executeAlu(stageDataIn.data(0));
+		
+		--ch <= '1' when aluOut = aluOut2 else '0';
 end BasicAlu;
 
 
@@ -504,13 +510,15 @@ begin
 --		exc => aluException
 --	);
 
-				NEW_ADDRESS_ADDER: entity work.IntegerAdder
-				port map(
-					inA => stageDataIn.data(0).argValues.arg0,
-					inB => stageDataIn.data(0).argValues.arg1,
-					output => aluResult
-				);
+--				NEW_ADDRESS_ADDER: entity work.IntegerAdder
+--				port map(
+--					inA => stageDataIn.data(0).argValues.arg0,
+--					inB => stageDataIn.data(0).argValues.arg1,
+--					output => open
+--								--	aluResult
+--				);
 	
+		aluResult <= addMwordBasic(stageDataIn.data(0).argValues.arg0, stageDataIn.data(0).argValues.arg1);
 	aluOut <= setExecState(stageDataIn.data(0), aluResult, '0', (others => '0'));
 end BasicAgu;
 

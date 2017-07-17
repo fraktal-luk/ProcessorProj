@@ -225,20 +225,24 @@ begin
 			newDecodedWithTargets.data(i) <= -- TODO: remove usage of Exec package
 				work.ProcLogicExec.setResult(setInstructionTarget(newDecoded.data(i), targets(i)), links(i));
 					
-			NEW_TARGET_ADDER: entity work.IntegerAdder
-			port map(
-				inA => newDecoded.data(i).basicInfo.ip,
-				inB => newDecoded.data(i).constantArgs.imm,
-				output => targets(i)
-			);
+--			NEW_TARGET_ADDER: entity work.IntegerAdder
+--			port map(
+--				inA => newDecoded.data(i).basicInfo.ip,
+--				inB => newDecoded.data(i).constantArgs.imm,
+--				output => open--targets(i)
+--			);
 			
-			NEW_LINK_ADDER: entity work.IntegerAdder
-			port map(
-				inA => newDecoded.data(i).basicInfo.ip,
-				inB => getAddressIncrement(newDecoded.data(i)),
-				output => links(i)
-			);			
+				targets(i) <= --addMwordBasic(newDecoded.data(i).basicInfo.ip, newDecoded.data(i).constantArgs.imm);
+							addMwordFaster(newDecoded.data(i).basicInfo.ip, newDecoded.data(i).constantArgs.imm);
+--			NEW_LINK_ADDER: entity work.IntegerAdder
+--			port map(
+--				inA => newDecoded.data(i).basicInfo.ip,
+--				inB => getAddressIncrement(newDecoded.data(i)),
+--				output => open--links(i)
+--			);			
+				links(i) <= addMwordBasic(newDecoded.data(i).basicInfo.ip, getAddressIncrement(newDecoded.data(i)));			
 		end generate;
+		
 		
 		stageDataDecodeNew <= newDecodedWithTargets when EARLY_TARGET_ENABLE
 								else newDecoded;	

@@ -87,7 +87,7 @@ architecture Behavioral5 of NewCore0 is
 		signal sendingQueueE: std_logic := '0';
 
 			signal sendingFromBQ: std_logic := '0';
-			signal dataOutBQ: InstructionState := DEFAULT_INSTRUCTION_STATE;
+			signal dataOutBQ: InstructionState := DEFAULT_INSTRUCTION_STATE; -- DEPREC
 			signal dataOutBQV: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
 
 	-- back end interfaces
@@ -190,7 +190,7 @@ begin
 		---
 		sendingFromBQ => sendingFromBQ,
 			dataFromBQV => dataOutBQV,
-		dataFromBQ => dataOutBQ,
+		--dataFromBQ => dataOutBQ,
 
 				sendingFromSB => '0',
 				dataFromSB => dataFromSB,
@@ -434,7 +434,7 @@ begin
 		acceptingNewBQ => acceptingNewBQ,
 		sendingOutBQ => sendingFromBQ,
 			dataOutBQV => dataOutBQV,
-		dataOutBQ => dataOutBQ,
+		--dataOutBQ => dataOutBQ,
 		prevSendingToBQ => renamedSending,
 		dataNewToBQ => compactedToBQ,
 			
@@ -508,7 +508,7 @@ begin
 					sbSendingOut => sbSending,
 					dataFromSB => dataFromSB,
 				
-				dataBQV => dataOutBQV,
+			--	dataBQV => dataOutBQV,
 					
 				lateEventSignal => lateEventSignal,	
 			execOrIntEventSignalIn => execOrIntEventSignal,
@@ -582,6 +582,12 @@ begin
 			LAST_COMMITTED_SYNCHRONOUS: process(clk) 	
 			begin
 				if rising_edge(clk) then
+					-- CAREFUL! When writing the same virtual reg multiple times, to get a vector to put on FreeList,
+					-- 			we either A) bypass phys dests to next instructions instead of reading stable map, 
+					--				or B) don't bypass but select to put the phys dests for all but the last writing op,
+					--				and that last one returns the stable map entry.
+					--				Option A means that below we substitute relevant phys names, and B means that
+					--				we don't, and handle overridden dests by seleciton bits in RegisterFreeList.
 					physStableDelayed <= work.ProcLogicRenaming.getStableDestsParallel(dataOutROB, physStable);					
 				end if;
 			end process;

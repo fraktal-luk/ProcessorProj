@@ -153,6 +153,9 @@ return InstructionSlotArray;
 
 
 function combineMulti(vec0, vec1: StageDataMulti) return StageDataMulti;
+
+function findWhichTakeReg(sd: StageDataMulti) return std_logic_vector;
+function findWhichPutReg(sd: StageDataMulti) return std_logic_vector;
 	
 end GeneralPipeDev;
 
@@ -510,10 +513,12 @@ end function;
 
 function findOverriddenDests(insVec: StageDataMulti) return std_logic_vector is
 	variable res: std_logic_vector(insVec.fullMask'range) := (others=>'0');
+	variable em: std_logic_vector(insVec.fullMask'range) := (others => '0');
 begin
+	em := getExceptionMask(insVec);
 	for i in insVec.fullMask'range loop
 		for j in insVec.fullMask'range loop
-			if 		j > i and insVec.fullMask(j) = '1'
+			if 		j > i and insVec.fullMask(j) = '1' and em(j) = '0' -- CAREFUL: if exception, doesn't write
 				and insVec.data(i).virtualDestArgs.d0 = insVec.data(j).virtualDestArgs.d0 then
 				res(i) := '1';
 			end if;
@@ -527,7 +532,7 @@ function getPhysicalDestMask(insVec: StageDataMulti) return std_logic_vector is
 	variable res: std_logic_vector(insVec.fullMask'range) := (others=>'0');
 begin
 	for i in insVec.fullMask'range loop
-		res(i) := insVec.fullMask(i) 
+		res(i) := '1'--insVec.fullMask(i) 
 				and insVec.data(i).physicalDestArgs.sel(0);
 	end loop;			
 	return res;
@@ -537,7 +542,7 @@ function getExceptionMask(insVec: StageDataMulti) return std_logic_vector is
 	variable res: std_logic_vector(insVec.fullMask'range) := (others=>'0');
 begin
 	for i in insVec.fullMask'range loop
-		res(i) := insVec.fullMask(i) 
+		res(i) := '1'--insVec.fullMask(i) 
 				and insVec.data(i).controlInfo.--newException;
 														 hasException;
 	end loop;			
@@ -989,6 +994,30 @@ begin
 			j := j + 1;
 		end if;
 		
+	end loop;
+	
+	return res;
+end function;
+
+
+
+function findWhichTakeReg(sd: StageDataMulti) return std_logic_vector is
+	variable res: std_logic_vector(0 to PIPE_WIDTH-1) := (others => '0');
+begin
+	for i in 0 to PIPE_WIDTH-1 loop
+		res(i) := sd.fullMask(i); -- CAREFUL, TEMP: every in the group (can be previosuly separated for rename, etc)
+	end loop;
+	
+	return res;
+end function;
+
+
+function findWhichPutReg(sd: StageDataMulti) return std_logic_vector is
+	variable res: std_logic_vector(0 to PIPE_WIDTH-1) := (others => '0');
+begin
+	for i in 0 to PIPE_WIDTH-1 loop
+		res(i) :=	 sd.fullMask(i) 
+					or  (sd.data(i).controlInfo.squashed and FREE_LIST_COARSE_REWIND); -- CAREFUL: for whole group
 	end loop;
 	
 	return res;

@@ -98,7 +98,7 @@ entity UnitMemory is
 				sbSendingOut: out std_logic;
 				dataFromSB: out InstructionState;
 			
-			dataBQV: in StageDataMulti;
+		--	dataBQV: in StageDataMulti;
 			
 		lateEventSignal: in std_logic;	
 		execOrIntEventSignalIn: in std_logic;
@@ -320,9 +320,9 @@ begin
 			);
 
 				-- NOTE: all ops committed in 1 cycle are from the same group, so they'll always fit into one
-				combinedQueueData <= combineMulti(dataOutSQV, dataBQV);
+				combinedQueueData <= --combineMulti(dataOutSQV, dataBQV);
 											--combineMulti(dataOutSQV, DEFAULT_STAGE_DATA_MULTI);
-											--dataOutSQV;
+											dataOutSQV;
 
 					STORE_BUFFER: entity work.TestCQPart0(WriteBuffer)
 					generic map(

@@ -68,7 +68,7 @@ entity UnitExec is
 			acceptingNewBQ: out std_logic;
 			sendingOutBQ: out std_logic;
 				dataOutBQV: out StageDataMulti;
-			dataOutBQ: out InstructionState;
+			--dataOutBQ: out InstructionState;
 			prevSendingToBQ: in std_logic;
 			dataNewToBQ: in StageDataMulti;
 			
@@ -260,7 +260,7 @@ begin
 				
 				sendingSQOut => sendingOutBQ, -- OUTPUT
 					dataOutV => dataOutBQV,
-				dataOutSQ => dataOutBQ -- OUTPUT
+				dataOutSQ => open--dataOutBQ
 			);
 			
 			SYS_REG_FF: process(clk)

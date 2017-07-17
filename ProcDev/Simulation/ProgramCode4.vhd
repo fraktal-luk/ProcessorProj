@@ -41,7 +41,7 @@ package ProgramCode4 is
 			1 => insNOP, --ins655H(subI, r30, r0, 1),
 			2 => insNOP,
 					--ins655655(ext2, 0, 0, halt, 0, 0),
-			3 => insNOP,
+			3 => insNOP,			
 			
 			4 => ins65J(jl, r31, 4*(320-4)), -- Test result forwarding src1
 			5 => ins65J(jl, r31, 4*(350-5)), -- Test result forwarding src0
@@ -65,9 +65,14 @@ package ProgramCode4 is
 			27 => ins655655(ext0, r25, r25, subR, r26, 0),
 			28 => ins65J(jnz, r25, 4*(1023 - 28)), -- if not, jump to illegal addr
 			29 => insNOP,
+					--ins655655(ext0, r0, r26, shlC, 5, 5), -- Shifts
 			30 => insNOP,
+					--ins655655(ext0, r0, r26, shraC, 5, 5),
 			31 => insNOP,
-			32 => insNOP,			
+					--ins655655(ext0, r27, r26, shlC, 23, 5),
+			32 => insNOP,
+					--ins655655(ext0, r0, r27, shraC, 31, 5),
+			
 			33 => ins65J(jz, r0, 4* (-30)), -- jump to 3(@12)
 			
 			-- On expception

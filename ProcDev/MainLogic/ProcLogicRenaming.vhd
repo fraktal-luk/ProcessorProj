@@ -69,7 +69,7 @@ function getSysRegWriteSel(sd: StageDataMulti) return slv5;
 -- CAREFUL: this seems not used and would choose the last value in group
 function getSysRegWriteValue(sd: StageDataMulti) return Mword;
 
-
+-- FUNCTION BODY
 function TMP_handleSpecial(sd: StageDataMulti) return StageDataMulti is
 	variable res: StageDataMulti := sd;
 	variable found: boolean := false;
@@ -80,13 +80,19 @@ begin
 			res.fullMask(i) := '0';
 		end if;
 
-		if res.data(i).controlInfo.specialAction = '1' then
+		if 	res.data(i).controlInfo.specialAction = '1'
+			or res.data(i).controlInfo.hasException = '1' -- CAREFUL
+			--	TODO: include here also early branches? 
+		then
 			found := true;
 		end if;
 	end loop;
 	
 	return res;
 end function;
+
+
+function initList return PhysNameArray;
 
 end ProcLogicRenaming;
 
@@ -99,7 +105,9 @@ function getRegMapRequest(sd: StageDataMulti; newPhys: PhysNameArray) return Reg
 begin
 	-- Choose ops that have real virtual destination.
 	-- Unselect mappings not written because of WAW dependency.
-	res.sel := getDestMask(sd) and not findOverriddenDests(sd);
+	res.sel := getDestMask(sd) and sd.fullMask 		-- have to be full!
+					and not getExceptionMask(sd)			-- if exception, doesn't write
+					and not findOverriddenDests(sd);
 	for i in 0 to PIPE_WIDTH-1 loop
 		res.index(i) := sd.data(i).virtualDestArgs.d0;
 		res.value(i) := newPhys(i);
@@ -297,10 +305,13 @@ begin
 end function;
 
 
-
+-- CAREFUL: if use bypassing (>> usage in top module), don't exclude overridden dests 
+--				from selection in RegisterFreeList!
 function getStableDestsParallel(insVec: StageDataMulti; pdVec: PhysNameArray) return PhysNameArray is
 	variable res: PhysNameArray(0 to PIPE_WIDTH-1) := pdVec(0 to PIPE_WIDTH-1);
 begin
+		return res; -- no bypassing
+		
 	for i in insVec.fullMask'range loop
 		for j in insVec.fullMask'range loop	
 			-- Is s0 equal to prev instruction's dest?				
@@ -392,4 +403,13 @@ end function;
 		return res;
 	end function;
 
+function initList return PhysNameArray is
+	variable res: PhysNameArray(0 to FREE_LIST_SIZE-1) := (others => (others=> '0'));
+begin
+	for i in 0 to N_PHYS - 32 - 1 loop
+		res(i) := i2slv(32 + i, PhysName'length);
+	end loop;
+	return res;
+end function;
+			
 end ProcLogicRenaming;

@@ -17,6 +17,7 @@ package NewPipelineData is
 
 	constant BASIC_CHECKS: boolean := true;
 	constant LOG_PIPELINE: boolean := false;
+		constant LOG_FREE_LIST: boolean := false;
 
 	-- Configuration defs 
 	constant MW: natural := 4; -- Max pipe width  
@@ -78,11 +79,11 @@ package NewPipelineData is
 	
 		-- If true, physical registers are allocated even for empty slots in instruction group
 		--		and later freed from them.
-		constant ALLOC_REGS_ALWAYS: boolean := false;
+		--constant ALLOC_REGS_ALWAYS: boolean := false;
 
 		constant INITIAL_GROUP_TAG: SmallNumber := (others => '0');
 															-- i2slv(-PIPE_WIDTH, SMALL_NUMBER_SIZE)
-		constant USE_GPR_TAG: boolean := true;
+		--constant USE_GPR_TAG: boolean := true;
 
 		
 		-- Allows to raise 'lockSend' for instruction before Exec when source which was 'readyNext'
@@ -98,12 +99,13 @@ package NewPipelineData is
 	------
 
 	-- TODO: move config info to general config file included in higher level definition files
-	constant N_PHYSICAL_REGS: natural := 64;
+	constant N_PHYSICAL_REGS: natural := 64;  -- CAREFUL: not more than 2**PHYS_NAME_SIZE!
 	constant N_PHYS: natural := N_PHYSICAL_REGS;
 	
-	constant FREE_LIST_SIZE: natural := 64; -- ??
+	constant FREE_LIST_SIZE: natural := N_PHYS; -- CAREFUL: must be enough for N_PHYS-32
+		constant FREE_LIST_COARSE_REWIND: std_logic := '0';
 	
-	constant PHYS_NAME_SIZE: integer := 6;
+	constant PHYS_NAME_SIZE: integer := 6; -- CAREFUL: 2**PHYS_NAME_SIZE must be not less than n_PHYS!
 	subtype PhysName is std_logic_vector(PHYS_NAME_SIZE-1 downto 0);
 	type PhysNameArray is array(natural range <>) of PhysName;
 
@@ -154,6 +156,7 @@ type InstructionBasicInfo is record
 end record;
 
 type InstructionControlInfo is record
+		squashed: std_logic;
 	completed: std_logic;
 		completed2: std_logic;
 	-- Momentary data:
@@ -535,6 +538,7 @@ end function;
 function defaultControlInfo return InstructionControlInfo is
 begin
 	return InstructionControlInfo'(
+													squashed => '0',
 												completed => '0',
 													completed2 => '0',
 												newEvent => '0',
@@ -593,12 +597,15 @@ end function;
 
 function defaultPhysicalArgs return InstructionPhysicalArgs is
 begin
-	return InstructionPhysicalArgs'("000", "000000", "000000", "000000");
+	return InstructionPhysicalArgs'("000", --others => (others => '0'));--
+														--"000000", "000000", "000000");
+														(others => '0'), (others => '0'), (others => '0'));
 end function;
 
 function defaultPhysicalDestArgs return InstructionPhysicalDestArgs is
 begin
-	return InstructionPhysicalDestArgs'("0", "000000");
+	return InstructionPhysicalDestArgs'("0", (others => '0'));
+															--"000000");
 end function;
 
 function defaultArgValues return InstructionArgValues is

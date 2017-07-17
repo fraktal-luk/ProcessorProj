@@ -59,6 +59,25 @@ procedure checkIQ(bufferData: InstructionStateArray; fullMask: std_logic_vector;
 						insSending: InstructionState; sending: std_logic;
 						bufferDrive: FlowDriveBuffer; bufferResponse: FlowResponseBuffer);
 
+
+
+procedure checkFreeList(indTake, indPutA, nTaken, nPut: in integer);
+
+-- pragma synthesis off
+procedure logFreeListImpl(indTake, indPut, nTaken, nPut: in integer;
+							 content: in PhysNameArray; freeListTakeSel: in std_logic_vector;
+							 putTags: in PhysNameArray; freeListPutSel: in std_logic_vector;
+							 takeAllow: in std_logic; putAllow: in std_logic;
+							 freeListRewind: in std_logic; freeListWriteTag: in SmallNumber;
+							 filename: in string; desc: in string);
+-- pragma synthesis on
+
+procedure logFreeList(indTake, indPut, nTaken, nPut: in integer;
+							 signal content: in PhysNameArray; freeListTakeSel: in std_logic_vector;
+							 putTags: in PhysNameArray; freeListPutSel: in std_logic_vector;
+							 takeAllow: in std_logic; putAllow: in std_logic;
+							 freeListRewind: in std_logic; freeListWriteTag: in SmallNumber);
+
 end BasicCheck;
 
 
@@ -320,6 +339,102 @@ begin
 	end loop;
 	
 	-- pragma synthesis on	
+end procedure;
+
+
+procedure checkFreeList(indTake, indPutA, nTaken, nPut: in integer) is
+	variable indPut: integer := indPutA;
+	variable diff: integer := 0;
+begin
+	-- pragma synthesis off
+	if indTake > indPut then
+		indPut := indPut + FREE_LIST_SIZE;
+	end if;
+	diff := indPut - indTake;
+	-- NOTE: Below alert doesn't mean that wrong operation happened, but if 'take' of sufficient width
+	-- happens before 'put', it will read wrong data. It could be prevented when we lock Rename in such cases.
+	assert diff >= PIPE_WIDTH report "Too few free registers on list" severity error;
+	
+	-- Now what will be the new state:
+	diff := diff + nPut - nTaken;
+	-- NOTE: like the previous alert, this is a careful reaction, not that something bad already has taken place. 
+	assert diff >= PIPE_WIDTH report "Free list becoming drained!" severity error;
+	
+	-- TODO: check if no 0 values are read or written (if implementation prevents physical reg 0 from alloction)
+	
+	-- pragma synthesis on
+end procedure;
+
+
+-- pragma synthesis off
+procedure logFreeListImpl(indTake, indPut, nTaken, nPut: in integer;
+							 content: in PhysNameArray; freeListTakeSel: in std_logic_vector;
+							 putTags: in PhysNameArray; freeListPutSel: in std_logic_vector;
+							 takeAllow: in std_logic; putAllow: in std_logic;
+							 freeListRewind: in std_logic; freeListWriteTag: in SmallNumber;
+							 filename: in string; desc: in string) is
+	use std.textio.all;
+
+	file outFile: text open append_mode is filename;
+	variable fline: line;
+begin	
+	write(fline, time'image(now) & ", " & desc);
+	writeline(outFile, fline);
+	
+	if freeListRewind = '1' then
+		write(fline, "Rewinding to: " & integer'image(slv2u(freeListWriteTag)));
+		writeline(outFile, fline);
+	end if;
+	
+	-- What's being taken from list:
+	if takeAllow = '1' then
+		write(fline, "Taking  at " & integer'image(indTake) & ":    ");
+		for i in 0 to freeListTakeSel'length-1 loop
+			if freeListTakeSel(i) = '1' then
+				write(fline, integer'image(slv2u(content((indTake + i) mod FREE_LIST_SIZE))) & ","); 
+			else
+				write(fline, "_" & ",");
+			end if;	
+		end loop;
+		writeline(outFile, fline);
+	end if;
+
+	-- What's being put to list:
+	if putAllow = '1' then
+		write(fline, "Putting at " & integer'image(indPut) & ":    " & "          ");
+		for i in 0 to freeListPutSel'length-1 loop
+			if freeListPutSel(i) = '1' then
+				write(fline, integer'image(slv2u(putTags(i))) & ","); 
+			else
+				write(fline, "_" & ",");
+			end if;	
+		end loop;
+		writeline(outFile, fline);
+	end if;	
+		
+end procedure;
+-- pragma synthesis on
+
+
+procedure logFreeList(indTake, indPut, nTaken, nPut: in integer;
+							 signal content: in PhysNameArray; freeListTakeSel: in std_logic_vector;
+							 putTags: in PhysNameArray; freeListPutSel: in std_logic_vector;
+							 takeAllow: in std_logic; putAllow: in std_logic;
+							 freeListRewind: in std_logic; freeListWriteTag: in SmallNumber) is
+begin
+	-- pragma synthesis off
+	if not LOG_FREE_LIST then
+		return;
+	end if;
+					  logFreeListImpl(indTake, indPut, nTaken, nPut,
+											content, freeListTakeSel,
+											putTags, freeListPutSel,
+											takeAllow, putAllow,
+											freeListRewind, freeListWriteTag,
+											makeLogPath(content'path_name),
+											"");	
+	
+	--	pragma synthesis on
 end procedure;
 
 

@@ -80,6 +80,7 @@ architecture Behavioral of ReadyRegTableV is
 begin		
 		readyTableSetAllow <= sendingToWrite;  -- for ready table	
 		readyTableSetSel <= getPhysicalDestMask(stageDataToWrite) 
+						and		stageDataToWrite.fullMask
 						and not getExceptionMask(stageDataToWrite);
 		readyTableSetPhysicalTags <= getPhysicalDests(stageDataToWrite); -- for ready table
 		readyTableSetVirtualTags <= getVirtualDests(stageDataToWrite); -- for ready table

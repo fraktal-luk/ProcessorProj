@@ -251,7 +251,10 @@ begin
 						TMP_elem := false;
 						for k in 0 to PIPE_WIDTH-1 loop
 							if TMP_elem then
-								res.data(j).fullMask(k) := '0';							
+								if res.data(j).fullMask(k) = '1' then -- CAREFUL: squashed set only for existing ops
+									res.data(j).data(k).controlInfo.squashed := '1';
+								end if;
+								res.data(j).fullMask(k) := '0';								
 							end if;	
 
 							TMP_s0 := i2slv(k, SMALL_NUMBER_SIZE);
@@ -296,7 +299,10 @@ begin
 						TMP_elem := false;
 						for k in 0 to PIPE_WIDTH-1 loop
 							if TMP_elem then
-								res.data(j).fullMask(k) := '0';							
+								if res.data(j).fullMask(k) = '1' then -- CAREFUL: squashed set only for existing ops
+									res.data(j).data(k).controlInfo.squashed := '1';
+								end if;							
+								res.data(j).fullMask(k) := '0';	
 							end if;
 							
 							TMP_s0 := i2slv(k, SMALL_NUMBER_SIZE);

@@ -94,7 +94,7 @@ entity UnitSequencer is
 		
 			sendingFromBQ: in std_logic;
 				dataFromBQV: in StageDataMulti;
-			dataFromBQ: in InstructionState;
+			--dataFromBQ: in InstructionState;
 		
 				sendingFromSB: in std_logic;
 				dataFromSB: in InstructionState;
@@ -193,13 +193,15 @@ begin
 
 	pcBase <= stageDataOutPC.basicInfo.ip and i2slv(-PIPE_WIDTH*4, MWORD_SIZE); -- Clearing low bits
 
-	SEQ_ADDER: entity work.IntegerAdder
-	port map(
-		inA => pcBase,
-		inB => PC_INC,
-		output => pcNext
-	);
-
+--	SEQ_ADDER: entity work.IntegerAdder
+--	port map(
+--		inA => pcBase,
+--		inB => PC_INC,
+--		output => open--pcNext
+--	);
+		
+			pcNext <= addMwordBasic(pcBase, PC_INC);
+		
 		TMP_phase0 <= eiEvents.causing.controlInfo.phase0;
 		TMP_phase2 <= eiEvents.causing.controlInfo.phase2;
 
@@ -366,14 +368,24 @@ begin
 		-- INPUT: newPhysSources, newPhysDests
 		signal stageDataRenameIn: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;		
 		signal reserveSelSig, takeVec: std_logic_vector(0 to PIPE_WIDTH-1) := (others => '0' );
-	begin	
-		reserveSelSig <= getDestMask(frontDataLastLiving);
-		takeVec <= (others => '1') when ALLOC_REGS_ALWAYS
-				else frontDataLastLiving.fullMask;		
+		signal nToTake: integer := 0;
+	begin
+		-- CAREFUL, TODO: selection of changes in rename table and free list movement.
+		--						Taking from list is performed in RegisterFreeList, must have the same mask!
+		reserveSelSig <= getDestMask(frontDataLastLiving); 
+		takeVec <= --frontDataLastLiving.fullMask;		
+															-- REG ALLOC 
+						findWhichTakeReg(frontDataLastLiving);
+
+			nToTake <= countOnes(takeVec);
 
 		GEN_TAGS: for i in 0 to PIPE_WIDTH-1 generate	
-			newNumberTags(i) <= i2slv(binFlowNum(renameCtr) + i + 1, SMALL_NUMBER_SIZE);											
-			newGprTags(i) <= i2slv((slv2u(newPhysDestPointer) + i) mod FREE_LIST_SIZE, SMALL_NUMBER_SIZE);
+			-- CAREFUL, TODO: here GPR tags are selected
+			newNumberTags(i) <= i2slv(binFlowNum(renameCtr) + i + 1, SMALL_NUMBER_SIZE);										
+			newGprTags(i) <= 
+									i2slv((slv2u(newPhysDestPointer) + nToTake) mod FREE_LIST_SIZE, SMALL_NUMBER_SIZE)
+										when FREE_LIST_COARSE_REWIND = '1'
+							else	i2slv((slv2u(newPhysDestPointer) + i + 1) mod FREE_LIST_SIZE, SMALL_NUMBER_SIZE);
 		end generate;
 	
 		stageDataRenameIn <= 
