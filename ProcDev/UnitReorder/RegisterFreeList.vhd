@@ -117,14 +117,10 @@ begin
 		freeListTakeAllow <= takeAllow; -- CMP: => ... or auxTakeAllow;
 							-- or auxTakeAllow; -- CAREFUL: for additional step in rewinding for complex implems
 		
-		freeListTakeSel <= --stageDataToReserve.fullMask;
-														-- CAREFUL: must agree with Sequencer signals	
-								findWhichTakeReg(stageDataToReserve);
+		freeListTakeSel <= findWhichTakeReg(stageDataToReserve); -- CAREFUL: must agree with Sequencer signals
 		freeListPutAllow <= sendingToRelease;
 		-- Releasing a register every time (but not always prev stable!)
-		freeListPutSel <= --stageDataToRelease.fullMask;
-														-- CAREFUL: this chooses which ops put anything at all
-								findWhichPutReg(stageDataToRelease);
+		freeListPutSel <= findWhichPutReg(stageDataToRelease);-- CAREFUL: this chooses which ops put anyth. at all
 		freeListRewind <= rewind;
 		
 		
@@ -136,21 +132,16 @@ begin
 			signal listPtrPut: SmallNumber := i2slv(N_PHYS - 32, SMALL_NUMBER_SIZE);
 		begin
 			
-			-- 
-			--READ_TAGS: for i in 0 to WIDTH-1 generate
-				freeListTakeNumTags(0) -- CMP: index changed below (... + i + 1) => (... + i)
-					<= i2slv((slv2u(listPtrTake) + 0) mod FREE_LIST_SIZE, freeListTakeNumTags(0)'length);
-			--end generate;
+			freeListTakeNumTags(0) <= i2slv((slv2u(listPtrTake)) mod FREE_LIST_SIZE, SMALL_NUMBER_SIZE);
 
-				READ_DESTS: for i in 0 to WIDTH-1 generate
-					newPhysDestsAsync(i) <= listContent((slv2u(listPtrTake) + i) mod FREE_LIST_SIZE);
-				end generate;
-			
+			READ_DESTS: for i in 0 to WIDTH-1 generate
+				newPhysDestsAsync(i) <= listContent((slv2u(listPtrTake) + i) mod FREE_LIST_SIZE);
+			end generate;
+
+
 			SYNCHRONOUS: process(clk)
 				variable indPut, indTake: integer := 0;
 				variable nTaken, nPut: integer := 0;
-				
-
 			begin
 				if rising_edge(clk) then
 						indTake := slv2u(listPtrTake); 
@@ -170,11 +161,7 @@ begin
 						-- pragma synthesis on
 							
 						if freeListRewind = '1' then
-							listPtrTake <= freeListWriteTag; -- Indexing TMP							
---								report "Causing: " & integer'image(slv2u(causingInstruction.numberTag))
---												& "/" & integer'image(slv2u(causingInstruction.gprTag))
---												& "/" & integer'image(slv2u(causingInstruction.groupTag));
---												--& "/" & integer'image(slv2u(causingInstruction.numberTag))
+							listPtrTake <= freeListWriteTag; -- Indexing TMP
 						end if;
 						
 						if freeListTakeAllow = '1' and freeListRewind = '0' then
@@ -191,15 +178,7 @@ begin
 								if freeListPutSel(i) = '1' then
 									listContent(indPut) <= physCommitFreedDelayed(i);
 									indPut := (indPut + 1) mod FREE_LIST_SIZE;
-								end if;
-								
---								if slv2u(physCommitFreedDelayed(i)) = 33 then									
---									report "Putting: " & integer'image(slv2u(stageDataToRelease.data(i).numberTag))
---													& "/" & integer'image(slv2u(stageDataToRelease.data(i).gprTag))
---													& "/" & integer'image(slv2u(stageDataToRelease.data(i).groupTag))
---													& "@" & integer'image(slv2u(stageDataToRelease.data(i).basicInfo.ip));										
---								end if;
-								
+								end if;	
 							end loop;
 							listPtrPut <= i2slv(indPut, listPtrPut'length);	
 						end if;						

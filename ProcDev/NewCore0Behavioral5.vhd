@@ -8,14 +8,13 @@ architecture Behavioral5 of NewCore0 is
 	signal pcDataSig: InstructionState := DEFAULT_INSTRUCTION_STATE;
 	signal pcSendingSig: std_logic := '0';
 
+	signal acceptingOutFront: std_logic := '0';
+	signal stage0Events: StageMultiEventInfo;
+	
 	signal frontDataLastLiving: StageDataMulti;
 	signal frontLastSending, renameAccepting: std_logic := '0';
 
-	signal acceptingOutFront: std_logic := '0';
-	signal stage0Events: StageMultiEventInfo;
-		
-	-- for Front
-	signal killVec: std_logic_vector(0 to N_EVENT_AREAS-1) := (others => '0');	
+	signal killVec: std_logic_vector(0 to N_EVENT_AREAS-1) := (others => '0');	-- for Front
 
 	signal renamedDataLiving, stageDataCommittedOut: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;				
 	signal renamedSending, iqAccepts: std_logic := '0';			
@@ -87,7 +86,6 @@ architecture Behavioral5 of NewCore0 is
 		signal sendingQueueE: std_logic := '0';
 
 			signal sendingFromBQ: std_logic := '0';
-			signal dataOutBQ: InstructionState := DEFAULT_INSTRUCTION_STATE; -- DEPREC
 			signal dataOutBQV: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
 
 	-- back end interfaces
@@ -117,10 +115,7 @@ architecture Behavioral5 of NewCore0 is
 	signal readyRegFlags, readyRegFlagsV: std_logic_vector(0 to 3*PIPE_WIDTH-1) := (others => '0');
 			
 		signal readyRegFlags_2: std_logic_vector(0 to 3*PIPE_WIDTH-1) := (others => '0');
-		signal readyRegFlagsNext, readyRegFlagsNextV: std_logic_vector(0 to 3*PIPE_WIDTH-1) := (others => '0');					
-						
-		signal sysRegData: InstructionState := DEFAULT_INSTRUCTION_STATE;
-		signal sysRegSending: std_logic := '0';
+		signal readyRegFlagsNext, readyRegFlagsNextV: std_logic_vector(0 to 3*PIPE_WIDTH-1) := (others => '0');
 						
 	signal outputA, outputB, outputC, outputD, outputE: InstructionSlot := DEFAULT_INSTRUCTION_SLOT;
 	signal outputOpPreB, outputOpPreC: InstructionState := DEFAULT_INSTRUCTION_STATE;
@@ -190,7 +185,6 @@ begin
 		---
 		sendingFromBQ => sendingFromBQ,
 			dataFromBQV => dataOutBQV,
-		--dataFromBQ => dataOutBQ,
 
 				sendingFromSB => '0',
 				dataFromSB => dataFromSB,
@@ -420,21 +414,12 @@ begin
 		outputD => outputD,
 			
 		outputOpPreB => outputOpPreB,
-			
-		--sysRegSelect => open,--sysRegReadSel,
-		--sysRegIn => sysRegReadValue,
-		--sysRegWriteSelOut => sysRegWriteSel,
-		--sysRegWriteValueOut => sysRegWriteValue,
 
-		--sysRegDataOut => sysRegData,
-		--sysRegSending => sysRegSending,
-		
 		whichAcceptedCQ => whichAcceptedCQ,
 		
 		acceptingNewBQ => acceptingNewBQ,
 		sendingOutBQ => sendingFromBQ,
 			dataOutBQV => dataOutBQV,
-		--dataOutBQ => dataOutBQ,
 		prevSendingToBQ => renamedSending,
 		dataNewToBQ => compactedToBQ,
 			
@@ -495,9 +480,6 @@ begin
 				sysStoreAddress => sysStoreAddress,
 				sysStoreValue => sysStoreValue,
 
-			--sysRegDataIn => sysRegData,
-			--sysRegSendingIn => sysRegSending,
-
 			committing => committingSig,
 			groupCtrNext => commitGroupCtrNextSig,
 			
@@ -507,9 +489,7 @@ begin
 					sbEmpty => sbEmpty,
 					sbSendingOut => sbSending,
 					dataFromSB => dataFromSB,
-				
-			--	dataBQV => dataOutBQV,
-					
+									
 				lateEventSignal => lateEventSignal,	
 			execOrIntEventSignalIn => execOrIntEventSignal,
 				execCausing => execCausing,

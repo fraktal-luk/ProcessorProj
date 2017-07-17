@@ -57,18 +57,17 @@ entity TestCQPart0 is
 		en: in std_logic;
 
 		whichAcceptedCQ: out std_logic_vector(0 to 3) := (others=>'0');
-		--cqWhichSend: in std_logic_vector(0 to 3);				
-		--inputInstructions: in InstructionStateArray(0 to 3);
-				maskIn: in std_logic_vector(0 to INPUT_WIDTH-1);
-				dataIn: in InstructionStateArray(0 to INPUT_WIDTH-1);
+
+		maskIn: in std_logic_vector(0 to INPUT_WIDTH-1);
+		dataIn: in InstructionStateArray(0 to INPUT_WIDTH-1);
 		
 		anySending: out std_logic;		
 
-			cqMaskOut: out std_logic_vector(0 to OUTPUT_SIZE-1);
-			cqDataOut: out InstructionStateArray(0 to OUTPUT_SIZE-1);
+		cqMaskOut: out std_logic_vector(0 to OUTPUT_SIZE-1);
+		cqDataOut: out InstructionStateArray(0 to OUTPUT_SIZE-1);
 				
-				bufferMaskOut: out std_logic_vector(0 to QUEUE_SIZE-1);
-				bufferDataOut: out InstructionStateArray(0 to QUEUE_SIZE-1);
+		bufferMaskOut: out std_logic_vector(0 to QUEUE_SIZE-1);
+		bufferDataOut: out InstructionStateArray(0 to QUEUE_SIZE-1);
 		
 		execEventSignal: in std_logic;
 		execCausing: in InstructionState -- Redundant cause we have inputs from all Exec ends? 		
@@ -109,10 +108,7 @@ begin
 	CQ_SYNCHRONOUS: process(clk)
 		variable fullMaskShifted: std_logic_vector(0 to PIPE_WIDTH-1) := (others => '0');
 	begin
-		if rising_edge(clk) then
-			--if resetSig = '1' then
-				
-			--elsif enSig = '1' then	
+		if rising_edge(clk) then	
 				stageDataCQ <= stageDataCQNext;
 				
 				logBuffer(stageDataCQ.data, stageDataCQ.fullMask, livingMaskCQ,
@@ -124,7 +120,6 @@ begin
 									flowDriveCQ, flowResponseCQ);	
 					assert isNonzero(compareMaskCQ) = '0' report "Overwriting in CQ!";
 				end if;
-			--end if;
 		end if;
 	end process;
 	
@@ -227,13 +222,9 @@ architecture WriteBuffer of TestCQPart0 is
 								InstructionStateArray(0 to QUEUE_SIZE-1) := (others => defaultInstructionState);
 	signal stageFullMask, stageFullMaskNext: std_logic_vector(0 to QUEUE_SIZE-1) := (others => '0');
 
-	--signal livingMaskRaw, livingMaskCQ: std_logic_vector(0 to QUEUE_SIZE-1) := (others=>'0');
 	signal isSending: std_logic := '0';
 	
 		constant zeroMaskCQ: std_logic_vector(0 to QUEUE_SIZE-1) := (others=>'0');
-		--constant zeroInputMask: std_logic_vector(0 to 3) := (others=>'0');
-		--signal compareMaskCQ: std_logic_vector(0 to QUEUE_SIZE-1) := (others=>'0');
-	
 	signal stageDataCQ, stageDataCQLiving, stageDataCQNext,
 									stageDataCQNextCheckOld, stageDataCQNextCheckNew
 							: StageDataCommitQueue 
@@ -250,10 +241,7 @@ begin
 
 	CQ_SYNCHRONOUS: process(clk)
 	begin
-		if rising_edge(clk) then
-			--if resetSig = '1' then
-				
-			--elsif enSig = '1' then	
+		if rising_edge(clk) then	
 				stageData <= stageDataNext;
 				stageFullMask <= stageFullMaskNext;
 				
@@ -262,7 +250,6 @@ begin
 					checkBuffer(stageData, stageFullMask,
 									stageDataNext, stageFullMaskNext,
 									flowDriveCQ, flowResponseCQ);	
-			--end if;
 		end if;
 	end process;
 		
@@ -291,10 +278,7 @@ begin
 		flowDrive => flowDriveCQ,
 		flowResponse => flowResponseCQ
 	);			
-											
-	--livingMaskRaw <= stageFullMask;	
-	--livingMaskCQ <= stageFullMask;	
-	
+
 	isSending <= stageFullMask(0); -- CAREFUL: no 'nextAccepting' - introduce?
 	
 	anySending <= isSending; -- Because CQ(0) must be committing if any other is 

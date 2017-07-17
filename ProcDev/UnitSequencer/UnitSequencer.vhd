@@ -94,7 +94,6 @@ entity UnitSequencer is
 		
 			sendingFromBQ: in std_logic;
 				dataFromBQV: in StageDataMulti;
-			--dataFromBQ: in InstructionState;
 		
 				sendingFromSB: in std_logic;
 				dataFromSB: in InstructionState;
@@ -193,14 +192,7 @@ begin
 
 	pcBase <= stageDataOutPC.basicInfo.ip and i2slv(-PIPE_WIDTH*4, MWORD_SIZE); -- Clearing low bits
 
---	SEQ_ADDER: entity work.IntegerAdder
---	port map(
---		inA => pcBase,
---		inB => PC_INC,
---		output => open--pcNext
---	);
-		
-			pcNext <= addMwordBasic(pcBase, PC_INC);
+		pcNext <= addMwordBasic(pcBase, PC_INC);
 		
 		TMP_phase0 <= eiEvents.causing.controlInfo.phase0;
 		TMP_phase2 <= eiEvents.causing.controlInfo.phase2;
@@ -373,9 +365,7 @@ begin
 		-- CAREFUL, TODO: selection of changes in rename table and free list movement.
 		--						Taking from list is performed in RegisterFreeList, must have the same mask!
 		reserveSelSig <= getDestMask(frontDataLastLiving); 
-		takeVec <= --frontDataLastLiving.fullMask;		
-															-- REG ALLOC 
-						findWhichTakeReg(frontDataLastLiving);
+		takeVec <= findWhichTakeReg(frontDataLastLiving); -- REG ALLOC
 
 			nToTake <= countOnes(takeVec);
 

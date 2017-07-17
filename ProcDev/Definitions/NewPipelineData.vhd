@@ -36,10 +36,6 @@ package NewPipelineData is
 	constant EARLY_TARGET_ENABLE: boolean := true; -- Calc branch targets in front pipe
 	constant BRANCH_AT_DECODE: boolean := false;
 	
-	 -- System reg writing goes through BQ/ through special temp register
-	--constant USE_BQ_FOR_MTC: boolean := true;--false;
-	
-	
 	constant CQ_SINGLE_OUTPUT: boolean := (LOG2_PIPE_WIDTH = 0);
 	constant CQ_THREE_OUTPUTS: boolean := not CQ_SINGLE_OUTPUT;
 	
@@ -77,20 +73,14 @@ package NewPipelineData is
 	
 	constant ROB_SIZE: natural := 8; -- ??
 	
-		-- If true, physical registers are allocated even for empty slots in instruction group
-		--		and later freed from them.
-		--constant ALLOC_REGS_ALWAYS: boolean := false;
-
 		constant INITIAL_GROUP_TAG: SmallNumber := (others => '0');
 															-- i2slv(-PIPE_WIDTH, SMALL_NUMBER_SIZE)
-		--constant USE_GPR_TAG: boolean := true;
-
 		
 		-- Allows to raise 'lockSend' for instruction before Exec when source which was 'readyNext'
 		--	doesn't show in 'ready'	when expected	
 		constant BLOCK_ISSUE_WHEN_MISSING: std_logic := '0';
 		
-	constant N_RES_TAGS: natural := 4-1 + CQ_SIZE; -- + PIPE_WIDTH; -- + 3*PIPE_WIDTH; 
+	constant N_RES_TAGS: natural := 4-1 + CQ_SIZE;
 						-- Above: num subpipe results + CQ slots + max commited slots + pre-IQ red ports
 	constant N_NEXT_RES_TAGS: natural := 2; 
 
@@ -161,13 +151,8 @@ type InstructionControlInfo is record
 		completed2: std_logic;
 	-- Momentary data:
 	newEvent: std_logic; -- True if any new event appears
-	--	newReset: std_logic;
-	--newInterrupt: std_logic;
-	--newException: std_logic;
 	newBranch: std_logic;
-	--newReturn: std_logic; -- going to normal next, as in cancelling a branch
 	-- Persistent data:
-	--hasEvent: std_logic; -- Persistent
 		hasReset: std_logic;
 	hasInterrupt: std_logic;
 	hasException: std_logic;
@@ -188,12 +173,6 @@ type InstructionClassInfo is record
 		branchLink: std_logic;
 		mtc: std_logic;
 		mfc: std_logic;
-	--system: std_logic; -- ??
-	--memory: std_logic; -- ??
-	--fetchLock: std_logic;
-	--undef: std_logic;
-	--illegal: std_logic;
-	--privilege: SmallNumber;
 end record;
 
 type InstructionConstantArgs is record
@@ -542,16 +521,11 @@ begin
 												completed => '0',
 													completed2 => '0',
 												newEvent => '0',
-													--newReset => '0',
-												--hasEvent => '0',
-												--newInterrupt => '0',
 												hasInterrupt => '0',
 													hasReset => '0',
-												--newException => '0',
 												hasException => '0',
 												newBranch => '0',
 												hasBranch => '0',
-												--newReturn => '0',
 												hasReturn => '0',												
 													specialAction => '0',
 													phase0 => '0',
@@ -572,10 +546,6 @@ begin
 												branchLink => '0',
 												mtc => '0',
 												mfc => '0'
-											--system => '0',											
-											--undef => '0', --?
-											--illegal => '0',
-											--privilege => (others=>'1')
 											);	
 end function;
 
@@ -597,15 +567,12 @@ end function;
 
 function defaultPhysicalArgs return InstructionPhysicalArgs is
 begin
-	return InstructionPhysicalArgs'("000", --others => (others => '0'));--
-														--"000000", "000000", "000000");
-														(others => '0'), (others => '0'), (others => '0'));
+	return InstructionPhysicalArgs'("000", (others => '0'), (others => '0'), (others => '0'));
 end function;
 
 function defaultPhysicalDestArgs return InstructionPhysicalDestArgs is
 begin
 	return InstructionPhysicalDestArgs'("0", (others => '0'));
-															--"000000");
 end function;
 
 function defaultArgValues return InstructionArgValues is

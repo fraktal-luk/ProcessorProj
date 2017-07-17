@@ -79,26 +79,21 @@ entity UnitMemory is
 			memStoreAllow: out std_logic;
 			memStoreValue: out Mword;
 			
-				sysStoreAllow: out std_logic;
-				sysStoreAddress: out slv5;
-				sysStoreValue: out Mword;
-			
-					sysLoadAllow: out std_logic;
-					sysLoadVal: in Mword;
-			
-			--sysRegDataIn: in InstructionState; -- DEPREC
-			--sysRegSendingIn: in std_logic; -- DEPREC
+			sysStoreAllow: out std_logic;
+			sysStoreAddress: out slv5;
+			sysStoreValue: out Mword;
+
+			sysLoadAllow: out std_logic;
+			sysLoadVal: in Mword;
 			
 			committing: in std_logic;
 			groupCtrNext: in SmallNumber;
 			groupCtrInc: in SmallNumber;
 			
 			sbAccepting: out std_logic;
-				sbEmpty: out std_logic;
-				sbSendingOut: out std_logic;
-				dataFromSB: out InstructionState;
-			
-		--	dataBQV: in StageDataMulti;
+			sbEmpty: out std_logic;
+			sbSendingOut: out std_logic;
+			dataFromSB: out InstructionState;
 			
 		lateEventSignal: in std_logic;	
 		execOrIntEventSignalIn: in std_logic;
@@ -111,48 +106,41 @@ end UnitMemory;
 architecture Behavioral of UnitMemory is
 	signal inputDataLoadUnit: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
 	signal eventSignal: std_logic := '0';	
-	signal activeCausing: InstructionState := defaultInstructionState;
+	signal activeCausing: InstructionState := DEFAULT_INSTRUCTION_STATE;
 	
 	signal loadUnitSendingSig: std_logic := '0';
 	
 	signal sendingOutSQ: std_logic  := '0';
 	signal dataOutSQ: InstructionState := DEFAULT_INSTRUCTION_STATE;
-		signal dataOutSQV: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
-	
+	signal dataOutSQV: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
+
+	signal dlqAccepting: std_logic := '1';	
 	signal sendingToDLQ, sendingFromDLQ, loadResultSending, isLoad: std_logic := '0';
 	signal dataToDLQ: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
 	
 	signal stageDataAfterCache, stageDataAfterSysRegs, loadResultData, dataFromDLQ:
-					InstructionState := defaultInstructionState;
+					InstructionState := DEFAULT_INSTRUCTION_STATE;
 	signal sendingMem0, sendingMem1: std_logic := '0';
-
-	signal sendingFromSysReg: std_logic := '0';
-	signal sysRegReadData: InstructionState := defaultInstructionState;
 	
-	signal dlqAccepting: std_logic := '1';
-	
-		signal inputDataC, outputDataC: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
-		signal acceptingLS, acceptingLU: std_logic := '0';
-
 	signal execAcceptingCSig, execAcceptingESig: std_logic := '0';	
+	signal inputDataC: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
 	
+	signal acceptingLS: std_logic := '0';
+	signal sendingFromSysReg: std_logic := '0';	
 	signal addressingData: InstructionState := DEFAULT_INSTRUCTION_STATE;
 	signal sendingAddressingSig: std_logic := '0';	
 	
-		signal sendingToLoadUnitSig, sendingAddressToSQSig,  sendingToMfcSig,
+	signal sendingToLoadUnitSig, sendingAddressToSQSig, sendingToMfcSig,
 				 storeAddressWrSig, storeValueWrSig: std_logic := '0';
-		signal dataToLoadUnitSig, storeAddressDataSig, storeValueDataSig: InstructionState
-					:= DEFAULT_INSTRUCTION_STATE;
-					
+	signal dataToLoadUnitSig, storeAddressDataSig, storeValueDataSig:
+																		InstructionState := DEFAULT_INSTRUCTION_STATE;					
 	signal sbAcceptingV: std_logic_vector(0 to 3) := (others => '0');				
-		signal sbSending: std_logic := '0';
+	signal sbSending: std_logic := '0';
 	
-		signal sbMaskOut: std_logic_vector(0 to 0) := (others => '0');
-		signal sbDataOut: InstructionStateArray(0 to 0) := (others => DEFAULT_INSTRUCTION_STATE);
+	signal sbMaskOut: std_logic_vector(0 to 0) := (others => '0');
+	signal sbDataOut: InstructionStateArray(0 to 0) := (others => DEFAULT_INSTRUCTION_STATE);
 	
-			signal sbFullMask: std_logic_vector(0 to SB_SIZE-1) := (others => '0');
-	
-	signal combinedQueueData: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
+	signal sbFullMask: std_logic_vector(0 to SB_SIZE-1) := (others => '0');	
 ----------------	
 	signal ch0, ch1, ch2, ch3, ch4, ch5, ch6, ch7: std_logic := '0';
 begin
@@ -320,10 +308,6 @@ begin
 			);
 
 				-- NOTE: all ops committed in 1 cycle are from the same group, so they'll always fit into one
-				combinedQueueData <= --combineMulti(dataOutSQV, dataBQV);
-											--combineMulti(dataOutSQV, DEFAULT_STAGE_DATA_MULTI);
-											dataOutSQV;
-
 					STORE_BUFFER: entity work.TestCQPart0(WriteBuffer)
 					generic map(
 						INPUT_WIDTH => PIPE_WIDTH,
@@ -334,8 +318,8 @@ begin
 						clk => clk, reset => reset, en => en,
 						
 						whichAcceptedCQ => sbAcceptingV,
-						maskIn => combinedQueueData.fullMask,
-						dataIn => combinedQueueData.data,
+						maskIn => dataOutSQV.fullMask,
+						dataIn => dataOutSQV.data,
 						
 						bufferMaskOut => sbFullMask,
 						bufferDataOut => open,
@@ -393,10 +377,7 @@ begin
 				end process;
 
 
-			-- Sending to Delayed Load Queue: when load miss or load and sending from sys reg
-			--sendingFromSysReg <= sysRegSendingIn;
-			--sysRegReadData <= sysRegDataIn;
-			
+			-- Sending to Delayed Load Queue: when load miss or load and sending from sys reg			
 			isLoad <= '1' when stageDataAfterCache.operation.func = load else '0';
 			
 			sendingToDLQ <= sendingMem0 and isLoad
@@ -462,13 +443,9 @@ begin
 					sysLoadAllow <= sendingToMfcSig;
 									
 				 sysStoreAllow <= sbSending when sbDataOut(0).operation = (System, sysMTC) 
-															--sbDataOut(0).classInfo.mtc = '1'
-															else '0'; 
-				 sysStoreAddress <= sbDataOut(0).argValues.--arg2(4 downto 0);
-																			arg1(4 downto 0);
-				 sysStoreValue <= sbDataOut(0).argValues.--arg1;
-																		 arg2;
-														-- ^ CAREFUL: address holds data, cause it's queue for addresses
+								 else '0'; 
+				 sysStoreAddress <= sbDataOut(0).argValues.arg1(4 downto 0);
+				 sysStoreValue <= sbDataOut(0).argValues.arg2;
 				 
 		sbAccepting <= sbAcceptingV(0);	
 			sbEmpty <= not sbFullMask(0);

@@ -214,9 +214,7 @@ begin
 		c <= subSN(a, b);
 		before <= c(7);
 		flowDrive.kill <= killByTag(before, execEventSignal,
-										execCausing.controlInfo.--newInterrupt);
-																		hasInterrupt);
-										-- before and execEventSignal; 	
+										execCausing.controlInfo.hasInterrupt);
 	end block;	
 
 		stageEvents <= stageMultiEvents(stageData, flowResponse.isNew);
@@ -259,7 +257,6 @@ begin
 								sdLiving2,
 								stageDataNew,
 								flowResponse.living, flowResponse.sending, flowDrive.prevSending);			
-	--stageDataLiving <= stageMultiHandleKill(stageData, flowDrive.kill, partialKillMask);
 		stageDataLiving.fullMask <= stageData.fullMask;
 		stageDataLiving.data(0) <= work.TEMP_DEV.setException2(
 								stageData.data(0),
@@ -306,9 +303,8 @@ begin
 		flowResponse => flowResponse
 	);
 		-- TODO: move to visible package! 
-		stageEvents.causing <= work.TEMP_DEV.setPhase(--stageData.data(0),
-																stageDataLiving.data(0),
-																evtPhase0, evtPhase1, evtPhase2);
+		stageEvents.causing <= work.TEMP_DEV.setPhase(stageDataLiving.data(0),
+																	 evtPhase0, evtPhase1, evtPhase2);
 		stageEvents.eventOccured <= stageEvents.causing.controlInfo.newEvent;
 		
 	flowDrive.prevSending <= prevSending;
@@ -392,9 +388,7 @@ begin
 					c <= subSN(a, b);
 					before <= c(7);
 					flowDrive.kill <= killByTag(before, execEventSignal,
-													execCausing.controlInfo.--newInterrupt);
-																				   hasInterrupt);
-													-- before and execEventSignal; 	
+													execCausing.controlInfo.hasInterrupt);
 				end block;	
 
 					stageEvents <= stageMultiEvents(stageData, flowResponse.isNew);
@@ -411,18 +405,7 @@ begin
 				stageEventsOut <= stageEvents;
 			end block;
 
---	INT_ALU: entity work.IntegerAlu
---	port map(
---		inputInstruction => stageDataIn.data(0),
---		result => aluResult,
---		exc => aluException
---	);
-	
-	--aluOut2 <= setExecState(stageDataIn.data(0), aluResult, '0', aluException);
-	
-		aluOut <= executeAlu(stageDataIn.data(0));
-		
-		--ch <= '1' when aluOut = aluOut2 else '0';
+	aluOut <= executeAlu(stageDataIn.data(0));		
 end BasicAlu;
 
 
@@ -482,9 +465,7 @@ begin
 					c <= subSN(a, b);
 					before <= c(7);
 					flowDrive.kill <= killByTag(before, execEventSignal,
-													execCausing.controlInfo.--newInterrupt);
-																					hasInterrupt);
-													-- before and execEventSignal; 	
+													execCausing.controlInfo.hasInterrupt);
 				end block;	
 
 					stageEvents <= stageMultiEvents(stageData, flowResponse.isNew);
@@ -500,25 +481,8 @@ begin
 				
 				stageEventsOut <= stageEvents;
 			end block;
-
-
-
---	INT_ALU: entity work.IntegerAlu
---	port map(
---		inputInstruction => stageDataIn.data(0),
---		result => aluResult,
---		exc => aluException
---	);
-
---				NEW_ADDRESS_ADDER: entity work.IntegerAdder
---				port map(
---					inA => stageDataIn.data(0).argValues.arg0,
---					inB => stageDataIn.data(0).argValues.arg1,
---					output => open
---								--	aluResult
---				);
 	
-		aluResult <= addMwordBasic(stageDataIn.data(0).argValues.arg0, stageDataIn.data(0).argValues.arg1);
+	aluResult <= addMwordBasic(stageDataIn.data(0).argValues.arg0, stageDataIn.data(0).argValues.arg1);
 	aluOut <= setExecState(stageDataIn.data(0), aluResult, '0', (others => '0'));
 end BasicAgu;
 
@@ -576,11 +540,9 @@ begin
 					c <= subSN(a, b);
 					before <= c(7);
 					flowDrive.kill <= killByTag(before, execEventSignal,
-													execCausing.controlInfo.--newInterrupt);
-																					hasInterrupt);
-													-- before and execEventSignal; 	
-				end block;			-- CAREFUL: in this architecture 'isNew' is irrelevant because clearing vacating slot;
-						--				second difference from SingleTagged
+													execCausing.controlInfo.hasInterrupt);
+				end block;		-- CAREFUL: in this architecture 'isNew' is irrelevant because clearing vacating slot;
+									--				second difference from SingleTagged
 					stageEvents <= stageMultiEvents(stageData, flowResponse.isNew or '1');
 				
 				flowDrive.prevSending <= prevSending;

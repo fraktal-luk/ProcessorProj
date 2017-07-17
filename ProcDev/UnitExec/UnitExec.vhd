@@ -68,7 +68,6 @@ entity UnitExec is
 			acceptingNewBQ: out std_logic;
 			sendingOutBQ: out std_logic;
 				dataOutBQV: out StageDataMulti;
-			--dataOutBQ: out InstructionState;
 			prevSendingToBQ: in std_logic;
 			dataNewToBQ: in StageDataMulti;
 			
@@ -84,12 +83,6 @@ entity UnitExec is
 		outputD: out InstructionSlot;
 			
 		outputOpPreB: out InstructionState;
-			
-		--sysRegSelect: out slv5;
-		--sysRegIn: in Mword;
-				
-		--sysRegDataOut: out InstructionState;
-		--sysRegSending: out std_logic;
 
 		execEvent: out std_logic;
 		execCausingOut: out InstructionState;
@@ -175,10 +168,7 @@ begin
 				);
 				
 ------------------------------------------------
--- Branch/System
-					--sysRegSelect <= sysRegReadSel;
-					--sysRegValue <= sysRegIn;
-
+-- Branch
 					inputDataD.data(0) <= dataIQD;
 					inputDataD.fullMask(0) <= sendingIQD;
 					
@@ -203,15 +193,11 @@ begin
 						stageEventsOut => eventsD						
 					);	
 
-				--sysRegReadSel <= dataIQD.constantArgs.c1;
-
 -----------------------------------
 	BQ_BLOCK: block
 		signal storeTargetWrSig: std_logic := '0';
 		signal storeTargetDataSig: InstructionState := DEFAULT_INSTRUCTION_STATE;
-			signal storeTargetDataSRSig: InstructionState := DEFAULT_INSTRUCTION_STATE;
-		
-		--signal storingForMTC: std_logic := '0';
+			signal storeTargetDataSRSig: InstructionState := DEFAULT_INSTRUCTION_STATE;		
 	begin
 		sysRegData <= setInsResult(dataD0, sysRegValueReg);
 	
@@ -222,12 +208,7 @@ begin
 										((dataD0.controlInfo.hasBranch and --dataD0.classInfo.branchReg)
 																					  not dataD0.constantArgs.immSel)
 									or   dataD0.controlInfo.hasReturn);
-									--or   storingForMTC);
-									
-			--storingForMTC <= '0';-- and '1' when 	--	 dataD0.operation.func = sysMtc
-										--			 dataD0.classInfo.mtc = '1'
-										--		and USE_BQ_FOR_MTC else '0';						
-									
+
 			BRANCH_QUEUE: entity work.MemoryUnit(Behavioral)
 			generic map(
 				QUEUE_SIZE => SQ_SIZE
@@ -253,8 +234,7 @@ begin
 						
 				lateEventSignal => lateEventSignal,
 				execEventSignal => eventSignal,
-				execCausing => --activeCausing,
-									execCausing,
+				execCausing => execCausing,
 				
 				nextAccepting => '1',
 				
@@ -274,12 +254,8 @@ begin
 -------------------------------------
 
 		-- Data from sysreg reads goes to load pipe
-		--sysRegDataOut <= sysRegData;
-		--sysRegSending <= execSendingD when --dataD0.operation = (System, sysMfc) else '0';
-		--											  dataD0.classInfo.mfc = '1' else '0';
 		-- CAREFUL: Don't send the same thing from both subpipes:
-		execSendingEffectiveD <= execSendingD;-- when --dataD0.operation /= (System, sysMfc) else '0';
-															--	 dataD0.classInfo.mfc = '0' else '0';	
+		execSendingEffectiveD <= execSendingD;
 
 		execEventSignal <= eventsD.eventOccured;
 		execCausing <= eventsD.causing;

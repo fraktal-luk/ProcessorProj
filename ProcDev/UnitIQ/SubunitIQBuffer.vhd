@@ -105,16 +105,12 @@ begin
 	QUEUE_SYNCHRONOUS: process(clk) 	
 	begin
 		if rising_edge(clk) then
-			--if reset = '1' then
-				
-			--elsif en = '1' then	
-				queueData <= queueDataNext;
-				fullMask <= fullMaskNext;
-				
-				logBuffer(queueData, fullMask, livingMask, flowResponseQ);
-				checkIQ(queueData, fullMask, queueDataNext, fullMaskNext, dispatchDataNew, sends,
-						  flowDriveQ, flowResponseQ);
-			--end if;	
+			queueData <= queueDataNext;
+			fullMask <= fullMaskNext;
+	
+			logBuffer(queueData, fullMask, livingMask, flowResponseQ);
+			checkIQ(queueData, fullMask, queueDataNext, fullMaskNext, dispatchDataNew, sends,
+					  flowDriveQ, flowResponseQ);
 		end if;
 	end process;	
 		
@@ -169,25 +165,14 @@ begin
 	begin
 		a <= execCausing.groupTag;
 		b <= queueData(i).groupTag;
---		IQ_KILLER: entity work.CompareBefore8 port map(
---			inA =>  a,
---			inB =>  b,
---			outC => --before
---						open
---		);		
-		
 		c <= subSN(a, b);
 		before <= c(7);
-		
-		killMask(i) <= killByTag(before, execEventSignal, '0') -- before and execEventSignal
+		killMask(i) <= killByTag(before, execEventSignal, '0')
 								and fullMask(i); 			
 	end generate;	
 	
-	--accepting <= flowResponseQ.accepting;
-					--(0 =>	not livingMask(IQ_SIZE-1), others => '0'); -- NOTE: simpler but worse performance
-					--(0 =>	not fullMask(IQ_SIZE-1), others => '0');
-		acceptingVec <= --not livingMask(IQ_SIZE-PIPE_WIDTH to IQ_SIZE-1);
-						    not fullMask(IQ_SIZE-PIPE_WIDTH to IQ_SIZE-1);
+	acceptingVec <= --not livingMask(IQ_SIZE-PIPE_WIDTH to IQ_SIZE-1);
+						 not fullMask(IQ_SIZE-PIPE_WIDTH to IQ_SIZE-1);
 		
 	queueSending <= flowResponseQ.sending(0);	-- CAREFUL: assumes that flowResponseQ.sending is binary: [0,1]
 	iqDataOut <= queueData;						

@@ -46,12 +46,7 @@ entity RegisterFile0 is
     Port ( clk : in  STD_LOGIC;
            reset : in  STD_LOGIC;
            en : in  STD_LOGIC;
-			  
-			--		readAllowT0: in std_logic;
-			--		readAllowT1: in std_logic;
-			--		readAllowT2: in std_logic;
-			--		readAllowT3: in std_logic;
-			  
+
 			  writeAllow: in std_logic;
 			  writeVec: in std_logic_vector(0 to WIDTH-1);			  
 			  selectWrite: in PhysNameArray(0 to WIDTH-1);			  	
