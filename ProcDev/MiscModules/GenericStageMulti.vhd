@@ -482,7 +482,8 @@ begin
 				stageEventsOut <= stageEvents;
 			end block;
 	
-	aluResult <= addMwordBasic(stageDataIn.data(0).argValues.arg0, stageDataIn.data(0).argValues.arg1);
+	aluResult <= --addMwordBasic(stageDataIn.data(0).argValues.arg0, stageDataIn.data(0).argValues.arg1);
+					addMwordFaster(stageDataIn.data(0).argValues.arg0, stageDataIn.data(0).argValues.arg1);
 	aluOut <= setExecState(stageDataIn.data(0), aluResult, '0', (others => '0'));
 end BasicAgu;
 

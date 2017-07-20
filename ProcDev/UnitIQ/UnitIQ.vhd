@@ -60,6 +60,7 @@ entity UnitIQ is
 		
 		execCausing: in InstructionState;
 		execEventSignal: in std_logic;		
+			lateEventSignal: in std_logic;
 			
 		fni: in ForwardingInfo;
 			
@@ -94,11 +95,15 @@ architecture Behavioral of UnitIQ is
 
 		signal writtenTagsZ: PhysNameArray(0 to PIPE_WIDTH-1) := (others => (others => '0'));		
 
+	signal eventCausing: InstructionState := DEFAULT_INSTRUCTION_STATE;
+
 	constant HAS_RESET_IQ: std_logic := '0';
 	constant HAS_EN_IQ: std_logic := '0';	
 begin	
 	resetSig <= reset and HAS_RESET_IQ;
 	enSig <= en or not HAS_EN_IQ;
+		
+		eventCausing <= setInterrupt(execCausing, lateEventSignal);
 		
 	-- The queue	
 	QUEUE_MAIN_LOGIC: entity work.SubunitIQBuffer(Implem)
@@ -111,7 +116,7 @@ begin
 	 	newData => newData,
 	 	nextAccepting => dispatchAccepting,
 		execEventSignal => execEventSignal,
-		execCausing => execCausing,
+		execCausing => eventCausing,
 		aiArray => aiArray,
 			aiNew => aiNew,
 		readyRegFlags => readyRegFlags,
@@ -148,7 +153,7 @@ begin
 	 	prevSending => queueSending,
 	 	nextAccepting => nextAccepting,
 		execEventSignal => execEventSignal,
-		execCausing => execCausing,
+		execCausing => eventCausing,
 		resultTags => fni.resultTags,
 		resultVals => fni.resultValues,
 		regValues => regValues,

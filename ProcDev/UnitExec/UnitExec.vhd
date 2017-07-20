@@ -162,6 +162,7 @@ begin
 						dataOut => dataB2,
 						data1Prev => dataB1,
 					
+					lateEventSignal => lateEventSignal, -- CAREFUL: seems unneeded because activeCausing has the info
 					execEventSignal => eventSignal,
 					execCausing => activeCausing,
 					lockCommand => '0'					
@@ -211,7 +212,7 @@ begin
 
 			BRANCH_QUEUE: entity work.MemoryUnit(Behavioral)
 			generic map(
-				QUEUE_SIZE => SQ_SIZE
+				QUEUE_SIZE => BQ_SIZE
 			)
 			port map(
 				clk => clk,
@@ -261,7 +262,8 @@ begin
 		execCausing <= eventsD.causing;
 
 		eventSignal <= execOrIntEventSignalIn;	
-		activeCausing <= execOrIntCausingIn;	
+		activeCausing <= --execOrIntCausingIn;
+								setInterrupt(execCausing, lateEventSignal);
 
 		execAcceptingA <= execAcceptingASig;
 		execAcceptingB <= execAcceptingBSig;

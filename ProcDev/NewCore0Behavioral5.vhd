@@ -278,7 +278,9 @@ begin
 		dataOutIQ => dataOutIQA,
 		sendingOut => sendingSchedA,
 			
-		execCausing => execOrIntCausing,
+		execCausing => --execOrIntCausing,
+							execCausing,
+			lateEventSignal => lateEventSignal,
 		execEventSignal => execOrIntEventSignal			
 	);
 	
@@ -305,7 +307,9 @@ begin
 		dataOutIQ => dataOutIQB,
 		sendingOut => sendingSchedB,		
 		
-		execCausing => execOrIntCausing,
+		execCausing => --execOrIntCausing,
+							execCausing,
+			lateEventSignal => lateEventSignal,
 		execEventSignal => execOrIntEventSignal
 	);
 	
@@ -333,7 +337,9 @@ begin
 		dataOutIQ => dataOutIQC,
 		sendingOut => sendingSchedC,		
 		
-		execCausing => execOrIntCausing,
+		execCausing => --execOrIntCausing,
+							execCausing,
+			lateEventSignal => lateEventSignal,
 		execEventSignal => execOrIntEventSignal
 	);					
 	
@@ -360,7 +366,9 @@ begin
 		dataOutIQ => dataOutIQD,
 		sendingOut => sendingSchedD,		
 		
-		execCausing => execOrIntCausing,
+		execCausing => --execOrIntCausing,
+							execCausing,
+			lateEventSignal => lateEventSignal,
 		execEventSignal => execOrIntEventSignal
 	);	
 
@@ -389,7 +397,9 @@ begin
 		regReadAllow => regsAllowE, -- TODO: change to individual for each port
 		regValues => regValsE,		
 		
-		execCausing => execOrIntCausing,
+		execCausing => --execOrIntCausing,
+							execCausing,
+			lateEventSignal => lateEventSignal,
 		execEventSignal => execOrIntEventSignal
 	);	
 															
@@ -685,7 +695,8 @@ begin
 		
 		lateEventSignal => lateEventSignal,
 		execEventSignal => execOrIntEventSignal,
-		execCausing => execOrIntCausing,
+		execCausing => --execOrIntCausing,
+							execCausing,
 		
 		commitGroupCtr => commitGroupCtrSig,
 		commitGroupCtrNext => commitGroupCtrNextSig,

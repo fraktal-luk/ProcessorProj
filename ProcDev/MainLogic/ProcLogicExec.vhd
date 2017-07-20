@@ -169,6 +169,8 @@ package body ProcLogicExec is
 		variable res: InstructionState := ins;
 		variable result: Mword := (others => '0');
 		variable arg0, arg1, arg2: Mword := (others => '0');
+			variable argAddSub: Mword := (others => '0');
+			variable carryIn: std_logic := '0';
 		variable c0, c1: slv5 := (others => '0');
 		variable resultExt: std_logic_vector(MWORD_SIZE downto 0) := (others => '0');
 		variable ov, carry: std_logic := '0';
@@ -183,6 +185,16 @@ package body ProcLogicExec is
 	
 		c0 := ins.constantArgs.c0;
 		c1 := ins.constantArgs.c1;	
+	
+	
+			if ins.operation.func = arithSub then
+				argAddSub := not arg1;
+				carryIn := '1';
+			else
+				argAddSub := arg1;
+				carryIn := '0';
+			end if;
+	
 	
 		shTemp(4 downto 0) := c0; -- CAREFUL, TODO: handle the issue of 1-32 vs 0-31	
 		if ins.operation.func = logicShl then
@@ -220,10 +232,15 @@ package body ProcLogicExec is
 		-- Most negative byte count is -4, giving -4*8 + 0 = -32
 		-- Most positive byte count is 3, giving 3*8 + 7 = 31
 		
-	
+
+				resultExt := --addMwordExt(arg0, arg1);
+								addMwordFasterExt(arg0, --arg1, '0');
+																argAddSub, carryIn);	
 		case ins.operation.func is 
 			when arithAdd => 
-				resultExt := addMwordExt(arg0, arg1);
+				--resultExt := --addMwordExt(arg0, arg1);
+				--				addMwordFasterExt(arg0, --arg1, '0');
+				--												argAddSub, carryIn);
 				if
 					(arg0(MWORD_SIZE-1) = arg1(MWORD_SIZE-1)) and
 					(arg0(MWORD_SIZE-1) /= resultExt(MWORD_SIZE-1))				
@@ -233,7 +250,9 @@ package body ProcLogicExec is
 				carry := resultExt(MWORD_SIZE);
 				result := resultExt(MWORD_SIZE-1 downto 0);
 			when arithSub =>
-				resultExt := subMwordExt(arg0, arg1);
+				--resultExt := --subMwordExt(arg0, arg1);
+				--				addMwordFasterExt(arg0, --not arg1, '1'); -- NOTE: sub x,y as add x,~y+1	
+				--												argAddSub, carryIn);
 				if
 					(arg0(MWORD_SIZE-1) /= arg1(MWORD_SIZE-1)) and
 					(arg0(MWORD_SIZE-1) /= resultExt(MWORD_SIZE-1))				

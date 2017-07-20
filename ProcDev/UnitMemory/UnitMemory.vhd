@@ -145,7 +145,8 @@ architecture Behavioral of UnitMemory is
 	signal ch0, ch1, ch2, ch3, ch4, ch5, ch6, ch7: std_logic := '0';
 begin
 		eventSignal <= execOrIntEventSignalIn;	
-		activeCausing <= execOrIntCausingIn;
+		activeCausing <= --execOrIntCausingIn;
+								setInterrupt(execCausing, lateEventSignal);
 
 			inputDataC.data(0) <= dataIQC;
 			inputDataC.fullMask(0) <= sendingIQC;

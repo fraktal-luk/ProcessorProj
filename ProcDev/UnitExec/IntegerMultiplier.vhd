@@ -45,6 +45,8 @@ use work.ProcLogicFront.all;
 
 use work.ProcLogicExec.all;
 
+use work.TEMP_DEV.all;
+
 
 entity IntegerMultiplier is
 	port(
@@ -63,6 +65,7 @@ entity IntegerMultiplier is
 			dataOut: out InstructionState;	
 			data1Prev: out InstructionState; -- stage before last
 		
+			lateEventSignal: in std_logic;
 		execEventSignal: in std_logic;
 		execCausing: in InstructionState;
 		lockCommand: in std_logic
@@ -78,8 +81,11 @@ architecture Behavioral of IntegerMultiplier is
 	signal data0, data1: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
 	signal sending0, sending1, acc1, acc2: std_logic := '0';
 	
-	signal dataM: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;				
+	signal dataM: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
+		signal eventCausing: InstructionState := DEFAULT_INSTRUCTION_STATE;
 begin
+		eventCausing <= setInterrupt(execCausing, lateEventSignal);
+
 	inputData.data(0) <= dataIn;
 	inputData.fullMask(0) <= prevSending;
 	
@@ -96,7 +102,7 @@ begin
 		stageDataOut => data0,
 		
 		execEventSignal => execEventSignal,
-		execCausing => execCausing,
+		execCausing => eventCausing,
 		lockCommand => '0',
 		
 		stageEventsOut => open					
@@ -115,7 +121,7 @@ begin
 		stageDataOut => data1,
 		
 		execEventSignal => execEventSignal,
-		execCausing => execCausing,
+		execCausing => eventCausing,
 		lockCommand => '0',
 		
 		stageEventsOut => open					
@@ -137,7 +143,7 @@ begin
 		stageDataOut => outputData,
 		
 		execEventSignal => execEventSignal,
-		execCausing => execCausing,
+		execCausing => eventCausing,
 		lockCommand => '0',
 		
 		stageEventsOut => open					

@@ -167,7 +167,7 @@ begin
 		b <= queueData(i).groupTag;
 		c <= subSN(a, b);
 		before <= c(7);
-		killMask(i) <= killByTag(before, execEventSignal, '0')
+		killMask(i) <= killByTag(before, execEventSignal, execCausing.controlInfo.hasInterrupt)
 								and fullMask(i); 			
 	end generate;	
 	
