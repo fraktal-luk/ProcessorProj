@@ -36,13 +36,35 @@ package Decoding2 is
 		type QuintetValArray is array (QuintetArgName range d0 to c1) of slv5;
 		type QuintetSelect is array (QuintetArgName range d0 to c1) of std_logic;
 
-		type ArgFormatStruct is record
-			quintets: 	QuintetSrcArray;
-			immSize: 	ImmFormat;
-			immSign: 	std_logic;
-			hasLeftImm: std_logic;
-			leftImmSign: std_logic;
-		end record;
+
+			type ExecDomain is (none, Int, Float);
+			type ExecDomainArray is array (integer range <>) of ExecDomain;
+	
+			type RegisterSpec is record
+				place:  QuintetSrc;
+				domain: ExecDomain; 
+			end record;
+
+				type ArgFormatStruct is record
+					quintets: 	QuintetSrcArray;
+					immSize: 	ImmFormat;
+					immSign: 	std_logic;
+					hasLeftImm: std_logic;
+					leftImmSign: std_logic;
+						regDomains: ExecDomainArray(0 to 3); 				
+				end record;
+									
+						type ArgFormatNew is record
+							destSpec: RegisterSpec;
+							src0Spec: RegisterSpec;
+							src1Spec: RegisterSpec;
+							src2Spec: RegisterSpec;
+								c0Spec: RegisterSpec; -- TEMP!
+								c1Spec: RegisterSpec; -- 	-||-
+							immSel:		std_logic;
+							immSign:		std_logic;
+							immSize:		ImmFormat;
+						end record;
 
 		-- result would be like this:
 		type OpFieldStruct is record
@@ -96,40 +118,73 @@ package Decoding2 is
 		function parseWordNewW(w: word) return InsFieldTableNewW;
 
 			constant fmtUndef: ArgFormatStruct :=
-					((others=>none), none, '0','0','0');
+					((others=>none), none, '0','0','0',
+							(others => Int));
+
+				-- TEMP: experimental new formar
+				constant formatImm: ArgFormatNew := 
+					((qa, Int), 	(qb, Int), (qc, none), (qd, none),
+						(none, none), (none, none),	'1', '0', imm16);
 
 			constant fmtImm: ArgFormatStruct := 
-					((d0=>qa, d1=>none, s0=>qb, s1=>none, s2=>none, c0=>none, c1=>none), imm16, '0', '0', '0');
+					((d0=>qa, d1=>none, s0=>qb, s1=>none, s2=>none, c0=>none, c1=>none), imm16, '0', '0', '0',
+							(others => Int));
 			constant fmtReg2: ArgFormatStruct := 
-					((d0=>qa, d1=>none, s0=>qb, s1=>qc, s2=>none, c0=>none, c1=>none), none, '0', '0', '0');
+					((d0=>qa, d1=>none, s0=>qb, s1=>qc, s2=>none, c0=>none, c1=>none), none, '0', '0', '0',
+							(others => Int));
 			constant fmtReg3: ArgFormatStruct := 
-					((d0=>qa, d1=>none, s0=>qb, s1=>qc, s2=>qd, c0=>none, c1=>none), none, '0', '0', '0');					
+					((d0=>qa, d1=>none, s0=>qb, s1=>qc, s2=>qd, c0=>none, c1=>none), none, '0', '0', '0',
+							(others => Int));					
+
+			constant fmtRegFP2: ArgFormatStruct := 
+					((d0=>qa, d1=>none, s0=>qb, s1=>qc, s2=>none, c0=>none, c1=>none), none, '0', '0', '0',
+							(others => Float));
+			constant fmtRegFP3: ArgFormatStruct := 
+					((d0=>qa, d1=>none, s0=>qb, s1=>qc, s2=>qd, c0=>none, c1=>none), none, '0', '0', '0',
+							(others => Float));	
 
 			constant fmtLoadImm: ArgFormatStruct := 
-					((d0=>qa, d1=>none, s0=>qb, s1=>none, s2=>none, c0=>none, c1=>none), imm10, '1', '0', '0');
+					((d0=>qa, d1=>none, s0=>qb, s1=>none, s2=>none, c0=>none, c1=>none), imm10, '1', '0', '0',
+							(others => Int));
 			constant fmtStoreImm: ArgFormatStruct := 
-					((d0=>zero, d1=>none, s0=>qb, s1=>none, s2=>qa, c0=>none, c1=>none), imm10, '1', '0', '0');					
+					((d0=>zero, d1=>none, s0=>qb, s1=>none, s2=>qa, c0=>none, c1=>none), imm10, '1', '0', '0',
+							(others => Int));					
+
+			constant fmtLoadImmFP: ArgFormatStruct := 
+					((d0=>qa, d1=>none, s0=>qb, s1=>none, s2=>none, c0=>none, c1=>none), imm10, '1', '0', '0',
+							(Float, Int, Int, Int));
+			constant fmtStoreImmFP: ArgFormatStruct := 
+					((d0=>zero, d1=>none, s0=>qb, s1=>none, s2=>qa, c0=>none, c1=>none), imm10, '1', '0', '0',
+							(Int, Int, Int, Float));
 
 			-- Careful! In c1 we have to put condition! Temporary: zero Z, one NZ (but wont translate properly!)
 				--								Let 'none' mean jumping always (to distinguish certain from conditional)
 			constant fmtJumpLong: ArgFormatStruct := 
-					((d0=>zero, d1=>none, s0=>zero, s1=>none, s2=>none, c0=>none, c1=> none), imm26, '1', '0', '0');					
+					((d0=>zero, d1=>none, s0=>zero, s1=>none, s2=>none, c0=>none, c1=> none), imm26, '1', '0', '0',
+							(others => Int));					
 			constant fmtJumpLink: ArgFormatStruct := 
-					((d0=>qa, d1=>none, s0=>zero, s1=>none, s2=>none, c0=>none, c1=> none), imm21, '1', '0', '0');					
+					((d0=>qa, d1=>none, s0=>zero, s1=>none, s2=>none, c0=>none, c1=> none), imm21, '1', '0', '0',
+							(others => Int));					
 			constant fmtJumpCondZ: ArgFormatStruct := 
-					((d0=>zero, d1=>none, s0=>qa, s1=>none, s2=>none, c0=>none, c1=> zero), imm21, '1', '0', '0');					
+					((d0=>zero, d1=>none, s0=>qa, s1=>none, s2=>none, c0=>none, c1=> zero), imm21, '1', '0', '0',
+							(others => Int));					
 			constant fmtJumpCondNZ: ArgFormatStruct := 
-					((d0=>zero, d1=>none, s0=>qa, s1=>none, s2=>none, c0=>none, c1=> one), imm21, '1', '0', '0');					
+					((d0=>zero, d1=>none, s0=>qa, s1=>none, s2=>none, c0=>none, c1=> one), imm21, '1', '0', '0',
+							(others => Int));					
 			constant fmtJumpRZ: ArgFormatStruct := 
-					((d0=>qa, d1=>none, s0=>qb, s1=>qc, s2=>none, c0=>none, c1=> zero), none, '0', '0', '0');					
+					((d0=>qa, d1=>none, s0=>qb, s1=>qc, s2=>none, c0=>none, c1=> zero), none, '0', '0', '0',
+							(others => Int));					
 			constant fmtJumpRNZ: ArgFormatStruct := 
-					((d0=>qa, d1=>none, s0=>qb, s1=>qc, s2=>none, c0=>none, c1=> one), none, '0', '0', '0');	
+					((d0=>qa, d1=>none, s0=>qb, s1=>qc, s2=>none, c0=>none, c1=> one), none, '0', '0', '0',
+							(others => Int));	
 					
 			constant fmtShiftC: ArgFormatStruct :=		
-					((d0=>qa, d1=>none, s0=>qb, s1=>none, s2=>none, c0=>qc, c1=>none), none, '0', '0', '0');					
+					((d0=>qa, d1=>none, s0=>qb, s1=>none, s2=>none, c0=>qc, c1=>none), none, '0', '0', '0',
+							(others => Int));					
 			
 			constant fmtNoArgs: ArgFormatStruct :=		
-					((others=>none), none, '0', '0', '0');			
+					((others=>none), none, '0', '0', '0',
+							(others => Int));			
 			
 				constant fmtMFC_TEMP: ArgFormatStruct := 
 																		fmtLoadImm;
@@ -173,8 +228,8 @@ package Decoding2 is
 				21=> (ext1, jzR,  Jump, jump, fmtJumpRZ),
 				22=> (ext1, jnzR, Jump, jump, fmtJumpRNZ),
 
-					23 => (ext1, loadFP,		Memory,load,	fmtLoadImm),
-					24 => (ext1, storeFP,	Memory,store,	fmtStoreImm),
+					23 => (ext1, loadFP,		Memory,load,	fmtLoadImmFP),
+					24 => (ext1, storeFP,	Memory,store,	fmtStoreImmFP),
 				
 					25 => (ext2, halt, System, sysHalt, fmtNoArgs),
 					26 => (ext2, retI, System, sysRetI, fmtNoArgs),
@@ -231,14 +286,6 @@ package body Decoding2 is
 		ca.imm := ofs.imm;
 		ca.c0 := ofs.quintetValues(c0);
 		ca.c1 := ofs.quintetValues(c1);
-
-	--				-- CAREFUL! Here e use c1 to store condition
-	--				if idef.unit = Jump then
-	--					res.cond := ConditionType'val(1 + slv2u(ofs.quintetValues(c1)));
-	--							--	report integer'image(
-	--				else
-	--					res.cond := unknown;
-	--				end if;	
 
 		op := BinomialOp'(ofs.unit, ofs.func); 					
 
@@ -350,37 +397,16 @@ package body Decoding2 is
 		function findInstructionNewW(opcode, opcont: slv6) return integer is
 			variable tempInt: integer;
 		begin
-			tempInt := -- -1;
-							decodeTableNewW'right;
+			tempInt := decodeTableNewW'right;
 			for i in decodeTableNewW'range loop
 				if 		decodeTableNewW(i).opcd = opcode 
 					and (not hasOpcont(slv2opcode(opcode)) or (decodeTableNewW(i).opct = opcont))
-					-- If not hasOpcont, maybe just compare if none is really none, so no additional code needed?
-				--	and (not hasOpcont(idef.opcd) or  
 				then
-					tempInt := i;
-					exit;
+					return i;
 				end if;
 			end loop;
 			return tempInt;
 		end function;
-
-		function findInstructionDirect(opcode, opcont: slv6) return InsDefNewW is
-			variable res: InsDefNewW := undefInsDef;
-		begin
-			for i in decodeTableNewW'range loop
-				if 		decodeTableNewW(i).opcd = opcode 
-					and (not hasOpcont(slv2opcode(opcode)) or (decodeTableNewW(i).opct = opcont))
-					-- If not hasOpcont, maybe just compare if none is really none, so no additional code needed?
-				--	and (not hasOpcont(idef.opcd) or  
-				then
-					res := decodeTableNewW(i);
-					exit;
-				end if;
-			end loop;
-			return res;
-		end function;		
-
 
 		function getOpFields(w: word) return OpFieldStruct is
 			variable num: integer;
@@ -394,7 +420,8 @@ package body Decoding2 is
 			opcd := parts(opcode)(5 downto 0);
 			opct := parts(opcont)(5 downto 0);	
 						
-			if false then
+			if true then --
+				--	false then
 				-- This activates "large table" decoding
 				match := TEMP_find(opcd, opct);
 				ofs := getOpFieldStructW(parts, match);
