@@ -212,6 +212,7 @@ return HbuffQueueData is
 	
 	variable s0, s1, s2, s3, sT: std_logic_vector(1 downto 0) := "00";
 	variable v0, v1, v2, v3, vT: InstructionStateArray(0 to 3) := (others => DEFAULT_INSTRUCTION_STATE);
+		variable tempSN: SmallNumber := (others => '0');
 	
 	variable iMod: integer := 0;
 		variable cond0: std_logic := '0';
@@ -308,9 +309,15 @@ begin
 		v2 := inputExt(iMod+0 to iMod+3);
 		v3 := inputExt(iMod+4 to iMod+7);
 		
-		s0 := i2slv(nOut-1, 2);
+		
+			tempSN := subSN(nOutV, X"01");
+		s0 := --i2slv(nOut-1, 2);
+				tempSN(1 downto 0);
+				-- assert s0 = subSN(nOutV, X"01")(1 downto 0) report "nothy!";
 		s1 := s0;
-		s2 := i2slv(nOffMR, 2);
+		s2 := --i2slv(nOffMR, 2);
+				nOffMRV(1 downto 0);
+				--	assert s2 = nOffMRV(1 downto 0) report "aguhr!";
 		s3 := s2;
 
 			-- CONDITION: cond0 := (nRem > i) -- !! 5b - 1b						
