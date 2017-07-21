@@ -217,7 +217,6 @@ return HbuffQueueData is
 	variable iMod: integer := 0;
 		variable cond0: std_logic := '0';
 begin
-
 			nOffV(ALIGN_BITS-2 downto 0) := startIP(ALIGN_BITS-1 downto 1);
 			nRemV := subSN(nFullV, nOutV);
 			nOffMRV := subSN(nOffV, nRemV);
@@ -293,16 +292,11 @@ begin
 		v1 := qinExt(i+5 to i+8);
 		v2 := inputExt(iMod+0 to iMod+3);
 		v3 := inputExt(iMod+4 to iMod+7);
-		
-		
+			
 			tempSN := subSN(nOutV, X"01");
-		s0 := --i2slv(nOut-1, 2);
-				tempSN(1 downto 0);
-				-- assert s0 = subSN(nOutV, X"01")(1 downto 0) report "nothy!";
+		s0 := tempSN(1 downto 0);
 		s1 := s0;
-		s2 := --i2slv(nOffMR, 2);
-				nOffMRV(1 downto 0);
-				--	assert s2 = nOffMRV(1 downto 0) report "aguhr!";
+		s2 := nOffMRV(1 downto 0);
 		s3 := s2;
 
 			-- CONDITION: cond0 := (nRem > i) -- !! 5b - 1b						
@@ -339,7 +333,69 @@ begin
 	
 	end loop;
 
+		res.contentT := resContentT;
+	res.content := resContentT;
+		res.fullMaskT := resMaskT;
+	res.fullMask := resMaskT;
+	res.nFullV := --i2slv(nFullNew, SMALL_NUMBER_SIZE);
+						nFullNewV;
+	
+	return res;
+end function;
 
+
+-- nIn indicates number of full positions, aligned to right (for jump to not-beginning of block)
+-- CAREFUL: The start IP in bock can be encoded in the IP of element (0)?
+function TEMP_movingQueue_q16_i8_o8_Ref(buffIn: HbuffQueueData;
+												input: InstructionStateArray;
+												nFullV, nInV, nOutV: SmallNumber; killAll: std_logic;
+												startIP: Mword)
+return HbuffQueueData is
+	constant qin: InstructionStateArray(0 to HBUFFER_SIZE-1) := buffIn.content;
+	constant maskIn: std_logic_vector(0 to HBUFFER_SIZE-1) := buffIn.fullMask;
+	constant QLEN: integer := qin'length; -- Must be 16
+	constant ILEN: integer := input'length; -- must be 8
+	variable res: HbuffQueueData := DEFAULT_HBUFF_QUEUE_DATA;
+	
+	-- Extended: aditional 8 elements, filled with the last in queue; for convenience
+	variable qinExt: InstructionStateArray(0 to HBUFFER_SIZE + 8 - 1) := 
+																(others => qin(HBUFFER_SIZE-1));
+	variable inputExt: InstructionStateArray(0 to ILEN + 4 - 1) := 
+																(others => input(ILEN-1));
+	
+	variable resContent: InstructionStateArray(0 to QLEN-1) := (others => DEFAULT_INSTRUCTION_STATE);
+	variable resContentT: InstructionStateArray(0 to QLEN-1) := (others => DEFAULT_INSTRUCTION_STATE);
+	variable resMask, resMaskT: std_logic_vector(0 to QLEN-1) := (others => '0');
+	
+	variable nFull, nIn, nOut: integer := 0;
+	variable nRem, nOff, nOffMR, nFullNew: integer := 0;
+	variable nRemV, nOffV, nOffMRV, nFullNewV: SmallNumber := (others => '0');
+	
+	variable s0, s1, s2, s3, sT: std_logic_vector(1 downto 0) := "00";
+	variable v0, v1, v2, v3, vT: InstructionStateArray(0 to 3) := (others => DEFAULT_INSTRUCTION_STATE);
+		variable tempSN: SmallNumber := (others => '0');
+	
+	variable iMod: integer := 0;
+		variable cond0: std_logic := '0';
+begin
+
+			nOffV(ALIGN_BITS-2 downto 0) := startIP(ALIGN_BITS-1 downto 1);
+			nRemV := subSN(nFullV, nOutV);
+			nOffMRV := subSN(nOffV, nRemV);
+			
+			if killAll = '1' then
+				nFullNewV := (others => '0');
+			else
+				nFullNewV := addSN(nRemV, nInV);			
+			end if;
+
+	inputExt(0 to ILEN-1) := input;
+	qinExt(0 to HBUFFER_SIZE-1) := qin;
+
+	resContent := qin;
+	resContentT := qin;
+	
+	--------------
 
 	nFull := binFlowNum(nFullV);
 	nIn := binFlowNum(nInV);
@@ -377,10 +433,10 @@ begin
 			end if;	
 	end loop;
 	
-		res.contentT := resContentT;
-	res.content := resContentT;
-		res.fullMaskT := resMaskT;
-	res.fullMask := resMaskT;
+		res.contentT := resContent;
+	res.content := resContent;
+		res.fullMaskT := resMask;
+	res.fullMask := resMask;
 	res.nFullV := i2slv(nFullNew, SMALL_NUMBER_SIZE);
 	
 	return res;
