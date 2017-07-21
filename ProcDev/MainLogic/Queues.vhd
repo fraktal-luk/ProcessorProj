@@ -218,21 +218,6 @@ return HbuffQueueData is
 		variable cond0: std_logic := '0';
 begin
 
-
-
-	nFull := binFlowNum(nFullV);
-	nIn := binFlowNum(nInV);
-	nOut := binFlowNum(nOutV);	
-
-	nOff := (ILEN - nIn) mod 8; -- TODO: It will be gathered from low bits of IP of fetched block!
-	nRem := nFull - nOut;
-	nOffMR := nOff - nRem;
-	nFullNew := nRem + nIn;
-	if killAll = '1' then
-		nFullNew := 0;
-	end if;
-
-
 			nOffV(ALIGN_BITS-2 downto 0) := startIP(ALIGN_BITS-1 downto 1);
 			nRemV := subSN(nFullV, nOutV);
 			nOffMRV := subSN(nOffV, nRemV);
@@ -355,6 +340,19 @@ begin
 	end loop;
 
 
+
+	nFull := binFlowNum(nFullV);
+	nIn := binFlowNum(nInV);
+	nOut := binFlowNum(nOutV);	
+
+	nOff := (ILEN - nIn) mod 8; -- TODO: It will be gathered from low bits of IP of fetched block!
+	nRem := nFull - nOut;
+	nOffMR := nOff - nRem;
+	nFullNew := nRem + nIn;
+	if killAll = '1' then
+		nFullNew := 0;
+	end if;
+	
 
 	for i in 0 to QLEN-1 loop
 		-- Fill reference queue
