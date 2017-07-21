@@ -191,28 +191,21 @@ function TEMP_movingQueue_q16_i8_o8(buffIn: HbuffQueueData;
 												startIP: Mword)
 return HbuffQueueData is
 	constant qin: InstructionStateArray(0 to HBUFFER_SIZE-1) := buffIn.content;
-	constant maskIn: std_logic_vector(0 to HBUFFER_SIZE-1) := buffIn.fullMask;
 	constant QLEN: integer := qin'length; -- Must be 16
 	constant ILEN: integer := input'length; -- must be 8
 	variable res: HbuffQueueData := DEFAULT_HBUFF_QUEUE_DATA;
 	
 	-- Extended: aditional 8 elements, filled with the last in queue; for convenience
-	variable qinExt: InstructionStateArray(0 to HBUFFER_SIZE + 8 - 1) := 
-																(others => qin(HBUFFER_SIZE-1));
-	variable inputExt: InstructionStateArray(0 to ILEN + 4 - 1) := 
-																(others => input(ILEN-1));
+	variable qinExt: InstructionStateArray(0 to HBUFFER_SIZE + 8 - 1) := (others => qin(HBUFFER_SIZE-1));
+	variable inputExt: InstructionStateArray(0 to ILEN + 4 - 1) := (others => input(ILEN-1));
 	
-	variable resContent: InstructionStateArray(0 to QLEN-1) := (others => DEFAULT_INSTRUCTION_STATE);
 	variable resContentT: InstructionStateArray(0 to QLEN-1) := (others => DEFAULT_INSTRUCTION_STATE);
 	variable resMask, resMaskT: std_logic_vector(0 to QLEN-1) := (others => '0');
 	
-	variable nFull, nIn, nOut: integer := 0;
-	variable nRem, nOff, nOffMR, nFullNew: integer := 0;
-	variable nRemV, nOffV, nOffMRV, nFullNewV: SmallNumber := (others => '0');
+	variable nRemV, nOffV, nOffMRV, nFullNewV, nOutM1V: SmallNumber := (others => '0');
 	
 	variable s0, s1, s2, s3, sT: std_logic_vector(1 downto 0) := "00";
 	variable v0, v1, v2, v3, vT: InstructionStateArray(0 to 3) := (others => DEFAULT_INSTRUCTION_STATE);
-		variable tempSN: SmallNumber := (others => '0');
 	
 	variable iMod: integer := 0;
 		variable cond0: std_logic := '0';
@@ -229,8 +222,6 @@ begin
 
 	inputExt(0 to ILEN-1) := input;
 	qinExt(0 to HBUFFER_SIZE-1) := qin;
-
-	resContent := qin;
 	resContentT := qin;
 
 	-- For each index in queue we have to find a set of functions:
@@ -293,14 +284,14 @@ begin
 		v2 := inputExt(iMod+0 to iMod+3);
 		v3 := inputExt(iMod+4 to iMod+7);
 			
-			tempSN := subSN(nOutV, X"01");
-		s0 := tempSN(1 downto 0);
+			nOutM1V := subSN(nOutV, X"01");
+		s0 := nOutM1V(1 downto 0);
 		s1 := s0;
 		s2 := nOffMRV(1 downto 0);
 		s3 := s2;
 
-			-- CONDITION: cond0 := (nRem > i) -- !! 5b - 1b						
-			cond0 := greaterThan(nRemV, i, 5);
+		-- CONDITION: cond0 := (nRem > i) -- !! 5b - 1b						
+		cond0 := greaterThan(nRemV, i, 5);
 
 		if cond0 = '1' then
 			-- CONDITION = (nOut > 4) -- !! 4b -> 1b (universal)
@@ -330,15 +321,13 @@ begin
 		-- Fill implementation mask
 		-- CONDITION = (nFullNew > i)
 		resMaskT(i) := greaterThan(nFullNewV, i, 5);
-	
 	end loop;
 
-		res.contentT := resContentT;
+	--	res.contentT := resContentT;
 	res.content := resContentT;
-		res.fullMaskT := resMaskT;
+	--	res.fullMaskT := resMaskT;
 	res.fullMask := resMaskT;
-	res.nFullV := --i2slv(nFullNew, SMALL_NUMBER_SIZE);
-						nFullNewV;
+	res.nFullV := nFullNewV;
 	
 	return res;
 end function;
