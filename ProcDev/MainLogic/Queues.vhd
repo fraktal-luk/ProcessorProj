@@ -228,43 +228,27 @@ begin
 		nFullNew := 0;
 	end if;
 
-		--nOffV := i2slv(nOff, SMALL_NUMBER_SIZE);
 			nOffV(ALIGN_BITS-2 downto 0) := startIP(ALIGN_BITS-1 downto 1);
-			--		assert slv2u(nOffV) = nOff report "a jak!";
-		--nRemV := i2slv(nRem, SMALL_NUMBER_SIZE);
-		--			assert nRemV = subSN(nFullV, nOutV) report "okuq";
 			nRemV := subSN(nFullV, nOutV);
-					
-		--nOffMRV := i2slv(nOffMR, SMALL_NUMBER_SIZE);
-		--			assert nOffMRV = subSN(nOffV, nRemV) report "hhee!";
 			nOffMRV := subSN(nOffV, nRemV);
 			
-		--nFullNewV := i2slv(nFullNew, SMALL_NUMBER_SIZE);
 			if killAll = '1' then
 				nFullNewV := (others => '0');
 			else
 				nFullNewV := addSN(nRemV, nInV);			
 			end if;
-			--	assert slv2u(nFullNewV) = nFullNew report "sjuss";
 
 	inputExt(0 to ILEN-1) := input;
 	qinExt(0 to HBUFFER_SIZE-1) := qin;
 
 	resContent := qin;
 	resContentT := qin;
-	
-		--report   integer'image(nOut) & "<<" & integer'image(nFull) & "<<"
-		--		&	integer'image(nIn);
-		--report  "nRem: " & integer'image(nRem) & ", nOffMR: " & integer'image(nOffMR);
-	
-	
+
 	-- For each index in queue we have to find a set of functions:
 	-- from set {queue(0 to MAX_OUT-1), input} find selection and CLK_EN
 	-- {sel(i), cken(i)} = f(i, nFull, nIn, nOut)
 	-- where sel is 4b
-	for i in 0 to QLEN-1 loop
-				--report "Iter " & integer'image(i);
-			
+	for i in 0 to QLEN-1 loop			
 		-- q(0) can be updated from q(1..8) or from input(0..7) etc
 		
 		-- nFull[5], nIn[4], nOut[4]  -> 13 bits!
@@ -325,69 +309,42 @@ begin
 		s2 := i2slv(nOffMR, 2);
 		s3 := s2;
 
+			-- CONDITION: cond0 := (nRem > i) -- !! 5b - 1b						
+			cond0 := greaterThan(nRemV, i, 5);
 
-			--		report integer'image(i) & ": " & integer'image(nRem) & "/ " 
-			--					& std_logic'image(greaterThan(nRemV, i, 5));
-
-			if --nRem > i then -- !! 5b - 1b
-				greaterThan(nRemV, i, 5) = '1' then
-				cond0 := '1';
-			else
-				cond0 := '0';
-			end if;	
-
-		if --nRem > i then
-			cond0 = '1' then
-			if --nOut <= 4 then   -- !! 4b -> 1b (universal)
-				--(nOutV(3) or (nOutV(2) and (nOutV(1) or nOutV(0)))) = '0' then
-				greaterThan(nOutV, 4, 4) = '0' then
-				
+		if cond0 = '1' then
+			-- CONDITION = (nOut > 4) -- !! 4b -> 1b (universal)
+			if	greaterThan(nOutV, 4, 4) = '0' then			
 				sT := "00";
-					--	report "A";
 			else
 				sT := "01";
-					--	report "B";
 			end if;	
 		else	
-			if --nOffMR < 4 - i then -- !! 5b (range -16:7) -> 1b (each i)
-				lessThanSigned(nOffMRV, 4-i, 6) = '1' then
+			-- CONDITION = (nOffMR < 4 - i) -- !! 5b (range -16:7) -> 1b (each i)
+			if	lessThanSigned(nOffMRV, 4-i, 6) = '1' then
 				sT := "10";
-					--	report "C";
 			else
 				sT := "11";
-					--	report "D";
 			end if;
 		end if;
-
-					report integer'image(4 - i) & ": " & integer'image(nOffMR) & "/ " 
-								& std_logic'image(lessThanSigned(nOffMRV, 4-i, 6));
 		
 		-- This condition generates clock enable
 		-- CAREFUL: nOut /= 0 could be equiv to nextAccepting?
 		--				nextAccepting will differ from nOut /= 0 when nFull = 0, but in this case
 		--				the second part of condition is true everywhere, so the substitution seems valid!
-		if	--nOut /= 0 or --nRem <= i then --  nRem can be replaced with nFull
-			--				 cond0 = '0' then
-			--(isNonzero(nOutV(3 downto 0)) or not cond0) = '1' then -- !! 4b + 1b -> 1b
-			(nOutV(3 downto 0) & cond0) /= "00001" then
-							 
-			resContentT(i) := selectIns4x4(v0, v1, v2, v3, 
-													s0, s1, s2, s3,
-													sT);
+		-- CONDITION:(nOut /= 0 or nRem <= i) --  nRem can be replaced with nFull
+		if	(nOutV(3 downto 0) & cond0) /= "00001" then			 
+			resContentT(i) := selectIns4x4(v0, v1, v2, v3, 		s0, s1, s2, s3,		sT);
 		end if;										 
 		
 		-- Fill reference queue
 		if i < nRem then -- from queue
 			if i + nOut < QLEN then
 				resContent(i) := qin(i + nOut);
-			else
-				-- ??
 			end if;
 		else -- from input
 			if i + nOffMR < ILEN then
 				resContent(i) := input(i + nOffMR);
-			else
-				-- ??
 			end if;
 		end if;
 		
@@ -397,15 +354,15 @@ begin
 		end if;
 		
 		-- Fill implementation mask
+		-- CONDITION = (nFullNew > i)
 		if greaterThan(nFullNewV, i, 5) = '1' then
 			resMaskT(i) := '1';
 		end if;
 		
+			-- Checking if valid
 			if resMask(i) = '1' and resContent(i) /= resContentT(i) then
-				--report "ohno!";
 				res.cmpMask(i) := '1';				
-			end if;
-		
+			end if;	
 	end loop;
 	
 		res.contentT := resContentT;
