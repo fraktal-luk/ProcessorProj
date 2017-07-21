@@ -216,6 +216,9 @@ return HbuffQueueData is
 	variable iMod: integer := 0;
 		variable cond0: std_logic := '0';
 begin
+
+
+
 	nFull := binFlowNum(nFullV);
 	nIn := binFlowNum(nInV);
 	nOut := binFlowNum(nOutV);	
@@ -227,6 +230,7 @@ begin
 	if killAll = '1' then
 		nFullNew := 0;
 	end if;
+
 
 			nOffV(ALIGN_BITS-2 downto 0) := startIP(ALIGN_BITS-1 downto 1);
 			nRemV := subSN(nFullV, nOutV);
@@ -336,7 +340,16 @@ begin
 		if	(nOutV(3 downto 0) & cond0) /= "00001" then			 
 			resContentT(i) := selectIns4x4(v0, v1, v2, v3, 		s0, s1, s2, s3,		sT);
 		end if;										 
-		
+
+		-- Fill implementation mask
+		-- CONDITION = (nFullNew > i)
+		resMaskT(i) := greaterThan(nFullNewV, i, 5);
+	
+	end loop;
+
+
+
+	for i in 0 to QLEN-1 loop
 		-- Fill reference queue
 		if i < nRem then -- from queue
 			if i + nOut < QLEN then
@@ -348,16 +361,10 @@ begin
 			end if;
 		end if;
 		
-		-- Fill reference mask
-		if i < nFullNew then -- !! Make new condition for resMaskT. 5b -> 1b (each i) 
-			resMask(i) := '1';
-		end if;
-		
-		-- Fill implementation mask
-		-- CONDITION = (nFullNew > i)
-		if greaterThan(nFullNewV, i, 5) = '1' then
-			resMaskT(i) := '1';
-		end if;
+			-- Fill reference mask
+			if i < nFullNew then -- !! Make new condition for resMaskT. 5b -> 1b (each i) 
+				resMask(i) := '1';
+			end if;
 		
 			-- Checking if valid
 			if resMask(i) = '1' and resContent(i) /= resContentT(i) then
