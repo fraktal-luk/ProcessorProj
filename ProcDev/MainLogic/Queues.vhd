@@ -42,6 +42,17 @@ constant DEFAULT_HBUFF_QUEUE_DATA: HbuffQueueData := (
 );
 
 
+constant IGNORE_CMP_NB: boolean := true;--false;
+
+function getCNB(nbi: integer) return integer is
+begin
+	if IGNORE_CMP_NB then
+		return 8;
+	else
+		return nbi;
+	end if;
+end function;
+
 function addSN(a, b: SmallNumber) return SmallNumber is
 	variable res: SmallNumber := (others => '0');
 	variable rdigit, carry: std_logic := '0';
@@ -67,7 +78,8 @@ begin
 	return res;
 end function;
 
-function lessThan(v: SmallNumber; ref: integer; nb: integer) return std_logic is
+function lessThan(v: SmallNumber; ref: integer; nbi: integer) return std_logic is
+	variable nb: integer := getCNB(nbi);
 	variable res: std_logic := '0';
 	variable table: std_logic_vector(0 to 2**nb-1) := (others => '0');
 	
@@ -92,7 +104,8 @@ begin
 	return res;
 end function;
 
-function greaterThan(v: SmallNumber; ref: integer; nb: integer) return std_logic is
+function greaterThan(v: SmallNumber; ref: integer; nbi: integer) return std_logic is
+	variable nb: integer := getCNB(nbi);
 	variable res: std_logic := '0';
 	variable table: std_logic_vector(0 to 2**nb-1) := (others => '0');
 	
@@ -117,11 +130,13 @@ begin
 	return res;
 end function;
 
-function lessThanSigned(v: SmallNumber; ref: integer; nb: integer) return std_logic is
+function lessThanSigned(v: SmallNumber; ref: integer; nbi: integer) return std_logic is
+	variable nb: integer := getCNB(nbi);
 	variable res: std_logic := '0';
 	variable table: std_logic_vector(0 to 2**nb-1) := (others => '0');
 	
 	variable vv, rv: std_logic_vector(nb-1 downto 0) := (others => '0');
+	
 begin
 	assert nb < 9 report "Dont use so large numbers!" severity failure;
 
@@ -182,6 +197,40 @@ begin
 	
 	return res;
 end function;							 
+
+
+function selectQueueNext(queueList: InstructionStateArray; queueIndex: SmallNumber; condQueueHigh: std_logic;
+								 inputList: InstructionStateArray; inputIndex: SmallNumber; condInputHigh: std_logic;
+								 condChooseInput: std_logic) return InstructionState is
+	variable res: InstructionState := DEFAULT_INSTRUCTION_STATE;
+
+	variable s0, s1, s2, s3, sT: std_logic_vector(1 downto 0) := "00";
+	variable v0, v1, v2, v3, vT: InstructionStateArray(0 to 3) := (others => DEFAULT_INSTRUCTION_STATE);
+begin		
+				-- Subdivision of lists for 4-to-1 muxes
+				v0 := queueList(0 to 3);
+				v1 := queueList(4 to 7);
+				v2 := inputList(0 to 3);
+				v3 := inputList(4 to 7);
+					
+				-- Selection variables for submuxes
+				s0 := queueIndex(1 downto 0);
+				s1 := s0;
+				s2 := inputIndex(1 downto 0);
+				s3 := s2;
+
+				-- Selection var for top level mux				
+				if condChooseInput = '0' then
+					sT(1) := '0';
+					sT(0) := condQueueHigh;
+				else
+					sT(1) := '1';
+					sT(0) := condInputHigh;
+				end if;
+				
+				res := selectIns4x4(v0, v1, v2, v3, 		s0, s1, s2, s3,		sT);
+	return res;
+end function;
 
 
 -----------------------------------------------------------------------------------------
@@ -253,8 +302,8 @@ function TEMP_movingQueue_q16_i8_o8(buffIn: HbuffQueueData;
 												startIP: Mword)
 return HbuffQueueData is
 	constant qin: InstructionStateArray(0 to HBUFFER_SIZE-1) := buffIn.content;
-	constant QLEN: integer := qin'length; -- Must be 16
-	constant ILEN: integer := input'length; -- must be 8
+	constant QLEN: integer := qin'length;
+	constant ILEN: integer := input'length; -- max 8
 	variable res: HbuffQueueData := DEFAULT_HBUFF_QUEUE_DATA;
 	
 	-- Extended: aditional 8 elements, filled with the last in queue; for convenience
@@ -269,9 +318,6 @@ return HbuffQueueData is
 	
 	variable nRemV, nOffV, nOffMRV, nFullNewV, nOutM1V: SmallNumber := (others => '0');
 	variable queueIndex, inputIndex: SmallNumber := (others => '0');
-	
-	variable s0, s1, s2, s3, sT: std_logic_vector(1 downto 0) := "00";
-	variable v0, v1, v2, v3, vT: InstructionStateArray(0 to 3) := (others => DEFAULT_INSTRUCTION_STATE);
 	
 		variable tempInstructionState: InstructionState := DEFAULT_INSTRUCTION_STATE;
 	
@@ -288,6 +334,9 @@ begin
 				nFullNewV := addSN(nRemV, nInV);			
 			end if;
 
+			nOutM1V := subSN(nOutV, X"01");
+
+
 	inputExt(0 to ILEN-1) := input;
 	qinExt(0 to HBUFFER_SIZE-1) := qin;
 	resContentT := qin;
@@ -303,66 +352,27 @@ begin
 			queueList := qinExt(i+1 to i+8);
 			inputList := inputExt(iMod+0 to iMod+7);
 
+			queueIndex := nOutM1V;
+			inputIndex := nOffMRV;
+
 			-- CONDITION: cond0 := (nRem > i) -- !! 5b - 1b						
-			cond0 := greaterThan(nRemV, i, 5);
-					
+			cond0 := greaterThan(nRemV, i, 5);		
 			condChooseInput := not cond0;
-			
-				queueIndex := nOutM1V;
-				inputIndex := nOffMRV;
 				
 			condQueueHigh := greaterThan(nOutV, 4, 4);
 									--greaterThan(nOutM1V, 3, 4)
 			condInputHigh := not lessThanSigned(nOffMRV, 4-i, 6);
 
-			-- Internal handling of paartition and muxing:
-			-- TMP = 
-			--		$func(queueList, queueIndex, condQueueHigh,
-			--			  	inputList, inputIndex, condInputHigh,
-			--				condChooseInput);
-				-- Subdivision of lists for 4-to-1 muxes
-				v0 := qinExt(i+1 to i+4);
-				v1 := qinExt(i+5 to i+8);
-				v2 := inputExt(iMod+0 to iMod+3);
-				v3 := inputExt(iMod+4 to iMod+7);
-					
-				-- Selection variables for submuxes
-					nOutM1V := subSN(nOutV, X"01");
-				s0 := nOutM1V(1 downto 0);
-				s1 := s0;
-				s2 := nOffMRV(1 downto 0);
-				s3 := s2;
-
-				-- Selection var for top level mux
-				
-				-- cond0 is the 1. bit, selects queue content or input, second bit(s) select halves of 8-elem lists
-				if --cond0 = '1' then
-					condChooseInput = '0' then	
-					-- CONDITION = (nOut > 4) -- !! 4b -> 1b (universal)
-					if	condQueueHigh = '0' then
-										--nOutM1V, 3, 4) = '0' then
-						sT := "00";
-					else
-						sT := "01";
-					end if;	
-				else	
-					-- CONDITION = (nOffMR < 4 - i) -- !! 5b (range -16:7) -> 1b (each i)
-					if	condInputHigh = '0' then
-						sT := "10";
-					else
-						sT := "11";
-					end if;
-				end if;
-				
-				tempInstructionState := selectIns4x4(v0, v1, v2, v3, 		s0, s1, s2, s3,		sT);
-			----------------------------------
-
+			-- Internal handling of partition and muxing:
+			tempInstructionState := selectQueueNext(queueList, queueIndex, condQueueHigh,
+																 inputList, inputIndex, condInputHigh,
+																 condChooseInput);
 		-- This condition generates clock enable
 		-- CAREFUL: nOut /= 0 could be equiv to nextAccepting?
 		--				nextAccepting will differ from nOut /= 0 when nFull = 0, but in this case
 		--				the second part of condition is true everywhere, so the substitution seems valid!
 		-- CONDITION:(nOut /= 0 or nRem <= i) --  nRem can be replaced with nFull
-		if	(nOutV(3 downto 0) & cond0) /= "00001" then			 
+		if	(nOutV(3 downto 0) & cond0) /= "00001" then		 
 			resContentT(i) := tempInstructionState;
 		end if;										 
 
@@ -387,63 +397,29 @@ function TEMP_movingQueue_q16_i8_o8_Ref(buffIn: HbuffQueueData;
 												startIP: Mword)
 return HbuffQueueData is
 	constant qin: InstructionStateArray(0 to HBUFFER_SIZE-1) := buffIn.content;
-	constant maskIn: std_logic_vector(0 to HBUFFER_SIZE-1) := buffIn.fullMask;
-	constant QLEN: integer := qin'length; -- Must be 16
-	constant ILEN: integer := input'length; -- must be 8
+	constant QLEN: integer := qin'length;
+	constant ILEN: integer := input'length; -- max 8
 	variable res: HbuffQueueData := DEFAULT_HBUFF_QUEUE_DATA;
-	
-	-- Extended: aditional 8 elements, filled with the last in queue; for convenience
-	variable qinExt: InstructionStateArray(0 to HBUFFER_SIZE + 8 - 1) := 
-																(others => qin(HBUFFER_SIZE-1));
-	variable inputExt: InstructionStateArray(0 to ILEN + 4 - 1) := 
-																(others => input(ILEN-1));
-	
+
 	variable resContent: InstructionStateArray(0 to QLEN-1) := (others => DEFAULT_INSTRUCTION_STATE);
-	variable resContentT: InstructionStateArray(0 to QLEN-1) := (others => DEFAULT_INSTRUCTION_STATE);
 	variable resMask, resMaskT: std_logic_vector(0 to QLEN-1) := (others => '0');
 	
 	variable nFull, nIn, nOut: integer := 0;
 	variable nRem, nOff, nOffMR, nFullNew: integer := 0;
-	variable nRemV, nOffV, nOffMRV, nFullNewV: SmallNumber := (others => '0');
-	
-	variable s0, s1, s2, s3, sT: std_logic_vector(1 downto 0) := "00";
-	variable v0, v1, v2, v3, vT: InstructionStateArray(0 to 3) := (others => DEFAULT_INSTRUCTION_STATE);
-		variable tempSN: SmallNumber := (others => '0');
-	
-	variable iMod: integer := 0;
-		variable cond0: std_logic := '0';
 begin
-
-			nOffV(ALIGN_BITS-2 downto 0) := startIP(ALIGN_BITS-1 downto 1);
-			nRemV := subSN(nFullV, nOutV);
-			nOffMRV := subSN(nOffV, nRemV);
-			
-			if killAll = '1' then
-				nFullNewV := (others => '0');
-			else
-				nFullNewV := addSN(nRemV, nInV);			
-			end if;
-
-	inputExt(0 to ILEN-1) := input;
-	qinExt(0 to HBUFFER_SIZE-1) := qin;
-
 	resContent := qin;
-	resContentT := qin;
-	
-	--------------
 
 	nFull := binFlowNum(nFullV);
 	nIn := binFlowNum(nInV);
 	nOut := binFlowNum(nOutV);	
 
-	nOff := (ILEN - nIn) mod 8; -- TODO: It will be gathered from low bits of IP of fetched block!
+	nOff := (ILEN - nIn) mod 8; -- TODO: It will be gathered from low bits of IP of fetched block?
 	nRem := nFull - nOut;
 	nOffMR := nOff - nRem;
 	nFullNew := nRem + nIn;
 	if killAll = '1' then
 		nFullNew := 0;
 	end if;
-	
 
 	for i in 0 to QLEN-1 loop
 		-- Fill reference queue
@@ -461,16 +437,9 @@ begin
 			if i < nFullNew then -- !! Make new condition for resMaskT. 5b -> 1b (each i) 
 				resMask(i) := '1';
 			end if;
-		
-			-- Checking if valid
-			if resMask(i) = '1' and resContent(i) /= resContentT(i) then
-				res.cmpMask(i) := '1';				
-			end if;	
 	end loop;
 	
-		res.contentT := resContent;
 	res.content := resContent;
-		res.fullMaskT := resMask;
 	res.fullMask := resMask;
 	res.nFullV := i2slv(nFullNew, SMALL_NUMBER_SIZE);
 	
