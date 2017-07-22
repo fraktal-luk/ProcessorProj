@@ -183,52 +183,16 @@ begin
 	return res;
 end function;							 
 
--- nIn indicates number of full positions, aligned to right (for jump to not-beginning of block)
--- CAREFUL: The start IP in bock can be encoded in the IP of element (0)?
-function TEMP_movingQueue_q16_i8_o8(buffIn: HbuffQueueData;
-												input: InstructionStateArray;
-												nFullV, nInV, nOutV: SmallNumber; killAll: std_logic;
-												startIP: Mword)
-return HbuffQueueData is
-	constant qin: InstructionStateArray(0 to HBUFFER_SIZE-1) := buffIn.content;
-	constant QLEN: integer := qin'length; -- Must be 16
-	constant ILEN: integer := input'length; -- must be 8
-	variable res: HbuffQueueData := DEFAULT_HBUFF_QUEUE_DATA;
-	
-	-- Extended: aditional 8 elements, filled with the last in queue; for convenience
-	variable qinExt: InstructionStateArray(0 to HBUFFER_SIZE + 8 - 1) := (others => qin(HBUFFER_SIZE-1));
-	variable inputExt: InstructionStateArray(0 to ILEN + 4 - 1) := (others => input(ILEN-1));
-	
-	variable resContentT: InstructionStateArray(0 to QLEN-1) := (others => DEFAULT_INSTRUCTION_STATE);
-	variable resMask, resMaskT: std_logic_vector(0 to QLEN-1) := (others => '0');
-	
-	variable nRemV, nOffV, nOffMRV, nFullNewV, nOutM1V: SmallNumber := (others => '0');
-	
-	variable s0, s1, s2, s3, sT: std_logic_vector(1 downto 0) := "00";
-	variable v0, v1, v2, v3, vT: InstructionStateArray(0 to 3) := (others => DEFAULT_INSTRUCTION_STATE);
-	
-	variable iMod: integer := 0;
-		variable cond0: std_logic := '0';
-begin
-			nOffV(ALIGN_BITS-2 downto 0) := startIP(ALIGN_BITS-1 downto 1);
-			nRemV := subSN(nFullV, nOutV);
-			nOffMRV := subSN(nOffV, nRemV);
-			
-			if killAll = '1' then
-				nFullNewV := (others => '0');
-			else
-				nFullNewV := addSN(nRemV, nInV);			
-			end if;
 
-	inputExt(0 to ILEN-1) := input;
-	qinExt(0 to HBUFFER_SIZE-1) := qin;
-	resContentT := qin;
+-----------------------------------------------------------------------------------------
+-----------------------------------------------------------------------------------------
+	--	Algorithm for moving a queue with max input 8 and max output 8
+	--	
 
 	-- For each index in queue we have to find a set of functions:
 	-- from set {queue(0 to MAX_OUT-1), input} find selection and CLK_EN
 	-- {sel(i), cken(i)} = f(i, nFull, nIn, nOut)
 	-- where sel is 4b
-	for i in 0 to QLEN-1 loop			
 		-- q(0) can be updated from q(1..8) or from input(0..7) etc
 		
 		-- nFull[5], nIn[4], nOut[4]  -> 13 bits!
@@ -276,7 +240,57 @@ begin
 		--		B) nOut[1:0] //
 		--		C) nOffMR[1:0] // This time from 0; nOffMR := offset - nRem
 		--		D) nOffMR[1:0]
-		
+-----------------------------------------------------------------------------------------
+-----------------------------------------------------------------------------------------
+
+
+
+-- nIn indicates number of full positions, aligned to right (for jump to not-beginning of block)
+-- CAREFUL: The start IP in bock can be encoded in the IP of element (0)?
+function TEMP_movingQueue_q16_i8_o8(buffIn: HbuffQueueData;
+												input: InstructionStateArray;
+												nFullV, nInV, nOutV: SmallNumber; killAll: std_logic;
+												startIP: Mword)
+return HbuffQueueData is
+	constant qin: InstructionStateArray(0 to HBUFFER_SIZE-1) := buffIn.content;
+	constant QLEN: integer := qin'length; -- Must be 16
+	constant ILEN: integer := input'length; -- must be 8
+	variable res: HbuffQueueData := DEFAULT_HBUFF_QUEUE_DATA;
+	
+	-- Extended: aditional 8 elements, filled with the last in queue; for convenience
+	variable qinExt: InstructionStateArray(0 to HBUFFER_SIZE + 8 - 1) := (others => qin(HBUFFER_SIZE-1));
+	variable inputExt: InstructionStateArray(0 to ILEN + 4 - 1) := (others => input(ILEN-1));
+	
+	variable resContentT: InstructionStateArray(0 to QLEN-1) := (others => DEFAULT_INSTRUCTION_STATE);
+	variable resMask, resMaskT: std_logic_vector(0 to QLEN-1) := (others => '0');
+	
+	variable nRemV, nOffV, nOffMRV, nFullNewV, nOutM1V: SmallNumber := (others => '0');
+	
+	variable s0, s1, s2, s3, sT: std_logic_vector(1 downto 0) := "00";
+	variable v0, v1, v2, v3, vT: InstructionStateArray(0 to 3) := (others => DEFAULT_INSTRUCTION_STATE);
+	
+	variable iMod: integer := 0;
+		variable cond0: std_logic := '0';
+begin
+			nOffV(ALIGN_BITS-2 downto 0) := startIP(ALIGN_BITS-1 downto 1);
+			nRemV := subSN(nFullV, nOutV);
+			nOffMRV := subSN(nOffV, nRemV);
+			
+			if killAll = '1' then
+				nFullNewV := (others => '0');
+			else
+				nFullNewV := addSN(nRemV, nInV);			
+			end if;
+
+	inputExt(0 to ILEN-1) := input;
+	qinExt(0 to HBUFFER_SIZE-1) := qin;
+	resContentT := qin;
+
+	-- For each index in queue we have to find a set of functions:
+	-- from set {queue(0 to MAX_OUT-1), input} find selection and CLK_EN
+	-- {sel(i), cken(i)} = f(i, nFull, nIn, nOut)
+	-- where sel is 4b
+	for i in 0 to QLEN-1 loop		
 		iMod := i mod 4;
 		
 		v0 := qinExt(i+1 to i+4);
@@ -323,9 +337,7 @@ begin
 		resMaskT(i) := greaterThan(nFullNewV, i, 5);
 	end loop;
 
-	--	res.contentT := resContentT;
 	res.content := resContentT;
-	--	res.fullMaskT := resMaskT;
 	res.fullMask := resMaskT;
 	res.nFullV := nFullNewV;
 	
