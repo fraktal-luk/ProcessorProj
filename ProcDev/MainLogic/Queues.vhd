@@ -261,16 +261,22 @@ return HbuffQueueData is
 	variable qinExt: InstructionStateArray(0 to HBUFFER_SIZE + 8 - 1) := (others => qin(HBUFFER_SIZE-1));
 	variable inputExt: InstructionStateArray(0 to ILEN + 4 - 1) := (others => input(ILEN-1));
 	
+		variable queueList: InstructionStateArray(0 to 7) := (others => DEFAULT_INSTRUCTION_STATE);
+		variable inputList: InstructionStateArray(0 to 7) := (others => DEFAULT_INSTRUCTION_STATE);		
+	
 	variable resContentT: InstructionStateArray(0 to QLEN-1) := (others => DEFAULT_INSTRUCTION_STATE);
 	variable resMask, resMaskT: std_logic_vector(0 to QLEN-1) := (others => '0');
 	
 	variable nRemV, nOffV, nOffMRV, nFullNewV, nOutM1V: SmallNumber := (others => '0');
+	variable queueIndex, inputIndex: SmallNumber := (others => '0');
 	
 	variable s0, s1, s2, s3, sT: std_logic_vector(1 downto 0) := "00";
 	variable v0, v1, v2, v3, vT: InstructionStateArray(0 to 3) := (others => DEFAULT_INSTRUCTION_STATE);
 	
+		variable tempInstructionState: InstructionState := DEFAULT_INSTRUCTION_STATE;
+	
 	variable iMod: integer := 0;
-		variable cond0: std_logic := '0';
+		variable cond0, condChooseInput, condQueueHigh, condInputHigh: std_logic := '0';
 begin
 			nOffV(ALIGN_BITS-2 downto 0) := startIP(ALIGN_BITS-1 downto 1);
 			nRemV := subSN(nFullV, nOutV);
@@ -293,43 +299,71 @@ begin
 	for i in 0 to QLEN-1 loop		
 		iMod := i mod 4;
 		
-		v0 := qinExt(i+1 to i+4);
-		v1 := qinExt(i+5 to i+8);
-		v2 := inputExt(iMod+0 to iMod+3);
-		v3 := inputExt(iMod+4 to iMod+7);
+		-- Now prepare 2 lists of elements to select - 1 from queue content, another form input
+			queueList := qinExt(i+1 to i+8);
+			inputList := inputExt(iMod+0 to iMod+7);
+
+			-- CONDITION: cond0 := (nRem > i) -- !! 5b - 1b						
+			cond0 := greaterThan(nRemV, i, 5);
+					
+			condChooseInput := not cond0;
 			
-			nOutM1V := subSN(nOutV, X"01");
-		s0 := nOutM1V(1 downto 0);
-		s1 := s0;
-		s2 := nOffMRV(1 downto 0);
-		s3 := s2;
+				queueIndex := nOutM1V;
+				inputIndex := nOffMRV;
+				
+			condQueueHigh := greaterThan(nOutV, 4, 4);
+									--greaterThan(nOutM1V, 3, 4)
+			condInputHigh := not lessThanSigned(nOffMRV, 4-i, 6);
 
-		-- CONDITION: cond0 := (nRem > i) -- !! 5b - 1b						
-		cond0 := greaterThan(nRemV, i, 5);
+			-- Internal handling of paartition and muxing:
+			-- TMP = 
+			--		$func(queueList, queueIndex, condQueueHigh,
+			--			  	inputList, inputIndex, condInputHigh,
+			--				condChooseInput);
+				-- Subdivision of lists for 4-to-1 muxes
+				v0 := qinExt(i+1 to i+4);
+				v1 := qinExt(i+5 to i+8);
+				v2 := inputExt(iMod+0 to iMod+3);
+				v3 := inputExt(iMod+4 to iMod+7);
+					
+				-- Selection variables for submuxes
+					nOutM1V := subSN(nOutV, X"01");
+				s0 := nOutM1V(1 downto 0);
+				s1 := s0;
+				s2 := nOffMRV(1 downto 0);
+				s3 := s2;
 
-		if cond0 = '1' then
-			-- CONDITION = (nOut > 4) -- !! 4b -> 1b (universal)
-			if	greaterThan(nOutV, 4, 4) = '0' then			
-				sT := "00";
-			else
-				sT := "01";
-			end if;	
-		else	
-			-- CONDITION = (nOffMR < 4 - i) -- !! 5b (range -16:7) -> 1b (each i)
-			if	lessThanSigned(nOffMRV, 4-i, 6) = '1' then
-				sT := "10";
-			else
-				sT := "11";
-			end if;
-		end if;
-		
+				-- Selection var for top level mux
+				
+				-- cond0 is the 1. bit, selects queue content or input, second bit(s) select halves of 8-elem lists
+				if --cond0 = '1' then
+					condChooseInput = '0' then	
+					-- CONDITION = (nOut > 4) -- !! 4b -> 1b (universal)
+					if	condQueueHigh = '0' then
+										--nOutM1V, 3, 4) = '0' then
+						sT := "00";
+					else
+						sT := "01";
+					end if;	
+				else	
+					-- CONDITION = (nOffMR < 4 - i) -- !! 5b (range -16:7) -> 1b (each i)
+					if	condInputHigh = '0' then
+						sT := "10";
+					else
+						sT := "11";
+					end if;
+				end if;
+				
+				tempInstructionState := selectIns4x4(v0, v1, v2, v3, 		s0, s1, s2, s3,		sT);
+			----------------------------------
+
 		-- This condition generates clock enable
 		-- CAREFUL: nOut /= 0 could be equiv to nextAccepting?
 		--				nextAccepting will differ from nOut /= 0 when nFull = 0, but in this case
 		--				the second part of condition is true everywhere, so the substitution seems valid!
 		-- CONDITION:(nOut /= 0 or nRem <= i) --  nRem can be replaced with nFull
 		if	(nOutV(3 downto 0) & cond0) /= "00001" then			 
-			resContentT(i) := selectIns4x4(v0, v1, v2, v3, 		s0, s1, s2, s3,		sT);
+			resContentT(i) := tempInstructionState;
 		end if;										 
 
 		-- Fill implementation mask
