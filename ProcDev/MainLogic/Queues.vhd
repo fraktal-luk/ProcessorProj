@@ -308,7 +308,7 @@ return HbuffQueueData is
 	
 	-- Extended: aditional 8 elements, filled with the last in queue; for convenience
 	variable qinExt: InstructionStateArray(0 to HBUFFER_SIZE + 8 - 1) := (others => qin(HBUFFER_SIZE-1));
-	variable inputExt: InstructionStateArray(0 to ILEN + 4 - 1) := (others => input(ILEN-1));
+	variable inputExt: InstructionStateArray(0 to ILEN + 4+4 - 1 + 2) := (others => input(ILEN-1));
 	
 		variable queueList: InstructionStateArray(0 to 7) := (others => DEFAULT_INSTRUCTION_STATE);
 		variable inputList: InstructionStateArray(0 to 7) := (others => DEFAULT_INSTRUCTION_STATE);		
@@ -350,8 +350,9 @@ begin
 		
 		-- Now prepare 2 lists of elements to select - 1 from queue content, another form input
 			queueList := qinExt(i+1 to i+8);
+			--	report "A";	
 			inputList := inputExt(iMod+0 to iMod+7);
-
+			--	report "B";
 			queueIndex := nOutM1V;
 			inputIndex := nOffMRV;
 
@@ -372,7 +373,7 @@ begin
 		--				nextAccepting will differ from nOut /= 0 when nFull = 0, but in this case
 		--				the second part of condition is true everywhere, so the substitution seems valid!
 		-- CONDITION:(nOut /= 0 or nRem <= i) --  nRem can be replaced with nFull
-		if	(nOutV(3 downto 0) & cond0) /= "00001" then		 
+		if	(nOutV(3 downto 0) & cond0) /= "00001" then		-- CAREFUL: nOutV must be no more than 4b long! 
 			resContentT(i) := tempInstructionState;
 		end if;										 
 
