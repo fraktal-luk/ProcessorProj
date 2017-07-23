@@ -53,109 +53,109 @@ begin
 	end if;
 end function;
 
-function addSN(a, b: SmallNumber) return SmallNumber is
-	variable res: SmallNumber := (others => '0');
-	variable rdigit, carry: std_logic := '0';
-begin
-	for i in 0 to SMALL_NUMBER_SIZE-1 loop
-		rdigit := a(i) xor b(i) xor carry;
-		carry := (a(i) and b(i)) or (a(i) and carry) or (b(i) and carry);
-		res(i) := rdigit;
-	end loop;
-	return res;
-end function;
+--function addSN(a, b: SmallNumber) return SmallNumber is
+--	variable res: SmallNumber := (others => '0');
+--	variable rdigit, carry: std_logic := '0';
+--begin
+--	for i in 0 to SMALL_NUMBER_SIZE-1 loop
+--		rdigit := a(i) xor b(i) xor carry;
+--		carry := (a(i) and b(i)) or (a(i) and carry) or (b(i) and carry);
+--		res(i) := rdigit;
+--	end loop;
+--	return res;
+--end function;
+--
+--function subSN(a, b: SmallNumber) return SmallNumber is
+--	variable res: SmallNumber := (others => '0');
+--	variable rdigit, carry: std_logic := '0';
+--begin
+--	carry := '1';
+--	for i in 0 to SMALL_NUMBER_SIZE-1 loop
+--		rdigit := a(i) xor (not b(i)) xor carry;
+--		carry := (a(i) and not b(i)) or (a(i) and carry) or ((not b(i)) and carry);
+--		res(i) := rdigit;
+--	end loop;
+--	return res;
+--end function;
 
-function subSN(a, b: SmallNumber) return SmallNumber is
-	variable res: SmallNumber := (others => '0');
-	variable rdigit, carry: std_logic := '0';
-begin
-	carry := '1';
-	for i in 0 to SMALL_NUMBER_SIZE-1 loop
-		rdigit := a(i) xor (not b(i)) xor carry;
-		carry := (a(i) and not b(i)) or (a(i) and carry) or ((not b(i)) and carry);
-		res(i) := rdigit;
-	end loop;
-	return res;
-end function;
-
-function lessThan(v: SmallNumber; ref: integer; nbi: integer) return std_logic is
-	variable nb: integer := getCNB(nbi);
-	variable res: std_logic := '0';
-	variable table: std_logic_vector(0 to 2**nb-1) := (others => '0');
-	
-	variable vv, rv: std_logic_vector(nb-1 downto 0) := (others => '0');
-begin
-	assert nb < 9 report "Dont use so large numbers!" severity failure;
-
-	rv := i2slv(ref, nb); 
-	vv := v(nb-1 downto 0);
-
-	-- Generate truth table 
-	for i in 0 to 2**nb-1 loop
-		if i < ref then
-			table(i) := '1';
-		else
-			table(i) := '0';
-		end if;
-	end loop;
-	
-	res := table(slv2u(vv));
-	
-	return res;
-end function;
-
-function greaterThan(v: SmallNumber; ref: integer; nbi: integer) return std_logic is
-	variable nb: integer := getCNB(nbi);
-	variable res: std_logic := '0';
-	variable table: std_logic_vector(0 to 2**nb-1) := (others => '0');
-	
-	variable vv, rv: std_logic_vector(nb-1 downto 0) := (others => '0');
-begin
-	assert nb < 9 report "Dont use so large numbers!" severity failure;
-
-	rv := i2slv(ref, nb); 
-	vv := v(nb-1 downto 0);
-
-	-- Generate truth table 
-	for i in 0 to 2**nb-1 loop
-		if i > ref then
-			table(i) := '1';
-		else
-			table(i) := '0';
-		end if;
-	end loop;
-	
-	res := table(slv2u(vv));
-	
-	return res;
-end function;
-
-function lessThanSigned(v: SmallNumber; ref: integer; nbi: integer) return std_logic is
-	variable nb: integer := getCNB(nbi);
-	variable res: std_logic := '0';
-	variable table: std_logic_vector(0 to 2**nb-1) := (others => '0');
-	
-	variable vv, rv: std_logic_vector(nb-1 downto 0) := (others => '0');
-	
-begin
-	assert nb < 9 report "Dont use so large numbers!" severity failure;
-
-	rv := i2slv(ref, nb); 
-	vv := v(nb-1 downto 0);
-
-	-- Generate truth table 
-	for i in 0 to 2**nb-1 loop
-		if i - 2**(nb-1) < ref then
-			table(i) := '1';
-		else
-			table(i) := '0';
-		end if;
-	end loop;
-	
-	res := table(slv2s(vv) + 2**(nb-1));
-	
-	return res;
-end function;
+--function lessThan(v: SmallNumber; ref: integer; nbi: integer) return std_logic is
+--	variable nb: integer := getCNB(nbi);
+--	variable res: std_logic := '0';
+--	variable table: std_logic_vector(0 to 2**nb-1) := (others => '0');
+--	
+--	variable vv, rv: std_logic_vector(nb-1 downto 0) := (others => '0');
+--begin
+--	assert nb < 9 report "Dont use so large numbers!" severity failure;
+--
+--	rv := i2slv(ref, nb); 
+--	vv := v(nb-1 downto 0);
+--
+--	-- Generate truth table 
+--	for i in 0 to 2**nb-1 loop
+--		if i < ref then
+--			table(i) := '1';
+--		else
+--			table(i) := '0';
+--		end if;
+--	end loop;
+--	
+--	res := table(slv2u(vv));
+--	
+--	return res;
+--end function;
+--
+--function greaterThan(v: SmallNumber; ref: integer; nbi: integer) return std_logic is
+--	variable nb: integer := getCNB(nbi);
+--	variable res: std_logic := '0';
+--	variable table: std_logic_vector(0 to 2**nb-1) := (others => '0');
+--	
+--	variable vv, rv: std_logic_vector(nb-1 downto 0) := (others => '0');
+--begin
+--	assert nb < 9 report "Dont use so large numbers!" severity failure;
+--
+--	rv := i2slv(ref, nb); 
+--	vv := v(nb-1 downto 0);
+--
+--	-- Generate truth table 
+--	for i in 0 to 2**nb-1 loop
+--		if i > ref then
+--			table(i) := '1';
+--		else
+--			table(i) := '0';
+--		end if;
+--	end loop;
+--	
+--	res := table(slv2u(vv));
+--	
+--	return res;
+--end function;
+--
+--function lessThanSigned(v: SmallNumber; ref: integer; nbi: integer) return std_logic is
+--	variable nb: integer := getCNB(nbi);
+--	variable res: std_logic := '0';
+--	variable table: std_logic_vector(0 to 2**nb-1) := (others => '0');
+--	
+--	variable vv, rv: std_logic_vector(nb-1 downto 0) := (others => '0');
+--	
+--begin
+--	assert nb < 9 report "Dont use so large numbers!" severity failure;
+--
+--	rv := i2slv(ref, nb); 
+--	vv := v(nb-1 downto 0);
+--
+--	-- Generate truth table 
+--	for i in 0 to 2**nb-1 loop
+--		if i - 2**(nb-1) < ref then
+--			table(i) := '1';
+--		else
+--			table(i) := '0';
+--		end if;
+--	end loop;
+--	
+--	res := table(slv2s(vv) + 2**(nb-1));
+--	
+--	return res;
+--end function;
 
 
 

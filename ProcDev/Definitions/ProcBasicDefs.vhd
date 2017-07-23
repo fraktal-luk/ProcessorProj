@@ -221,7 +221,21 @@ begin
 	return res;
 end function;
 
-function lessThan(v: SmallNumber; ref: integer; nb: integer) return std_logic is
+
+constant IGNORE_CMP_NB: boolean := true;--false;
+
+function getCNB(nbi: integer) return integer is
+begin
+	if IGNORE_CMP_NB then
+		return 8;
+	else
+		return nbi;
+	end if;
+end function;
+
+
+function lessThan(v: SmallNumber; ref: integer; nbi: integer) return std_logic is
+	variable nb: integer := getCNB(nbi);
 	variable res: std_logic := '0';
 	variable table: std_logic_vector(0 to 2**nb-1) := (others => '0');
 	
@@ -246,7 +260,8 @@ begin
 	return res;
 end function;
 
-function greaterThan(v: SmallNumber; ref: integer; nb: integer) return std_logic is
+function greaterThan(v: SmallNumber; ref: integer; nbi: integer) return std_logic is
+	variable nb: integer := getCNB(nbi);
 	variable res: std_logic := '0';
 	variable table: std_logic_vector(0 to 2**nb-1) := (others => '0');
 	
@@ -271,7 +286,8 @@ begin
 	return res;
 end function;
 
-function lessThanSigned(v: SmallNumber; ref: integer; nb: integer) return std_logic is
+function lessThanSigned(v: SmallNumber; ref: integer; nbi: integer) return std_logic is
+	variable nb: integer := getCNB(nbi);
 	variable res: std_logic := '0';
 	variable table: std_logic_vector(0 to 2**nb-1) := (others => '0');
 	
