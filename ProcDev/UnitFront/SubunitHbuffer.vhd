@@ -70,7 +70,8 @@ end SubunitHbuffer;
 
 
 architecture Implem of SubunitHbuffer is
-	signal hbufferDataA, hbufferDataANext: InstructionStateArray(0 to HBUFFER_SIZE-1)
+	signal hbufferDataA, hbufferDataANext, hbufferDataANext_O, hbufferDataANext_N:
+									InstructionStateArray(0 to HBUFFER_SIZE-1)
 			:= (others => DEFAULT_ANNOTATED_HWORD);
 	signal hbufferDataANew: InstructionStateArray(0 to 2*PIPE_WIDTH-1)	
 			:= (others => DEFAULT_ANNOTATED_HWORD);	
@@ -84,7 +85,8 @@ architecture Implem of SubunitHbuffer is
 
 	signal shortOpcodes: std_logic_vector(0 to HBUFFER_SIZE-1) := (others=>'0');-- DEPREC but used as dummy
 	signal fullMaskHbuffer, livingMaskHbuffer: std_logic_vector(0 to HBUFFER_SIZE-1) := (others=>'0');
-		signal fullMask2, fullMask2Next, livingMask2: std_logic_vector(0 to HBUFFER_SIZE-1) := (others=>'0');
+		signal fullMask2, fullMask2Next, livingMask2, fullMask2Next_O, fullMask2Next_N:
+					std_logic_vector(0 to HBUFFER_SIZE-1) := (others=>'0');
 	signal hbuffOut: HbuffOutData 
 				:= (sd => DEFAULT_STAGE_DATA_MULTI, nOut=>(others=>'0'), nHOut=>(others=>'0'));
 
@@ -99,7 +101,7 @@ begin
 					  SMALL_NUMBER_SIZE);
 
 	hbufferDataANew <= getAnnotatedHwords(stageDataIn.basicInfo, fetchBlock);
-	hbufferDataANext <= bufferAHNext(hbufferDataA,
+	hbufferDataANext_O <= bufferAHNext(hbufferDataA,
 										--livingMask2,
 											fullMask2, -- NOTE: if flushing, no receiving so can be fullMask										
 										hbufferDataANew,	
@@ -111,7 +113,7 @@ begin
 											binFlowNum(hbufferDrive.nextAccepting),
 										binFlowNum(hbufferDrive.prevSending));						
 	fullMaskHbuffer <= setToOnes(shortOpcodes, binFlowNum(hbufferResponse.full));
-		fullMask2Next <= TEMP_hbufferFullMaskNext(hbufferDataA,
+		fullMask2Next_O <= TEMP_hbufferFullMaskNext(hbufferDataA,
 											livingMask2,	
 										hbufferDataANew,
 											prevSending,
@@ -148,6 +150,12 @@ begin
 												execEventSignal,
 												stageDataIn.basicInfo.ip);	
 	
+		hbufferDataANext_N <= buffDataNext.content;
+		fullMask2Next_N <= buffDataNext.fullMask;
+	
+				hbufferDataANext <= hbufferDataANext_N;
+				fullMask2Next <= fullMask2Next_N;
+	
 	FRONT_CLOCKED: process(clk)
 	begin					
 		if rising_edge(clk) then
@@ -167,6 +175,7 @@ begin
 									hbufferDrive, hbufferResponse);								
 			--end if;		
 
+					--	report integer'image(countOnes(fullMask2Next));
 					for i in 0 to fullMask2'length-1 loop
 						if fullMask2Next(i) = '1' then
 							assert buffDataNext.fullMask(i) = '1' report "not good maks!";
