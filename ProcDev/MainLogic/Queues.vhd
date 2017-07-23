@@ -218,7 +218,7 @@ begin
 				s1 := s0;
 				s2 := inputIndex(1 downto 0);
 				s3 := s2;
-
+					--	report integer'image(slv2u(s0)) & ", " & integer'image(slv2u(s2));
 				-- Selection var for top level mux				
 				if condChooseInput = '0' then
 					sT(1) := '0';
@@ -310,6 +310,8 @@ return HbuffQueueData is
 	variable qinExt: InstructionStateArray(0 to HBUFFER_SIZE + 8 - 1) := (others => qin(HBUFFER_SIZE-1));
 	variable inputExt: InstructionStateArray(0 to ILEN + 4+4 - 1 + 2) := (others => input(ILEN-1));
 	
+			variable inputExt5: InstructionStateArray(0 to 5*ILEN-1) := input & input & input & input & input;
+	
 		variable queueList: InstructionStateArray(0 to 7) := (others => DEFAULT_INSTRUCTION_STATE);
 		variable inputList: InstructionStateArray(0 to 7) := (others => DEFAULT_INSTRUCTION_STATE);		
 	
@@ -346,12 +348,14 @@ begin
 	-- {sel(i), cken(i)} = f(i, nFull, nIn, nOut)
 	-- where sel is 4b
 	for i in 0 to QLEN-1 loop		
-		iMod := i mod 4;
+		iMod := i mod --4;
+							ILEN;
 		
 		-- Now prepare 2 lists of elements to select - 1 from queue content, another form input
 			queueList := qinExt(i+1 to i+8);
 			--	report "A";	
-			inputList := inputExt(iMod+0 to iMod+7);
+			inputList := --inputExt(iMod+0 to iMod+7);
+								inputExt5(iMod+0 to iMod+7);
 			--	report "B";
 			queueIndex := nOutM1V;
 			inputIndex := nOffMRV;
@@ -362,12 +366,24 @@ begin
 				
 			condQueueHigh := greaterThan(nOutV, 4, 4);
 									--greaterThan(nOutM1V, 3, 4)
-			condInputHigh := not lessThanSigned(nOffMRV, 4-i, 6);
+			condInputHigh := --not lessThanSigned(nOffMRV, 4-i, 6);
+										not lessThan(nOffMRV and X"07", 4, 6);
 
 			-- Internal handling of partition and muxing:
 			tempInstructionState := selectQueueNext(queueList, queueIndex, condQueueHigh,
 																 inputList, inputIndex, condInputHigh,
 																 condChooseInput);
+																 
+--						if  abs(slv2s(tempInstructionState.basicInfo.ip) - 300) <= 20 then
+--							report integer'image(i) & ": here we have "
+--									& integer'image(slv2u(inputList(0).basicInfo.ip)) & ", "
+--									& integer'image(slv2u(inputList(1).basicInfo.ip)) & ", "
+--									& integer'image(slv2u(inputList(2).basicInfo.ip)) & ", "
+--									& integer'image(slv2u(inputList(3).basicInfo.ip)) & ", ";
+--
+--						end if;
+						
+						
 		-- This condition generates clock enable
 		-- CAREFUL: nOut /= 0 could be equiv to nextAccepting?
 		--				nextAccepting will differ from nOut /= 0 when nFull = 0, but in this case
@@ -433,7 +449,7 @@ begin
 				resContent(i) := input(i + nOffMR);
 			end if;
 		end if;
-		
+						--	report integer'image(i + nOut) & "; " & integer'image(i + nOffMR); 
 			-- Fill reference mask
 			if i < nFullNew then -- !! Make new condition for resMaskT. 5b -> 1b (each i) 
 				resMask(i) := '1';

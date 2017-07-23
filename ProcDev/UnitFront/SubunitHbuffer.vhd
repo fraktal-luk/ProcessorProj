@@ -94,7 +94,7 @@ architecture Implem of SubunitHbuffer is
 	signal nHIn: SmallNumber := (others => '0');
 	signal sendingSig: SmallNumber := (others => '0');
 	
-		signal buffData: HbuffQueueData := DEFAULT_HBUFF_QUEUE_DATA;
+		signal buffData, buffData2: HbuffQueueData := DEFAULT_HBUFF_QUEUE_DATA;
 begin
 	nHIn <= i2slv(FETCH_BLOCK_SIZE - (slv2u(stageDataIn.basicInfo.ip(ALIGN_BITS-1 downto 1))),
 					  SMALL_NUMBER_SIZE);
@@ -141,12 +141,12 @@ begin
 															livingMask2);
 	
 	FRONT_CLOCKED: process(clk)
-		variable dm: HbuffQueueData := DEFAULT_HBUFF_QUEUE_DATA;
+		variable dm, dm1, dm2: HbuffQueueData := DEFAULT_HBUFF_QUEUE_DATA;
 	begin					
 		if rising_edge(clk) then
 			--if reset = '1' then
-						
-			dm :=	TEMP_movingQueue_q16_i8_o8(buffData,
+
+			dm1 :=	TEMP_movingQueue_q16_i8_o8_Ref(buffData,
 														hbufferDataANew,
 														hbufferResponse.full,
 														hbufferDrive.prevSending,
@@ -155,6 +155,25 @@ begin
 														execEventSignal,
 														stageDataIn.basicInfo.ip);
 														
+			dm :=	TEMP_movingQueue_q16_i8_o8(buffData,
+														hbufferDataANew,
+														hbufferResponse.full,
+														hbufferDrive.prevSending,
+														--hbufferResponse.sending,
+															hbufferDrive.nextAccepting,
+														execEventSignal,
+														stageDataIn.basicInfo.ip);
+					for j in 0 to dm.fullMask'length-1 loop
+--						if dm.fullMask(j) = '1' then
+--							assert dm.content(j) = dm1.content(j) report "not eq; " & integer'image(j)
+--										& "; " & integer'image(slv2u(dm.content(j).basicInfo.ip)) & " vs "
+--										& "; " & integer'image(slv2u(dm1.content(j).basicInfo.ip));
+--										
+--						end if;
+					end loop;
+						--assert dm1 = dm report "differing";								
+						
+					buffData2 <= dm1;
 				buffData <= dm;									
 			stageData.data <= dm.content;
 			stageData.fullMask <= dm.fullMask;
