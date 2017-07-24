@@ -24,139 +24,22 @@ use work.GeneralPipeDev.all;
 package Queues is
 
 type HbuffQueueData is record
-		contentT: InstructionStateArray(0 to HBUFFER_SIZE-1);
+	--	contentT: InstructionStateArray(0 to HBUFFER_SIZE-1);
 	content: InstructionStateArray(0 to HBUFFER_SIZE-1);
-		fullMaskT: std_logic_vector(0 to HBUFFER_SIZE-1);
+	--	fullMaskT: std_logic_vector(0 to HBUFFER_SIZE-1);
 	fullMask: std_logic_vector(0 to HBUFFER_SIZE-1);
-		cmpMask: std_logic_vector(0 to HBUFFER_SIZE-1);
+	--	cmpMask: std_logic_vector(0 to HBUFFER_SIZE-1);
 	nFullV: SmallNumber;
 end record;
 
 constant DEFAULT_HBUFF_QUEUE_DATA: HbuffQueueData := (
-		contentT => (others => DEFAULT_INSTRUCTION_STATE),
+	--	contentT => (others => DEFAULT_INSTRUCTION_STATE),
 	content => (others => DEFAULT_INSTRUCTION_STATE),
-		fullMaskT => (others => '0'),	
+	--	fullMaskT => (others => '0'),	
 	fullMask => (others => '0'),
-		cmpMask => (others => '0'),	
+	--	cmpMask => (others => '0'),	
 	nFullV => (others => '0')
 );
-
-
-constant IGNORE_CMP_NB: boolean := true;--false;
-
-function getCNB(nbi: integer) return integer is
-begin
-	if IGNORE_CMP_NB then
-		return 8;
-	else
-		return nbi;
-	end if;
-end function;
-
---function addSN(a, b: SmallNumber) return SmallNumber is
---	variable res: SmallNumber := (others => '0');
---	variable rdigit, carry: std_logic := '0';
---begin
---	for i in 0 to SMALL_NUMBER_SIZE-1 loop
---		rdigit := a(i) xor b(i) xor carry;
---		carry := (a(i) and b(i)) or (a(i) and carry) or (b(i) and carry);
---		res(i) := rdigit;
---	end loop;
---	return res;
---end function;
---
---function subSN(a, b: SmallNumber) return SmallNumber is
---	variable res: SmallNumber := (others => '0');
---	variable rdigit, carry: std_logic := '0';
---begin
---	carry := '1';
---	for i in 0 to SMALL_NUMBER_SIZE-1 loop
---		rdigit := a(i) xor (not b(i)) xor carry;
---		carry := (a(i) and not b(i)) or (a(i) and carry) or ((not b(i)) and carry);
---		res(i) := rdigit;
---	end loop;
---	return res;
---end function;
-
---function lessThan(v: SmallNumber; ref: integer; nbi: integer) return std_logic is
---	variable nb: integer := getCNB(nbi);
---	variable res: std_logic := '0';
---	variable table: std_logic_vector(0 to 2**nb-1) := (others => '0');
---	
---	variable vv, rv: std_logic_vector(nb-1 downto 0) := (others => '0');
---begin
---	assert nb < 9 report "Dont use so large numbers!" severity failure;
---
---	rv := i2slv(ref, nb); 
---	vv := v(nb-1 downto 0);
---
---	-- Generate truth table 
---	for i in 0 to 2**nb-1 loop
---		if i < ref then
---			table(i) := '1';
---		else
---			table(i) := '0';
---		end if;
---	end loop;
---	
---	res := table(slv2u(vv));
---	
---	return res;
---end function;
---
---function greaterThan(v: SmallNumber; ref: integer; nbi: integer) return std_logic is
---	variable nb: integer := getCNB(nbi);
---	variable res: std_logic := '0';
---	variable table: std_logic_vector(0 to 2**nb-1) := (others => '0');
---	
---	variable vv, rv: std_logic_vector(nb-1 downto 0) := (others => '0');
---begin
---	assert nb < 9 report "Dont use so large numbers!" severity failure;
---
---	rv := i2slv(ref, nb); 
---	vv := v(nb-1 downto 0);
---
---	-- Generate truth table 
---	for i in 0 to 2**nb-1 loop
---		if i > ref then
---			table(i) := '1';
---		else
---			table(i) := '0';
---		end if;
---	end loop;
---	
---	res := table(slv2u(vv));
---	
---	return res;
---end function;
---
---function lessThanSigned(v: SmallNumber; ref: integer; nbi: integer) return std_logic is
---	variable nb: integer := getCNB(nbi);
---	variable res: std_logic := '0';
---	variable table: std_logic_vector(0 to 2**nb-1) := (others => '0');
---	
---	variable vv, rv: std_logic_vector(nb-1 downto 0) := (others => '0');
---	
---begin
---	assert nb < 9 report "Dont use so large numbers!" severity failure;
---
---	rv := i2slv(ref, nb); 
---	vv := v(nb-1 downto 0);
---
---	-- Generate truth table 
---	for i in 0 to 2**nb-1 loop
---		if i - 2**(nb-1) < ref then
---			table(i) := '1';
---		else
---			table(i) := '0';
---		end if;
---	end loop;
---	
---	res := table(slv2s(vv) + 2**(nb-1));
---	
---	return res;
---end function;
-
 
 
 function selectIns4(v0: InstructionStateArray(0 to 3);
@@ -309,35 +192,28 @@ return HbuffQueueData is
 	-- Extended: aditional 8 elements, filled with the last in queue; for convenience
 	variable qinExt: InstructionStateArray(0 to HBUFFER_SIZE + 8 - 1) := (others => qin(HBUFFER_SIZE-1));
 	variable inputExt: InstructionStateArray(0 to ILEN + 4+4 - 1 + 2) := (others => input(ILEN-1));
+	variable inputExt5: InstructionStateArray(0 to 5*ILEN-1) := input & input & input & input & input;
 	
-			variable inputExt5: InstructionStateArray(0 to 5*ILEN-1) := input & input & input & input & input;
-	
-		variable queueList: InstructionStateArray(0 to 7) := (others => DEFAULT_INSTRUCTION_STATE);
-		variable inputList: InstructionStateArray(0 to 7) := (others => DEFAULT_INSTRUCTION_STATE);		
+	variable queueList, inputList: InstructionStateArray(0 to 7) := (others => DEFAULT_INSTRUCTION_STATE);
+--	variable inputList: InstructionStateArray(0 to 7) := (others => DEFAULT_INSTRUCTION_STATE);		
 	
 	variable resContentT: InstructionStateArray(0 to QLEN-1) := (others => DEFAULT_INSTRUCTION_STATE);
-	variable resMask, resMaskT: std_logic_vector(0 to QLEN-1) := (others => '0');
+	variable resMaskT: std_logic_vector(0 to QLEN-1) := (others => '0');
 	
 	variable nRemV, nOffV, nOffMRV, nFullNewV, nOutM1V: SmallNumber := (others => '0');
 	variable queueIndex, inputIndex: SmallNumber := (others => '0');
 	
-		variable tempInstructionState: InstructionState := DEFAULT_INSTRUCTION_STATE;
-	
+	variable tempSelected: InstructionState := DEFAULT_INSTRUCTION_STATE;
 	variable iMod: integer := 0;
-		variable cond0, condChooseInput, condQueueHigh, condInputHigh: std_logic := '0';
+	variable condChooseInput, condQueueHigh, condInputHigh: std_logic := '0';
 begin
-			nOffV(ALIGN_BITS-2 downto 0) := startIP(ALIGN_BITS-1 downto 1);
-			nRemV := subSN(nFullV, nOutV);
-			nOffMRV := subSN(nOffV, nRemV);
-			
-			if killAll = '1' then
-				nFullNewV := (others => '0');
-			else
-				nFullNewV := addSN(nRemV, nInV);			
-			end if;
-
-			nOutM1V := subSN(nOutV, X"01");
-
+	nOffV(ALIGN_BITS-2 downto 0) := startIP(ALIGN_BITS-1 downto 1);
+	nRemV := subSN(nFullV, nOutV);
+	nOffMRV := subSN(nOffV, nRemV);
+	nOutM1V := subSN(nOutV, X"01");		
+	if killAll = '0' then -- else => zeros
+		nFullNewV := addSN(nRemV, nInV);			
+	end if;
 
 	inputExt(0 to ILEN-1) := input;
 	qinExt(0 to HBUFFER_SIZE-1) := qin;
@@ -345,63 +221,41 @@ begin
 
 	-- For each index in queue we have to find a set of functions:
 	-- from set {queue(0 to MAX_OUT-1), input} find selection and CLK_EN
-	-- {sel(i), cken(i)} = f(i, nFull, nIn, nOut)
-	-- where sel is 4b
+	-- {sel(i), cken(i)} = f(i, nFull, nIn, nOut), where sel is 4b
 	for i in 0 to QLEN-1 loop		
-		iMod := i mod --4;
-							ILEN;
-		
-		-- Now prepare 2 lists of elements to select - 1 from queue content, another form input
-			queueList := qinExt(i+1 to i+8);
-			--	report "A";	
-			inputList := --inputExt(iMod+0 to iMod+7);
-								inputExt5(iMod+0 to iMod+7);
-			--	report "B";
-			queueIndex := nOutM1V;
-			inputIndex := nOffMRV;
+		iMod := i mod ILEN;
+		-- Prepare 2 lists of elements to select - 1 list from queue content, another form input
+		queueList := qinExt(i+1 to i+8);
+		inputList := inputExt5(iMod+0 to iMod+7);
+		queueIndex := nOutM1V;
+		inputIndex := nOffMRV;
 
-			-- CONDITION: cond0 := (nRem > i) -- !! 5b - 1b						
-			cond0 := greaterThan(nRemV, i, 5);		
-			condChooseInput := not cond0;
-				
-			condQueueHigh := greaterThan(nOutV, 4, 4);
-									--greaterThan(nOutM1V, 3, 4)
-			condInputHigh := --not lessThanSigned(nOffMRV, 4-i, 6);
-										not lessThan(nOffMRV and X"07", 4, 6);
+		-- CONDITION = (nRem <= i)						
+		condChooseInput := not greaterThan(nRemV, i, 5); -- from input - rather than from old content		
+		condQueueHigh := greaterThan(nOutV, 4, 4);
+								--greaterThan(nOutM1V, 3, 4)
+		condInputHigh := not lessThan(nOffMRV and X"07", 4, 6); -- CAREFUL: means 3 bits for useful index!
 
-			-- Internal handling of partition and muxing:
-			tempInstructionState := selectQueueNext(queueList, queueIndex, condQueueHigh,
-																 inputList, inputIndex, condInputHigh,
-																 condChooseInput);
-																 
---						if  abs(slv2s(tempInstructionState.basicInfo.ip) - 300) <= 20 then
---							report integer'image(i) & ": here we have "
---									& integer'image(slv2u(inputList(0).basicInfo.ip)) & ", "
---									& integer'image(slv2u(inputList(1).basicInfo.ip)) & ", "
---									& integer'image(slv2u(inputList(2).basicInfo.ip)) & ", "
---									& integer'image(slv2u(inputList(3).basicInfo.ip)) & ", ";
---
---						end if;
-						
-						
+		-- Internal handling of partition and muxing:
+		tempSelected := selectQueueNext(queueList, queueIndex, condQueueHigh,
+															 inputList, inputIndex, condInputHigh,
+															 condChooseInput);						
 		-- This condition generates clock enable
 		-- CAREFUL: nOut /= 0 could be equiv to nextAccepting?
 		--				nextAccepting will differ from nOut /= 0 when nFull = 0, but in this case
 		--				the second part of condition is true everywhere, so the substitution seems valid!
 		-- CONDITION:(nOut /= 0 or nRem <= i) --  nRem can be replaced with nFull
-		if	(nOutV(3 downto 0) & cond0) /= "00001" then		-- CAREFUL: nOutV must be no more than 4b long! 
-			resContentT(i) := tempInstructionState;
+		if	(nOutV(3 downto 0) & condChooseInput) /= "00000" then		-- CAREFUL: nOutV must be no more than 4b long! 
+			resContentT(i) := tempSelected;
 		end if;										 
 
-		-- Fill implementation mask
 		-- CONDITION = (nFullNew > i)
-		resMaskT(i) := greaterThan(nFullNewV, i, 5);
+		resMaskT(i) := greaterThan(nFullNewV, i, 5); -- fillng fullMask
 	end loop;
 
 	res.content := resContentT;
 	res.fullMask := resMaskT;
 	res.nFullV := nFullNewV;
-	
 	return res;
 end function;
 
@@ -449,17 +303,15 @@ begin
 				resContent(i) := input(i + nOffMR);
 			end if;
 		end if;
-						--	report integer'image(i + nOut) & "; " & integer'image(i + nOffMR); 
-			-- Fill reference mask
-			if i < nFullNew then -- !! Make new condition for resMaskT. 5b -> 1b (each i) 
-				resMask(i) := '1';
-			end if;
+		-- Fill reference mask
+		if i < nFullNew then -- !! Make new condition for resMaskT. 5b -> 1b (each i) 
+			resMask(i) := '1';
+		end if;
 	end loop;
 	
 	res.content := resContent;
 	res.fullMask := resMask;
 	res.nFullV := i2slv(nFullNew, SMALL_NUMBER_SIZE);
-	
 	return res;
 end function;
 
