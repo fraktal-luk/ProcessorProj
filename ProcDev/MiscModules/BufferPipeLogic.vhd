@@ -168,17 +168,23 @@ begin
 		-- when sending and not reveiving
 		-- when sending and killed
 		-- when not sending and {...}
-		livingSig <= num2flow(binFlowNum(fullSig) - binFlowNum(kill));
-		
+		livingSig <= --num2flow(binFlowNum(fullSig) - binFlowNum(kill));
+							subSN(fullSig, kill);
 		sendingSig(0) <= nextAccepting(0);
 		
-		acceptingSig <= num2flow(CAPACITY - binFlowNum(fullSig) + binFlowNum(sendingSig));
+		acceptingSig <= --num2flow(CAPACITY - binFlowNum(fullSig) + binFlowNum(sendingSig));
+								addSN(subSN(num2flow(CAPACITY), fullSig), sendingSig);
 		
-		receivingSig <= num2flow(-binFlowNum(kill)) when isNonzero(kill) = '1' else 
+		receivingSig <= --num2flow(-binFlowNum(kill)) 
+							 subSN((others => '0'), kill)
+													when isNonzero(kill) = '1' else 						
 								prevSending;
+								
 		
-		afterReceiving <= num2flow( binFlowNum(fullSig) - binFlowNum(sendingSig)
-												+ binFlowNum(receivingSig) );
+		afterReceiving <= --num2flow( binFlowNum(fullSig) - binFlowNum(sendingSig)
+								--				+ binFlowNum(receivingSig) );
+								addSN(subSN(fullSig, sendingSig), receivingSig);				
+												
 									-- when receiving considers 'killed' num 
 				
 		CLOCKED: process(clk)
