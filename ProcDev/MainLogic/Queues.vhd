@@ -68,26 +68,37 @@ end function;
 
 
 -- for circular?
-function TMP_take(qs: TMP_queueState; nSend, nRec: SmallNumber;
-						fullMask, killMask: std_logic_vector)
+function TMP_change(qs: TMP_queueState; nSend, nRec: SmallNumber;
+						fullMaskA, killMaskA: std_logic_vector; killSig: std_logic)
 return TMP_queueState is
-	constant LEN: integer := fullMask'length;
+	constant LEN: integer := fullMaskA'length;
+
+		variable fullMask, killMask: std_logic_vector(0 to LEN-1) := (others => '0'); -- CAREFUL, TMP
 
 	variable res: TMP_queueState := qs;
 	variable pStartNew, pEndNew, pEndNext, nFullNext, pLive,
 				sizeNum, maskNum, tempCnt: SmallNumber := (others => '0');
-	variable liveMask, killedSearchMask, killedPr: std_logic_vector(0 to LEN-1) := (others => '0');
+	variable liveMask, killedSearchMask, liveSearchMask,
+				killedPr, livePr: std_logic_vector(0 to LEN-1) := (others => '0');
 	variable pLiveSel: std_logic := '0';
+		variable startInd: integer := 0;
 begin
+		startInd := slv2u(qs.pStart);			
+
+		for j in 0 to LEN-1 loop
+			fullMask((j + startInd) mod LEN) := fullMaskA(j);
+			killMask((j + startInd) mod LEN) := killMaskA(j);
+		end loop;
+		
 	assert true; -- TODO: assert nLiving >= num
-			return res;
+
 	sizeNum := i2slv(LEN, SMALL_NUMBER_SIZE);
 	assert countOnes(sizeNum) = 1 report "Size not binary";  -- make sure LEN is a binary number;
 	maskNum := i2slv(LEN-1, SMALL_NUMBER_SIZE);	
 	
 	liveMask := fullMask and not killMask;
 	
-	pStartNew := addSN(qs.pStart, nSend);
+	pStartNew := addSN(qs.pStart, nSend);						
 	pEndNew := addSN(qs.pEnd, nRec);
 	
 	-- Where is "first killed" slot if any?
@@ -95,20 +106,32 @@ begin
 	killedPr(0) := killMask(LEN-1);
 	killedSearchMask := killMask and not killedPr; -- Bit sum must be 0 or 1
 	
+				livePr(1 to LEN-1) := liveMask(0 to LEN-2);
+				livePr(0) := liveMask(LEN-1);
+				liveSearchMask := not liveMask and livePr;
+	
 	for i in 0 to LEN-1 loop
 		tempCnt := i2slv(i, SMALL_NUMBER_SIZE);
 		pLive := tempCnt;		
-		if killedSearchMask(i) = '1' then
+		if --killedSearchMask(i) = '1' then
+			killedPr(i) = '0' and (killMask(i) = '1' or tempCnt = pEndNew)
+		then -- we have "first killed"
 			pLiveSel := '1';
+						--		report "Have live sel  " & integer'image(i);
 			exit;
 		end if;
 	end loop;
-	
-	if pLiveSel = '1' then
-		pEndNext := pLive;
-	else
+
+	if killSig = '0' then
 		pEndNext := pEndNew;
+	else	
+		if pLiveSel = '1' then
+			pEndNext := pLive;
+		else
+			pEndNext := pEndNew;
+		end if;	
 	end if;
+	
 	
 	nFullNext := subSN(pEndNext, pStartNew); -- CAREFUL! Omits highest bit
 	

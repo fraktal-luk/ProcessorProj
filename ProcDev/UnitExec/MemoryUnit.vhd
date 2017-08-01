@@ -50,6 +50,8 @@ use work.ProcLogicMemory.all;
 
 use work.BasicCheck.all;
 
+use work.Queues.all;
+
 
 entity MemoryUnit is
 	generic(
@@ -103,7 +105,14 @@ architecture Behavioral of MemoryUnit is
 	signal bufferDrive: FlowDriveBuffer := (killAll => '0', lockAccept => '0', lockSend => '0',
 																others=>(others=>'0'));
 	signal bufferResponse: FlowResponseBuffer := (others=>(others=>'0'));
+	
+		signal qs0, qs1: TMP_queueState := TMP_defaultQueueState;
+		signal ta, tb: SmallNumber := (others => '0');
 begin				
+				ta <= bufferResponse.sending;
+				tb <= bufferDrive.prevSending;
+				qs1 <= TMP_change(qs0, ta, tb, fullMask, killMask, lateEventSignal or execEventSignal);
+
 		fullMask <= extractFullMask(content);
 		livingMask <= fullMask and not killMask;
 							
@@ -147,7 +156,9 @@ begin
 			
 			process (clk)
 			begin
-				if rising_edge(clk) then			
+				if rising_edge(clk) then	
+						qs0 <= qs1;
+							
 					content <= contentNext;
 					
 					logBuffer(contentData, fullMask, livingMask, bufferResponse);	
