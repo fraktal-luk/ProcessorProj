@@ -42,6 +42,123 @@ constant DEFAULT_HBUFF_QUEUE_DATA: HbuffQueueData := (
 );
 
 
+type TMP_queueState is record
+	--capacity ??
+	pStart: SmallNumber;
+	pEnd: SmallNumber;
+	nFull: SmallNumber;
+end record;
+
+-- Methods for the type:
+-- getWindow (for all useful windows)
+-- take -> just moving pointers?
+-- put ->  ^^
+-- compare pointers, move ptrs, etc? -- or is it just the question of proper arithmetic?
+-- "normalize" from circular to fixed front?
+-- > we need to check if operations are correct: not overflowing, not underflowing etc
+
+function TMP_defaultQueueState return TMP_queueState is
+	variable res: TMP_queueState;
+begin
+	res.pStart := (others => '0');
+	res.pEnd := (others => '0');
+	res.nFull := (others => '0');
+	return res;
+end function;
+
+
+-- for circular?
+function TMP_take(qs: TMP_queueState; nSend, nRec: SmallNumber;
+						fullMask, killMask: std_logic_vector)
+return TMP_queueState is
+	constant LEN: integer := fullMask'length;
+
+	variable res: TMP_queueState := qs;
+	variable pStartNew, pEndNew, pEndNext, nFullNext, pLive,
+				sizeNum, maskNum, tempCnt: SmallNumber := (others => '0');
+	variable liveMask, killedSearchMask, killedPr: std_logic_vector(0 to LEN-1) := (others => '0');
+	variable pLiveSel: std_logic := '0';
+begin
+	assert true; -- TODO: assert nLiving >= num
+			return res;
+	sizeNum := i2slv(LEN, SMALL_NUMBER_SIZE);
+	assert countOnes(sizeNum) = 1 report "Size not binary";  -- make sure LEN is a binary number;
+	maskNum := i2slv(LEN-1, SMALL_NUMBER_SIZE);	
+	
+	liveMask := fullMask and not killMask;
+	
+	pStartNew := addSN(qs.pStart, nSend);
+	pEndNew := addSN(qs.pEnd, nRec);
+	
+	-- Where is "first killed" slot if any?
+	killedPr(1 to LEN-1) := killMask(0 to LEN-2);
+	killedPr(0) := killMask(LEN-1);
+	killedSearchMask := killMask and not killedPr; -- Bit sum must be 0 or 1
+	
+	for i in 0 to LEN-1 loop
+		tempCnt := i2slv(i, SMALL_NUMBER_SIZE);
+		pLive := tempCnt;		
+		if killedSearchMask(i) = '1' then
+			pLiveSel := '1';
+			exit;
+		end if;
+	end loop;
+	
+	if pLiveSel = '1' then
+		pEndNext := pLive;
+	else
+		pEndNext := pEndNew;
+	end if;
+	
+	nFullNext := subSN(pEndNext, pStartNew); -- CAREFUL! Omits highest bit
+	
+	res.pStart := pStartNew and maskNum;
+	res.pEnd := pEndNext and maskNum;
+	res.nFull := nFullNext and maskNum;
+	-- TODO: handle maximum capacity 
+	
+	return res;
+end function;
+
+
+
+
+
+function selectIns4(v0: InstructionStateArray(0 to 3);
+						  s0: std_logic_vector(1 downto 0))
+						  return InstructionState;
+
+function selectIns4x4(v0, v1, v2, v3: InstructionStateArray(0 to 3);
+							 s0, s1, s2, s3: std_logic_vector(1 downto 0); -- select (for each subvec)
+							 sT: std_logic_vector(1 downto 0)) -- select top
+							 return InstructionState;							 
+
+function selectQueueNext(queueList: InstructionStateArray; queueIndex: SmallNumber; condQueueHigh: std_logic;
+								 inputList: InstructionStateArray; inputIndex: SmallNumber; condInputHigh: std_logic;
+								 condChooseInput: std_logic) return InstructionState;
+
+-- nIn indicates number of full positions, aligned to right (for jump to not-beginning of block)
+-- CAREFUL: The start IP in bock can be encoded in the IP of element (0)?
+function TEMP_movingQueue_q16_i8_o8(buffIn: HbuffQueueData;
+												input: InstructionStateArray;
+												nFullV, nInV, nOutV: SmallNumber; killAll: std_logic;
+												startIP: Mword)
+return HbuffQueueData;
+
+-- nIn indicates number of full positions, aligned to right (for jump to not-beginning of block)
+-- CAREFUL: The start IP in bock can be encoded in the IP of element (0)?
+function TEMP_movingQueue_q16_i8_o8_Ref(buffIn: HbuffQueueData;
+												input: InstructionStateArray;
+												nFullV, nInV, nOutV: SmallNumber; killAll: std_logic;
+												startIP: Mword)
+return HbuffQueueData;
+
+end Queues;
+
+
+
+package body Queues is
+
 function selectIns4(v0: InstructionStateArray(0 to 3);
 						  s0: std_logic_vector(1 downto 0))
 						  return InstructionState is
@@ -57,7 +174,7 @@ begin
 		when others =>
 			res := v0(3);
 	end case;
-	
+						res := v0(slv2u(s0));
 	return res;
 end function;
 						  
@@ -315,12 +432,6 @@ begin
 	return res;
 end function;
 
-
-end Queues;
-
-
-
-package body Queues is
 
 
 end Queues;
