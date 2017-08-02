@@ -67,9 +67,43 @@ begin
 end function;
 
 
+
+function rotateMask(mask: std_logic_vector; n: integer) return std_logic_vector is
+	constant LEN: integer := mask'length;
+	variable res: std_logic_vector(0 to LEN-1) := (others => '0');
+begin
+	for j in 0 to LEN-1 loop
+		res(j) := mask((j - n) mod LEN);
+	end loop;
+	return res;
+end function;
+
+function rotateInsArray(arr: InstructionStateArray; n: integer) return InstructionStateArray is
+	constant LEN: integer := arr'length;
+	variable res: InstructionStateArray(0 to LEN-1) := (others => DEFAULT_INSTRUCTION_STATE);
+begin
+	for j in 0 to LEN-1 loop
+		res(j) := arr((j - n) mod LEN);
+	end loop;
+	return res;
+end function;
+
+-- Changes circular queue to its image with begining at 0
+function normalizeMask(qs: TMP_queueState; mask: std_logic_vector) return std_logic_vector is
+begin
+	return rotateMask(mask, -slv2u(qs.pStart));
+end function;
+
+function normalizeInsArray(qs: TMP_queueState; arr: InstructionStateArray) return InstructionStateArray is
+begin
+	return rotateInsArray(arr, -slv2u(qs.pStart));
+end function;
+
+
+
 -- for circular?
 function TMP_change(qs: TMP_queueState; nSend, nRec: SmallNumber;
-						fullMaskA, killMaskA: std_logic_vector; killSig: std_logic)
+						fullMaskA, killMaskA: std_logic_vector; killSig: std_logic; maskNext: std_logic_vector)
 return TMP_queueState is
 	constant LEN: integer := fullMaskA'length;
 
@@ -83,18 +117,16 @@ return TMP_queueState is
 	variable pLiveSel: std_logic := '0';
 		variable startInd: integer := 0;
 begin
-		startInd := slv2u(qs.pStart);			
+	--fullMask := rotateMask(fullMaskA, slv2u(qs.pStart)); -- bring from index 0 to qs.pStart etc
+	--killMask := rotateMask(killMaskA, slv2u(qs.pStart));
+		fullMask := fullMaskA;
+		killMask := killMaskA;
 
-		for j in 0 to LEN-1 loop
-			fullMask((j + startInd) mod LEN) := fullMaskA(j);
-			killMask((j + startInd) mod LEN) := killMaskA(j);
-		end loop;
-		
-	assert true; -- TODO: assert nLiving >= num
+	-- TODO: check if not seding more than living, etc.
 
 	sizeNum := i2slv(LEN, SMALL_NUMBER_SIZE);
-	assert countOnes(sizeNum) = 1 report "Size not binary";  -- make sure LEN is a binary number;
 	maskNum := i2slv(LEN-1, SMALL_NUMBER_SIZE);	
+	assert countOnes(sizeNum) = 1 report "Size not binary";  -- make sure LEN is a binary number;
 	
 	liveMask := fullMask and not killMask;
 	
@@ -106,44 +138,138 @@ begin
 	killedPr(0) := killMask(LEN-1);
 	killedSearchMask := killMask and not killedPr; -- Bit sum must be 0 or 1
 	
-				livePr(1 to LEN-1) := liveMask(0 to LEN-2);
-				livePr(0) := liveMask(LEN-1);
-				liveSearchMask := not liveMask and livePr;
-	
+	-- Put this into a function?
 	for i in 0 to LEN-1 loop
-		tempCnt := i2slv(i, SMALL_NUMBER_SIZE);
-		pLive := tempCnt;		
-		if --killedSearchMask(i) = '1' then
-			killedPr(i) = '0' and (killMask(i) = '1' or tempCnt = pEndNew)
-		then -- we have "first killed"
+		pLive := i2slv(i, SMALL_NUMBER_SIZE);
+		if killedPr(i) = '0' and (killMask(i) = '1') then -- we have "first killed"
 			pLiveSel := '1';
-						--		report "Have live sel  " & integer'image(i);
 			exit;
 		end if;
 	end loop;
 
-	if killSig = '0' then
-		pEndNext := pEndNew;
-	else	
-		if pLiveSel = '1' then
-			pEndNext := pLive;
-		else
-			pEndNext := pEndNew;
-		end if;	
+	if pLiveSel = '1' then
+		pEndNext := pLive;			
+	else
+		pEndNext := pEndNew;			
 	end if;
-	
 	
 	nFullNext := subSN(pEndNext, pStartNew); -- CAREFUL! Omits highest bit
 	
 	res.pStart := pStartNew and maskNum;
 	res.pEnd := pEndNext and maskNum;
 	res.nFull := nFullNext and maskNum;
-	-- TODO: handle maximum capacity 
-	
+	-- Handle the case where every slot is full
+	-- CAREFUL: must be a bit from future fullMask, cause current liveMask slot can be sent and cleared!
+	if isNonzero(res.nFull) = '0' and maskNext(0) = '1' then -- Any slot from liveMask would do
+		res.nFull := res.nFull or sizeNum;
+	end if;
 	return res;
 end function;
 
 
+function TMP_getFrontWindow(qs: TMP_queueState;
+									 arr: InstructionStateArray; mask: std_logic_vector)
+return StageDataMulti is
+	variable res: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
+	variable ind: integer := 0;
+	constant LEN: integer := arr'length; 
+begin
+	ind := slv2u(qs.pStart);
+	for i in 0 to PIPE_WIDTH-1 loop
+		res.fullMask(i) := mask((i + ind) mod LEN);
+		res.data(i) := arr((i + ind) mod LEN);
+	end loop;
+	
+	return res;
+end function;
+
+function TMP_getPreFrontWindow(qs: TMP_queueState;
+									 arr: InstructionStateArray; mask: std_logic_vector)
+return StageDataMulti is
+	variable res: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
+	variable ind: integer := 0;
+	constant LEN: integer := arr'length; 
+begin
+	ind := slv2u(qs.pStart) - PIPE_WIDTH;
+	for i in 0 to PIPE_WIDTH-1 loop
+		res.fullMask(i) := mask((i + ind) mod LEN);
+		res.data(i) := arr((i + ind) mod LEN);
+	end loop;
+	
+	return res;
+end function;
+
+function TMP_getBackWindow(qs: TMP_queueState;
+									 arr: InstructionStateArray; mask: std_logic_vector)
+return StageDataMulti is
+	variable res: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
+	variable ind: integer := 0;
+	constant LEN: integer := arr'length; 
+begin
+	ind := slv2u(qs.pEnd);
+	for i in 0 to PIPE_WIDTH-1 loop
+		res.fullMask(i) := mask((i + ind) mod LEN);
+		res.data(i) := arr((i + ind) mod LEN);
+	end loop;
+	
+	return res;
+end function;
+
+-- This calculates selection bits for the new input branch of muxes
+-- In case of shifting queue, must work with updated back pointer, or nRemaining
+function TMP_getIndicesForInput(qs: TMP_queueState; mask: std_logic_vector) return SmallNumberArray is
+	constant LEN: integer := mask'length;
+	constant MASK_NUM: SmallNumber := i2slv(PIPE_WIDTH-1, SMALL_NUMBER_SIZE); -- Based on PIPE_WIDTH!
+	variable res: SmallNumberArray(0 to LEN-1) := (others => (others => '0'));
+	variable sn: SmallNumber := (others => '0');
+begin
+	for i in 0 to LEN-1 loop
+		sn := i2slv(i, SMALL_NUMBER_SIZE);
+		sn := subSN(sn, qs.pEnd);
+		sn := sn and MASK_NUM;
+		res(i) := sn;
+	end loop;
+	return res;
+end function;
+
+function TMP_getCkEnForInput(qs: TMP_queueState; mask: std_logic_vector; nRec: SmallNumber)
+return std_logic_vector is
+	constant LEN: integer := mask'length;
+	variable res: std_logic_vector(0 to LEN-1) := (others => '0');
+	variable sn, sn0: SmallNumber := (others => '0');
+begin
+	for i in 0 to LEN-1 loop
+		-- Put '1' if (i - qs.pEnd) in [0 to nRec-1]  // or use enable for whole window up to PIEP_WIDTH-1??
+		-- TODO
+			sn := i2slv(i, SMALL_NUMBER_SIZE);
+			sn := subSN(sn, qs.pEnd);
+			-- Check if sn is nonnegative but smaller than nRec
+			sn0 := subSN(sn, nRec);
+		res(i) := not sn(SMALL_NUMBER_SIZE-1) and sn0(SMALL_NUMBER_SIZE-1); 
+						--lessThan(sn, PIPE_WIDTH, 8);
+	end loop;
+	return res;
+end function; 
+
+
+function TMP_getSendingMask(qs: TMP_queueState; mask: std_logic_vector; nSend: SmallNumber)
+return std_logic_vector is
+	constant LEN: integer := mask'length;
+	variable res: std_logic_vector(0 to LEN-1) := (others => '0');
+	variable sn, sn0: SmallNumber := (others => '0');
+begin
+	for i in 0 to LEN-1 loop
+		-- Put '1' if (i - qs.pEnd) in [0 to nRec-1]  // or use enable for whole window up to PIEP_WIDTH-1??
+		-- TODO
+			sn := i2slv(i, SMALL_NUMBER_SIZE);
+			sn := subSN(sn, qs.pStart);
+			-- Check if sn is nonnegative but smaller than nSend
+			sn0 := subSN(sn, nSend);
+		res(i) := not sn(SMALL_NUMBER_SIZE-1) and sn0(SMALL_NUMBER_SIZE-1); 
+						--lessThan(sn, PIPE_WIDTH, 8);
+	end loop;
+	return res;
+end function;
 
 
 

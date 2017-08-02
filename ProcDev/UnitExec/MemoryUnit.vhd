@@ -96,10 +96,12 @@ architecture Behavioral of MemoryUnit is
 
 	signal content, contentNext, contentUpdated:
 					InstructionSlotArray(0 to QUEUE_SIZE-1) := (others => DEFAULT_INSTRUCTION_SLOT);
-	signal contentData, contentDataNext: InstructionStateArray(0 to QUEUE_SIZE-1)
+	signal contentData, contentDataNext,  TMP_content: InstructionStateArray(0 to QUEUE_SIZE-1)
 																			:= (others => DEFAULT_INSTRUCTION_STATE);
 	signal fullMask, livingMask, killMask, contentMaskNext, matchingA, matchingD,
-								matchingShA, matchingShD: std_logic_vector(0 to QUEUE_SIZE-1) := (others => '0'); 
+				matchingShA, matchingShD,  
+				TMP_mask, TMP_ckEnForInput, TMP_sendingMask, TMP_killMask, TMP_maskNext
+								: std_logic_vector(0 to QUEUE_SIZE-1) := (others => '0'); 
 	signal sqOutData: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
 
 	signal bufferDrive: FlowDriveBuffer := (killAll => '0', lockAccept => '0', lockSend => '0',
@@ -108,10 +110,24 @@ architecture Behavioral of MemoryUnit is
 	
 		signal qs0, qs1: TMP_queueState := TMP_defaultQueueState;
 		signal ta, tb: SmallNumber := (others => '0');
+		signal contentView: InstructionStateArray(0 to QUEUE_SIZE-1) := (others => DEFAULT_INSTRUCTION_STATE);
+		signal maskView: std_logic_vector(0 to QUEUE_SIZE-1) := (others => '0');
+		
+		signal inputIndices: SmallNumberArray(0 to QUEUE_SIZE-1) := (others => (others => '0'));
+		
 begin				
 				ta <= bufferResponse.sending;
 				tb <= bufferDrive.prevSending;
-				qs1 <= TMP_change(qs0, ta, tb, fullMask, killMask, lateEventSignal or execEventSignal);
+				qs1 <= TMP_change(qs0, ta, tb, TMP_mask, TMP_killMask, lateEventSignal or execEventSignal,
+										TMP_maskNext);
+				contentView <= normalizeInsArray(qs0, TMP_content);
+				maskView <= normalizeMask(qs0, TMP_mask);
+				
+				inputIndices <= TMP_getIndicesForInput(qs0, TMP_mask);
+				TMP_ckEnForInput <= TMP_getCkEnforInput(qs0, TMP_mask, bufferDrive.prevSending);
+				TMP_sendingMask <= TMP_getSendingMask(qs0, TMP_mask, bufferResponse.sending);
+					TMP_killMask <= rotateMask(killMask, slv2u(qs0.pStart));
+					TMP_maskNext <= (TMP_mask and not TMP_killMask and not TMP_sendingMask) or TMP_ckEnForInput;
 
 		fullMask <= extractFullMask(content);
 		livingMask <= fullMask and not killMask;
@@ -158,6 +174,7 @@ begin
 			begin
 				if rising_edge(clk) then	
 						qs0 <= qs1;
+						TMP_mask <= TMP_maskNext;	
 							
 					content <= contentNext;
 					
