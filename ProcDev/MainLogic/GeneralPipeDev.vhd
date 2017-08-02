@@ -156,7 +156,11 @@ function combineMulti(vec0, vec1: StageDataMulti) return StageDataMulti;
 
 function findWhichTakeReg(sd: StageDataMulti) return std_logic_vector;
 function findWhichPutReg(sd: StageDataMulti) return std_logic_vector;
-	
+
+function getKillMask(content: InstructionStateArray; fullMask: std_logic_vector;
+							causing: InstructionState; execEventSig: std_logic; lateEventSig: std_logic)
+return std_logic_vector;
+
 end GeneralPipeDev;
 
 
@@ -1022,5 +1026,21 @@ begin
 	
 	return res;
 end function;
+
+
+function getKillMask(content: InstructionStateArray; fullMask: std_logic_vector;
+							causing: InstructionState; execEventSig: std_logic; lateEventSig: std_logic)
+return std_logic_vector is
+	variable res: std_logic_vector(0 to fullMask'length-1);
+	variable diff: SmallNumber := (others => '0');
+begin
+	for i in 0 to fullMask'length-1 loop
+		diff := subSN(causing.groupTag, content(i).groupTag); -- High bit of diff carries the info "tag is before"
+		res(i) := killByTag(diff(SMALL_NUMBER_SIZE-1), execEventSig, lateEventSig) and fullMask(i);
+	end loop;
+	return res;
+end function;
+
+
 
 end GeneralPipeDev;

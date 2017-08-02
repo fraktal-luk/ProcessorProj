@@ -271,6 +271,24 @@ begin
 	return res;
 end function;
 
+function TMP_getNewContent(content: InstructionStateArray; newContent: InstructionStateArray;
+									cken: std_logic_vector; indices: SmallNumberArray)
+return InstructionStateArray is
+	constant LEN: integer := content'length;
+	constant ILEN: integer := newContent'length;
+	constant MASK_NUM: SmallNumber := i2slv(ILEN-1, SMALL_NUMBER_SIZE);
+	variable res: InstructionStateArray(0 to LEN-1) := content;
+	variable tmpSN: SmallNUmber := (others => '0');
+begin
+	for i in 0 to LEN-1 loop
+		tmpSN := indices(i) and MASK_NUM;
+		if cken(i) = '1' then
+			res(i) := newContent(slv2u(tmpSN));
+		end if;
+	end loop;
+	return res;
+end function;
+
 
 
 function selectIns4(v0: InstructionStateArray(0 to 3);

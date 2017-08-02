@@ -96,7 +96,7 @@ architecture Behavioral of MemoryUnit is
 
 	signal content, contentNext, contentUpdated:
 					InstructionSlotArray(0 to QUEUE_SIZE-1) := (others => DEFAULT_INSTRUCTION_SLOT);
-	signal contentData, contentDataNext,  TMP_content: InstructionStateArray(0 to QUEUE_SIZE-1)
+	signal contentData, contentDataNext,  TMP_content, TMP_contentNext: InstructionStateArray(0 to QUEUE_SIZE-1)
 																			:= (others => DEFAULT_INSTRUCTION_STATE);
 	signal fullMask, livingMask, killMask, contentMaskNext, matchingA, matchingD,
 				matchingShA, matchingShD,  
@@ -126,8 +126,11 @@ begin
 				inputIndices <= TMP_getIndicesForInput(qs0, TMP_mask);
 				TMP_ckEnForInput <= TMP_getCkEnforInput(qs0, TMP_mask, bufferDrive.prevSending);
 				TMP_sendingMask <= TMP_getSendingMask(qs0, TMP_mask, bufferResponse.sending);
-					TMP_killMask <= rotateMask(killMask, slv2u(qs0.pStart));
+					TMP_killMask <= --rotateMask(killMask, slv2u(qs0.pStart));
+						getKillMask(TMP_content, TMP_mask, execCausing, execEventSignal, lateEventSignal);
+					
 					TMP_maskNext <= (TMP_mask and not TMP_killMask and not TMP_sendingMask) or TMP_ckEnForInput;
+				TMP_contentNext <= TMP_getNewContent(TMP_content, dataIn.data, TMP_ckEnForInput, inputIndices);
 
 		fullMask <= extractFullMask(content);
 		livingMask <= fullMask and not killMask;
@@ -175,7 +178,8 @@ begin
 				if rising_edge(clk) then	
 						qs0 <= qs1;
 						TMP_mask <= TMP_maskNext;	
-							
+						TMP_content <= TMP_contentNext;
+						
 					content <= contentNext;
 					
 					logBuffer(contentData, fullMask, livingMask, bufferResponse);	
