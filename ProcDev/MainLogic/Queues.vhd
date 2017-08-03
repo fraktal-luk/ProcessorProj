@@ -103,11 +103,9 @@ end function;
 
 -- for circular?
 function TMP_change(qs: TMP_queueState; nSend, nRec: SmallNumber;
-						fullMaskA, killMaskA: std_logic_vector; killSig: std_logic; maskNext: std_logic_vector)
+						fullMask, killMask: std_logic_vector; killSig: std_logic; maskNext: std_logic_vector)
 return TMP_queueState is
-	constant LEN: integer := fullMaskA'length;
-
-		variable fullMask, killMask: std_logic_vector(0 to LEN-1) := (others => '0'); -- CAREFUL, TMP
+	constant LEN: integer := fullMask'length;
 
 	variable res: TMP_queueState := qs;
 	variable pStartNew, pEndNew, pEndNext, nFullNext, pLive,
@@ -115,14 +113,8 @@ return TMP_queueState is
 	variable liveMask, killedSearchMask, liveSearchMask,
 				killedPr, livePr: std_logic_vector(0 to LEN-1) := (others => '0');
 	variable pLiveSel: std_logic := '0';
-		variable startInd: integer := 0;
 begin
-	--fullMask := rotateMask(fullMaskA, slv2u(qs.pStart)); -- bring from index 0 to qs.pStart etc
-	--killMask := rotateMask(killMaskA, slv2u(qs.pStart));
-		fullMask := fullMaskA;
-		killMask := killMaskA;
-
-	-- TODO: check if not seding more than living, etc.
+	-- TODO: check if not sending more than living, etc.
 
 	sizeNum := i2slv(LEN, SMALL_NUMBER_SIZE);
 	maskNum := i2slv(LEN-1, SMALL_NUMBER_SIZE);	
@@ -240,13 +232,11 @@ return std_logic_vector is
 begin
 	for i in 0 to LEN-1 loop
 		-- Put '1' if (i - qs.pEnd) in [0 to nRec-1]  // or use enable for whole window up to PIEP_WIDTH-1??
-		-- TODO
 			sn := i2slv(i, SMALL_NUMBER_SIZE);
 			sn := subSN(sn, qs.pEnd);
 			-- Check if sn is nonnegative but smaller than nRec
 			sn0 := subSN(sn, nRec);
 		res(i) := not sn(SMALL_NUMBER_SIZE-1) and sn0(SMALL_NUMBER_SIZE-1); 
-						--lessThan(sn, PIPE_WIDTH, 8);
 	end loop;
 	return res;
 end function; 
@@ -259,14 +249,11 @@ return std_logic_vector is
 	variable sn, sn0: SmallNumber := (others => '0');
 begin
 	for i in 0 to LEN-1 loop
-		-- Put '1' if (i - qs.pEnd) in [0 to nRec-1]  // or use enable for whole window up to PIEP_WIDTH-1??
-		-- TODO
 			sn := i2slv(i, SMALL_NUMBER_SIZE);
 			sn := subSN(sn, qs.pStart);
 			-- Check if sn is nonnegative but smaller than nSend
 			sn0 := subSN(sn, nSend);
 		res(i) := not sn(SMALL_NUMBER_SIZE-1) and sn0(SMALL_NUMBER_SIZE-1); 
-						--lessThan(sn, PIPE_WIDTH, 8);
 	end loop;
 	return res;
 end function;
@@ -278,7 +265,7 @@ return InstructionStateArray is
 	constant ILEN: integer := newContent'length;
 	constant MASK_NUM: SmallNumber := i2slv(ILEN-1, SMALL_NUMBER_SIZE);
 	variable res: InstructionStateArray(0 to LEN-1) := content;
-	variable tmpSN: SmallNUmber := (others => '0');
+	variable tmpSN: SmallNumber := (others => '0');
 begin
 	for i in 0 to LEN-1 loop
 		tmpSN := indices(i) and MASK_NUM;

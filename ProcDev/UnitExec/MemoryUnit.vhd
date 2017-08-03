@@ -116,21 +116,22 @@ architecture Behavioral of MemoryUnit is
 		signal inputIndices: SmallNumberArray(0 to QUEUE_SIZE-1) := (others => (others => '0'));
 		
 begin				
-				ta <= bufferResponse.sending;
+				ta <= bufferResponse.sending;	-- Aux to use named objects for TMP_change (avoid simulator error)
 				tb <= bufferDrive.prevSending;
 				qs1 <= TMP_change(qs0, ta, tb, TMP_mask, TMP_killMask, lateEventSignal or execEventSignal,
 										TMP_maskNext);
-				contentView <= normalizeInsArray(qs0, TMP_content);
-				maskView <= normalizeMask(qs0, TMP_mask);
-				
+			
 				inputIndices <= TMP_getIndicesForInput(qs0, TMP_mask);
 				TMP_ckEnForInput <= TMP_getCkEnforInput(qs0, TMP_mask, bufferDrive.prevSending);
 				TMP_sendingMask <= TMP_getSendingMask(qs0, TMP_mask, bufferResponse.sending);
-					TMP_killMask <= --rotateMask(killMask, slv2u(qs0.pStart));
-						getKillMask(TMP_content, TMP_mask, execCausing, execEventSignal, lateEventSignal);
+				TMP_killMask <= getKillMask(TMP_content, TMP_mask, execCausing, execEventSignal, lateEventSignal);
 					
-					TMP_maskNext <= (TMP_mask and not TMP_killMask and not TMP_sendingMask) or TMP_ckEnForInput;
+				TMP_maskNext <= (TMP_mask and not TMP_killMask and not TMP_sendingMask) or TMP_ckEnForInput;
 				TMP_contentNext <= TMP_getNewContent(TMP_content, dataIn.data, TMP_ckEnForInput, inputIndices);
+
+				contentView <= normalizeInsArray(qs0, TMP_content);
+				maskView <= normalizeMask(qs0, TMP_mask);
+
 
 		fullMask <= extractFullMask(content);
 		livingMask <= fullMask and not killMask;
