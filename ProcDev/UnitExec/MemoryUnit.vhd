@@ -116,7 +116,8 @@ architecture Behavioral of MemoryUnit is
 		signal inputIndices: SmallNumberArray(0 to QUEUE_SIZE-1) := (others => (others => '0'));
 		
 begin				
-				ta <= bufferResponse.sending;	-- Aux to use named objects for TMP_change (avoid simulator error)
+				ta <= --bufferResponse.sending;	-- Aux to use named objects for TMP_change (avoid simulator error)
+							bufferDrive.nextAccepting;
 				tb <= bufferDrive.prevSending;
 				qs1 <= TMP_change(qs0, ta, tb, TMP_mask, TMP_killMask, lateEventSignal or execEventSignal,
 										TMP_maskNext);
@@ -126,7 +127,8 @@ begin
 				TMP_ckEnForInput <= TMP_getCkEnForInput(qs0, TMP_mask, bufferDrive.prevSending);
 					-- in shifting queue this would be shfited by nSend
 					-- Also slots for moved part would have enable, found from (i < nRemaining), only if nSend /= 0
-				TMP_sendingMask <= TMP_getSendingMask(qs0, TMP_mask, bufferResponse.sending);
+				TMP_sendingMask <= TMP_getSendingMask(qs0, TMP_mask, --bufferResponse.sending);
+																						bufferDrive.nextAccepting);
 				TMP_killMask <= getKillMask(TMP_content, TMP_mask, execCausing, execEventSignal, lateEventSignal);
 					
 				TMP_maskNext <= (TMP_mask and not TMP_killMask and not TMP_sendingMask) or TMP_ckEnForInput;
