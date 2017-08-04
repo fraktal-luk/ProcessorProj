@@ -102,7 +102,7 @@ architecture Behavioral of MemoryUnit is
 				matchingShA, matchingShD,  
 				TMP_mask, TMP_ckEnForInput, TMP_sendingMask, TMP_killMask, TMP_maskNext,	TMP_maskA, TMP_maskD
 								: std_logic_vector(0 to QUEUE_SIZE-1) := (others => '0'); 
-	signal sqOutData, TMP_frontW, TMP_preFrontW: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
+	signal sqOutData, TMP_frontW, TMP_preFrontW, TMP_sendingData: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
 
 	signal bufferDrive: FlowDriveBuffer := (killAll => '0', lockAccept => '0', lockSend => '0',
 																others=>(others=>'0'));
@@ -135,7 +135,8 @@ begin
 					-- TODO: new form taking into account the updated slots
 						TMP_getNewContentUpdate(TMP_content, dataIn.data, TMP_ckEnForInput, inputIndices,
 												TMP_maskA, TMP_maskD,
-												storeAddressWr, storeValueWr, storeAddressDataIn, storeValueDataIn);
+												storeAddressWr, storeValueWr, storeAddressDataIn, storeValueDataIn,
+												CLEAR_COMPLETED);
 
 		TMP_maskA <= findMatching(makeSlotArray(TMP_content, TMP_mask), storeAddressDataIn); --dataA);
 		TMP_maskD <= findMatching(makeSlotArray(TMP_content, TMP_mask), storeValueDataIn);
@@ -151,6 +152,7 @@ begin
 			TMP_frontW <= TMP_getFrontWindow(qs0, TMP_content, TMP_mask);
 			TMP_preFrontW <= TMP_getPreFrontWindow(qs0, TMP_content, TMP_mask);
 
+			TMP_sendingData <= findCommittingSQ(TMP_frontW.data, TMP_frontW.fullMask, groupCtrInc, committing);
 
 
 		fullMask <= extractFullMask(content);
@@ -188,7 +190,8 @@ begin
 		contentUpdated <= makeSlotArray(contentDataNext, contentMaskNext);		
 		contentNext <= contentUpdated;
 		
-			sqOutData <= findCommittingSQ(extractData(content), livingMask, groupCtrInc, committing);
+			sqOutData <= --findCommittingSQ(extractData(content), livingMask, groupCtrInc, committing);
+							TMP_sendingData;
 					
 			sendingSQ <= isNonzero(sqOutData.fullMask);
 			dataOutSQ <= sqOutData.data(0); -- CAREFUL, TEMP!
@@ -249,7 +252,10 @@ begin
 												and fullMask(i);									
 					end generate;
 					
-	acceptingOut <= not fullMask(QUEUE_SIZE-PIPE_WIDTH); -- when last slot free					
+	acceptingOut <= not --fullMask(QUEUE_SIZE-PIPE_WIDTH); -- when last slot free	
+								TMP_preFrontW.fullMask(0);
+
+	
 	sendingSQOut <= sendingSQ;
 end Behavioral;
 

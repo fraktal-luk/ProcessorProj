@@ -317,7 +317,8 @@ end function;
 function TMP_getNewContentUpdate(content: InstructionStateArray; newContent: InstructionStateArray;
 									cken: std_logic_vector; indices: SmallNumberArray;
 									maskA, maskD: std_logic_vector; wrA, wrD: std_logic;
-									insA, insD: InstructionState)
+									insA, insD: InstructionState;
+									clearCompleted: boolean)
 return InstructionStateArray is
 	constant LEN: integer := content'length;
 	constant ILEN: integer := newContent'length;
@@ -334,12 +335,16 @@ begin
 		--		Also: write only needed entires: for D -> result, completed2; for A -> target, completed 
 
 		if (wrA and maskA(i)) = '1' then
-			res(i).target := insA.result;
+			res(i).--target 
+					argValues.arg1
+					:= insA.result;
 			res(i).controlInfo.completed := '1';
 		end if;
 		
 		if (wrD and maskD(i)) = '1' then
-			res(i).result := insD.argValues.arg2;
+			res(i).--result
+					argValues.arg2
+					:= insD.argValues.arg2;
 			res(i).controlInfo.completed2 := '1';						
 		end if;
 
@@ -350,8 +355,16 @@ begin
 			-- res(i) := newContent(slv2u(tmpSN));
 			res(i).groupTag := newContent(slv2u(tmpSN)).groupTag;
 			res(i).operation := newContent(slv2u(tmpSN)).operation;
-			res(i).controlInfo.completed := '0';
-			res(i).controlInfo.completed2 := '0';			
+			
+				res(i).argValues := newContent(slv2u(tmpSN)).argValues;
+			
+			if clearCompleted then
+				res(i).controlInfo.completed := '0';
+				res(i).controlInfo.completed2 := '0';
+			else
+				res(i).controlInfo.completed := newContent(slv2u(tmpSN)).controlInfo.completed;
+				res(i).controlInfo.completed2 := newContent(slv2u(tmpSN)).controlInfo.completed2;				
+			end if;
 		end if;
 	end loop;
 	return res;
