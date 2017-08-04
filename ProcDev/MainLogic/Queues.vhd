@@ -127,7 +127,7 @@ begin
 	
 	-- Where is "first killed" slot if any?
 	killedPr(1 to LEN-1) := killMask(0 to LEN-2);
-	killedPr(0) := killMask(LEN-1);
+	killedPr(0) := killMask(LEN-1); -- CAREFUL: for shifting queue this would be constant '0'  
 	killedSearchMask := killMask and not killedPr; -- Bit sum must be 0 or 1
 	
 	-- Put this into a function?
@@ -148,8 +148,8 @@ begin
 	nFullNext := subSN(pEndNext, pStartNew); -- CAREFUL! Omits highest bit
 	
 	res.pStart := pStartNew and maskNum;
-	res.pEnd := pEndNext and maskNum;
-	res.nFull := nFullNext and maskNum;
+	res.pEnd := pEndNext and maskNum;	-- CAREFUL: in shifting queue 1 more bit for MAX_SIZE
+	res.nFull := nFullNext and maskNum;	--				here likewise ^^
 	-- Handle the case where every slot is full
 	-- CAREFUL: must be a bit from future fullMask, cause current liveMask slot can be sent and cleared!
 	if isNonzero(res.nFull) = '0' and maskNext(0) = '1' then -- Any slot from liveMask would do
@@ -241,6 +241,42 @@ begin
 	return res;
 end function; 
 
+	function TMP_getCkEnForInput_Shifting(qs: TMP_queueState; mask: std_logic_vector; nSend, nRec: SmallNumber)
+	return std_logic_vector is
+		constant LEN: integer := mask'length;
+		variable res: std_logic_vector(0 to LEN-1) := (others => '0');
+		variable sn, sn0: SmallNumber := (others => '0');
+	begin
+		for i in 0 to LEN-1 loop
+			-- Put '1' if (i - qs.pEnd) in [0 to nRec-1]  // or use enable for whole window up to PIEP_WIDTH-1??
+				sn := i2slv(i, SMALL_NUMBER_SIZE);
+				sn := subSN(sn, qs.pEnd);
+				sn := addSN(sn, nSend); -- difference from circular: temporary pEnd moves towards front 
+				-- Check if sn is nonnegative but smaller than nRec
+				sn0 := subSN(sn, nRec);
+			res(i) := not sn(SMALL_NUMBER_SIZE-1) and sn0(SMALL_NUMBER_SIZE-1); 
+		end loop;
+		return res;
+	end function;
+
+	function TMP_getCkEnForMoved_Shifting(qs: TMP_queueState; mask: std_logic_vector; nSend, nRec: SmallNumber)
+	return std_logic_vector is
+		constant LEN: integer := mask'length;
+		variable res: std_logic_vector(0 to LEN-1) := (others => '0');
+		variable sn, sn0, nRem: SmallNumber := (others => '0');
+	begin
+		for i in 0 to LEN-1 loop
+			-- Put '1' if (i - qs.pEnd) in [0 to nRec-1]  // or use enable for whole window up to PIEP_WIDTH-1??
+				sn := i2slv(i, SMALL_NUMBER_SIZE);
+					nRem := subSN(qs.pEnd, nSend);
+				-- Check if sn is nonnegative but smaller than nRemaining
+				sn0 := subSN(sn, nRem);
+			res(i) := not sn(SMALL_NUMBER_SIZE-1) and sn0(SMALL_NUMBER_SIZE-1)
+							and isNonzero(nSend); -- moves only when sending something!
+		end loop;
+		return res;
+	end function;
+
 
 function TMP_getSendingMask(qs: TMP_queueState; mask: std_logic_vector; nSend: SmallNumber)
 return std_logic_vector is
@@ -275,6 +311,52 @@ begin
 	end loop;
 	return res;
 end function;
+
+
+-- This will work for circular queues
+function TMP_getNewContentUpdate(content: InstructionStateArray; newContent: InstructionStateArray;
+									cken: std_logic_vector; indices: SmallNumberArray;
+									maskA, maskD: std_logic_vector; wrA, wrD: std_logic;
+									insA, insD: InstructionState)
+return InstructionStateArray is
+	constant LEN: integer := content'length;
+	constant ILEN: integer := newContent'length;
+	constant MASK_NUM: SmallNumber := i2slv(ILEN-1, SMALL_NUMBER_SIZE);
+	variable res: InstructionStateArray(0 to LEN-1) := content;
+	variable tmpSN: SmallNumber := (others => '0');
+begin
+	for i in 0 to LEN-1 loop
+		tmpSN := indices(i) and MASK_NUM;
+		-- TODO: add updated slots to the mux
+		-- 		The update will apply only to selected fields of the slots, and for circular queue
+		--			those fields are never written from different sources.
+		--			So for circular queue there can be independent loops, without multiplexing those fields.
+		--		Also: write only needed entires: for D -> result, completed2; for A -> target, completed 
+
+		if (wrA and maskA(i)) = '1' then
+			res(i).target := insA.result;
+			res(i).controlInfo.completed := '1';
+		end if;
+		
+		if (wrD and maskD(i)) = '1' then
+			res(i).result := insD.argValues.arg2;
+			res(i).controlInfo.completed2 := '1';						
+		end if;
+
+
+		if cken(i) = '1' then -- cken is for new input
+			-- CAREFUL: write only those fields that have to be written:
+			--				groupTag, operation, completed = 0, completed2 = 0
+			-- res(i) := newContent(slv2u(tmpSN));
+			res(i).groupTag := newContent(slv2u(tmpSN)).groupTag;
+			res(i).operation := newContent(slv2u(tmpSN)).operation;
+			res(i).controlInfo.completed := '0';
+			res(i).controlInfo.completed2 := '0';			
+		end if;
+	end loop;
+	return res;
+end function;
+
 
 
 
