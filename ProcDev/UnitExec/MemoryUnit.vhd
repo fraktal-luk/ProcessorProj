@@ -56,7 +56,8 @@ use work.Queues.all;
 entity MemoryUnit is
 	generic(
 		QUEUE_SIZE: integer := 4;
-		CLEAR_COMPLETED: boolean := true
+		CLEAR_COMPLETED: boolean := true;
+		KEEP_INPUT_CONTENT: boolean := false
 	);
 	port(
 		clk: in std_logic;
@@ -138,7 +139,7 @@ begin
 						TMP_getNewContentUpdate(TMP_content, dataIn.data, TMP_ckEnForInput, inputIndices,
 												TMP_maskA, TMP_maskD,
 												storeAddressWr, storeValueWr, storeAddressDataIn, storeValueDataIn,
-												CLEAR_COMPLETED);
+												CLEAR_COMPLETED, KEEP_INPUT_CONTENT);
 
 		TMP_maskA <= findMatching(makeSlotArray(TMP_content, TMP_mask), storeAddressDataIn); --dataA);
 		TMP_maskD <= findMatching(makeSlotArray(TMP_content, TMP_mask), storeValueDataIn);

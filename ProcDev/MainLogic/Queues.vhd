@@ -318,7 +318,7 @@ function TMP_getNewContentUpdate(content: InstructionStateArray; newContent: Ins
 									cken: std_logic_vector; indices: SmallNumberArray;
 									maskA, maskD: std_logic_vector; wrA, wrD: std_logic;
 									insA, insD: InstructionState;
-									clearCompleted: boolean)
+									clearCompleted, keepInputContent: boolean)
 return InstructionStateArray is
 	constant LEN: integer := content'length;
 	constant ILEN: integer := newContent'length;
@@ -356,7 +356,9 @@ begin
 			res(i).groupTag := newContent(slv2u(tmpSN)).groupTag;
 			res(i).operation := newContent(slv2u(tmpSN)).operation;
 			
+			if keepInputContent then
 				res(i).argValues := newContent(slv2u(tmpSN)).argValues;
+			end if;
 			
 			if clearCompleted then
 				res(i).controlInfo.completed := '0';
