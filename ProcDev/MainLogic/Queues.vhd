@@ -227,6 +227,7 @@ end function;
 function TMP_getCkEnForInput(qs: TMP_queueState; mask: std_logic_vector; nRec: SmallNumber)
 return std_logic_vector is
 	constant LEN: integer := mask'length;
+		constant MASK_NUM: SmallNumber := i2slv(LEN-1, SMALL_NUMBER_SIZE);
 	variable res: std_logic_vector(0 to LEN-1) := (others => '0');
 	variable sn, sn0: SmallNumber := (others => '0');
 begin
@@ -234,16 +235,30 @@ begin
 		-- Put '1' if (i - qs.pEnd) in [0 to nRec-1]  // or use enable for whole window up to PIEP_WIDTH-1??
 			sn := i2slv(i, SMALL_NUMBER_SIZE);
 			sn := subSN(sn, qs.pEnd);
+				sn := sn and MASK_NUM;
 			-- Check if sn is nonnegative but smaller than nRec
 			sn0 := subSN(sn, nRec);
+				--sn := sn and MASK_NUM;
+				--sn0 := sn0 and MASK_NUM;
+			
 		res(i) := not sn(SMALL_NUMBER_SIZE-1) and sn0(SMALL_NUMBER_SIZE-1); 
+		
+		--if mask = "0110" then
+		--	report integer'image(i); 
+		--	report integer'image(slv2u(nRec)) & ", " & integer'image(slv2u(sn)) & ", " &
+		--				integer'image(slv2u(sn0));		
+		--end if;		
 	end loop;
+	
+
+	
 	return res;
 end function; 
 
 	function TMP_getCkEnForInput_Shifting(qs: TMP_queueState; mask: std_logic_vector; nSend, nRec: SmallNumber)
 	return std_logic_vector is
 		constant LEN: integer := mask'length;
+			constant MASK_NUM: SmallNumber := i2slv(LEN-1, SMALL_NUMBER_SIZE);		
 		variable res: std_logic_vector(0 to LEN-1) := (others => '0');
 		variable sn, sn0: SmallNumber := (others => '0');
 	begin
@@ -251,7 +266,8 @@ end function;
 			-- Put '1' if (i - qs.pEnd) in [0 to nRec-1]  // or use enable for whole window up to PIEP_WIDTH-1??
 				sn := i2slv(i, SMALL_NUMBER_SIZE);
 				sn := subSN(sn, qs.pEnd);
-				sn := addSN(sn, nSend); -- difference from circular: temporary pEnd moves towards front 
+				sn := addSN(sn, nSend); -- difference from circular: temporary pEnd moves towards front
+					sn := sn and MASK_NUM;
 				-- Check if sn is nonnegative but smaller than nRec
 				sn0 := subSN(sn, nRec);
 			res(i) := not sn(SMALL_NUMBER_SIZE-1) and sn0(SMALL_NUMBER_SIZE-1); 
@@ -262,12 +278,14 @@ end function;
 	function TMP_getCkEnForMoved_Shifting(qs: TMP_queueState; mask: std_logic_vector; nSend, nRec: SmallNumber)
 	return std_logic_vector is
 		constant LEN: integer := mask'length;
+			constant MASK_NUM: SmallNumber := i2slv(LEN-1, SMALL_NUMBER_SIZE);		
 		variable res: std_logic_vector(0 to LEN-1) := (others => '0');
 		variable sn, sn0, nRem: SmallNumber := (others => '0');
 	begin
 		for i in 0 to LEN-1 loop
 			-- Put '1' if (i - qs.pEnd) in [0 to nRec-1]  // or use enable for whole window up to PIEP_WIDTH-1??
 				sn := i2slv(i, SMALL_NUMBER_SIZE);
+					sn := sn and MASK_NUM;
 					nRem := subSN(qs.pEnd, nSend);
 				-- Check if sn is nonnegative but smaller than nRemaining
 				sn0 := subSN(sn, nRem);
@@ -281,12 +299,14 @@ end function;
 function TMP_getSendingMask(qs: TMP_queueState; mask: std_logic_vector; nSend: SmallNumber)
 return std_logic_vector is
 	constant LEN: integer := mask'length;
+		constant MASK_NUM: SmallNumber := i2slv(LEN-1, SMALL_NUMBER_SIZE);	
 	variable res: std_logic_vector(0 to LEN-1) := (others => '0');
 	variable sn, sn0: SmallNumber := (others => '0');
 begin
 	for i in 0 to LEN-1 loop
 			sn := i2slv(i, SMALL_NUMBER_SIZE);
 			sn := subSN(sn, qs.pStart);
+				sn := sn and MASK_NUM;
 			-- Check if sn is nonnegative but smaller than nSend
 			sn0 := subSN(sn, nSend);
 		res(i) := not sn(SMALL_NUMBER_SIZE-1) and sn0(SMALL_NUMBER_SIZE-1); 

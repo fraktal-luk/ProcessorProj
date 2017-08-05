@@ -455,7 +455,7 @@ begin
 				end if;
 				
 				write(fline, 
-								 integer'image(slv2u(sd.data(i).data(j).numberTag))
+								 integer'image(slv2u(sd.data(i).data(j).groupTag))
 					  & "@" & integer'image(slv2u(sd.data(i).data(j).basicInfo.ip)));
 				write(fline, ", ");
 			end if;
