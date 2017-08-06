@@ -183,97 +183,76 @@ return StageDataROB is
 	variable TMP_s0, TMP_s1: SmallNumber := (others => '0');
 	
 		variable groupSelect: std_logic_vector(0 to ROB_SIZE-1) := (others => '0');
+		variable TMP_found: boolean := false;		
 begin
 	ihr := getTagHighSN(refTag);
 	for i in 0 to execEnds'length-1 loop
-		ih := getTagHighSN(execEnds(i).groupTag);
 		il := getTagLowSN(execEnds(i).groupTag);
-		--  -k = (not k) + 1 ;; a - k - 1 = a + (not k)
-		ind := addSN(ih, not ihr);
-		ind(SMALL_NUMBER_SIZE-1 downto SMALL_NUMBER_SIZE-LOG2_PIPE_WIDTH) := (others => '0');
-			
-		groupSelect := calcGroupSelect(execEnds(i).groupTag, refTag);
-			
-		if execReady(i) = '1' then -- Setting completed and squashing ops
-			for j in 0 to ROB_SIZE-1 loop
-				if groupSelect(j) = '1' then
-					-----					
-						TMP_elem := false;
-						for k in 0 to PIPE_WIDTH-1 loop
-							if TMP_elem then
-								if res.data(j).fullMask(k) = '1' then -- CAREFUL: squashed set only for existing ops
-									res.data(j).data(k).controlInfo.squashed := '1';
-								end if;
-								res.data(j).fullMask(k) := '0';								
-							end if;	
-
-							TMP_s0 := i2slv(k, SMALL_NUMBER_SIZE);
-							if TMP_s0 = il then							
-								if execEnds(i).controlInfo.hasException = '1' then
-									TMP_elem := true;
-									res.data(j).data(k).controlInfo.hasException := '1';
-								end if;
-								res.data(j).data(k).controlInfo.completed := '1';								
-							end if;
-						end loop;
-					------
-				end if;	
-			end loop;
-		end if;
+		groupSelect := calcGroupSelect(execEnds(i).groupTag, refTag);			
+		for j in 0 to ROB_SIZE-1 loop
+			if groupSelect(j) = '1' and execReady(i) = '1' then	
+				for k in 0 to PIPE_WIDTH-1 loop
+					TMP_s0 := i2slv(k, SMALL_NUMBER_SIZE);
+					if TMP_s0 = il then							
+						if execEnds(i).controlInfo.hasException = '1' then
+							TMP_elem := true;
+								res.data(j).data(k).controlInfo.newEvent := '1'; --- !!!
+							res.data(j).data(k).controlInfo.hasException := '1';
+						end if;
+						res.data(j).data(k).controlInfo.completed := '1';								
+					end if;													
+				end loop;
+			end if;	
+		end loop;
 	end loop;
 
 	-- CAREFUL: setting completed2
 	for i in 0 to execEnds2'length-1 loop
-		ih := getTagHighSN(execEnds2(i).groupTag);
 		il := getTagLowSN(execEnds2(i).groupTag);
-		--  -k = (not k) + 1 ;; a - k - 1 = a + (not k)
-		ind := addSN(ih, not ihr);
-		ind(SMALL_NUMBER_SIZE-1 downto SMALL_NUMBER_SIZE-LOG2_PIPE_WIDTH) := (others => '0');
-			
-		groupSelect := calcGroupSelect(execEnds2(i).groupTag, refTag);
-				
-		if execReady2(i) = '1' then -- Setting completed2 and squashing ops
-			for j in 0 to ROB_SIZE-1 loop
-				if groupSelect(j) = '1' then
-					-----
-						TMP_elem := false;
-						for k in 0 to PIPE_WIDTH-1 loop
-							if TMP_elem then
-								if res.data(j).fullMask(k) = '1' then -- CAREFUL: squashed set only for existing ops
-									res.data(j).data(k).controlInfo.squashed := '1';
-								end if;							
-								res.data(j).fullMask(k) := '0';	
-							end if;
+		groupSelect := calcGroupSelect(execEnds2(i).groupTag, refTag);				
+		for j in 0 to ROB_SIZE-1 loop
+			if groupSelect(j) = '1' and execReady2(i) = '1' then
+				-----
+				for k in 0 to PIPE_WIDTH-1 loop
+					TMP_s0 := i2slv(k, SMALL_NUMBER_SIZE);
+					if TMP_s0 = il then							
+						if execEnds2(i).controlInfo.hasException = '1' then
+							TMP_elem := true;
+								res.data(j).data(k).controlInfo.newEvent := '1'; --- !!!
+							res.data(j).data(k).controlInfo.hasException := '1';
+						end if;
 							
-							TMP_s0 := i2slv(k, SMALL_NUMBER_SIZE);
-							if TMP_s0 = il then								
-								if 	execEnds2(i).controlInfo.hasException = '1'
-									or	execEnds2(i).controlInfo.hasBranch = '1'
-									--or	execEnds2(i).controlInfo.specialAction = '1'
-								then							
-									TMP_elem := true;
-								end if;
-
-								-- TODO: remember to add branch info when taken/not taken stats are needed for predictor!
-								if execEnds2(i).controlInfo.hasException = '1' then	
-									res.data(j).data(k).controlInfo.hasException := '1';					
-								end if;
-								
-								if execEnds2(i).controlInfo.hasBranch = '1' then
-									res.data(j).data(k).controlInfo.hasBranch := '1';				
-								end if;
-
-								if execEnds2(i).controlInfo.specialAction = '1' then
-									--res.data(j).data(k).controlInfo.specialAction := '1';						
-								end if;
-
-								res.data(j).data(k).controlInfo.completed2 := '1';	
-							end if;
-						end loop;
-				end if;
-			end loop;	
-		end if;
+						if execEnds2(i).controlInfo.hasBranch = '1' then
+							TMP_elem := true;
+								res.data(j).data(k).controlInfo.newEvent := '1'; --- !!!
+							res.data(j).data(k).controlInfo.hasBranch := '1';
+						end if;
+						
+						res.data(j).data(k).controlInfo.completed2 := '1';								
+					end if;						
+				end loop;
+			end if;
+		end loop;	
 	end loop;
+
+	-- Propagate killed/squashed
+			for j in 0 to ROB_SIZE-1 loop
+				TMP_found := false;
+				for k in 0 to PIPE_WIDTH-1 loop
+					if TMP_found then
+						if res.data(j).fullMask(k) = '1' then
+							res.data(j).data(k).controlInfo.squashed := '1';
+						end if;
+						res.data(j).fullMask(k) := '0';
+					end if;				
+					if res.data(j).data(k).controlInfo.newEvent = '1' then
+						-- CAREFUL: kill subsequent ones when this has excpetion or new branch, but not a branch 
+						--				set in front pipe!
+						res.data(j).data(k).controlInfo.newEvent := '0'; -- CAREFUL: clear to leave blank for late evts
+						TMP_found := true;
+					end if;
+				end loop;
+			end loop;
 
 	if killSignal = '0' then
 		return res;
