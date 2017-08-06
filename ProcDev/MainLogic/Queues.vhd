@@ -224,10 +224,12 @@ begin
 	return res;
 end function;
 
+-- CAREFUL: if buff size is not greater than PIPE_WIDTH, comparisons using MASK_NUM are not valid!
+--				Applies to a number of functions below.
 function TMP_getCkEnForInput(qs: TMP_queueState; mask: std_logic_vector; nRec: SmallNumber)
 return std_logic_vector is
 	constant LEN: integer := mask'length;
-		constant MASK_NUM: SmallNumber := i2slv(LEN-1, SMALL_NUMBER_SIZE);
+		constant MASK_NUM: SmallNumber := i2slv(LEN-1, SMALL_NUMBER_SIZE); 
 	variable res: std_logic_vector(0 to LEN-1) := (others => '0');
 	variable sn, sn0: SmallNumber := (others => '0');
 begin

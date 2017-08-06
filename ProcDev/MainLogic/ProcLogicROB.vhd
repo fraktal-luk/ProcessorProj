@@ -27,9 +27,6 @@ use std.textio.all;
 
 package ProcLogicROB is
 
---function tagHigh(v: SmallNumber) return SmallNumber;
---function tagLow(v: SmallNumber) return SmallNumber;
-
 -- pragma synthesis off
 procedure logROBImplem(sd, sdl: StageDataROB; fr: FlowResponseBuffer;
 								filename: string; desc: string);
@@ -52,39 +49,18 @@ function setCompleted(content: StageDataROB; refTag: SmallNumber;
 							killSignal: std_logic; fromCommitted: std_logic)							
 return StageDataROB;
 
-function killInROB(content: StageDataROB; refTag: SmallNumber; killTag: SmallNumber;
-						killSignal: std_logic; fromCommitted: std_logic)
-return StageDataROB;
-
 --													CAREFUL: tags in future change to InsTag
 function getNumKilled(full: SmallNumber; tagCausing, tagRef: SmallNumber; evt: std_logic)
 return SmallNumber is
 	variable res: SmallNumber := (others => '0');
-	--variable ch, rh: SmallNumber := (others => '0');
-	--	variable ch2, rh2: SmallNumber := (others => '0');
+		variable num: SmallNumber := (others => '0');
 begin
---	ch := tagHigh(tagCausing);
---	rh := tagHigh(tagRef);
---	
---		ch2 := getTagHigh(--tagCausing);
---								SmallNumber'("00001010"));
---		rh2 := getTagHigh(tagRef);
-		
-	
 	if evt = '1' then
-	
-			--report integer'image(slv2u(ch)) & " " & integer'image(slv2u(ch2)); 
-	
-			res:=	i2slv((
-					slv2s(full)
-					+	integer(slv2u(--rh))-- 
-											getTagHigh(tagRef)))
-					- 	integer(slv2u(--ch))-- 
-											getTagHigh(tagCausing)))
-						) mod 2**(SMALL_NUMBER_SIZE - LOG2_PIPE_WIDTH), --(256/PIPE_WIDTH
-					SMALL_NUMBER_SIZE);		
+		num := addSN(full, getTagHighSN(tagRef));
+		num := subSN(num, getTagHighSN(tagCausing));
+		num(SMALL_NUMBER_SIZE-1 downto SMALL_NUMBER_SIZE-LOG2_PIPE_WIDTH) := (others => '0');
 	end if;
-	
+	res := num;		
 	return res;
 end function;
 
@@ -96,16 +72,12 @@ end function;
 		begin
 			vs(SMALL_NUMBER_SIZE-1-LOG2_PIPE_WIDTH downto 0) := selTag(SMALL_NUMBER_SIZE-1 downto LOG2_PIPE_WIDTH);
 			vr(SMALL_NUMBER_SIZE-1-LOG2_PIPE_WIDTH downto 0) := refTag(SMALL_NUMBER_SIZE-1 downto LOG2_PIPE_WIDTH);
-		
-			--indRef := integer(slv2u(getTagHigh(refTag)));
 
-			--index := (indH - indRef - 1) mod 2**(SMALL_NUMBER_SIZE - LOG2_PIPE_WIDTH);
-
-			-- //  indH - indRef - 1 = indH + (-1 - indRef) = indH + not indRef
+			-- Formula:  indH - indRef - 1 = indH + (-1 - indRef) = indH + not indRef
 			ve := addSN(vs, not vr);
-			--ve(ve'high) := '0'; -- CAREFUL: This is to enable comparison in wrapping arithmetic 
-				ve(ve'high downto ve'high - LOG2_PIPE_WIDTH) := (others => '0');
-			-- 
+			-- CAREFUL: This is to enable comparison in wrapping arithmetic 
+			ve(ve'high downto ve'high - LOG2_PIPE_WIDTH) := (others => '0');
+
 			for i in 0 to ROB_SIZE-1 loop
 				if i2slv(i, SMALL_NUMBER_SIZE) = ve then
 					res(i) := '1';
@@ -116,27 +88,11 @@ end function;
 			return res;
 		end function;
 
-
 end ProcLogicROB;
 
 
 
 package body ProcLogicROB is
-
---function tagHigh(v: SmallNumber) return SmallNumber is
---	variable res: SmallNumber := (others => '0');
---begin
---	res(SMALL_NUMBER_SIZE-1-LOG2_PIPE_WIDTH downto 0) := v(SMALL_NUMBER_SIZE-1 downto LOG2_PIPE_WIDTH);
---	return res;
---end function;
---
---function tagLow(v: SmallNumber) return SmallNumber is
---	variable res: SmallNumber := (others => '0');
---begin
---	res(LOG2_PIPE_WIDTH-1 downto 0) := v(LOG2_PIPE_WIDTH-1 downto 0);
---	return res;
---end function;
-
 
 function groupCompleted(insVec: StageDataMulti) return std_logic is
 begin
@@ -220,8 +176,7 @@ function setCompleted(content: StageDataROB; refTag: SmallNumber;
 							killSignal: std_logic; fromCommitted: std_logic)							
 return StageDataROB is
 	variable res: StageDataROB := content;
-	variable indH, indL, indRef, index: integer;
-
+		variable ihr, il, ih, ind: SmallNumber := (others => '0');
 	constant CLEAR_EMPTY_SLOTS_ROB: boolean := false;	
 	variable matched, TMP_elem: boolean := false;
 	
@@ -229,22 +184,17 @@ return StageDataROB is
 	
 		variable groupSelect: std_logic_vector(0 to ROB_SIZE-1) := (others => '0');
 begin
-	indRef := integer(slv2u(getTagHigh(refTag)));
+	ihr := getTagHighSN(refTag);
 	for i in 0 to execEnds'length-1 loop
-		indH := integer(slv2u(getTagHigh(execEnds(i).groupTag)));
-		indL := integer(slv2u(getTagLow(execEnds(i).groupTag)));
+		ih := getTagHighSN(execEnds(i).groupTag);
+		il := getTagLowSN(execEnds(i).groupTag);
 		--  -k = (not k) + 1 ;; a - k - 1 = a + (not k)
-		index := (indH - indRef - 1) mod 2**(SMALL_NUMBER_SIZE - LOG2_PIPE_WIDTH);
-						
-			if index > ROB_SIZE-1 then
-				--next;
-			end if;
+		ind := addSN(ih, not ihr);
+		ind(SMALL_NUMBER_SIZE-1 downto SMALL_NUMBER_SIZE-LOG2_PIPE_WIDTH) := (others => '0');
 			
-				groupSelect := calcGroupSelect(execEnds(i).groupTag, refTag);
-				--assert groupSelect(index) = '1' report "qutyyy";
-				--assert countOnes(groupSelect) = 1 report "oykhh";
+		groupSelect := calcGroupSelect(execEnds(i).groupTag, refTag);
 			
-		if execReady(i) = '1' then
+		if execReady(i) = '1' then -- Setting completed and squashing ops
 			for j in 0 to ROB_SIZE-1 loop
 				if groupSelect(j) = '1' then
 					-----					
@@ -258,9 +208,7 @@ begin
 							end if;	
 
 							TMP_s0 := i2slv(k, SMALL_NUMBER_SIZE);
-							TMP_s1 := clearTagHigh(execEnds(i).groupTag);
-							if --k = indL then
-								TMP_s0 = TMP_s1 then							
+							if TMP_s0 = il then							
 								if execEnds(i).controlInfo.hasException = '1' then
 									TMP_elem := true;
 									res.data(j).data(k).controlInfo.hasException := '1';
@@ -276,26 +224,18 @@ begin
 
 	-- CAREFUL: setting completed2
 	for i in 0 to execEnds2'length-1 loop
-		indH := integer(slv2u(getTagHigh(execEnds2(i).groupTag)));
-		indL := integer(slv2u(getTagLow(execEnds2(i).groupTag)));
+		ih := getTagHighSN(execEnds2(i).groupTag);
+		il := getTagLowSN(execEnds2(i).groupTag);
 		--  -k = (not k) + 1 ;; a - k - 1 = a + (not k)
-		index := (indH - indRef - 1) mod 2**(SMALL_NUMBER_SIZE - LOG2_PIPE_WIDTH);
-		
-			if index > ROB_SIZE-1 then
-				--next;
-			end if;
+		ind := addSN(ih, not ihr);
+		ind(SMALL_NUMBER_SIZE-1 downto SMALL_NUMBER_SIZE-LOG2_PIPE_WIDTH) := (others => '0');
 			
-				groupSelect := calcGroupSelect(execEnds2(i).groupTag, refTag);
-				--assert groupSelect(index) = '1' report "qutyyy";
-				--assert countOnes(groupSelect) = 1 report "oykhh";
+		groupSelect := calcGroupSelect(execEnds2(i).groupTag, refTag);
 				
-		if execReady2(i) = '1' then
+		if execReady2(i) = '1' then -- Setting completed2 and squashing ops
 			for j in 0 to ROB_SIZE-1 loop
 				if groupSelect(j) = '1' then
 					-----
-				
-		-----------
-
 						TMP_elem := false;
 						for k in 0 to PIPE_WIDTH-1 loop
 							if TMP_elem then
@@ -306,9 +246,7 @@ begin
 							end if;
 							
 							TMP_s0 := i2slv(k, SMALL_NUMBER_SIZE);
-							TMP_s1 := clearTagHigh(execEnds2(i).groupTag);
-							if --k = indL then
-								TMP_s0 = TMP_s1 then								
+							if TMP_s0 = il then								
 								if 	execEnds2(i).controlInfo.hasException = '1'
 									or	execEnds2(i).controlInfo.hasBranch = '1'
 									--or	execEnds2(i).controlInfo.specialAction = '1'
@@ -346,16 +284,15 @@ begin
 	end if;
 	
 	for i in 0 to ROB_SIZE-1 loop
-			-- For slots after the affected one
-			if matched then
-				res.fullMask(i) := '0';
-				if CLEAR_EMPTY_SLOTS_ROB then
-					res.data(i) := DEFAULT_STAGE_DATA_MULTI;
-				end if;				
-			end if;
+		-- For slots after the affected one
+		if matched then
+			res.fullMask(i) := '0';
+			if CLEAR_EMPTY_SLOTS_ROB then
+				res.data(i) := DEFAULT_STAGE_DATA_MULTI;
+			end if;				
+		end if;
 			
-		if --i = index then -- CAREFUL: index remains from last iter of loop (execEnds2)
-			groupSelect(i) = '1' then	
+		if groupSelect(i) = '1' then	
 			matched := true;
 		end if;
 				
@@ -363,52 +300,6 @@ begin
 	
 	return res;
 end function;
-
-
-function killInROB(content: StageDataROB; refTag: SmallNumber; killTag: SmallNumber;
-						killSignal: std_logic; fromCommitted: std_logic)
-return StageDataROB is
-	variable res: StageDataROB := content;
-	variable indH, indL, indRef, index, indexP1: integer;
-	
-	constant CLEAR_EMPTY_SLOTS_ROB: boolean := false;
-	variable matched: boolean := false;
-begin
-	
-			return res;
-	
-	if killSignal = '0' then
-		return res;
-	end if;
-
-	indH := integer(slv2u(getTagHigh(killTag)));
-	indL := integer(slv2u(getTagLow(killTag)));
-
-	indRef := integer(slv2u(getTagHigh(refTag)));
-
-	index := (indH - indRef - 1) mod 2**(SMALL_NUMBER_SIZE - LOG2_PIPE_WIDTH);
-	indexP1 := (indH - indRef) mod 2**(SMALL_NUMBER_SIZE - LOG2_PIPE_WIDTH);
-	
-	if fromCommitted = '1' then
-		matched := true;
-	end if;
-	
-	for i in 0 to ROB_SIZE-1 loop
-			-- For slots after the affected one
-			if matched then
-				res.fullMask(i) := '0';
-				if CLEAR_EMPTY_SLOTS_ROB then
-					res.data(i) := DEFAULT_STAGE_DATA_MULTI;
-				end if;				
-			end if;
-			
-		if i = index then
-			matched := true;
-		end if;
-				
-	end loop;
-	return res;
-end function;						
 
 
 procedure logROB(signal sd, sdl: StageDataROB; fr: FlowResponseBuffer) is

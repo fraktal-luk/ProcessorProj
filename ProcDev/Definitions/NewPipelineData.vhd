@@ -104,6 +104,8 @@ package NewPipelineData is
 
 	function getTagHigh(tag: std_logic_vector) return std_logic_vector;
 	function getTagLow(tag: std_logic_vector) return std_logic_vector;
+		function getTagHighSN(tag: SmallNumber) return SmallNumber;
+		function getTagLowSN(tag: SmallNumber) return SmallNumber;	
 	function clearTagLow(tag: std_logic_vector) return std_logic_vector;	
 	function clearTagHigh(tag: std_logic_vector) return std_logic_vector;	
 	function alignAddress(adr: std_logic_vector) return std_logic_vector;
@@ -539,6 +541,21 @@ package body NewPipelineData is
 		res := tag(LOG2_PIPE_WIDTH-1 downto 0);
 		return res;
 	end function;
+
+		function getTagHighSN(tag: SmallNumber) return SmallNumber is
+			variable res: SmallNumber := (others => '0');
+		begin
+			res(SMALL_NUMBER_SIZE-1-LOG2_PIPE_WIDTH downto 0) := tag(SMALL_NUMBER_SIZE-1 downto LOG2_PIPE_WIDTH);
+			return res;
+		end function;
+
+		function getTagLowSN(tag: SmallNumber) return SmallNumber is
+			variable res: SmallNumber := (others => '0');
+		begin
+			res(LOG2_PIPE_WIDTH-1 downto 0) := tag(LOG2_PIPE_WIDTH-1 downto 0);
+			return res;
+		end function;
+
 
 	function clearTagLow(tag: std_logic_vector) return std_logic_vector is
 		variable res: std_logic_vector(tag'high downto 0) := (others => '0');
