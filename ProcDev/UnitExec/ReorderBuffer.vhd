@@ -42,6 +42,7 @@ use work.TEMP_DEV.all;
 
 use work.ProcLogicROB.all;
 
+use work.Queues.all;
 
 
 entity ReorderBuffer is
@@ -76,6 +77,10 @@ end ReorderBuffer;
 
 
 architecture Implem of ReorderBuffer is
+
+		signal TMP_mask, TMP_ckEnForInput, TMP_sendingMask, TMP_killMask, TMP_maskNext:
+				std_logic_vector(0 to ROB_SIZE-1) := (others => '0');
+
 	signal stageData, stageDataLiving, stageDataNext, stageDataUpdated: 
 							StageDataROB := (fullMask => (others => '0'),
 												  data => (others => DEFAULT_STAGE_DATA_MULTI));
@@ -88,12 +93,36 @@ architecture Implem of ReorderBuffer is
 	signal fromCommitted: std_logic := '0';
 		
 	signal numKilled: SmallNumber := (others => '0');
+
+
+		signal qs0, qs1: TMP_queueState := TMP_defaultQueueState;
+		signal ta, tb: SmallNumber := (others => '0');
+		
+		signal inputIndices: SmallNumberArray(0 to ROB_SIZE-1) := (others => (others => '0'));
 	
 	constant ROB_HAS_RESET: std_logic := '0';
 	constant ROB_HAS_EN: std_logic := '0';
 begin
 	resetSig <= reset and ROB_HAS_RESET;
 	enSig <= en or not ROB_HAS_EN;
+	
+	
+				ta <= flowDrive.nextAccepting;
+				tb <= flowDrive.prevSending;
+				qs1 <= TMP_change(qs0, ta, tb, TMP_mask, TMP_killMask, lateEventSignal or execEventSignal,
+										TMP_maskNext);
+										
+				inputIndices <= TMP_getIndicesForInput(qs0, TMP_mask);
+					-- indices for moved part in shifting queue would be nSend (bufferResponse.sending) everywhere
+				TMP_ckEnForInput <= TMP_getCkEnForInput(qs0, TMP_mask, flowDrive.prevSending);
+					-- in shifting queue this would be shfited by nSend
+					-- Also slots for moved part would have enable, found from (i < nRemaining), only if nSend /= 0
+				TMP_sendingMask <= TMP_getSendingMask(qs0, TMP_mask, flowDrive.nextAccepting);
+				TMP_killMask <= getKillMaskROB(qs0, TMP_mask, execCausing, execEventSignal, lateEventSignal);
+
+				TMP_maskNext <= (TMP_mask and not TMP_killMask and not TMP_sendingMask) or TMP_ckEnForInput;
+
+	
 	
 	-- This is before shifting!
 	stageDataLiving <= stageData;
@@ -112,7 +141,12 @@ begin
 											
 	ROB_SYNCHRONOUS: process (clk)
 	begin
-		if rising_edge(clk) then			
+		if rising_edge(clk) then	
+				qs0 <= qs1;
+				TMP_mask <= TMP_maskNext;	
+				--TMP_content <= TMP_contentNext;
+
+		
 			stageData <= stageDataNext;
 	
 			logROB(stageData, stageDataLiving, flowResponse);

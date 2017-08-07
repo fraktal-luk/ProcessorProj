@@ -316,6 +316,38 @@ begin
 	return res;
 end function;
 
+
+	function getKillMaskROB(qs: TMP_queueState; fullMask: std_logic_vector;
+									causing: InstructionState; execEventSig: std_logic; lateEventSig: std_logic)
+	return std_logic_vector is
+		constant LEN: integer := fullMask'length;
+		constant MASK_NUM: SmallNumber := i2slv(LEN-1, SMALL_NUMBER_SIZE);
+		variable res: std_logic_vector(0 to LEN-1) := (others => '0');
+		variable sn, sn0, ih: SmallNumber := (others => '0');
+	begin
+		ih := getTagHighSN(causing.groupTag);
+			ih := subSN(ih, qs.pStart);
+			ih := ih and MASK_NUM; -- We must cut it to effective index size, because it must be 
+										  -- inside the range of ROB indices
+										  
+		-- qs.pStart is the beginning of vector
+		for i in 0 to LEN-1 loop
+			sn := i2slv(i+1, SMALL_NUMBER_SIZE); -- CAREFUL: +1 because group 1 goes to slot 0 etc!
+															-- TODO: ensure that when changing initial group tag,
+															--			this will be correctly changed too!
+			sn := subSN(sn, qs.pStart); -- Index relative relative to start
+			sn := sn and MASK_NUM;
+			-- Check if higher part of causing tag is smaller than this index. If so, kill
+			sn0 := subSN(ih, sn); -- If negative, s0 is smaller
+			res(i) := ((sn0(sn0'high) and execEventSig) or lateEventSig)
+						and fullMask(i);
+		end loop;
+		
+		return res;
+	end function;
+
+
+
 function TMP_getNewContent(content: InstructionStateArray; newContent: InstructionStateArray;
 									cken: std_logic_vector; indices: SmallNumberArray)
 return InstructionStateArray is
