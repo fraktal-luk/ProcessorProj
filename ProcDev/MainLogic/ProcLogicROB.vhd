@@ -141,6 +141,29 @@ begin
 	return res;
 end function;
 
+function getBitFromROBMask(stageData: StageDataROB; slot: SmallNumber) return std_logic is
+	variable res: std_logic := '0';
+	variable ind: SmallNumber := (others => '0');
+	constant MASK_NUM: SmallNumber := i2slv(ROB_SIZE-1, SMALL_NUMBER_SIZE);
+begin
+	ind := slot and MASK_NUM;
+	res := stageData.fullMask(slv2u(ind));
+	return res;
+end function;
+
+function getBitFromROBMaskPre(stageData: StageDataROB; slot: SmallNumber) return std_logic is
+	variable res: std_logic := '0';
+	variable ind: SmallNumber := (others => '0');
+	constant MASK_NUM: SmallNumber := i2slv(ROB_SIZE-1, SMALL_NUMBER_SIZE);
+	constant ONE: SmallNumber := i2slv(1, SMALL_NUMBER_SIZE);
+begin
+	ind := subSN(slot, ONE);
+	ind := ind and MASK_NUM;
+	res := stageData.fullMask(slv2u(ind));
+	return res;
+end function;
+
+
 
 end ProcLogicROB;
 
