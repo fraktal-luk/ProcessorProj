@@ -195,9 +195,11 @@ begin
 		flowDrive.killAll <= fromCommitted;
 		
 	isSending <= --stageData.fullMask(0)
-						getBitFromROBMask(stageData, (others => '0'))
+						getBitFromROBMask(--stageData, (others => '0'))
+												TMP_stageData, qs0.pStart)
 				and groupCompleted(--stageData.data(0))
-										 TMP_front)	--getSlotFromROB(stageData, (others => '0')))
+										 --TMP_front)	--getSlotFromROB(stageData, (others => '0')))
+										 TMP_frontCircular)
 				and not fromCommitted
 							and nextAccepting;
 
@@ -206,10 +208,12 @@ begin
 	-- TODO: allow accepting also when queue full but sending, that is freeing a place.
 	acceptingOut <= --'1' when binFlowNum(flowResponse.full) < ROB_SIZE else '0';
 							not --stageData.fullMask(ROB_SIZE-1);
-									getBitFromROBMaskPre(stageData, (others => '0'));
+									getBitFromROBMaskPre(--stageData, (others => '0'));
+																	TMP_stageData, qs0.pStart);
 								
 	outputData <= --stageData.data(0);
-						TMP_front;
+						--TMP_front;
+							TMP_frontCircular;
 
 	sendingOut <= isSending;
 end Implem;
