@@ -78,10 +78,12 @@ end ReorderBuffer;
 
 architecture Implem of ReorderBuffer is
 
-		signal TMP_mask, TMP_ckEnForInput, TMP_sendingMask, TMP_killMask, TMP_maskNext:
+		signal fullMask, TMP_mask, TMP_ckEnForInput, TMP_sendingMask, TMP_killMask, TMP_maskNext:
 				std_logic_vector(0 to ROB_SIZE-1) := (others => '0');
 
-	signal stageData, stageDataLiving, stageDataNext, stageDataUpdated: 
+		signal TMP_front, TMP_frontCircular: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
+	signal stageData, stageDataLiving, stageDataNext, stageDataUpdated,
+					TMP_stageData, TMP_stageDataUpdated, TMP_stageDataNext: 
 							StageDataROB := (fullMask => (others => '0'),
 												  data => (others => DEFAULT_STAGE_DATA_MULTI));
 	signal flowDrive: FlowDriveBuffer	:= (killAll => '0', lockAccept => '0', lockSend => '0',
@@ -122,8 +124,20 @@ begin
 
 				TMP_maskNext <= (TMP_mask and not TMP_killMask and not TMP_sendingMask) or TMP_ckEnForInput;
 
+				TMP_stageDataUpdated <= setCompleted_Circular(TMP_stageData, commitGroupCtr,
+												execEnds, execReady, execEnds2, execReady2,
+												execEventSignal, fromCommitted);
+	
+				TMP_stageDataNext <= stageROBNext_Circular(TMP_stageDataUpdated, TMP_mask, inputData,
+															 binFlowNum(flowResponse.living),
+															 '0',
+															 prevSending, qs0.pEnd);
+	
+			TMP_front <= getSlotFromROB(stageData, (others => '0'));
+			TMP_frontCircular <= getSlotFromROB(TMP_stageData, qs0.pStart);
 	
 	
+		fullMask <= stageData.fullMask;
 	-- This is before shifting!
 	stageDataLiving <= stageData;
 	
@@ -144,7 +158,8 @@ begin
 		if rising_edge(clk) then	
 				qs0 <= qs1;
 				TMP_mask <= TMP_maskNext;	
-				--TMP_content <= TMP_contentNext;
+					TMP_stageData.data <= TMP_stageDataNext.data;
+					TMP_stageData.fullMask <= TMP_maskNext;
 
 		
 			stageData <= stageDataNext;
