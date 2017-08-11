@@ -261,7 +261,9 @@ begin
 			sendingToMfcSig <= sendingAddressingSig when addressingData.operation = (System, sysMFC) else '0';
 		
 		
-		sendingAddressToSQSig <= sendingAddressingSig when addressingData.operation.func = store else '0';
+		sendingAddressToSQSig <= sendingAddressingSig when addressingData.operation.func = store 
+																			or addressingData.operation = (System, sysMTC)
+																			else '0';
 				
 		dataToLoadUnitSig <= addressingData;
 								
@@ -346,8 +348,9 @@ begin
 					prevSending => prevSendingToLQ,
 					dataIn => dataNewToLQ,
 				
-				storeAddressWr => sendingToLoadUnitSig, --?
-				storeValueWr => '0',
+				storeAddressWr => sendingToLoadUnitSig or sendingToMfcSig, --?
+				storeValueWr => --'0',
+										sendingToLoadUnitSig or sendingToMfcSig,
 
 				storeAddressDataIn => dataToLoadUnitSig, --?
 				storeValueDataIn => DEFAULT_INSTRUCTION_STATE,

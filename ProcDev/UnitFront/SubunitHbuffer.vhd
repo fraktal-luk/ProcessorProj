@@ -46,6 +46,7 @@ use work.ProcLogicFront.all;
 
 use work.BasicCheck.all;
 
+	use work.Queues.all;
 
 entity SubunitHbuffer is
 	port(
@@ -69,7 +70,8 @@ end SubunitHbuffer;
 
 
 architecture Implem of SubunitHbuffer is
-	signal hbufferDataA, hbufferDataANext: InstructionStateArray(0 to HBUFFER_SIZE-1)
+	signal hbufferDataA, hbufferDataANext, hbufferDataANext_O, hbufferDataANext_N:
+									InstructionStateArray(0 to HBUFFER_SIZE-1)
 			:= (others => DEFAULT_ANNOTATED_HWORD);
 	signal hbufferDataANew: InstructionStateArray(0 to 2*PIPE_WIDTH-1)	
 			:= (others => DEFAULT_ANNOTATED_HWORD);	
@@ -83,19 +85,23 @@ architecture Implem of SubunitHbuffer is
 
 	signal shortOpcodes: std_logic_vector(0 to HBUFFER_SIZE-1) := (others=>'0');-- DEPREC but used as dummy
 	signal fullMaskHbuffer, livingMaskHbuffer: std_logic_vector(0 to HBUFFER_SIZE-1) := (others=>'0');
-		signal fullMask2, fullMask2Next, livingMask2: std_logic_vector(0 to HBUFFER_SIZE-1) := (others=>'0');
+		signal fullMask2, fullMask2Next, livingMask2, fullMask2Next_O, fullMask2Next_N:
+					std_logic_vector(0 to HBUFFER_SIZE-1) := (others=>'0');
 	signal hbuffOut: HbuffOutData 
 				:= (sd => DEFAULT_STAGE_DATA_MULTI, nOut=>(others=>'0'), nHOut=>(others=>'0'));
 
 	signal partialKillMaskHbuffer: std_logic_vector(0 to HBUFFER_SIZE-1) := (others=>'0');
 	signal nHIn: SmallNumber := (others => '0');
 	signal sendingSig: SmallNumber := (others => '0');
+	
+		signal buffData, buffData2, buffDataNext: HbuffQueueData := DEFAULT_HBUFF_QUEUE_DATA;
+	
 begin
 	nHIn <= i2slv(FETCH_BLOCK_SIZE - (slv2u(stageDataIn.basicInfo.ip(ALIGN_BITS-1 downto 1))),
 					  SMALL_NUMBER_SIZE);
 
 	hbufferDataANew <= getAnnotatedHwords(stageDataIn.basicInfo, fetchBlock);
-	hbufferDataANext <= bufferAHNext(hbufferDataA,
+	hbufferDataANext_O <= bufferAHNext(hbufferDataA,
 										--livingMask2,
 											fullMask2, -- NOTE: if flushing, no receiving so can be fullMask										
 										hbufferDataANew,	
@@ -107,7 +113,7 @@ begin
 											binFlowNum(hbufferDrive.nextAccepting),
 										binFlowNum(hbufferDrive.prevSending));						
 	fullMaskHbuffer <= setToOnes(shortOpcodes, binFlowNum(hbufferResponse.full));
-		fullMask2Next <= TEMP_hbufferFullMaskNext(hbufferDataA,
+		fullMask2Next_O <= TEMP_hbufferFullMaskNext(hbufferDataA,
 											livingMask2,	
 										hbufferDataANew,
 											prevSending,
@@ -135,12 +141,29 @@ begin
 	hbuffOut <= newFromHbuffer(hbufferDataA, --livingMaskHbuffer);
 															livingMask2);
 	
+			buffDataNext <= 
+			TEMP_movingQueue_q16_i8_o8(buffData,
+												hbufferDataANew,
+													hbufferResponse.full,
+													hbufferDrive.prevSending,
+													hbufferDrive.nextAccepting,
+												execEventSignal,
+												stageDataIn.basicInfo.ip);	
+	
+		hbufferDataANext_N <= buffDataNext.content;
+		fullMask2Next_N <= buffDataNext.fullMask;
+	
+				hbufferDataANext <= hbufferDataANext_N;
+				fullMask2Next <= fullMask2Next_N;
+	
 	FRONT_CLOCKED: process(clk)
 	begin					
 		if rising_edge(clk) then
 			--if reset = '1' then
 				
 			--elsif en = '1' then
+						buffData <= buffDataNext;
+			
 				hbufferDataA <= hbufferDataANext;
 									--	stageDataNext.data;
 					fullMask2 <= fullMask2Next;
@@ -150,7 +173,15 @@ begin
 				--			flow numbers, while the validity of those numbers is checked by slot logic
 				checkBuffer(hbufferDataA, fullMask2, hbufferDataANext, fullMask2Next,
 									hbufferDrive, hbufferResponse);								
-			--end if;					
+			--end if;		
+
+					--	report integer'image(countOnes(fullMask2Next));
+					for i in 0 to fullMask2'length-1 loop
+						if fullMask2Next(i) = '1' then
+							assert buffDataNext.fullMask(i) = '1' report "not good maks!";
+							assert buffDataNext.content(i) = hbufferDataANext(i) report "not mathcing";
+						end if;
+					end loop;
 		end if;
 	end process;	
 

@@ -212,7 +212,8 @@ begin
 
 			BRANCH_QUEUE: entity work.MemoryUnit(Behavioral)
 			generic map(
-				QUEUE_SIZE => BQ_SIZE
+				QUEUE_SIZE => BQ_SIZE,
+				KEEP_INPUT_CONTENT => true
 			)
 			port map(
 				clk => clk,

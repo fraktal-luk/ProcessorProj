@@ -50,11 +50,14 @@ use work.ProcLogicMemory.all;
 
 use work.BasicCheck.all;
 
+use work.Queues.all;
+
 
 entity MemoryUnit is
 	generic(
 		QUEUE_SIZE: integer := 4;
-		CLEAR_COMPLETED: boolean := true
+		CLEAR_COMPLETED: boolean := true;
+		KEEP_INPUT_CONTENT: boolean := false
 	);
 	port(
 		clk: in std_logic;
@@ -94,19 +97,71 @@ architecture Behavioral of MemoryUnit is
 
 	signal content, contentNext, contentUpdated:
 					InstructionSlotArray(0 to QUEUE_SIZE-1) := (others => DEFAULT_INSTRUCTION_SLOT);
-	signal contentData, contentDataNext: InstructionStateArray(0 to QUEUE_SIZE-1)
+	signal contentData, contentDataNext,  TMP_content, TMP_contentNext: InstructionStateArray(0 to QUEUE_SIZE-1)
 																			:= (others => DEFAULT_INSTRUCTION_STATE);
 	signal fullMask, livingMask, killMask, contentMaskNext, matchingA, matchingD,
-								matchingShA, matchingShD: std_logic_vector(0 to QUEUE_SIZE-1) := (others => '0'); 
-	signal sqOutData: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
+				matchingShA, matchingShD,  
+				TMP_mask, TMP_ckEnForInput, TMP_sendingMask, TMP_killMask, TMP_maskNext,	TMP_maskA, TMP_maskD
+								: std_logic_vector(0 to QUEUE_SIZE-1) := (others => '0'); 
+	signal sqOutData, TMP_frontW, TMP_preFrontW, TMP_sendingData: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
 
 	signal bufferDrive: FlowDriveBuffer := (killAll => '0', lockAccept => '0', lockSend => '0',
 																others=>(others=>'0'));
 	signal bufferResponse: FlowResponseBuffer := (others=>(others=>'0'));
+	
+		signal qs0, qs1: TMP_queueState := TMP_defaultQueueState;
+		signal ta, tb: SmallNumber := (others => '0');
+		signal contentView: InstructionStateArray(0 to QUEUE_SIZE-1) := (others => DEFAULT_INSTRUCTION_STATE);
+		signal maskView: std_logic_vector(0 to QUEUE_SIZE-1) := (others => '0');
+		
+		signal inputIndices: SmallNumberArray(0 to QUEUE_SIZE-1) := (others => (others => '0'));
+		
 begin				
+				ta <= --bufferResponse.sending;	-- Aux to use named objects for TMP_change (avoid simulator error)
+							bufferDrive.nextAccepting;
+				tb <= bufferDrive.prevSending;
+				qs1 <= TMP_change(qs0, ta, tb, TMP_mask, TMP_killMask, lateEventSignal or execEventSignal,
+										TMP_maskNext);
+			
+				inputIndices <= TMP_getIndicesForInput(qs0, TMP_mask);
+					-- indices for moved part in shifting queue would be nSend (bufferResponse.sending) everywhere
+				TMP_ckEnForInput <= TMP_getCkEnForInput(qs0, TMP_mask, bufferDrive.prevSending);
+					-- in shifting queue this would be shfited by nSend
+					-- Also slots for moved part would have enable, found from (i < nRemaining), only if nSend /= 0
+				TMP_sendingMask <= TMP_getSendingMask(qs0, TMP_mask, --bufferResponse.sending);
+																						bufferDrive.nextAccepting);
+				TMP_killMask <= getKillMask(TMP_content, TMP_mask, execCausing, execEventSignal, lateEventSignal);
+					
+				TMP_maskNext <= (TMP_mask and not TMP_killMask and not TMP_sendingMask) or TMP_ckEnForInput;
+					-- in shifting queue generated from (i < nFullNext)
+				TMP_contentNext <= --TMP_getNewContent(TMP_content, dataIn.data, TMP_ckEnForInput, inputIndices);
+					-- TODO: new form taking into account the updated slots
+						TMP_getNewContentUpdate(TMP_content, dataIn.data, TMP_ckEnForInput, inputIndices,
+												TMP_maskA, TMP_maskD,
+												storeAddressWr, storeValueWr, storeAddressDataIn, storeValueDataIn,
+												CLEAR_COMPLETED, KEEP_INPUT_CONTENT);
+
+		TMP_maskA <= findMatching(makeSlotArray(TMP_content, TMP_mask), storeAddressDataIn); --dataA);
+		TMP_maskD <= findMatching(makeSlotArray(TMP_content, TMP_mask), storeValueDataIn);
+					
+					--	Get front window and sending
+					-- .... <= TMP_getFrontWindow(qs0, TMP_content, TMP_mask);
+					--			  get accepting...
+					--			  TMP_getPreFrontWindow(qs0, TMP_content, TMP_mask); -- better check nFull?
+
+				contentView <= normalizeInsArray(qs0, TMP_content);
+				maskView <= normalizeMask(qs0, TMP_mask);
+
+			TMP_frontW <= TMP_getFrontWindow(qs0, TMP_content, TMP_mask);
+			TMP_preFrontW <= TMP_getPreFrontWindow(qs0, TMP_content, TMP_mask);
+
+			TMP_sendingData <= findCommittingSQ(TMP_frontW.data, TMP_frontW.fullMask, groupCtrInc, committing);
+
+
 		fullMask <= extractFullMask(content);
 		livingMask <= fullMask and not killMask;
-							
+			
+			-- CAREFUL: for shifting queue, the bit will be shifted by nSend, so condition is matching(i+nSend)
 		matchingA <= findMatching(content, storeAddressDataIn); --dataA);
 		matchingD <= findMatching(content, storeValueDataIn); -- dataD);
 							
@@ -138,7 +193,8 @@ begin
 		contentUpdated <= makeSlotArray(contentDataNext, contentMaskNext);		
 		contentNext <= contentUpdated;
 		
-			sqOutData <= findCommittingSQ(extractData(content), livingMask, groupCtrInc, committing);
+			sqOutData <= --findCommittingSQ(extractData(content), livingMask, groupCtrInc, committing);
+							TMP_sendingData;
 					
 			sendingSQ <= isNonzero(sqOutData.fullMask);
 			dataOutSQ <= sqOutData.data(0); -- CAREFUL, TEMP!
@@ -147,7 +203,11 @@ begin
 			
 			process (clk)
 			begin
-				if rising_edge(clk) then			
+				if rising_edge(clk) then	
+						qs0 <= qs1;
+						TMP_mask <= TMP_maskNext;	
+						TMP_content <= TMP_contentNext;
+						
 					content <= contentNext;
 					
 					logBuffer(contentData, fullMask, livingMask, bufferResponse);	
@@ -195,7 +255,10 @@ begin
 												and fullMask(i);									
 					end generate;
 					
-	acceptingOut <= not fullMask(QUEUE_SIZE-PIPE_WIDTH); -- when last slot free					
+	acceptingOut <= not --fullMask(QUEUE_SIZE-PIPE_WIDTH); -- when last slot free	
+								TMP_preFrontW.fullMask(0);
+
+	
 	sendingSQOut <= sendingSQ;
 end Behavioral;
 
