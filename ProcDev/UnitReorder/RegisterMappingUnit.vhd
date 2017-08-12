@@ -156,6 +156,7 @@ begin
 				for i in 0 to reserveMW'length-1 loop
 					if reserveMW(i) = '1' then
 						newestMap(slv2u(selectReserveMW(i))) <= writeReserveMW(i);
+							assert isNonzero(writeReserveMW(i)) = '1' report "Mapping a speculative register to p0!";
 					end if;
 				end loop;	
 			end if;
@@ -164,6 +165,7 @@ begin
 				for i in 0 to commitMW'length-1 loop
 					if commitMW(i) = '1' then
 						stableMap(slv2u(selectCommitMW(i))) <= writeCommitMW(i);
+							assert isNonzero(writeCommitMW(i)) = '1' report "Mapping a stable register to p0!";						
 					end if;
 				end loop;	
 			end if;

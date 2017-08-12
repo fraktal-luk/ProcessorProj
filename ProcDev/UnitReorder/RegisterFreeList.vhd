@@ -178,6 +178,7 @@ begin
 								if freeListPutSel(i) = '1' then
 									listContent(indPut) <= physCommitFreedDelayed(i);
 									indPut := (indPut + 1) mod FREE_LIST_SIZE;
+										assert isNonzero(physCommitFreedDelayed(i)) = '1' report "Putting 0 to free list!";
 								end if;	
 							end loop;
 							listPtrPut <= i2slv(indPut, listPtrPut'length);	

@@ -292,13 +292,13 @@ begin
 	end if;
 	
 	-- CAREFUL! Clearing tags in empty slots, to avoid incorrect info about available results!
-	for i in 0 to res.fullMask'length-1 loop
-		if res.fullMask(i) = '0' then
-			for j in 0 to PIPE_WIDTH-1 loop
-				res.data(i).data(j).physicalDestArgs.d0 := (others => '0');
-			end loop;	
-		end if;	
-	end loop;
+--	for i in 0 to res.fullMask'length-1 loop
+--		if res.fullMask(i) = '0' then
+--			for j in 0 to PIPE_WIDTH-1 loop
+--				res.data(i).data(j).physicalDestArgs.d0 := (others => '0');
+--			end loop;	
+--		end if;	
+--	end loop;
 	
 	if CLEAR_EMPTY_SLOTS_ROB then	
 		for i in 0 to content.data'length-1 loop -- to livingContent'length - nOut - 1 loop
