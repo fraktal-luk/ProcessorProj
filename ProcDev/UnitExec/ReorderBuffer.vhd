@@ -142,7 +142,6 @@ begin
 	stageDataLiving <= stageData;
 	
 	stageDataUpdated <= setCompleted(stageDataLiving, commitGroupCtr,
-																		--(others => '0'),
 												execEnds, execReady,
 												execEnds2, execReady2,
 												execEventSignal, fromCommitted);
@@ -187,33 +186,24 @@ begin
 	flowDrive.nextAccepting <= num2flow(1) when isSending = '1'
 								else  (others => '0');
 	
-		numKilled <= getNumKilled(flowResponse.full, --execCausing.groupTag,
-																		execEnds2(3).groupTag,
-																		commitGroupCtr, execEventSignal);
+		numKilled <= getNumKilled(flowResponse.full,
+												execEnds2(3).groupTag,
+												commitGroupCtr, execEventSignal);
 	
 	flowDrive.kill <= numKilled;							
 		flowDrive.killAll <= fromCommitted;
 		
-	isSending <= --stageData.fullMask(0)
-						getBitFromROBMask(--stageData, (others => '0'))
-												TMP_stageData, qs0.pStart)
-				and groupCompleted(--stageData.data(0))
-										 --TMP_front)	--getSlotFromROB(stageData, (others => '0')))
-										 TMP_frontCircular)
+	isSending <= getBitFromROBMask(TMP_stageData, qs0.pStart)
+				and groupCompleted(TMP_frontCircular)
 				and not fromCommitted
 							and nextAccepting;
 
 	fromCommitted <= lateEventSignal;
 						
 	-- TODO: allow accepting also when queue full but sending, that is freeing a place.
-	acceptingOut <= --'1' when binFlowNum(flowResponse.full) < ROB_SIZE else '0';
-							not --stageData.fullMask(ROB_SIZE-1);
-									getBitFromROBMaskPre(--stageData, (others => '0'));
-																	TMP_stageData, qs0.pStart);
+	acceptingOut <= not getBitFromROBMaskPre(TMP_stageData, qs0.pStart);
 								
-	outputData <= --stageData.data(0);
-						--TMP_front;
-							TMP_frontCircular;
+	outputData <= TMP_frontCircular;
 
 	sendingOut <= isSending;
 end Implem;

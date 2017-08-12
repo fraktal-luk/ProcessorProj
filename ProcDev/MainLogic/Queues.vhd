@@ -24,26 +24,19 @@ use work.GeneralPipeDev.all;
 package Queues is
 
 type HbuffQueueData is record
-	--	contentT: InstructionStateArray(0 to HBUFFER_SIZE-1);
 	content: InstructionStateArray(0 to HBUFFER_SIZE-1);
-	--	fullMaskT: std_logic_vector(0 to HBUFFER_SIZE-1);
 	fullMask: std_logic_vector(0 to HBUFFER_SIZE-1);
-	--	cmpMask: std_logic_vector(0 to HBUFFER_SIZE-1);
 	nFullV: SmallNumber;
 end record;
 
 constant DEFAULT_HBUFF_QUEUE_DATA: HbuffQueueData := (
-	--	contentT => (others => DEFAULT_INSTRUCTION_STATE),
 	content => (others => DEFAULT_INSTRUCTION_STATE),
-	--	fullMaskT => (others => '0'),	
 	fullMask => (others => '0'),
-	--	cmpMask => (others => '0'),	
 	nFullV => (others => '0')
 );
 
 
 type TMP_queueState is record
-	--capacity ??
 	pStart: SmallNumber;
 	pEnd: SmallNumber;
 	nFull: SmallNumber;
@@ -128,7 +121,7 @@ begin
 	-- Where is "first killed" slot if any?
 	killedPr(1 to LEN-1) := killMask(0 to LEN-2);
 	killedPr(0) := killMask(LEN-1); -- CAREFUL: for shifting queue this would be constant '0'  
-	killedSearchMask := killMask and not killedPr; -- Bit sum must be 0 or 1
+	--killedSearchMask := killMask and not killedPr; -- Bit sum must be 0 or 1
 	
 	-- Put this into a function?
 	for i in 0 to LEN-1 loop
@@ -159,64 +152,157 @@ begin
 end function;
 
 
-function TMP_getFrontWindow(qs: TMP_queueState;
-									 arr: InstructionStateArray; mask: std_logic_vector)
+function getQueueWindow(arr: InstructionStateArray; mask: std_logic_vector; ind: SmallNumber)
 return StageDataMulti is
 	variable res: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
-	variable ind: integer := 0;
-	constant LEN: integer := arr'length; 
+	constant LEN: integer := arr'length;
+	constant indNum: integer := slv2u(ind);
 begin
-	ind := slv2u(qs.pStart);
 	for i in 0 to PIPE_WIDTH-1 loop
-		res.fullMask(i) := mask((i + ind) mod LEN);
-		res.data(i) := arr((i + ind) mod LEN);
+		res.fullMask(i) := mask((i + indNum) mod LEN);
+		res.data(i) := arr((i + indNum) mod LEN);
 	end loop;
-	
 	return res;
 end function;
 
-function TMP_getPreFrontWindow(qs: TMP_queueState;
-									 arr: InstructionStateArray; mask: std_logic_vector)
-return StageDataMulti is
-	variable res: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
-	variable ind: integer := 0;
-	constant LEN: integer := arr'length; 
+function smallNum(n: integer) return SmallNumber is
 begin
-	ind := slv2u(qs.pStart) - PIPE_WIDTH;
-	for i in 0 to PIPE_WIDTH-1 loop
-		res.fullMask(i) := mask((i + ind) mod LEN);
-		res.data(i) := arr((i + ind) mod LEN);
+	return i2slv(n, SMALL_NUMBER_SIZE);
+end function;
+
+
+function getQueueFrontWindow(qs: TMP_queueState; arr: InstructionStateArray; mask: std_logic_vector)
+return StageDataMulti is
+begin
+	return getQueueWindow(arr, mask, qs.pStart);
+end function;
+
+function getQueuePreFrontWindow(qs: TMP_queueState; arr: InstructionStateArray; mask: std_logic_vector)
+return StageDataMulti is
+begin
+	return getQueueWindow(arr, mask, subSN(qs.pStart, smallNum(PIPE_WIDTH)));
+end function;
+
+function getQueueBackWindow(qs: TMP_queueState; arr: InstructionStateArray; mask: std_logic_vector)
+return StageDataMulti is
+begin
+	return getQueueWindow(arr, mask, qs.pEnd);
+end function;
+
+--
+--
+--function TMP_getFrontWindow(qs: TMP_queueState;
+--									 arr: InstructionStateArray; mask: std_logic_vector)
+--return StageDataMulti is
+--	variable res: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
+--	variable ind: integer := 0;
+--	constant LEN: integer := arr'length; 
+--begin
+--	ind := slv2u(qs.pStart);
+--	for i in 0 to PIPE_WIDTH-1 loop
+--		res.fullMask(i) := mask((i + ind) mod LEN);
+--		res.data(i) := arr((i + ind) mod LEN);
+--	end loop;
+--	
+--	return res;
+--end function;
+--
+--function TMP_getPreFrontWindow(qs: TMP_queueState;
+--									 arr: InstructionStateArray; mask: std_logic_vector)
+--return StageDataMulti is
+--	variable res: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
+--	variable ind: integer := 0;
+--	constant LEN: integer := arr'length; 
+--begin
+--	ind := slv2u(qs.pStart) - PIPE_WIDTH;
+--	for i in 0 to PIPE_WIDTH-1 loop
+--		res.fullMask(i) := mask((i + ind) mod LEN);
+--		res.data(i) := arr((i + ind) mod LEN);
+--	end loop;
+--	
+--	return res;
+--end function;
+--
+--function TMP_getBackWindow(qs: TMP_queueState;
+--									 arr: InstructionStateArray; mask: std_logic_vector)
+--return StageDataMulti is
+--	variable res: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
+--	variable ind: integer := 0;
+--	constant LEN: integer := arr'length; 
+--begin
+--	ind := slv2u(qs.pEnd);
+--	for i in 0 to PIPE_WIDTH-1 loop
+--		res.fullMask(i) := mask((i + ind) mod LEN);
+--		res.data(i) := arr((i + ind) mod LEN);
+--	end loop;
+--	
+--	return res;
+--end function;
+
+-- Indices in numbers modulo length, where 0 is at given position
+function getQueueIndicesFrom(mask: std_logic_vector; start: SmallNumber) return SmallNumberArray is
+	constant LEN: integer := mask'length;	
+	variable res: SmallNumberArray(0 to LEN-1) := (others => (others => '0'));
+	variable sn: SmallNumber := (others => '0');
+begin
+	for i in 0 to LEN-1 loop
+		sn := subSN(smallNum(i), start);
+		res(i) := sn and smallNum(LEN-1); -- CAREFUL: mask to get bounded range
 	end loop;
-	
 	return res;
 end function;
 
-function TMP_getBackWindow(qs: TMP_queueState;
-									 arr: InstructionStateArray; mask: std_logic_vector)
-return StageDataMulti is
-	variable res: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
-	variable ind: integer := 0;
-	constant LEN: integer := arr'length; 
+function compareIndicesGreater(inds: SmallNumberArray; num: SmallNumber) return std_logic_vector is
+	constant LEN: integer := inds'length;
+	variable res: std_logic_vector(0 to LEN-1) := (others => '0');
+	variable sn: SmallNumber := (others => '0');
 begin
-	ind := slv2u(qs.pEnd);
-	for i in 0 to PIPE_WIDTH-1 loop
-		res.fullMask(i) := mask((i + ind) mod LEN);
-		res.data(i) := arr((i + ind) mod LEN);
+	for i in 0 to LEN-1 loop
+		sn := subSN(num, inds(i)); -- If starts with 1, then num is smaller
+		res(i) := sn(sn'high);
 	end loop;
-	
 	return res;
 end function;
+
+function compareIndicesSmaller(inds: SmallNumberArray; num: SmallNumber) return std_logic_vector is
+	constant LEN: integer := inds'length;
+	variable res: std_logic_vector(0 to LEN-1) := (others => '0');
+	variable sn: SmallNumber := (others => '0');
+begin
+	for i in 0 to LEN-1 loop
+		sn := subSN(inds(i), num); -- If starts with 1, then num is greater
+		res(i) := sn(sn'high);
+	end loop;
+	return res;
+end function;
+
+function compareIndicesEqual(inds: SmallNumberArray; num: SmallNumber) return std_logic_vector is
+	constant LEN: integer := inds'length;
+	variable res: std_logic_vector(0 to LEN-1) := (others => '0');
+	variable sn: SmallNumber := (others => '0');
+begin
+	for i in 0 to LEN-1 loop
+		if num = inds(i) then
+			res(i) := '1';
+		else
+			res(i) := '0';
+		end if;
+	end loop;
+	return res;
+end function;
+
 
 -- This calculates selection bits for the new input branch of muxes
 -- In case of shifting queue, must work with updated back pointer, or nRemaining
 function TMP_getIndicesForInput(qs: TMP_queueState; mask: std_logic_vector) return SmallNumberArray is
 	constant LEN: integer := mask'length;
-	constant MASK_NUM: SmallNumber := i2slv(PIPE_WIDTH-1, SMALL_NUMBER_SIZE); -- Based on PIPE_WIDTH!
+	constant MASK_NUM: SmallNumber := smallNum(PIPE_WIDTH-1);
+							--	SmallNumber := i2slv(PIPE_WIDTH-1, SMALL_NUMBER_SIZE); -- Based on PIPE_WIDTH!
 	variable res: SmallNumberArray(0 to LEN-1) := (others => (others => '0'));
 	variable sn: SmallNumber := (others => '0');
 begin
 	for i in 0 to LEN-1 loop
-		sn := i2slv(i, SMALL_NUMBER_SIZE);
+		sn := smallNum(i);--i2slv(i, SMALL_NUMBER_SIZE);
 		sn := subSN(sn, qs.pEnd);
 		sn := sn and MASK_NUM;
 		res(i) := sn;
@@ -243,17 +329,8 @@ begin
 				--sn := sn and MASK_NUM;
 				--sn0 := sn0 and MASK_NUM;
 			
-		res(i) := not sn(SMALL_NUMBER_SIZE-1) and sn0(SMALL_NUMBER_SIZE-1); 
-		
-		--if mask = "0110" then
-		--	report integer'image(i); 
-		--	report integer'image(slv2u(nRec)) & ", " & integer'image(slv2u(sn)) & ", " &
-		--				integer'image(slv2u(sn0));		
-		--end if;		
-	end loop;
-	
-
-	
+		res(i) := not sn(SMALL_NUMBER_SIZE-1) and sn0(SMALL_NUMBER_SIZE-1); 		
+	end loop;	
 	return res;
 end function; 
 
