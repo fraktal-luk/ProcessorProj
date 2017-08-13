@@ -340,19 +340,27 @@ end function;
 
 
 
-function TMP_getNewContent(content: InstructionStateArray; newContent: InstructionStateArray;
-									cken: std_logic_vector; indices: SmallNumberArray)
+function TMP_getNewContent_General(content: InstructionStateArray; newContent: InstructionStateArray;
+												movedCken: std_logic_vector; movedIndices: SmallNumberArray;
+												inputCken: std_logic_vector; inputIndices: SmallNumberArray)
 return InstructionStateArray is
 	constant LEN: integer := content'length;
 	constant ILEN: integer := newContent'length;
 	constant MASK_NUM: SmallNumber := i2slv(ILEN-1, SMALL_NUMBER_SIZE);
 	variable res: InstructionStateArray(0 to LEN-1) := content;
 	variable tmpSN: SmallNumber := (others => '0');
+	variable moved: InstructionStateArray(0 to ILEN-1) := (others => DEFAULT_INSTRUCTION_STATE);
 begin
 	for i in 0 to LEN-1 loop
-		tmpSN := indices(i) and MASK_NUM;
-		if cken(i) = '1' then
-			res(i) := newContent(slv2u(tmpSN));
+		-- "moved" list for each index is different
+		for j in 0 to ILEN-1 loop
+			moved(j) := content((i + j) mod LEN);
+		end loop;
+	
+		if inputCken(i) = '1' then
+			res(i) := newContent(slv2u(inputIndices(i)));
+		elsif movedCken(i) = '1' then
+			res(i) := moved(slv2u(movedIndices(i)));
 		end if;
 	end loop;
 	return res;
