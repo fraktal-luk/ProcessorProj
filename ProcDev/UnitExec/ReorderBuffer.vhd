@@ -117,22 +117,15 @@ begin
 				qs1 <= TMP_change(qs0, ta, tb, TMP_mask, TMP_killMask, lateEventSignal or execEventSignal,
 										TMP_maskNext);
 										
-				inputIndices <= --TMP_getIndicesForInput(qs0, TMP_mask);
-										getQueueIndicesForInput(qs0, TMP_mask);
+				inputIndices <= getQueueIndicesForInput(qs0, TMP_mask);
 					-- indices for moved part in shifting queue would be nSend (bufferResponse.sending) everywhere
-				TMP_ckEnForInput <= --TMP_getCkEnForInput(qs0, TMP_mask, flowDrive.prevSending);
-											getQueueEnableForInput(qs0, TMP_mask, flowDrive.prevSending);
+				TMP_ckEnForInput <= getQueueEnableForInput(qs0, TMP_mask, flowDrive.prevSending);
 					-- in shifting queue this would be shfited by nSend
 					-- Also slots for moved part would have enable, found from (i < nRemaining), only if nSend /= 0
-				TMP_sendingMask <= --TMP_getSendingMask(qs0, TMP_mask, flowDrive.nextAccepting);
-											getQueueSendingMask(qs0, TMP_mask, flowDrive.nextAccepting);
+				TMP_sendingMask <= getQueueSendingMask(qs0, TMP_mask, flowDrive.nextAccepting);
 				TMP_killMask <= getKillMaskROB(qs0, TMP_mask, execCausing, execEventSignal, lateEventSignal);
 
 				TMP_maskNext <= (TMP_mask and not TMP_killMask and not TMP_sendingMask) or TMP_ckEnForInput;
-
-			inputIndices_T <= getQueueIndicesForInput(qs0, TMP_mask);
-			ckEnForInput_T <= getQueueEnableForInput(qs0, TMP_mask, flowDrive.prevSending);
-			sendingMask_T <= getQueueSendingMask(qs0, TMP_mask, flowDrive.nextAccepting);
 
 				TMP_stageDataUpdated <= setCompleted_Circular(TMP_stageData, commitGroupCtr,
 												execEnds, execReady, execEnds2, execReady2,

@@ -123,15 +123,12 @@ begin
 	tb <= bufferDrive.prevSending;
 	qs1 <= TMP_change(qs0, ta, tb, TMP_mask, TMP_killMask, lateEventSignal or execEventSignal, TMP_maskNext);
 			
-	inputIndices <= --TMP_getIndicesForInput(qs0, TMP_mask);
-						 getQueueIndicesForInput(qs0, TMP_mask);
+	inputIndices <= getQueueIndicesForInput(qs0, TMP_mask);
 	-- indices for moved part in shifting queue would be nSend (bufferResponse.sending) everywhere
-	TMP_ckEnForInput <= --TMP_getCkEnForInput(qs0, TMP_mask, bufferDrive.prevSending);
-								getQueueEnableForInput(qs0, TMP_mask, bufferDrive.prevSending);
+	TMP_ckEnForInput <= getQueueEnableForInput(qs0, TMP_mask, bufferDrive.prevSending);
 	-- in shifting queue this would be shfited by nSend
 	-- Also slots for moved part would have enable, found from (i < nRemaining), only if nSend /= 0
-	TMP_sendingMask <= --TMP_getSendingMask(qs0, TMP_mask, bufferDrive.nextAccepting);
-								getQueueSendingMask(qs0, TMP_mask, bufferDrive.nextAccepting);
+	TMP_sendingMask <= getQueueSendingMask(qs0, TMP_mask, bufferDrive.nextAccepting);
 	TMP_killMask <= getKillMask(TMP_content, TMP_mask, execCausing, execEventSignal, lateEventSignal);
 				
 	TMP_maskNext <= (TMP_mask and not TMP_killMask and not TMP_sendingMask) or TMP_ckEnForInput;
@@ -141,11 +138,6 @@ begin
 												TMP_maskA, TMP_maskD,
 												storeAddressWr, storeValueWr, storeAddressDataIn, storeValueDataIn,
 												CLEAR_COMPLETED, KEEP_INPUT_CONTENT);
-
-		--inputIndices_T <= getQueueIndicesForInput(qs0, TMP_mask);
-		--ckEnForInput_T <= getQueueEnableForInput(qs0, TMP_mask, bufferDrive.prevSending);
-		--sendingMask_T <= getQueueSendingMask(qs0, TMP_mask, bufferDrive.nextAccepting);
-		
 
 	TMP_maskA <= findMatching(makeSlotArray(TMP_content, TMP_mask), storeAddressDataIn); --dataA);
 	TMP_maskD <= findMatching(makeSlotArray(TMP_content, TMP_mask), storeValueDataIn);

@@ -189,55 +189,6 @@ begin
 	return getQueueWindow(arr, mask, qs.pEnd);
 end function;
 
---
---
---function TMP_getFrontWindow(qs: TMP_queueState;
---									 arr: InstructionStateArray; mask: std_logic_vector)
---return StageDataMulti is
---	variable res: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
---	variable ind: integer := 0;
---	constant LEN: integer := arr'length; 
---begin
---	ind := slv2u(qs.pStart);
---	for i in 0 to PIPE_WIDTH-1 loop
---		res.fullMask(i) := mask((i + ind) mod LEN);
---		res.data(i) := arr((i + ind) mod LEN);
---	end loop;
---	
---	return res;
---end function;
---
---function TMP_getPreFrontWindow(qs: TMP_queueState;
---									 arr: InstructionStateArray; mask: std_logic_vector)
---return StageDataMulti is
---	variable res: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
---	variable ind: integer := 0;
---	constant LEN: integer := arr'length; 
---begin
---	ind := slv2u(qs.pStart) - PIPE_WIDTH;
---	for i in 0 to PIPE_WIDTH-1 loop
---		res.fullMask(i) := mask((i + ind) mod LEN);
---		res.data(i) := arr((i + ind) mod LEN);
---	end loop;
---	
---	return res;
---end function;
---
---function TMP_getBackWindow(qs: TMP_queueState;
---									 arr: InstructionStateArray; mask: std_logic_vector)
---return StageDataMulti is
---	variable res: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
---	variable ind: integer := 0;
---	constant LEN: integer := arr'length; 
---begin
---	ind := slv2u(qs.pEnd);
---	for i in 0 to PIPE_WIDTH-1 loop
---		res.fullMask(i) := mask((i + ind) mod LEN);
---		res.data(i) := arr((i + ind) mod LEN);
---	end loop;
---	
---	return res;
---end function;
 
 -- Indices in numbers modulo length, where 0 is at given position
 function getQueueIndicesFrom(mask: std_logic_vector; start: SmallNumber) return SmallNumberArray is
@@ -301,25 +252,6 @@ begin
 	return res;
 end function;
 
-
--- This calculates selection bits for the new input branch of muxes
--- In case of shifting queue, must work with updated back pointer, or nRemaining
-function TMP_getIndicesForInput(qs: TMP_queueState; mask: std_logic_vector) return SmallNumberArray is
-	constant LEN: integer := mask'length;
-	constant MASK_NUM: SmallNumber := smallNum(PIPE_WIDTH-1);
-							--	SmallNumber := i2slv(PIPE_WIDTH-1, SMALL_NUMBER_SIZE); -- Based on PIPE_WIDTH!
-	variable res: SmallNumberArray(0 to LEN-1) := (others => (others => '0'));
-	variable sn: SmallNumber := (others => '0');
-begin
-	for i in 0 to LEN-1 loop
-		sn := smallNum(i);--i2slv(i, SMALL_NUMBER_SIZE);
-		sn := subSN(sn, qs.pEnd);
-		sn := sn and MASK_NUM;
-		res(i) := sn;
-	end loop;
-	return res;
-end function;
-
 		function getQueueIndicesForInput(qs: TMP_queueState; mask: std_logic_vector) return SmallNumberArray is
 		begin
 			return trimSNA(getQueueIndicesFrom(mask, qs.pEnd), smallNum(PIPE_WIDTH-1));
@@ -327,94 +259,48 @@ end function;
 
 -- CAREFUL: if buff size is not greater than PIPE_WIDTH, comparisons using MASK_NUM are not valid!
 --				Applies to a number of functions below.
-function TMP_getCkEnForInput(qs: TMP_queueState; mask: std_logic_vector; nRec: SmallNumber)
-return std_logic_vector is
-	constant LEN: integer := mask'length;
-		constant MASK_NUM: SmallNumber := i2slv(LEN-1, SMALL_NUMBER_SIZE); 
-	variable res: std_logic_vector(0 to LEN-1) := (others => '0');
-	variable sn, sn0: SmallNumber := (others => '0');
-begin
-	for i in 0 to LEN-1 loop
-		-- Put '1' if (i - qs.pEnd) in [0 to nRec-1]  // or use enable for whole window up to PIEP_WIDTH-1??
-			sn := i2slv(i, SMALL_NUMBER_SIZE);
-			sn := subSN(sn, qs.pEnd);
-				sn := sn and MASK_NUM;
-			-- Check if sn is nonnegative but smaller than nRec
-			sn0 := subSN(sn, nRec);
-				--sn := sn and MASK_NUM;
-				--sn0 := sn0 and MASK_NUM;
-			
-		res(i) := not sn(SMALL_NUMBER_SIZE-1) and sn0(SMALL_NUMBER_SIZE-1); 		
-	end loop;	
-	return res;
-end function; 
-
 	function getQueueEnableForInput(qs: TMP_queueState; mask: std_logic_vector; nRec: SmallNumber)
 	return std_logic_vector is
 	begin
 		return compareIndicesSmaller(getQueueIndicesFrom(mask, qs.pEnd), nRec);
 	end function;
-	
-	
 
-	function TMP_getCkEnForInput_Shifting(qs: TMP_queueState; mask: std_logic_vector; nSend, nRec: SmallNumber)
+		function getQueueIndicesForInput_Shifting(qs: TMP_queueState; mask: std_logic_vector; nSend: SmallNumber)
+		return SmallNumberArray is
+		begin
+			return trimSNA(getQueueIndicesFrom(mask, subSN(qs.pEnd, nSend)), smallNum(PIPE_WIDTH-1));
+		end function;
+
+	function getEnableForInput_Shifting(qs: TMP_queueState; mask: std_logic_vector; nSend, nRec: SmallNumber)
+	return std_logic_vector is
+	begin
+		return compareIndicesSmaller(getQueueIndicesFrom(mask, subSN(qs.pEnd, nSend)), nRec);
+	end function;
+
+
+	function getEnableForMoved_Shifting(qs: TMP_queueState; mask: std_logic_vector; nSend, nRec: SmallNumber)
 	return std_logic_vector is
 		constant LEN: integer := mask'length;
-			constant MASK_NUM: SmallNumber := i2slv(LEN-1, SMALL_NUMBER_SIZE);		
 		variable res: std_logic_vector(0 to LEN-1) := (others => '0');
-		variable sn, sn0: SmallNumber := (others => '0');
+	begin
+		if isNonzero(nSend) = '1' then
+			return compareIndicesSmaller(getQueueIndicesFrom(mask, qs.pStart), subSN(qs.pEnd, nSend));
+		else
+			return res;
+		end if;
+	end function;
+
+	function getIndicesForMoved_Shifting(qs: TMP_queueState; mask: std_logic_vector; nSend, nRec: SmallNumber)
+	return SmallNumberArray is
+		constant LEN: integer := mask'length;
+		variable res: SmallNumberArray(0 to LEN-1) := (others => (others => '0'));
 	begin
 		for i in 0 to LEN-1 loop
-			-- Put '1' if (i - qs.pEnd) in [0 to nRec-1]  // or use enable for whole window up to PIEP_WIDTH-1??
-				sn := i2slv(i, SMALL_NUMBER_SIZE);
-				sn := subSN(sn, qs.pEnd);
-				sn := addSN(sn, nSend); -- difference from circular: temporary pEnd moves towards front
-					sn := sn and MASK_NUM;
-				-- Check if sn is nonnegative but smaller than nRec
-				sn0 := subSN(sn, nRec);
-			res(i) := not sn(SMALL_NUMBER_SIZE-1) and sn0(SMALL_NUMBER_SIZE-1); 
+			res(i) := subSN(nSend, smallNum(1));
 		end loop;
 		return res;
 	end function;
 
-	function TMP_getCkEnForMoved_Shifting(qs: TMP_queueState; mask: std_logic_vector; nSend, nRec: SmallNumber)
-	return std_logic_vector is
-		constant LEN: integer := mask'length;
-			constant MASK_NUM: SmallNumber := i2slv(LEN-1, SMALL_NUMBER_SIZE);		
-		variable res: std_logic_vector(0 to LEN-1) := (others => '0');
-		variable sn, sn0, nRem: SmallNumber := (others => '0');
-	begin
-		for i in 0 to LEN-1 loop
-			-- Put '1' if (i - qs.pEnd) in [0 to nRec-1]  // or use enable for whole window up to PIEP_WIDTH-1??
-				sn := i2slv(i, SMALL_NUMBER_SIZE);
-					sn := sn and MASK_NUM;
-					nRem := subSN(qs.pEnd, nSend);
-				-- Check if sn is nonnegative but smaller than nRemaining
-				sn0 := subSN(sn, nRem);
-			res(i) := not sn(SMALL_NUMBER_SIZE-1) and sn0(SMALL_NUMBER_SIZE-1)
-							and isNonzero(nSend); -- moves only when sending something!
-		end loop;
-		return res;
-	end function;
-
-
-function TMP_getSendingMask(qs: TMP_queueState; mask: std_logic_vector; nSend: SmallNumber)
-return std_logic_vector is
-	constant LEN: integer := mask'length;
-		constant MASK_NUM: SmallNumber := i2slv(LEN-1, SMALL_NUMBER_SIZE);	
-	variable res: std_logic_vector(0 to LEN-1) := (others => '0');
-	variable sn, sn0: SmallNumber := (others => '0');
-begin
-	for i in 0 to LEN-1 loop
-			sn := i2slv(i, SMALL_NUMBER_SIZE);
-			sn := subSN(sn, qs.pStart);
-				sn := sn and MASK_NUM;
-			-- Check if sn is nonnegative but smaller than nSend
-			sn0 := subSN(sn, nSend);
-		res(i) := not sn(SMALL_NUMBER_SIZE-1) and sn0(SMALL_NUMBER_SIZE-1); 
-	end loop;
-	return res;
-end function;
 
 	function getQueueSendingMask(qs: TMP_queueState; mask: std_logic_vector; nSend: SmallNumber)
 	return std_logic_vector is
