@@ -77,7 +77,7 @@ architecture Implem of SubunitHbuffer is
 			:= (others => DEFAULT_ANNOTATED_HWORD);	
 	
 	-- DEPREC
-	signal stageData, stageDataNext: StageDataHbuffer := DEFAULT_STAGE_DATA_HBUFFER;
+	--signal stageData, stageDataNext: StageDataHbuffer := DEFAULT_STAGE_DATA_HBUFFER;
 	
 	signal hbufferDrive: FlowDriveBuffer := (killAll => '0', lockAccept => '0', lockSend => '0',
 																others=>(others=>'0'));
@@ -95,21 +95,53 @@ architecture Implem of SubunitHbuffer is
 	signal sendingSig: SmallNumber := (others => '0');
 	
 		signal buffData, buffData2, buffDataNext: HbuffQueueData := DEFAULT_HBUFF_QUEUE_DATA;
-	
+
+		signal TMP_stageData, TMP_stageDataUpdated, TMP_stageDataNext: InstructionStateArray(0 to HBUFFER_SIZE-1)
+								:= (others => DEFAULT_INSTRUCTION_STATE);
+
+		signal TMP_mask, TMP_ckEnForInput, TMP_ckEnForMoved, TMP_sendingMask, TMP_killMask, TMP_maskNext:
+				std_logic_vector(0 to HBUFFER_SIZE-1) := (others => '0');
+		signal qs0, qs1: TMP_queueState := TMP_defaultQueueState;
+		signal ta, tb: SmallNumber := (others => '0');
+		
+		signal inputIndices, movedIndices: SmallNumberArray(0 to HBUFFER_SIZE-1) := (others => (others => '0'));
+		
 begin
+				ta <= hbufferDrive.nextAccepting;
+				tb <= hbufferDrive.prevSending;
+				qs1 <= TMP_change_Shifting(qs0, ta, tb, TMP_mask, TMP_killMask, execEventSignal,
+										TMP_maskNext);
+										
+				inputIndices <= getQueueIndicesForInput_Shifting(qs0, TMP_mask, 2*PIPE_WIDTH,
+																					hbufferDrive.nextAccepting);
+				TMP_ckEnForInput <= getEnableForInput_Shifting(qs0, TMP_mask,
+																				hbufferDrive.nextAccepting, hbufferDrive.prevSending);
+
+				movedIndices <= getQueueIndicesForMoved_Shifting(qs0, TMP_mask,
+																				hbufferDrive.nextAccepting, hbufferDrive.prevSending);
+				TMP_ckEnForMoved <= getEnableForMoved_Shifting(qs0, TMP_mask,
+																				hbufferDrive.nextAccepting, hbufferDrive.prevSending);
+				
+				TMP_killMask <= getKillMask(TMP_stageData, TMP_mask, execCausing, '0', execEventSignal);
+				
+				TMP_maskNext <= getQueueMaskNext_Shifting(qs1, TMP_mask);
+
+
+				TMP_stageDataNext <= TMP_getNewContent_General(TMP_stageData, hbufferDataANew,
+																		 TMP_ckEnForMoved, movedIndices,
+																		 TMP_ckEnForInput, inputIndices);
+
+
 	nHIn <= i2slv(FETCH_BLOCK_SIZE - (slv2u(stageDataIn.basicInfo.ip(ALIGN_BITS-1 downto 1))),
 					  SMALL_NUMBER_SIZE);
 
 	hbufferDataANew <= getAnnotatedHwords(stageDataIn.basicInfo, fetchBlock);
 	hbufferDataANext_O <= bufferAHNext(hbufferDataA,
-										--livingMask2,
 											fullMask2, -- NOTE: if flushing, no receiving so can be fullMask										
 										hbufferDataANew,	
 										DEFAULT_DATA_PC,
 										stageDataIn.basicInfo,	
-										--binFlowNum(hbufferResponse.living), 
 											binFlowNum(hbufferResponse.full),
-										--binFlowNum(hbufferResponse.sending),
 											binFlowNum(hbufferDrive.nextAccepting),
 										binFlowNum(hbufferDrive.prevSending));						
 	fullMaskHbuffer <= setToOnes(shortOpcodes, binFlowNum(hbufferResponse.full));
@@ -123,23 +155,11 @@ begin
 										binFlowNum(hbufferResponse.sending), binFlowNum(hbufferDrive.prevSending));
 		
 		-- TODO: handle possibility of partial killing by partialKillMask!
-		livingMask2 <= fullMask2 when --flowDriveHbuff.kill = '0' else (others => '0');
-												execEventSignal = '0' else (others => '0');
--- CAREFUL:	alternative integrated version. Slower but smaller
---				stageDataNext <= TEMP_hbufferStageDataNext(
---										hbufferDataA,
---											--livingMaskHbuffer,
---											--fullMaskHbuffer,
---											livingMask2,	
---										hbufferDataANew,
---											prevSending,
---										stageDataIn_OLD,
---										binFlowNum(hbufferResponse.living), 
---										binFlowNum(hbufferResponse.sending), binFlowNum(hbufferDrive.prevSending));		
+		livingMask2 <= fullMask2 when execEventSignal = '0' else (others => '0');
+	
 		
 	livingMaskHbuffer <= setToOnes(shortOpcodes, binFlowNum(hbufferResponse.living)); -- TEMP?
-	hbuffOut <= newFromHbuffer(hbufferDataA, --livingMaskHbuffer);
-															livingMask2);
+	hbuffOut <= newFromHbuffer(hbufferDataA, livingMask2);
 	
 			buffDataNext <= 
 			TEMP_movingQueue_q16_i8_o8(buffData,
@@ -159,21 +179,21 @@ begin
 	FRONT_CLOCKED: process(clk)
 	begin					
 		if rising_edge(clk) then
-			--if reset = '1' then
-				
-			--elsif en = '1' then
-						buffData <= buffDataNext;
+					qs0 <= qs1;
+					TMP_stageData <= TMP_stageDataNext;
+					TMP_mask <= TMP_maskNext;
+		
+				buffData <= buffDataNext;
 			
 				hbufferDataA <= hbufferDataANext;
-									--	stageDataNext.data;
 					fullMask2 <= fullMask2Next;
-									--	stageDataNext.fullMask;
-				logBuffer(hbufferDataA, fullMask2, livingMask2, hbufferResponse);	
+				logBuffer(hbufferDataA, 
+							--		TMP_stageData,
+									fullMask2, livingMask2, hbufferResponse);	
 				-- NOTE: below has no info about flow constraints. It just checks data against
 				--			flow numbers, while the validity of those numbers is checked by slot logic
 				checkBuffer(hbufferDataA, fullMask2, hbufferDataANext, fullMask2Next,
 									hbufferDrive, hbufferResponse);								
-			--end if;		
 
 					--	report integer'image(countOnes(fullMask2Next));
 					for i in 0 to fullMask2'length-1 loop

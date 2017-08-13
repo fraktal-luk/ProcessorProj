@@ -123,7 +123,7 @@ begin
 	tb <= bufferDrive.prevSending;
 	qs1 <= TMP_change(qs0, ta, tb, TMP_mask, TMP_killMask, lateEventSignal or execEventSignal, TMP_maskNext);
 			
-	inputIndices <= getQueueIndicesForInput(qs0, TMP_mask);
+	inputIndices <= getQueueIndicesForInput(qs0, TMP_mask, PIPE_WIDTH);
 	-- indices for moved part in shifting queue would be nSend (bufferResponse.sending) everywhere
 	TMP_ckEnForInput <= getQueueEnableForInput(qs0, TMP_mask, bufferDrive.prevSending);
 	-- in shifting queue this would be shfited by nSend

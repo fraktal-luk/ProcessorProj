@@ -152,6 +152,64 @@ begin
 end function;
 
 
+function TMP_change_Shifting(qs: TMP_queueState; nSend, nRec: SmallNumber;
+						fullMask, killMask: std_logic_vector; killSig: std_logic; maskNext: std_logic_vector)
+return TMP_queueState is
+	constant LEN: integer := fullMask'length;
+
+	variable res: TMP_queueState := qs;
+	variable pStartNew, pEndNew, pEndNext, nFullNext, pLive,
+				sizeNum, maskNum, tempCnt: SmallNumber := (others => '0');
+	variable liveMask, killedSearchMask, liveSearchMask,
+				killedPr, livePr: std_logic_vector(0 to LEN-1) := (others => '0');
+	variable pLiveSel: std_logic := '0';
+begin
+	-- TODO: check if not sending more than living, etc.
+
+	sizeNum := i2slv(LEN, SMALL_NUMBER_SIZE);
+	maskNum := i2slv(LEN-1, SMALL_NUMBER_SIZE);	
+	assert countOnes(sizeNum) = 1 report "Size not binary";  -- make sure LEN is a binary number;
+	
+	liveMask := fullMask and not killMask;
+	
+	pStartNew := qs.pStart;--addSN(qs.pStart, nSend);						
+	pEndNew := subSN(addSN(qs.pEnd, nRec), nSend);
+	
+	-- Where is "first killed" slot if any?
+	killedPr(1 to LEN-1) := killMask(0 to LEN-2);
+	killedPr(0) := '0'; -- CAREFUL: for shifting queue this would be constant '0'  
+	--killedSearchMask := killMask and not killedPr; -- Bit sum must be 0 or 1
+	
+	-- Put this into a function?
+	for i in 0 to LEN-1 loop
+		pLive := i2slv(i, SMALL_NUMBER_SIZE);
+		if killedPr(i) = '0' and (killMask(i) = '1') then -- we have "first killed"
+			pLiveSel := '1';
+			exit;
+		end if;
+	end loop;
+
+	if pLiveSel = '1' then
+		pEndNext := pLive;			
+	else
+		pEndNext := pEndNew;			
+	end if;
+	
+	nFullNext := subSN(pEndNext, pStartNew); -- CAREFUL! Omits highest bit
+	
+	res.pStart := pStartNew and maskNum;
+	res.pEnd := pEndNext and (maskNum or sizeNum);	-- CAREFUL: in shifting queue 1 more bit for MAX_SIZE
+	res.nFull := nFullNext and (maskNum or sizeNum);	--				here likewise ^^
+	-- Handle the case where every slot is full
+	-- CAREFUL: must be a bit from future fullMask, cause current liveMask slot can be sent and cleared!
+	--if isNonzero(res.nFull) = '0' and maskNext(0) = '1' then -- Any slot from liveMask would do
+	--	--res.nFull := res.nFull or sizeNum;
+	--end if;
+	return res;
+end function;
+
+
+
 function getQueueWindow(arr: InstructionStateArray; mask: std_logic_vector; ind: SmallNumber)
 return StageDataMulti is
 	variable res: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
@@ -252,9 +310,10 @@ begin
 	return res;
 end function;
 
-		function getQueueIndicesForInput(qs: TMP_queueState; mask: std_logic_vector) return SmallNumberArray is
+		function getQueueIndicesForInput(qs: TMP_queueState; mask: std_logic_vector; ilen: integer)
+		return SmallNumberArray is
 		begin
-			return trimSNA(getQueueIndicesFrom(mask, qs.pEnd), smallNum(PIPE_WIDTH-1));
+			return trimSNA(getQueueIndicesFrom(mask, qs.pEnd), smallNum(ilen-1));
 		end function;
 
 -- CAREFUL: if buff size is not greater than PIPE_WIDTH, comparisons using MASK_NUM are not valid!
@@ -265,10 +324,11 @@ end function;
 		return compareIndicesSmaller(getQueueIndicesFrom(mask, qs.pEnd), nRec);
 	end function;
 
-		function getQueueIndicesForInput_Shifting(qs: TMP_queueState; mask: std_logic_vector; nSend: SmallNumber)
+		function getQueueIndicesForInput_Shifting(qs: TMP_queueState; mask: std_logic_vector;
+																ilen: integer; nSend: SmallNumber)
 		return SmallNumberArray is
 		begin
-			return trimSNA(getQueueIndicesFrom(mask, subSN(qs.pEnd, nSend)), smallNum(PIPE_WIDTH-1));
+			return trimSNA(getQueueIndicesFrom(mask, subSN(qs.pEnd, nSend)), smallNum(ilen-1));
 		end function;
 
 	function getEnableForInput_Shifting(qs: TMP_queueState; mask: std_logic_vector; nSend, nRec: SmallNumber)
@@ -290,13 +350,13 @@ end function;
 		end if;
 	end function;
 
-	function getIndicesForMoved_Shifting(qs: TMP_queueState; mask: std_logic_vector; nSend, nRec: SmallNumber)
+	function getQueueIndicesForMoved_Shifting(qs: TMP_queueState; mask: std_logic_vector; nSend, nRec: SmallNumber)
 	return SmallNumberArray is
 		constant LEN: integer := mask'length;
 		variable res: SmallNumberArray(0 to LEN-1) := (others => (others => '0'));
 	begin
 		for i in 0 to LEN-1 loop
-			res(i) := subSN(nSend, smallNum(1));
+			res(i) := subSN(nSend, smallNum(1)) and smallNum(LEN-1);
 		end loop;
 		return res;
 	end function;
@@ -306,6 +366,12 @@ end function;
 	return std_logic_vector is
 	begin
 		return compareIndicesSmaller(getQueueIndicesFrom(mask, qs.pStart), nSend);
+	end function;
+
+
+	function getQueueMaskNext_Shifting(qsNew: TMP_queueState; mask: std_logic_vector) return std_logic_vector is
+	begin
+		return compareIndicesSmaller(getQueueIndicesFrom(mask, smallNum(0)), qsNew.pEnd);
 	end function;
 
 
@@ -354,7 +420,7 @@ begin
 	for i in 0 to LEN-1 loop
 		-- "moved" list for each index is different
 		for j in 0 to ILEN-1 loop
-			moved(j) := content((i + j) mod LEN);
+			moved(j) := content((i + j + 1) mod LEN); -- +1 because for 0 it's just no ck enable
 		end loop;
 	
 		if inputCken(i) = '1' then

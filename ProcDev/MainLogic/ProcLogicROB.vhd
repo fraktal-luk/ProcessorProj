@@ -261,33 +261,16 @@ begin
 	-- CAREFUL: even when not clearing empty slots, result tags probably should be cleared!
 	--				It's to prevent reading of fake results from empty slots
 	res := content;
-		
-	if sending = '1' then	
-		-- shift by 1
-		res.fullMask(0 to ROB_SIZE-2) := res.fullMask(1 to ROB_SIZE-1);
-		res.fullMask(ROB_SIZE-1) := '0'; -- CAREFUL, TODO: This may be incorrect (?) if we allow receiving
-													-- 					into full buffer when it's sending...											
-		basicFullMask(0 to ROB_SIZE-2) := basicFullMask(1 to ROB_SIZE-1);											
-		basicFullMask(ROB_SIZE-1) := '0';
-			
-		res.data(0 to ROB_SIZE-2) := res.data(1 to ROB_SIZE-1);		
-		newFull := nFull-1;
-	end if;
-		
+
 	-- Accept new content
 	if receiving = '1' then
-		--bPrev := basicFullMask(ROB_SIZE-1); -- CAREFUL: difference from basic function version
 		for i in 0 to ROB_SIZE-1 loop	-- Trick to avoid transitional out of bounds value of index
-			--bCurrent := basicFullMask(i);
-			if --(bCurrent = '0' and bPrev = '1') then
-				i2slv(i, SMALL_NUMBER_SIZE) = ind then
-				
+			if i2slv(i, SMALL_NUMBER_SIZE) = ind then			
 				res.fullMask(i) := '1';
 				res.data(i) := newContent;
 			end if;
 			bPrev := bCurrent;
-		end loop;
-		
+		end loop;	
 		newFull := newFull + 1;				
 	end if;
 	
@@ -520,7 +503,7 @@ begin
 	for i in 0 to ROB_SIZE-1 loop
 		-- For slots after the affected one
 		if matched then
-			res.fullMask(i) := '0';
+			--res.fullMask(i) := '0';
 			if CLEAR_EMPTY_SLOTS_ROB then
 				res.data(i) := DEFAULT_STAGE_DATA_MULTI;
 			end if;				
