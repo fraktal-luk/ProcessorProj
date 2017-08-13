@@ -291,6 +291,16 @@ begin
 	return res;
 end function;
 
+function trimSNA(arr: SmallNumberArray; maskNum: SmallNumber) return SmallNumberArray is
+	constant LEN: integer := arr'length;
+	variable res: SmallNumberArray(0 to LEN-1) := arr;
+begin
+	for i in 0 to LEN-1 loop
+		res(i) := res(i) and maskNum;
+	end loop;
+	return res;
+end function;
+
 
 -- This calculates selection bits for the new input branch of muxes
 -- In case of shifting queue, must work with updated back pointer, or nRemaining
@@ -309,6 +319,11 @@ begin
 	end loop;
 	return res;
 end function;
+
+		function getQueueIndicesForInput(qs: TMP_queueState; mask: std_logic_vector) return SmallNumberArray is
+		begin
+			return trimSNA(getQueueIndicesFrom(mask, qs.pEnd), smallNum(PIPE_WIDTH-1));
+		end function;
 
 -- CAREFUL: if buff size is not greater than PIPE_WIDTH, comparisons using MASK_NUM are not valid!
 --				Applies to a number of functions below.
@@ -333,6 +348,14 @@ begin
 	end loop;	
 	return res;
 end function; 
+
+	function getQueueEnableForInput(qs: TMP_queueState; mask: std_logic_vector; nRec: SmallNumber)
+	return std_logic_vector is
+	begin
+		return compareIndicesSmaller(getQueueIndicesFrom(mask, qs.pEnd), nRec);
+	end function;
+	
+	
 
 	function TMP_getCkEnForInput_Shifting(qs: TMP_queueState; mask: std_logic_vector; nSend, nRec: SmallNumber)
 	return std_logic_vector is
@@ -392,6 +415,12 @@ begin
 	end loop;
 	return res;
 end function;
+
+	function getQueueSendingMask(qs: TMP_queueState; mask: std_logic_vector; nSend: SmallNumber)
+	return std_logic_vector is
+	begin
+		return compareIndicesSmaller(getQueueIndicesFrom(mask, qs.pStart), nSend);
+	end function;
 
 
 	function getKillMaskROB(qs: TMP_queueState; fullMask: std_logic_vector;
