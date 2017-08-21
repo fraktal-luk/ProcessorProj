@@ -407,6 +407,214 @@ begin
 end function;
 
 
+function bufferAHNext(content: InstructionStateArray;
+									livingMask: std_logic_vector;
+								newContent: InstructionStateArray; 
+								fetchData: InstructionState;
+									fetchBasicInfo: InstructionBasicInfo;								
+								nFull, nOut, nIn: integer) 
+return InstructionStateArray is
+	variable res: InstructionStateArray(0 to content'length-1) 
+			:= (others => DEFAULT_ANNOTATED_HWORD);
+	variable newShift: integer := 0; -- CAREFUL! This determines where actual data starts in newContent
+		constant CLEAR_EMPTY_SLOTS_HBUFF: boolean := false;	
+	variable tempX: InstructionStateArray(0 to content'length + newContent'length - 1) 
+			:= (others => DEFAULT_ANNOTATED_HWORD);
+	variable tempMaskX: std_logic_vector(0 to content'length + newContent'length - 1) := (others => '0');		
+			
+	variable tempY: InstructionStateArray(0 to 2*content'length + newContent'length - 1) 
+			:= (others => DEFAULT_ANNOTATED_HWORD);
+begin	
+	-- CAREFUL! Hbuffer size MUST be a multiple of newContent size!
+
+	newShift := slv2u(fetchBasicInfo.ip(ALIGN_BITS-1 downto 1)); -- pc(ALIGN_BITS-1 downto 1));					
+		--	newShift := 0;
+		-- For position 'i':
+		-- Y: if taking newContent[y], it must be: nFull + y - newShift = i, so
+		--		y = i + newShift - nFull 
+		-- 	So let's get y := (i + newShift - nFull)
+		-- X: if taking form content[x], it must be: i + nOut = x, so
+		--		x := i + nOut
+		--
+		-- However, for Y: when i is end of queue, it can only take yMax,
+		--					when end-1, it can take {yMax-1, yMax}, etc.
+		-- and for X: x must be smaller than QUEUE_SIZE
+		--
+		-- Selection X vs Y: when nFull-nOut+nIn > i, select X, else select Y
+		--	
+		
+	-- Prepare initial tempX, tempY, masks
+	tempX := content & newContent;
+			tempMaskX(0 to content'length-1) := livingMask;
+	for k in 0 to tempY'length-1 loop
+		tempY(k) := newContent(k mod newContent'length);
+	end loop;
+			
+		-- Shift tempX + mask	
+		tempX(0 to content'length-1) := tempX(nOut to content'length-1 + nOut);
+			tempMaskX(0 to content'length-1) := tempMaskX(nOut to content'length-1 + nOut);	
+		-- Shift tempY
+		tempY(0 to content'length-1) := 
+			tempY(		(content'length - nFull + nOut) + newShift 
+								to (content'length - nFull + nOut) + content'length-1 + newShift);
+	
+	-- Select from X or Y
+	for p in 0 to content'length-1 loop
+		if tempMaskX(p) = '1' then
+			res(p) := tempX(p);
+		else		
+			res(p) := tempY(p);
+		end if;		
+	end loop;
+
+	if CLEAR_EMPTY_SLOTS_HBUFF then
+		res(nFull - nOut + nIn to res'length-1) := (others => DEFAULT_ANNOTATED_HWORD);
+	end if;
+		
+	return res;
+end function;
+
+
+function TEMP_hbufferFullMaskNext(content: InstructionStateArray;
+											livingMask: std_logic_vector;
+											newContent: InstructionStateArray;
+											prevSending: std_logic;
+											fetchData: InstructionState;
+												fetchBasicInfo: InstructionBasicInfo;											
+											nFull, nOut, nIn: integer)  
+return std_logic_vector is
+	variable res: std_logic_vector(0 to content'length-1) 
+			:= (others => '0');
+	variable newShift: integer := 0; -- CAREFUL! This determines where actual data starts in newContent
+		constant CLEAR_EMPTY_SLOTS_HBUFF: boolean := false;	
+	variable tempX: InstructionStateArray(0 to content'length + newContent'length - 1) 
+			:= (others => DEFAULT_ANNOTATED_HWORD);
+	variable tempMaskX: std_logic_vector(0 to content'length + newContent'length - 1) := (others => '0');		
+			
+	variable tempMaskY: std_logic_vector(0 to 2*content'length + newContent'length - 1) 
+			:= (others => '0');
+begin	
+	-- CAREFUL! Hbuffer size MUST be a multiple of newContent size!
+
+	newShift := slv2u(fetchBasicInfo.ip(ALIGN_BITS-1 downto 1)); -- pc(ALIGN_BITS-1 downto 1));					
+		-- For position 'i':
+		-- Y: if taking newContent[y], it must be: nFull + y - newShift = i, so
+		--		y = i + newShift - nFull 
+		-- 	So let's get y := (i + newShift - nFull)
+		-- X: if taking form content[x], it must be: i + nOut = x, so
+		--		x := i + nOut
+		--
+		-- However, for Y: when i is end of queue, it can only take yMax,
+		--					when end-1, it can take {yMax-1, yMax}, etc.
+		-- and for X: x must be smaller than QUEUE_SIZE
+		--
+		-- Selection X vs Y: when nFull-nOut+nIn > i, select X, else select Y
+		--	
+	tempX := content & newContent;
+	tempMaskX(0 to content'length-1) := livingMask;
+	for k in 0 to newContent'length - 1 loop
+		--if nIn /= 0 then
+			tempMaskY(k) := prevSending;
+			tempMaskY(content'length + k) := prevSending;
+		--end if;
+	end loop;
+	
+	tempMaskX(0 to tempMaskX'length-1 - nOut) := tempMaskX(nOut to tempMaskX'length-1);
+	tempMaskY(0 to content'length-1) := 
+		tempMaskY(		(content'length - nFull + nOut) + newShift 
+					to (content'length - nFull + nOut) + content'length-1 + newShift);					
+					
+	for p in 0 to content'length-1 loop	
+		if --nFull - nOut > p then
+			tempMaskX(p) = '1' then
+											
+			res(p) := '1';
+		else		
+			res(p) := tempMaskY(p);
+		end if;	
+	end loop;
+
+	return res;
+end function;
+
+
+function TEMP_hbufferStageDataNext(content: InstructionStateArray;
+											livingMask: std_logic_vector;
+											newContent: InstructionStateArray;
+											prevSending: std_logic;
+											fetchData: InstructionState;
+												fetchBasicInfo: InstructionBasicInfo;											
+											nFull, nOut, nIn: integer)  
+return StageDataHbuffer is
+	variable res: StageDataHbuffer := DEFAULT_STAGE_DATA_HBUFFER;
+	variable newShift: integer := 0; -- CAREFUL! This determines where actual data starts in newContent
+		constant CLEAR_EMPTY_SLOTS_HBUFF: boolean := false;	
+	variable tempX: InstructionStateArray(0 to content'length + newContent'length - 1) 
+			:= (others => DEFAULT_ANNOTATED_HWORD);
+	variable tempMaskX: std_logic_vector(0 to content'length + newContent'length - 1) := (others => '0');		
+			
+	variable tempY: InstructionStateArray(0 to 2*content'length + newContent'length - 1) 
+			:= (others => DEFAULT_ANNOTATED_HWORD);					
+	variable tempMaskY: std_logic_vector(0 to 2*content'length + newContent'length - 1) 
+			:= (others => '0');
+begin	
+	-- CAREFUL! Hbuffer size MUST be a multiple of newContent size!
+
+	newShift := slv2u(fetchBasicInfo.ip(ALIGN_BITS-1 downto 1));					
+		-- For position 'i':
+		-- Y: if taking newContent[y], it must be: nFull + y - newShift = i, so
+		--		y = i + newShift - nFull 
+		-- 	So let's get y := (i + newShift - nFull)
+		-- X: if taking form content[x], it must be: i + nOut = x, so
+		--		x := i + nOut
+		--
+		-- However, for Y: when i is end of queue, it can only take yMax,
+		--					when end-1, it can take {yMax-1, yMax}, etc.
+		-- and for X: x must be smaller than QUEUE_SIZE
+		--
+		-- Selection X vs Y: when nFull-nOut+nIn > i, select X, else select Y
+		--	
+	tempX := content & newContent;
+	tempMaskX(0 to content'length-1) := livingMask;		
+	for k in 0 to tempY'length-1 loop
+		tempY(k) := newContent(k mod newContent'length); -- & newContent & newContent & newContent;	
+	end loop;			
+			
+	for k in 0 to newContent'length - 1 loop
+		--if nIn /= 0 then
+			tempMaskY(k) := prevSending;
+			tempMaskY(content'length + k) := prevSending;
+		--end if;
+	end loop;
+
+	tempX(0 to content'length-1 - nOut) := tempX(nOut to content'length-1);
+	tempMaskX(0 to tempMaskX'length-1 - nOut) := tempMaskX(nOut to tempMaskX'length-1);
+		
+
+	tempY(0 to content'length-1) := 
+		tempY(		(content'length - nFull + nOut) + newShift 
+					to (content'length - nFull + nOut) + content'length-1 + newShift);
+
+	tempMaskY(0 to content'length-1) := 
+		tempMaskY(		(content'length - nFull + nOut) + newShift 
+					to (content'length - nFull + nOut) + content'length-1 + newShift);					
+			
+	for p in 0 to content'length-1 loop	
+		if tempMaskX(p) = '1' then
+			res.data(p) := tempX(p);
+			res.fullMask(p) := '1';
+		else
+			res.data(p) := tempY(p);
+			res.fullMask(p) := tempMaskY(p);
+		end if;	
+	end loop;
+	
+	return res;
+end function;
+
+
+
+
 function bufferAHNextDefault(content, newContent: AnnotatedHwordArray; 
 								fetchData: StageDataPC;
 								nFull, nOut, nIn: integer) 
@@ -1180,5 +1388,107 @@ begin
 	return res;
 end function;
 
- 
+
+							
+				function storeQueueNext(content: InstructionStateArray;
+									  livingMask: std_logic_vector;
+									  newContent: InstructionStateArray;
+									  newMask: std_logic_vector;
+									  nLiving: integer;
+									  sending: integer;
+									  receiving: std_logic;
+									  dataA, dataD: InstructionState;
+									  wrA, wrD: std_logic;
+									  mA, mD: std_logic_vector;
+									  clearCompleted: boolean
+									  ) return InstructionStateArray is
+					constant LEN: integer := content'length;
+					variable tempContent, tempNewContent: InstructionStateArray(0 to LEN + PIPE_WIDTH-1)
+									:= (others => DEFAULT_INSTRUCTION_STATE);
+					variable tempMask: std_logic_vector(0 to LEN + PIPE_WIDTH-1) := (others => '0');
+					variable res: InstructionStateArray(0 to LEN-1)
+											:= (others => DEFAULT_INSTRUCTION_STATE);--content;
+					variable outMask: std_logic_vector(0 to LEN-1) := (others => '0');
+					variable c1, c2: std_logic := '0';
+					variable sv: Mword := (others => '0');
+						variable sh: integer := sending;
+				begin							
+					tempContent(0 to LEN-1) := content;
+					for i in 0 to LEN-1 loop
+						tempNewContent(i) := newContent((nLiving-sh + i) mod PIPE_WIDTH);
+					end loop;
+					
+					tempMask(0 to LEN-1) := livingMask;
+
+					-- Shift by n of sending
+					tempContent(0 to LEN - 1) := tempContent(sh to sh + LEN-1);
+					-- CAREFUL: tempMask must have enough zeros at the end to clear outdated 'ones'!
+					outMask(0 to LEN-1) := tempMask(sh to sh + LEN-1); 
+					
+					for i in 0 to LEN-1 loop
+						res(i).basicInfo := DEFAULT_BASIC_INFO;
+							c1 := res(i).controlInfo.completed;
+							c2 := res(i).controlInfo.completed2;
+							res(i).controlInfo := DEFAULT_CONTROL_INFO;
+							res(i).controlInfo.completed := c1;
+							res(i).controlInfo.completed2 := c2;
+						res(i).bits := (others => '0');
+						res(i).classInfo := DEFAULT_CLASS_INFO;
+						res(i).constantArgs := DEFAULT_CONSTANT_ARGS;
+						res(i).virtualArgs := DEFAULT_VIRTUAL_ARGS;
+						res(i).virtualDestArgs := DEFAULT_VIRTUAL_DEST_ARGS;
+						res(i).physicalArgs := DEFAULT_PHYSICAL_ARGS;
+						res(i).physicalDestArgs := DEFAULT_PHYSICAL_DEST_ARGS;
+						
+						res(i).numberTag := (others => '0');
+						res(i).gprTag := (others => '0');
+						
+							sv := res(i).argValues.arg2;
+							res(i).argValues := DEFAULT_ARG_VALUES;
+							res(i).argValues.arg2 := sv;
+						res(i).target := (others => '0');
+						
+						if outMask(i) = '1' then									
+							res(i).groupTag := tempContent(i).groupTag;
+							res(i).operation := tempContent(i).operation; --(Memory, store);														
+						else
+							res(i).groupTag := tempNewContent(i).groupTag;
+							res(i).operation := tempNewContent(i).operation; --(Memory, store);							
+						end if;
+															
+						if (wrA and mA(i)) = '1' then
+							res(i).argValues.arg1 := dataA.result;
+							res(i).controlInfo.completed := '1';
+						elsif outMask(i) = '1' then
+							res(i).argValues.arg1 := tempContent(i).argValues.arg1;
+							res(i).controlInfo.completed := tempContent(i).controlInfo.completed;									
+						else
+							res(i).argValues.arg1 := tempNewContent(i).argValues.arg1;
+							if clearCompleted then
+								res(i).controlInfo.completed := '0';
+							else
+								res(i).controlInfo.completed := tempNewContent(i).controlInfo.completed;
+							end if;	
+						end if;
+
+						if (wrD and mD(i)) = '1' then									
+							res(i).argValues.arg2 := dataD.argValues.arg2;
+							res(i).controlInfo.completed2 := '1';
+						elsif outMask(i) = '1' then
+							res(i).argValues.arg2 := tempContent(i).argValues.arg2;
+							res(i).controlInfo.completed2 := tempContent(i).controlInfo.completed2;
+						else	
+							res(i).argValues.arg2 := tempNewContent(i).argValues.arg2;
+							if clearCompleted then
+								res(i).controlInfo.completed2 := '0';
+							else
+								res(i).controlInfo.completed2 := tempNewContent(i).controlInfo.completed2;
+							end if;
+						end if;
+
+					end loop;
+					
+					return res;
+				end function;
+
 end OLD_FUNCTIONS;

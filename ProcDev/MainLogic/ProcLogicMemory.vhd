@@ -35,18 +35,18 @@ package ProcLogicMemory is
 function findCommittingSQ(content: InstructionStateArray; livingMask: std_logic_vector;
 								  committingTag: SmallNumber; send: std_logic) return StageDataMulti;							
 
-function storeQueueNext(content: InstructionStateArray;
-									  livingMask: std_logic_vector;
-									  newContent: InstructionStateArray;
-									  newMask: std_logic_vector;
-									  nLiving: integer;
-									  sending: integer;
-									  receiving: std_logic;
-									  dataA, dataD: InstructionState;
-									  wrA, wrD: std_logic;
-									  mA, mD: std_logic_vector;
-									  clearCompleted: boolean									  
-									  ) return InstructionStateArray;
+--function storeQueueNext(content: InstructionStateArray;
+--									  livingMask: std_logic_vector;
+--									  newContent: InstructionStateArray;
+--									  newMask: std_logic_vector;
+--									  nLiving: integer;
+--									  sending: integer;
+--									  receiving: std_logic;
+--									  dataA, dataD: InstructionState;
+--									  wrA, wrD: std_logic;
+--									  mA, mD: std_logic_vector;
+--									  clearCompleted: boolean									  
+--									  ) return InstructionStateArray;
 
 				function lmQueueNext(content: InstructionStateArray;
 									  livingMask: std_logic_vector;
@@ -131,107 +131,7 @@ package body ProcLogicMemory is
 
 							return res;
 						end function;
-							
-				function storeQueueNext(content: InstructionStateArray;
-									  livingMask: std_logic_vector;
-									  newContent: InstructionStateArray;
-									  newMask: std_logic_vector;
-									  nLiving: integer;
-									  sending: integer;
-									  receiving: std_logic;
-									  dataA, dataD: InstructionState;
-									  wrA, wrD: std_logic;
-									  mA, mD: std_logic_vector;
-									  clearCompleted: boolean
-									  ) return InstructionStateArray is
-					constant LEN: integer := content'length;
-					variable tempContent, tempNewContent: InstructionStateArray(0 to LEN + PIPE_WIDTH-1)
-									:= (others => DEFAULT_INSTRUCTION_STATE);
-					variable tempMask: std_logic_vector(0 to LEN + PIPE_WIDTH-1) := (others => '0');
-					variable res: InstructionStateArray(0 to LEN-1)
-											:= (others => DEFAULT_INSTRUCTION_STATE);--content;
-					variable outMask: std_logic_vector(0 to LEN-1) := (others => '0');
-					variable c1, c2: std_logic := '0';
-					variable sv: Mword := (others => '0');
-						variable sh: integer := sending;
-				begin							
-					tempContent(0 to LEN-1) := content;
-					for i in 0 to LEN-1 loop
-						tempNewContent(i) := newContent((nLiving-sh + i) mod PIPE_WIDTH);
-					end loop;
-					
-					tempMask(0 to LEN-1) := livingMask;
 
-					-- Shift by n of sending
-					tempContent(0 to LEN - 1) := tempContent(sh to sh + LEN-1);
-					-- CAREFUL: tempMask must have enough zeros at the end to clear outdated 'ones'!
-					outMask(0 to LEN-1) := tempMask(sh to sh + LEN-1); 
-					
-					for i in 0 to LEN-1 loop
-						res(i).basicInfo := DEFAULT_BASIC_INFO;
-							c1 := res(i).controlInfo.completed;
-							c2 := res(i).controlInfo.completed2;
-							res(i).controlInfo := DEFAULT_CONTROL_INFO;
-							res(i).controlInfo.completed := c1;
-							res(i).controlInfo.completed2 := c2;
-						res(i).bits := (others => '0');
-						res(i).classInfo := DEFAULT_CLASS_INFO;
-						res(i).constantArgs := DEFAULT_CONSTANT_ARGS;
-						res(i).virtualArgs := DEFAULT_VIRTUAL_ARGS;
-						res(i).virtualDestArgs := DEFAULT_VIRTUAL_DEST_ARGS;
-						res(i).physicalArgs := DEFAULT_PHYSICAL_ARGS;
-						res(i).physicalDestArgs := DEFAULT_PHYSICAL_DEST_ARGS;
-						
-						res(i).numberTag := (others => '0');
-						res(i).gprTag := (others => '0');
-						
-							sv := res(i).argValues.arg2;
-							res(i).argValues := DEFAULT_ARG_VALUES;
-							res(i).argValues.arg2 := sv;
-						res(i).target := (others => '0');
-						
-						if outMask(i) = '1' then									
-							res(i).groupTag := tempContent(i).groupTag;
-							res(i).operation := tempContent(i).operation; --(Memory, store);														
-						else
-							res(i).groupTag := tempNewContent(i).groupTag;
-							res(i).operation := tempNewContent(i).operation; --(Memory, store);							
-						end if;
-															
-						if (wrA and mA(i)) = '1' then
-							res(i).argValues.arg1 := dataA.result;
-							res(i).controlInfo.completed := '1';
-						elsif outMask(i) = '1' then
-							res(i).argValues.arg1 := tempContent(i).argValues.arg1;
-							res(i).controlInfo.completed := tempContent(i).controlInfo.completed;									
-						else
-							res(i).argValues.arg1 := tempNewContent(i).argValues.arg1;
-							if clearCompleted then
-								res(i).controlInfo.completed := '0';
-							else
-								res(i).controlInfo.completed := tempNewContent(i).controlInfo.completed;
-							end if;	
-						end if;
-
-						if (wrD and mD(i)) = '1' then									
-							res(i).argValues.arg2 := dataD.argValues.arg2;
-							res(i).controlInfo.completed2 := '1';
-						elsif outMask(i) = '1' then
-							res(i).argValues.arg2 := tempContent(i).argValues.arg2;
-							res(i).controlInfo.completed2 := tempContent(i).controlInfo.completed2;
-						else	
-							res(i).argValues.arg2 := tempNewContent(i).argValues.arg2;
-							if clearCompleted then
-								res(i).controlInfo.completed2 := '0';
-							else
-								res(i).controlInfo.completed2 := tempNewContent(i).controlInfo.completed2;
-							end if;
-						end if;
-
-					end loop;
-					
-					return res;
-				end function;
 
 
 				function lmQueueNext(content: InstructionStateArray;

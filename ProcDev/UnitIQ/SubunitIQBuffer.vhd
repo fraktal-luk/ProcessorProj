@@ -48,6 +48,8 @@ use work.ProcComponents.all;
 
 use work.BasicCheck.all;
 
+use work.Queues.all;
+
 
 entity SubunitIQBuffer is
 	generic(
@@ -81,12 +83,16 @@ end SubunitIQBuffer;
 architecture Implem of SubunitIQBuffer is
 	signal queueData, queueDataUpdated, queueDataUpdatedSel: InstructionStateArray(0 to IQ_SIZE-1) 
 								:= (others=>defaultInstructionState);
-	signal queueDataLiving, queueDataNext: InstructionStateArray(0 to IQ_SIZE-1)
+	signal queueDataLiving, queueDataNext, TMP_dataNext, queueData_TMP: InstructionStateArray(0 to IQ_SIZE-1)
 								:= (others=>defaultInstructionState);		
 	signal fullMask, fullMaskNext, killMask, livingMask, readyMask,
 			readyMask2, readyMask_C,
+			inputEnable, movedEnable, TMP_maskNext,
 			sendingMask: 
-								std_logic_vector(0 to IQ_SIZE-1) := (others=>'0');				
+								std_logic_vector(0 to IQ_SIZE-1) := (others=>'0');	
+
+	signal inputIndices, movedIndices: SmallNumberArray(0 to IQ_SIZE-1) := (others => (others => '0'));
+								
 	signal flowDriveQ: FlowDriveBuffer 
 				:= (killAll => '0', lockAccept => '0', lockSend => '0', others=>(others=>'0'));
 	signal flowResponseQ: FlowResponseBuffer := (others => (others=> '0'));
@@ -97,24 +103,98 @@ architecture Implem of SubunitIQBuffer is
 	signal newDataU: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;												
 	signal sends: std_logic := '0';
 	signal dispatchDataNew: InstructionState := defaultInstructionState;
+	
+		signal sendingIndex: SmallNumber := (others => '0');
+			signal TMP_sendingWin: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
+	
+		signal qs0, qs1: TMP_queueState := TMP_defaultQueueState;
+		signal ta, tb: SmallNumber := (others => '0');	
+		
+		signal sendingSlot: InstructionSlot := DEFAULT_INSTRUCTION_SLOT;
+		
+		
+	function selectSending(arr: InstructionStateArray; mask: std_logic_vector; nextAccepting: std_logic)
+	return InstructionSlot is
+		constant LEN: integer := arr'length;
+		variable res: InstructionSlot;
+	begin
+		res.full := mask(LEN-1);
+		res.ins := arr(LEN-1);
+		
+		for i in 0 to LEN-1 loop
+			if mask(i) = '1' then
+				res.full := nextAccepting;
+				res.ins := arr(i);
+				exit;
+			end if;
+		end loop;
+		return res;
+	end function;
+	
 begin
 	flowDriveQ.prevSending <= --prevSending;		
 										num2flow(countOnes(newData.fullMask)) when prevSendingOK = '1'
 										else (others => '0');
+	flowDriveQ.kill <= num2flow(countOnes(killMask));
+	flowDriveQ.nextAccepting <=  num2flow(1) when (nextAccepting and isNonzero(readyMask_C)) = '1'			
+									else num2flow(0);															
+
 	
 	QUEUE_SYNCHRONOUS: process(clk) 	
 	begin
 		if rising_edge(clk) then
+			qs0 <= qs1;
+		
 			queueData <= queueDataNext;
+							--	TMP_dataNext;
 			fullMask <= fullMaskNext;
-	
+							--	TMP_maskNext;
+
+			--		logBuffer(queueData_TMP, fullMask, livingMask, flowResponseQ);								
 			logBuffer(queueData, fullMask, livingMask, flowResponseQ);
 			checkIQ(queueData, fullMask, queueDataNext, fullMaskNext, dispatchDataNew, sends,
 					  flowDriveQ, flowResponseQ);
 		end if;
 	end process;	
+
+		ta <= flowDriveQ.nextAccepting;
+		tb <= flowDriveQ.prevSending;		
+		qs1 <= TMP_change_Shifting(qs0, ta, tb, fullMask, killMask,
+											execEventSignal or execCausing.controlInfo.hasInterrupt,
+											fullMaskNext);
 		
-	flowDriveQ.kill <= num2flow(countOnes(killMask));		
+		sendingMask <= getFirstOne(readyMask2 and livingMask) when nextAccepting = '1'
+					else	(others => '0');
+		
+
+		inputEnable <= getEnableForInput_Shifting(qs0, fullMask,
+																				flowDriveQ.nextAccepting, flowDriveQ.prevSending);
+		inputIndices <= getQueueIndicesForInput_Shifting(qs0, fullMask, PIPE_WIDTH, flowDriveQ.nextAccepting);
+		
+		-- CAREFUL: here we need to enable only those from sending, not from first
+			-- find index of sending - probably not used
+			sendingIndex <= findQueueIndex(sendingMask);
+			
+		movedEnable <= getEnableForMoved_Shifting(qs0, fullMask,
+																				flowDriveQ.nextAccepting, flowDriveQ.prevSending)
+						and setFromFirstOne(sendingMask);
+		movedIndices <= (others => (others => '0')); -- Always moved by 1 or not at all, so 0-th moved elem
+		
+		TMP_maskNext <= getQueueMaskNext_Shifting(qs1, fullMask);
+
+			TMP_dataNext <= TMP_getNewContent_General(queueDataUpdated,
+																	newDataU.data,
+																	movedEnable, movedIndices, inputEnable, inputIndices);
+
+			--TMP_sendingWin <= getQueueWindow(queueDataUpdatedSel, readyMask_C, sendingIndex);
+
+		sendingSlot <=	selectSending(queueDataUpdatedSel, readyMask_C, nextAccepting);
+				--sends <= TMP_sendingWin.fullMask(0);
+				--dispatchDataNew <= TMP_sendingWin.data(0);
+			--sends <= sendingSlot.full;
+			--dispatchDataNew <= sendingSlot.ins;
+			
+	-----------------------------------------------------------------------
 	queueDataLiving <= queueDataUpdated;
 			
 	livingMask <= fullMask and not killMask;
@@ -136,10 +216,7 @@ begin
 														binFlowNum(flowResponseQ.sending),
 														binFlowNum(flowDriveQ.prevSending),
 														prevSendingOK);
-				
-	flowDriveQ.nextAccepting <=  num2flow(1) when (nextAccepting and isNonzero(readyMask_C)) = '1'			
-									else num2flow(0);															
-	
+					
 	queueDataUpdated <= updateForWaitingArray(queueData, readyRegFlags, aiArray, '0');
 	queueDataUpdatedSel <= updateForSelectionArray(queueData, readyRegFlags, aiArray);
 
@@ -156,23 +233,12 @@ begin
 		clk => clk, reset =>  reset, en => en,
 		flowDrive => flowDriveQ,
 		flowResponse => flowResponseQ
-	);
-
-	KILL_MASK: for i in killMask'range generate
-		signal before: std_logic;
-		signal a, b: std_logic_vector(7 downto 0);
-		signal c: SmallNumber := (others => '0');		
-	begin
-		a <= execCausing.groupTag;
-		b <= queueData(i).groupTag;
-		c <= subSN(a, b);
-		before <= c(7);
-		killMask(i) <= killByTag(before, execEventSignal, execCausing.controlInfo.hasInterrupt)
-								and fullMask(i); 			
-	end generate;	
+	);	
 	
-	acceptingVec <= --not livingMask(IQ_SIZE-PIPE_WIDTH to IQ_SIZE-1);
-						 not fullMask(IQ_SIZE-PIPE_WIDTH to IQ_SIZE-1);
+	killMask <=
+		getKillMask(queueData, fullMask, execCausing, execEventSignal, execCausing.controlInfo.hasInterrupt);
+	
+	acceptingVec <= not fullMask(IQ_SIZE-PIPE_WIDTH to IQ_SIZE-1);
 		
 	queueSending <= flowResponseQ.sending(0);	-- CAREFUL: assumes that flowResponseQ.sending is binary: [0,1]
 	iqDataOut <= queueData;						
