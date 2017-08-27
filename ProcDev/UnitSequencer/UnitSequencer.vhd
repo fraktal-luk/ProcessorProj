@@ -184,8 +184,8 @@ architecture Behavioral of UnitSequencer is
 			
 			signal ch0, ch1: std_logic := '0';
 				
-	constant HAS_RESET_SEQ: std_logic := '1';
-	constant HAS_EN_SEQ: std_logic := '1';			
+	constant HAS_RESET_SEQ: std_logic := '0';
+	constant HAS_EN_SEQ: std_logic := '0';			
 begin	 
 	resetSig <= reset and HAS_RESET_SEQ;
 	enSig <= en or not HAS_EN_SEQ;
@@ -198,16 +198,8 @@ begin
 		TMP_phase2 <= eiEvents.causing.controlInfo.phase2;
 
 	EVENTS: block
-		-- $INPUT: 
-		--		stage0EventInfo, execEventSignal, execCausing, eiEvents
-		-- $OUTPUT:
-		-- 	execOrIntCausing, execOrIntEventSignal, killVecOut, generalEvents,
 	begin	
-			--killVecOut(6) <= TMP_phase0;
-			--killVecOut(5) <= execOrIntEventSignal;
-			--killVecOut(0 to 4) <= generalEvents.affectedVec;
-
-			generalEvents <= NEW_generalEvents(
+		generalEvents <= NEW_generalEvents(
 											stageDataOutPC,
 												TMP_phase0,--eiEvents.eventOccured, 
 											eiEvents.causing,

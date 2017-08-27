@@ -22,41 +22,13 @@ use work.NewPipelineData.all;
 
 package TEMP_DEV is
 
--- Type for table: ExecUnit -> exec subpipe number
-type ExecUnitToNaturalTable is array(ExecUnit'left to ExecUnit'right) of integer;
-
--- Routing table for issue queues
--- 0 - ALU, Div
--- 1 - MAC
--- 2 - Memory
--- 3 - Jump,
---	4 - System
-constant ISSUE_ROUTING_TABLE: ExecUnitToNaturalTable := (
-		General => -1, -- Should never happen!
-		ALU => 0,
-		MAC => 1,
-		Divide => 0,
-		Jump => 3,
-		Memory => 2,
-		System => 3 + 1);
-
-	-- TODO: automatically handle 32/64b config
-	function TEMP_addMword(a, b: Mword) return Mword;
-
-	function addMword(a, b: Mword) return Mword;
-
-
 function setInstructionTarget(ins: InstructionState; target: Mword) return InstructionState;
 
 -- Gives queue number based on functional unit
-function unit2queue(unit: ExecUnit) return natural;
-function findByExecUnit(iv: InstructionStateArray; seeking: ExecUnit) return std_logic_vector;
+function unit2queue(unit: ExecUnit) return integer;
 function routeToIQ(sd: StageDataMulti; srcVec: std_logic_vector) return StageDataMulti;	
 
-	function routeToIQ2(sd: StageDataMulti; srcVec: std_logic_vector) return StageDataMulti;	
-	
-	-- Tells if 'a' is older than 'b'
-	function tagBefore(a, b: SmallNumber) return std_logic;
+function routeToIQ2(sd: StageDataMulti; srcVec: std_logic_vector) return StageDataMulti;	
 
 function extractReadyRegBits(bits: std_logic_vector; data: InstructionStateArray)
 return std_logic_vector;
@@ -108,6 +80,7 @@ function setBranchLink(insv: StageDataMulti) return StageDataMulti;
 function findStores(insv: StageDataMulti) return std_logic_vector;
 function findLoads(insv: StageDataMulti) return std_logic_vector;
 
+
 function addMwordBasic(a, b: Mword) return Mword;
 function subMwordBasic(a, b: Mword) return Mword;
 
@@ -127,36 +100,6 @@ end TEMP_DEV;
 
 package body TEMP_DEV is
 
-		function TEMP_addMword(a, b: Mword) return Mword is
-			variable res: Mword := (others => '0');
-			variable al, ah, bl, bh, cl, ch: integer := 0;
-			variable ta, tb: hword := (others => '0'); 
-		begin
-			ta := a(31 downto 16);
-			ah := slv2u(ta);
-			al := slv2u(a(15 downto 0));
-			tb := b(31 downto 16);
-			bh := slv2u(tb);
-			bl := slv2u(b(15 downto 0));
-			
-			cl := bl + al;
-			ch := ah + bh;
-			
-			if cl >= 2**16 then
-				ch := ch + 1;
-			end if;
-			
-			res(31 downto 16) := i2slv(ch, 16);
-			res(15 downto 0) := i2slv(cl, 16);			
-			return res;
-		end function;
-
-		function addMword(a, b: Mword) return Mword is
-		begin
-			-- TODO: handle 64b config
-			return addWord(a, b);
-		end function;
-
 	function setInstructionTarget(ins: InstructionState; target: Mword) return InstructionState is
 		variable res: InstructionState := ins;
 	begin
@@ -165,20 +108,19 @@ package body TEMP_DEV is
 	end function;
 
 
-function unit2queue(unit: ExecUnit) return natural is
+function unit2queue(unit: ExecUnit) return integer is
 begin
-	return ISSUE_ROUTING_TABLE(unit);
-end function;
-
-function findByExecUnit(iv: InstructionStateArray; seeking: ExecUnit) return std_logic_vector is
-	variable res: std_logic_vector(iv'range) := (others=>'0');
-begin
-	for i in iv'range loop
-		if iv(i).operation.unit = seeking then
-			res(i) := '1';
-		end if;
-	end loop;
-	return res;
+	--return ISSUE_ROUTING_TABLE(unit);
+	case unit is
+		when General => return -1; -- Should never happen!
+		when ALU => return 0;
+		when MAC => return 1;
+		when Divide => return 0;
+		when Jump => return 3;
+		when Memory => return 2;
+		when System => return 3 + 1;
+		when others => return -1;
+	end case;
 end function;
 
 	-- New routing to IQ, to replace IssueRouting
@@ -289,21 +231,6 @@ end function;
 			return res;
 		end function;
 
-
-	-- CAREFUL! In this version (ci = ai - bi, no negatio on return) "10...0" WILL be after "0...0"!
-	--				Generally, "0..01" to "10..0" will be.
-	function tagBefore(a, b: SmallNumber) return std_logic is
-		variable ai, bi, ci: integer;
-		variable c: SmallNumber;
-	begin
-		ai := slv2u(a);
-		bi := slv2u(b);
-		ci := ai - bi;
-		c := i2slv(ci, SMALL_NUMBER_SIZE);
-		return c(c'high);
-	end function;
-	
-	
 function extractReadyRegBits(bits: std_logic_vector; data: InstructionStateArray) return std_logic_vector is
 	variable res: std_logic_vector(0 to 3*data'length-1) := (others => '0'); -- 31) := (others=>'0');
 begin

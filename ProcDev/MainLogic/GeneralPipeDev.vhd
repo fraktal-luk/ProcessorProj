@@ -51,12 +51,6 @@ function compactMask(data: InstructionStateArray; mask: std_logic_vector) return
 function findMatching(content: InstructionSlotArray; ins: InstructionState)
 return std_logic_vector;
 
-function queueMaskNext(livingMask: std_logic_vector;
-					  newMask: std_logic_vector;
-					  nLivingIn: integer;
-					  sending: integer;
-					  receiving: std_logic) return std_logic_vector;
-
 function stageSimpleNext(content, newContent: InstructionState; full, sending, receiving: std_logic)
 return InstructionState;
 
@@ -101,17 +95,12 @@ function getPhysicalDestMask(insVec: StageDataMulti) return std_logic_vector;
 
 function getExceptionMask(insVec: StageDataMulti) return std_logic_vector;
 
-function getLastFull(newContent: StageDataMulti) return InstructionState;
 function getEffectiveMask(newContent: StageDataMulti) return std_logic_vector;
 function getLastEffective(newContent: StageDataMulti) return InstructionState;
-function groupHasException(newContent: StageDataMulti) return std_logic;
-
 
 function getSendingFromCQ(livingMask: std_logic_vector) return std_logic_vector;
 
-
 function killByTag(before, ei, int: std_logic) return std_logic;
-
 	
 -- FORWARDING NETWORK ------------
 function getWrittenTags(lastCommitted: StageDataMulti) return PhysNameArray;
@@ -150,9 +139,6 @@ function simpleQueueNext(content: InstructionStateArray; newContent: Instruction
 		sending: std_logic
 )
 return InstructionSlotArray;
-
-
-function combineMulti(vec0, vec1: StageDataMulti) return StageDataMulti;
 
 function findWhichTakeReg(sd: StageDataMulti) return std_logic_vector;
 function findWhichPutReg(sd: StageDataMulti) return std_logic_vector;
@@ -297,35 +283,6 @@ begin
 		end if;
 	end loop;							
 	return res;
-end function;
-
-
-function queueMaskNext(livingMask: std_logic_vector;
-					  newMask: std_logic_vector;
-					  nLivingIn: integer;
-					  sending: integer;
-					  receiving: std_logic) return std_logic_vector is
-	variable nLiving: integer := nLivingIn;
-	constant LEN: integer := livingMask'length;
-	variable tempMask: std_logic_vector(0 to LEN + PIPE_WIDTH-1) := (others => '0');
-	variable outMask: std_logic_vector(0 to LEN-1) := (others => '0');
-begin
-	if nLiving < 0  or nLiving > LEN then
-		nLiving := 0;
-	end if;
-								
-	tempMask(0 to LEN-1) := livingMask;
-
-	-- Append new data
-	if receiving = '1' then
-		tempMask(nLiving to nLiving + PIPE_WIDTH-1) := newMask;
-	end if;
-
-	-- Shift by n of sending
-	-- CAREFUL: tempMask must have enough zeros at the end to clear outdated 'ones'!
-	outMask(0 to LEN-1) := tempMask(sending to sending + LEN-1); 
-
-	return outMask;
 end function;
 
 
@@ -536,8 +493,7 @@ function getPhysicalDestMask(insVec: StageDataMulti) return std_logic_vector is
 	variable res: std_logic_vector(insVec.fullMask'range) := (others=>'0');
 begin
 	for i in insVec.fullMask'range loop
-		res(i) := '1'--insVec.fullMask(i) 
-				and insVec.data(i).physicalDestArgs.sel(0);
+		res(i) := insVec.data(i).physicalDestArgs.sel(0);
 	end loop;			
 	return res;
 end function;
@@ -546,9 +502,7 @@ function getExceptionMask(insVec: StageDataMulti) return std_logic_vector is
 	variable res: std_logic_vector(insVec.fullMask'range) := (others=>'0');
 begin
 	for i in insVec.fullMask'range loop
-		res(i) := '1'--insVec.fullMask(i) 
-				and insVec.data(i).controlInfo.--newException;
-														 hasException;
+		res(i) := insVec.data(i).controlInfo.hasException;
 	end loop;			
 	return res;
 end function;
@@ -660,21 +614,6 @@ begin
 	return res;
 end function;
 
-			
-	function getLastFull(newContent: StageDataMulti) return InstructionState is
-		variable res: InstructionState := defaultInstructionState;
-	begin
-		-- Seeking from right side cause we need the last one 
-		for i in newContent.fullMask'reverse_range loop
-			if newContent.fullMask(i) = '1' then
-				res := newContent.data(i);				
-				exit;
-			end if;
-		end loop;
-		return res;
-	end function;			
-
-
 	function getLastEffective(newContent: StageDataMulti) return InstructionState is
 		variable res: InstructionState := newContent.data(0);
 	begin
@@ -721,28 +660,9 @@ end function;
 		end loop;
 		return res;
 	end function;
-
-		function groupHasException(newContent: StageDataMulti) return std_logic is
-		begin			
-			for i in newContent.fullMask'range loop
-				-- Count only full instructions
-				if newContent.fullMask(i) = '1' then
-					if newContent.data(i).controlInfo.hasException = '1' then
-						return '1';
-					end if;
-				else 	
-					exit;
-				end if;
-				
-			end loop;			
-			return '0';
-		end function;
 	
 	function killByTag(before, ei, int: std_logic) return std_logic is
 	begin
-		-- Version with unified exec/interrupt event
-		--return before and ei;
-		-- Version with separate interrupt 
 		return (before and ei) or int;
 	end function;
 
@@ -920,7 +840,8 @@ begin
 		if insVec.data(i).controlInfo.hasBranch = '1' then
 			null;
 		else
-			targets(i) := i2slv(slv2u(prevAdr) + slv2u(getAddressIncrement(insVec.data(i))), MWORD_SIZE);
+			--targets(i) := i2slv(slv2u(prevAdr) + slv2u(getAddressIncrement(insVec.data(i))), MWORD_SIZE);
+			targets(i) := addMwordBasic(prevAdr, getAddressIncrement(insVec.data(i)));
 		end if;
 		res.data(i).basicInfo.ip := prevAdr; -- ??
 		prevAdr := targets(i);
@@ -985,25 +906,6 @@ begin
 	return res;		
 end function;
 
-function combineMulti(vec0, vec1: StageDataMulti) return StageDataMulti is
-	variable res: StageDataMulti := vec0;
-	variable j: integer := 0;
-begin
-	for i in 0 to PIPE_WIDTH-1 loop
-		if vec0.fullMask(i) = '1' then
-			next;
-		else
-			res.fullMask(i) := vec1.fullMask(j);
-			res.data(i) := vec1.data(j);
-			j := j + 1;
-		end if;
-		
-	end loop;
-	
-	return res;
-end function;
-
-
 
 function findWhichTakeReg(sd: StageDataMulti) return std_logic_vector is
 	variable res: std_logic_vector(0 to PIPE_WIDTH-1) := (others => '0');
@@ -1040,7 +942,6 @@ begin
 	end loop;
 	return res;
 end function;
-
 
 
 end GeneralPipeDev;
