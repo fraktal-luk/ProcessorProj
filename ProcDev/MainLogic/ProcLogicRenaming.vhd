@@ -46,10 +46,7 @@ function setArgStatus(insVec: StageDataMulti; readyRegFlagsVirtualNext: std_logi
 return StageDataMulti;
 
 	
-function prepareForAGU(insVec: StageDataMulti) return StageDataMulti;
-function prepareForBranch(insVec: StageDataMulti) return StageDataMulti;
-function prepareForAlu(insVec: StageDataMulti; bl: std_logic_vector) return StageDataMulti;
-function prepareForStoreData(insVec: StageDataMulti) return StageDataMulti;
+
 
 
 function getStableDestsParallel(insVec: StageDataMulti; pdVec: PhysNameArray) return PhysNameArray;
@@ -230,77 +227,6 @@ begin
 					and not readyRegFlagsVirtualNext(3*i + 2);
 		end loop;	
 	
-	return res;
-end function;
-
-function prepareForAGU(insVec: StageDataMulti) return StageDataMulti is
-	variable res: StageDataMulti := insVec;
-begin
-	for i in 0 to PIPE_WIDTH-1 loop
-		res.data(i).virtualArgs.sel(2) := '0';
-		res.data(i).physicalArgs.sel(2) := '0';
-		res.data(i).argValues.missing(2) := '0';
-	end loop;
-	return res;
-end function;
-
-function prepareForBranch(insVec: StageDataMulti) return StageDataMulti is
-	variable res: StageDataMulti := insVec;
-begin
-	for i in 0 to PIPE_WIDTH-1 loop
-		if res.data(i).operation /= (System, sysMfc) then
-			res.data(i).virtualDestArgs.sel := (others => '0');		
-			res.data(i).virtualDestArgs.d0 := (others => '0');
-			res.data(i).physicalDestArgs.sel := (others => '0');			
-			res.data(i).physicalDestArgs.d0 := (others => '0');
-		end if;
-		
-		if insVec.data(i).controlInfo.hasBranch = '1' then
-			res.data(i).constantArgs.imm := res.data(i).result;			
-		else
-			res.data(i).constantArgs.imm := res.data(i).target;
-		end if;
-		
-	end loop;
-	return res;
-end function;
-
-function prepareForAlu(insVec: StageDataMulti; bl: std_logic_vector) return StageDataMulti is
-	variable res: StageDataMulti := insVec;
-begin
-	for i in 0 to PIPE_WIDTH-1 loop
-		--if 	 res.data(i).operation = (Jump, jump) and isNonzero(res.data(i).virtualDestArgs.d0) = '1'
-		--	and res.data(i).virtualDestArgs.sel(0) = '1'
-		if bl(i) = '1'
-		then
-			--		assert bl(i) = '1' report "ttttt";
-		
-			res.data(i).operation := (Alu, arithAdd);
-		
-			res.data(i).physicalArgs.s0 := (others => '0');
-			res.data(i).argValues.zero(0) := '1';
-			res.data(i).argValues.missing(0) := '0';
-			
-			res.data(i).constantArgs.imm := res.data(i).result;
-		--else	
-			--		assert bl(i) = '0' report "rrrrrrrrrr";
-		end if;
-	end loop;
-	return res;
-end function;
-
-function prepareForStoreData(insVec: StageDataMulti) return StageDataMulti is
-	variable res: StageDataMulti := insVec;
-begin
-	for i in 0 to PIPE_WIDTH-1 loop
-		res.data(i).virtualArgs.sel(0) := '0';
-		res.data(i).virtualArgs.sel(1) := '0';		
-		res.data(i).physicalArgs.sel(0) := '0';
-		res.data(i).physicalArgs.sel(1) := '0';		
-		res.data(i).constantArgs.immSel := '0';
-		res.data(i).virtualDestArgs.sel(0) := '0';
-		res.data(i).physicalDestArgs.sel(0) := '0';
-	end loop;
 	return res;
 end function;
 

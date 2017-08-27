@@ -24,11 +24,6 @@ package TEMP_DEV is
 
 function setInstructionTarget(ins: InstructionState; target: Mword) return InstructionState;
 
--- Gives queue number based on functional unit
-function unit2queue(unit: ExecUnit) return integer;
-function routeToIQ(sd: StageDataMulti; srcVec: std_logic_vector) return StageDataMulti;	
-
-function routeToIQ2(sd: StageDataMulti; srcVec: std_logic_vector) return StageDataMulti;	
 
 function extractReadyRegBits(bits: std_logic_vector; data: InstructionStateArray)
 return std_logic_vector;
@@ -70,17 +65,6 @@ function trgToSR(ins: InstructionState) return InstructionState;
 function setInsResult(ins: InstructionState; result: Mword) return InstructionState;
 
 
-function findForALU(iv: InstructionStateArray) return std_logic_vector;
-
-function findBranchLink(insv: StageDataMulti) return std_logic_vector;
-
-function whichBranchLink(insv: StageDataMulti) return std_logic_vector;
-function setBranchLink(insv: StageDataMulti) return StageDataMulti;
-
-function findStores(insv: StageDataMulti) return std_logic_vector;
-function findLoads(insv: StageDataMulti) return std_logic_vector;
-
-
 function addMwordBasic(a, b: Mword) return Mword;
 function subMwordBasic(a, b: Mword) return Mword;
 
@@ -107,129 +91,18 @@ package body TEMP_DEV is
 		return res;
 	end function;
 
-
-function unit2queue(unit: ExecUnit) return integer is
-begin
-	--return ISSUE_ROUTING_TABLE(unit);
-	case unit is
-		when General => return -1; -- Should never happen!
-		when ALU => return 0;
-		when MAC => return 1;
-		when Divide => return 0;
-		when Jump => return 3;
-		when Memory => return 2;
-		when System => return 3 + 1;
-		when others => return -1;
-	end case;
-end function;
-
-	-- New routing to IQ, to replace IssueRouting
-	function routeToIQ(sd: StageDataMulti; srcVec: std_logic_vector) return StageDataMulti is
-		variable res: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
-		variable k: natural := 0;
-			constant CLEAR_EMPTY_SLOTS_IQ_ROUTING: boolean := false;
-	begin
-		if not CLEAR_EMPTY_SLOTS_IQ_ROUTING then
-			res.data := sd.data;
-		end if;
-	
-		for i in sd.fullMask'range loop
-			if srcVec(i) = '1' then
-				if sd.fullMask(k) = '0' then -- If no more instructions in packet, stop
-					exit;
-				end if;
-				res.fullMask(k) := '1';
-				res.data(k) := sd.data(i);
-				k := k + 1;
-			end if;
-		end loop;
-		return res;
-	end function;	
-
-		function routeToIQ2(sd: StageDataMulti; srcVec: std_logic_vector) return StageDataMulti is
-			variable res: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
-			variable k: natural := 0;
-				constant CLEAR_EMPTY_SLOTS_IQ_ROUTING: boolean := false;
-		begin
-			if not CLEAR_EMPTY_SLOTS_IQ_ROUTING then
-				res.data := sd.data;
-			end if;
-		
-			for i in sd.fullMask'range loop
-				-- Fill with input(j) where j is index of i-th '1' in srcVec
-				-- For output(0):
-				--	"0000" -> 3?
-				-- "0001" -> 3
-				-- "0010" -> 2
-				-- "0011" -> 2
-				-- "0100" -> 1
-				-- "0101" -> 1
-				-- "0110" -> 1 etc.
-				--		 ^ last bit is neutral for data, only matters for 'full' bit
-				-- For output(1):
-				-- "0000" -> 3?
-				-- "0001" -> 3?
-				-- "0010" -> 3?
-				-- "0011" -> 3
-				-- "0100" -> 3? 2?
-				-- "0101" -> 3
-				-- "0110" -> 2
-				-- "0111" -> 2
-				-- "1000" -> 1? 2? 3? 
-				-- "1001" -> 3
-				-- "1010" -> 2
-				-- "1011" -> 2
-				-- "1100" -> 1
-				-- "1101" -> 1
-				-- "1110" -> 1
-				-- "1111" -> 1
-				-- 	 ^ last bit is neutral, penult is not
-				--			Formula: 1 + ofs, ofs = 0 when "11__", 1 when "101_" or "011_", else 2 ??
-				-- For output(2):
-				-- "0000" -> ?
-				-- "0001" -> ?
-				-- "0010" -> ?
-				-- "0011" -> ?
-				-- "0100" -> ?
-				-- "0101" -> ?
-				-- "0110" -> ?
-				-- "0111" -> 3
-				-- "1000" -> ?
-				-- "1001" -> ?
-				-- "1010" -> ?
-				-- "1011" -> 3
-				-- "1100" -> ?
-				-- "1101" -> 3
-				-- "1110" -> 2
-				-- "1111" -> 2
-				-- 	^ last bit neutral. 2 when "111_", 3 when "110_"
-				--		formula": 2 + ofs, ofs = 0 when "111_", else 1
-				
-				-- Idea: separate the logic for each output. index(0) = f0(mask), index(1) = f1(mask) etc.
-				-- So in this place make inner loop with each possible mux index
-				for j in 0 to PIPE_WIDTH-1 loop
-					-- Select route input(j)->output(i) if condition met
-					res.data(i) := sd.data(j);
-					if countOnes(srcVec(0 to j-1)) = i and srcVec(j) = '1' then
-						res.fullMask(i) := '1';
-						exit;
-					end if;
-				end loop;
-			end loop;
-			return res;
-		end function;
-	
-		function shiftedIndex(startInd: integer; mask: std_logic_vector) return integer is
-			variable res: integer := mask'length-1;
-		begin
-			for i in startInd to mask'length-2 loop -- ignoring last mask bit, because it's neutral for content
-				if mask(i) = '1' then
-					res := res - 1;
-				end if;
-			end loop;
-			
-			return res;
-		end function;
+--		WHAT IS THIS?	
+--		function shiftedIndex(startInd: integer; mask: std_logic_vector) return integer is
+--			variable res: integer := mask'length-1;
+--		begin
+--			for i in startInd to mask'length-2 loop -- ignoring last mask bit, because it's neutral for content
+--				if mask(i) = '1' then
+--					res := res - 1;
+--				end if;
+--			end loop;
+--			
+--			return res;
+--		end function;
 
 function extractReadyRegBits(bits: std_logic_vector; data: InstructionStateArray) return std_logic_vector is
 	variable res: std_logic_vector(0 to 3*data'length-1) := (others => '0'); -- 31) := (others=>'0');
@@ -473,128 +346,52 @@ end function;
 		end function;
 
 
-	
-function getStoreAddressPart(ins: InstructionState)
-return InstructionState is
-	variable res: InstructionState := ins;
-	constant srcs: std_logic_vector(0 to 2) := ('1', '1', '0');
-begin
-	res := isolateArgSubset(res, '1', srcs);
-	return res;
-end function;
+--	
+--function getStoreAddressPart(ins: InstructionState)
+--return InstructionState is
+--	variable res: InstructionState := ins;
+--	constant srcs: std_logic_vector(0 to 2) := ('1', '1', '0');
+--begin
+--	res := isolateArgSubset(res, '1', srcs);
+--	return res;
+--end function;
+--
+--function getLoadAddressPart(ins: InstructionState)
+--return InstructionState is
+--	variable res: InstructionState := ins;
+--	constant srcs: std_logic_vector(0 to 2) := ('1', '1', '0');
+--begin
+--	res := isolateArgSubset(res, '0', srcs);
+--	return res;
+--end function;
+--
+--function getStoreDataPart(ins: InstructionState)
+--return InstructionState is
+--	variable res: InstructionState := ins;
+--	constant srcs: std_logic_vector(0 to 2) := ('0', '0', '1');
+--begin
+--	res := isolateArgSubset(res, '1', srcs);
+--	return res;
+--end function;
+--
+--function getResultPart(ins: InstructionState)
+--return InstructionState is
+--	variable res: InstructionState := ins;
+--	constant srcs: std_logic_vector(0 to 2) := ('0', '0', '0');
+--begin
+--	res := isolateArgSubset(res, '1', srcs);
+--	return res;
+--end function;
+--
+--function getSourcePart(ins: InstructionState)
+--return InstructionState is
+--	variable res: InstructionState := ins;
+--	constant srcs: std_logic_vector(0 to 2) := ('1', '1', '1');
+--begin
+--	res := isolateArgSubset(res, '0', srcs);
+--	return res;
+--end function;
 
-function getLoadAddressPart(ins: InstructionState)
-return InstructionState is
-	variable res: InstructionState := ins;
-	constant srcs: std_logic_vector(0 to 2) := ('1', '1', '0');
-begin
-	res := isolateArgSubset(res, '0', srcs);
-	return res;
-end function;
-
-function getStoreDataPart(ins: InstructionState)
-return InstructionState is
-	variable res: InstructionState := ins;
-	constant srcs: std_logic_vector(0 to 2) := ('0', '0', '1');
-begin
-	res := isolateArgSubset(res, '1', srcs);
-	return res;
-end function;
-
-function getResultPart(ins: InstructionState)
-return InstructionState is
-	variable res: InstructionState := ins;
-	constant srcs: std_logic_vector(0 to 2) := ('0', '0', '0');
-begin
-	res := isolateArgSubset(res, '1', srcs);
-	return res;
-end function;
-
-function getSourcePart(ins: InstructionState)
-return InstructionState is
-	variable res: InstructionState := ins;
-	constant srcs: std_logic_vector(0 to 2) := ('1', '1', '1');
-begin
-	res := isolateArgSubset(res, '0', srcs);
-	return res;
-end function;
-
-
-function findForALU(iv: InstructionStateArray) return std_logic_vector is
-	constant LEN: integer := iv'length;
-	variable res: std_logic_vector(0 to LEN-1) := (others => '0'); 
-begin
-	for i in 0 to LEN-1 loop
-		if iv(i).operation.unit = ALU then
-			res(i) := '1';
-		end if;
-	end loop;
-	return res;
-end function;
-
-function findBranchLink(insv: StageDataMulti) return std_logic_vector is
-	variable res: std_logic_vector(0 to PIPE_WIDTH-1) := (others => '0');
-begin
-	for i in 0 to PIPE_WIDTH-1 loop
-		if 	 insv.data(i).operation = (Jump, jump)
-			and isNonzero(insv.data(i).virtualDestArgs.d0) = '1'
-			and insv.data(i).virtualDestArgs.sel(0) = '1'
-		then
-			res(i) := '1';
-		end if;
-	end loop;
-	return res;
-end function;
-
-
-function whichBranchLink(insv: StageDataMulti) return std_logic_vector is
-	variable res: std_logic_vector(0 to PIPE_WIDTH-1) := (others => '0');
-begin
-	for i in 0 to PIPE_WIDTH-1 loop
-		res(i) := insv.data(i).classInfo.branchLink;
-	end loop;
-	
-	return res;
-end function;
-
-function setBranchLink(insv: StageDataMulti) return StageDataMulti is
-	variable res: StageDataMulti := insv;
-	variable bl: std_logic_vector(0 to PIPE_WIDTH-1) := (others => '0');
-begin
-	bl := findBranchLink(insv);
-	for i in 0 to PIPE_WIDTH-1 loop
-		res.data(i).classInfo.branchLink := bl(i);
-	end loop;
-	
-	return res;
-end function;
-
-
-function findStores(insv: StageDataMulti) return std_logic_vector is
-	variable res: std_logic_vector(0 to PIPE_WIDTH-1) := (others => '0');
-begin
-	for i in 0 to PIPE_WIDTH-1 loop
-		if 	insv.data(i).operation = (Memory, store) 
-			or	insv.data(i).operation = (System, sysMTC)
-		then
-			res(i) := '1';
-		end if;
-	end loop;
-	return res;
-end function;
-
-function findLoads(insv: StageDataMulti) return std_logic_vector is
-	variable res: std_logic_vector(0 to PIPE_WIDTH-1) := (others => '0');
-begin
-	for i in 0 to PIPE_WIDTH-1 loop
-		if 	insv.data(i).operation = (Memory, load)
-			or	insv.data(i).operation = (System, sysMFC)
-		then
-			res(i) := '1';
-		end if;
-	end loop;
-	return res;
-end function;
 
 
 function addMwordBasic(a, b: Mword) return Mword is

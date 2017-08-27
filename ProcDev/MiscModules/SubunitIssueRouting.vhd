@@ -39,6 +39,7 @@ use work.GeneralPipeDev.all;
 --use work.FrontPipeDev.all;
 use work.ProcLogicRenaming.all;
 use work.TEMP_DEV.all;
+use work.ProcLogicRouting.all;
 
 
 entity SubunitIssueRouting is

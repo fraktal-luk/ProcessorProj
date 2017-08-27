@@ -138,7 +138,7 @@ architecture Renaming of GenericStageMulti is
 	signal partialKillMask: std_logic_vector(0 to PIPE_WIDTH-1) := (others => '0');	
 	signal stageEvents: StageMultiEventInfo;
 begin
-	stageDataNew <= work.TEMP_DEV.setBranchLink(stageDataIn);
+	stageDataNew <= work.ProcLogicRouting.setBranchLink(stageDataIn);
 	stageDataNext <= stageMultiNextCl(stageDataLiving, stageDataNew,
 								flowResponse.living, flowResponse.sending, flowDrive.prevSending, true);			
 	stageDataLiving <= stageMultiHandleKill(stageData, '0', partialKillMask);
