@@ -66,6 +66,7 @@ function getSysRegWriteSel(sd: StageDataMulti) return slv5;
 -- CAREFUL: this seems not used and would choose the last value in group
 function getSysRegWriteValue(sd: StageDataMulti) return Mword;
 
+-- TODO: move to package body
 -- FUNCTION BODY
 function TMP_handleSpecial(sd: StageDataMulti) return StageDataMulti is
 	variable res: StageDataMulti := sd;
@@ -87,6 +88,10 @@ begin
 	
 	return res;
 end function;
+
+
+function findWhichTakeReg(sd: StageDataMulti) return std_logic_vector;
+function findWhichPutReg(sd: StageDataMulti) return std_logic_vector;
 
 
 function initList return PhysNameArray;
@@ -328,6 +333,30 @@ end function;
 		end loop;
 		return res;
 	end function;
+
+
+
+function findWhichTakeReg(sd: StageDataMulti) return std_logic_vector is
+	variable res: std_logic_vector(0 to PIPE_WIDTH-1) := (others => '0');
+begin
+	for i in 0 to PIPE_WIDTH-1 loop
+		res(i) := sd.fullMask(i); -- CAREFUL, TEMP: every in the group (can be previosuly separated for rename, etc)
+	end loop;
+	
+	return res;
+end function;
+
+
+function findWhichPutReg(sd: StageDataMulti) return std_logic_vector is
+	variable res: std_logic_vector(0 to PIPE_WIDTH-1) := (others => '0');
+begin
+	for i in 0 to PIPE_WIDTH-1 loop
+		res(i) :=	 sd.fullMask(i) 
+					or  (sd.data(i).controlInfo.squashed and FREE_LIST_COARSE_REWIND); -- CAREFUL: for whole group
+	end loop;
+	
+	return res;
+end function;
 
 function initList return PhysNameArray is
 	variable res: PhysNameArray(0 to FREE_LIST_SIZE-1) := (others => (others=> '0'));

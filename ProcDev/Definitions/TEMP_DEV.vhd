@@ -31,19 +31,15 @@ return std_logic_vector;
 function extractReadyRegBitsV(bits: std_logic_vector; data: InstructionStateArray)
 return std_logic_vector;
 
-function getAddressIncrement(ins: InstructionState) return Mword;
 
--- Jump target, increment if not jump 
-function getLinkInfoNormal(ins: InstructionState) return InstructionBasicInfo;
--- Handler address and system state
-function getExceptionTarget(ins: InstructionState) return InstructionBasicInfo;
--- Target, which may be exception handler call
-function getLinkInfoSuper(ins: InstructionState) return InstructionBasicInfo;
+-- SEQUENCE??
+function getAddressIncrement(ins: InstructionState) return Mword;
 
 
 function clearTempControlInfoSimple(ins: InstructionState) return InstructionState;
 function clearTempControlInfoMulti(sd: StageDataMulti) return StageDataMulti;
 
+-- SEQUENCE ------
 function setPhase(ins: InstructionState;
 							 phase0, phase1, phase2: std_logic)
 return InstructionState;
@@ -54,7 +50,7 @@ return InstructionState;
 
 function setLateTargetAndLink(ins: InstructionState; target: Mword; link: Mword; phase1: std_logic)
 return InstructionState;
-
+-------------------
 
 function clearEmptyResultTags(insVec: InstructionStateArray; fullMask: std_logic_vector)
 return InstructionStateArray;
@@ -137,43 +133,6 @@ begin
 		res(2) := '1'; -- 4
 	end if;
 	return res;
-end function;
-
-
-function getLinkInfoNormal(ins: InstructionState) return InstructionBasicInfo is
-	variable res: InstructionBasicInfo := ins.basicInfo;
-begin
-	res.ip := ins.result;
-	return res;
-end function;
-
-
-function getExceptionTarget(ins: InstructionState) return InstructionBasicInfo is
-	variable res: InstructionBasicInfo := ins.basicInfo;
-begin
-	-- get handler adr and system level 
-	res.ip := --getHandlerAddress(ins);
-			-- TODO, FIX: exceptionCode sliced - shift left by ALIGN_BITS? or leave just base address
-		EXC_BASE(MWORD_SIZE-1 downto ins.controlInfo.exceptionCode'length)
-	& ins.controlInfo.exceptionCode(ins.controlInfo.exceptionCode'length-1 downto ALIGN_BITS)
-	& EXC_BASE(ALIGN_BITS-1 downto 0);		
-	
-	res.systemLevel := "00000001";	
-	return res;
-end function;
-
-
-function getLinkInfoSuper(ins: InstructionState) return InstructionBasicInfo is
-	variable res: InstructionBasicInfo := ins.basicInfo;
-begin
-	if ins.controlInfo.hasException = '1' then 
-		return getExceptionTarget(ins);
-	-- > NOTE, TODO: Interupt chaining can be implemented in a simple way: when another interrupt appears, 
-	--		jump to handler directly from currently running handler, but don't set ILR.
-	--		ILR will remain from the first interrupt in chain, just like in tail function call
-	else
-		return getLinkInfoNormal(ins);
-	end if;
 end function;
 
 

@@ -45,6 +45,9 @@ use work.ProcComponents.all;
 use work.ProcLogicFront.all;
 use work.ProcLogicRenaming.all;
 
+use work.ProcLogicSequence.all;
+
+
 entity UnitSequencer is
 	port(
 		clk: in std_logic;
