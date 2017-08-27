@@ -51,7 +51,7 @@ package NewPipelineData is
 	constant INTEGER_WRITE_WIDTH: integer := getIntegerWriteWidth(CQ_SINGLE_OUTPUT);
 	
 	-- TODO: eliminate, change to chained implementation
-	constant N_EVENT_AREAS: natural := 8;-- How many distinct stages or groups of stages have own event signals
+	--constant N_EVENT_AREAS: natural := 8;-- How many distinct stages or groups of stages have own event signals
 	-- PC, Fetch0, Fetch1, Hbuffer, Decode, Rename, OOO, Committed
 	--	 0			1		  2 		  3		 4			5 	  6			 7	
 	

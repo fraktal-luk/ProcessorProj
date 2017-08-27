@@ -29,8 +29,8 @@ type ExecUnitToNaturalTable is array(ExecUnit'left to ExecUnit'right) of integer
 -- 0 - ALU, Div
 -- 1 - MAC
 -- 2 - Memory
--- 3 - Jump, System
-constant N_ISSUE_QUEUES: natural := 4;
+-- 3 - Jump,
+--	4 - System
 constant ISSUE_ROUTING_TABLE: ExecUnitToNaturalTable := (
 		General => -1, -- Should never happen!
 		ALU => 0,
@@ -64,16 +64,7 @@ return std_logic_vector;
 function extractReadyRegBitsV(bits: std_logic_vector; data: InstructionStateArray)
 return std_logic_vector;
 
--- Next address, even if after a taken branch -- UNUSED
-function getIncrementedAddress(ins: InstructionState) return Mword;
-
 function getAddressIncrement(ins: InstructionState) return Mword;
-
--- What would be next in flow without exceptions - that is next one or jump target 
-function getNormalTargetAddress(ins: InstructionState) return Mword;
-
--- Address to go to if exception happens
-function getHandlerAddress(ins: InstructionState) return Mword;
 
 -- Jump target, increment if not jump 
 function getLinkInfoNormal(ins: InstructionState) return InstructionBasicInfo;
@@ -335,18 +326,6 @@ begin
 	return res;
 end function;
 
-function getIncrementedAddress(ins: InstructionState) return Mword is
-	variable nBytes: natural;
-begin
-	-- TODO: when short instructions introduced, differentiate into 2B and 4B 
-	if false then -- For short ones
-		nBytes := 2;			
-	else
-		nBytes := 4;
-	end if;	
-	--return i2slv( slv2s(ins.basicInfo.ip) + nBytes, MWORD_SIZE);
-	return addMword(ins.basicInfo.ip, getAddressIncrement(ins));
-end function;
 
 function getAddressIncrement(ins: InstructionState) return Mword is
 	variable res: Mword := (others => '0');
@@ -358,33 +337,6 @@ begin
 		res(2) := '1'; -- 4
 	end if;
 	return res;
-end function;
-
-
--- CAREFUL:
--- 		When committing a write to system reg, if it's the status reg, it must be incorporated
---			into target. It means that PC value for fetching must be updated with the status reg new value,
---			and if interrupt comes after that, the savedStateInt also must include the written change!
---			It seems that PC basicInfo must be constantly mapped from statusReg: it thus becomes a physical
---			register valid for instructions to be fetched. If so, writing to it obviously must prevent
---			any instruction from being fetched before the change is committed. Or otherwise it would be allowed
---			normally, with an exception occuring in writing makes younger ops in the pipeline invalid,
---			but this would be very complex.
-
--- "Normal target" is sequential/branch, without exceptions
-function getNormalTargetAddress(ins: InstructionState) return Mword is
-begin
-	return ins.target;
-end function;
-
-function getHandlerAddress(ins: InstructionState) return Mword is
-begin
-			-- TODO, FIX: exceptionCode sliced - shift left by ALIGN_BITS? or leave just base address
-			return EXC_BASE(MWORD_SIZE-1 downto ins.controlInfo.exceptionCode'length)
-									& ins.controlInfo.exceptionCode(
-															ins.controlInfo.exceptionCode'length-1 downto ALIGN_BITS)
-									& EXC_BASE(ALIGN_BITS-1 downto 0);			
-			--res.basicInfo.systemLevel := "00000001";
 end function;
 
 
@@ -400,7 +352,12 @@ function getExceptionTarget(ins: InstructionState) return InstructionBasicInfo i
 	variable res: InstructionBasicInfo := ins.basicInfo;
 begin
 	-- get handler adr and system level 
-	res.ip := getHandlerAddress(ins);
+	res.ip := --getHandlerAddress(ins);
+			-- TODO, FIX: exceptionCode sliced - shift left by ALIGN_BITS? or leave just base address
+		EXC_BASE(MWORD_SIZE-1 downto ins.controlInfo.exceptionCode'length)
+	& ins.controlInfo.exceptionCode(ins.controlInfo.exceptionCode'length-1 downto ALIGN_BITS)
+	& EXC_BASE(ALIGN_BITS-1 downto 0);		
+	
 	res.systemLevel := "00000001";	
 	return res;
 end function;

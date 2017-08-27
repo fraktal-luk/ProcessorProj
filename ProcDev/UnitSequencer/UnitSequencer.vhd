@@ -70,7 +70,7 @@ entity UnitSequencer is
 			
 			lateEventOut: out std_logic;
 		
-		killVecOut: out std_logic_vector(0 to N_EVENT_AREAS-1);
+		--killVecOut: out std_logic_vector(0 to N_EVENT_AREAS-1);
 
 		-- Interface PC <-> front pipe
 		frontAccepting: in std_logic;
@@ -203,9 +203,9 @@ begin
 		-- $OUTPUT:
 		-- 	execOrIntCausing, execOrIntEventSignal, killVecOut, generalEvents,
 	begin	
-			killVecOut(6) <= TMP_phase0;
-			killVecOut(5) <= execOrIntEventSignal;
-			killVecOut(0 to 4) <= generalEvents.affectedVec;
+			--killVecOut(6) <= TMP_phase0;
+			--killVecOut(5) <= execOrIntEventSignal;
+			--killVecOut(0 to 4) <= generalEvents.affectedVec;
 
 			generalEvents <= NEW_generalEvents(
 											stageDataOutPC,

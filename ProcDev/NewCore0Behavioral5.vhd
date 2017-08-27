@@ -14,7 +14,7 @@ architecture Behavioral5 of NewCore0 is
 	signal frontDataLastLiving: StageDataMulti;
 	signal frontLastSending, renameAccepting: std_logic := '0';
 
-	signal killVec: std_logic_vector(0 to N_EVENT_AREAS-1) := (others => '0');	-- for Front
+	--signal killVec: std_logic_vector(0 to N_EVENT_AREAS-1) := (others => '0');	-- for Front
 
 	signal renamedDataLiving, stageDataCommittedOut: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;				
 	signal renamedSending, iqAccepts: std_logic := '0';			
@@ -157,7 +157,7 @@ begin
 		execOrIntEventSignalOut => execOrIntEventSignal,
 		execOrIntCausingOut => execOrIntCausing,
 			lateEventOut => lateEventSignal,
-		killVecOut => killVec,
+		--killVecOut => killVec,
 		-- Data from front pipe interface		
 		renameAccepting => renameAccepting, -- to frontend
 		frontLastSending => frontLastSending,
@@ -221,7 +221,10 @@ begin
 		lastSending => frontLastSending,
 		
 		stage0EventsOut => stage0Events,
-		killVector => killVec		
+		execEventSignal => execEventSignal,
+		lateEventSignal => lateEventSignal
+		
+		--killVector => killVec		
 	);
 	
 	ISSUE_ROUTING: entity work.SubunitIssueRouting(Behavioral)

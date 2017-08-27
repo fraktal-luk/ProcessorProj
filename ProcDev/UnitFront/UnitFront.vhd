@@ -67,7 +67,11 @@ entity UnitFront is
 		dataLastLiving: out StageDataMulti; 
 		lastSending: out std_logic;
 		-------
-		killVector: in std_logic_vector(0 to N_EVENT_AREAS-1)
+		
+		execEventSignal: in std_logic;
+		lateEventSignal: in std_logic
+		
+		--killVector: in std_logic_vector(0 to N_EVENT_AREAS-1)
 	);
 end UnitFront;
 
@@ -102,12 +106,16 @@ architecture Behavioral of UnitFront is
 		
 		signal hbufferDataIn: InstructionState := DEFAULT_INSTRUCTION_STATE;
 	
-	constant HAS_RESET_FRONT: std_logic := '1';
-	constant HAS_EN_FRONT: std_logic := '1';	
+		signal killAll: std_logic := '0';
+	
+	constant HAS_RESET_FRONT: std_logic := '0';
+	constant HAS_EN_FRONT: std_logic := '0';	
 begin	 
 	resetSig <= reset and HAS_RESET_FRONT;
 	enSig <= en or not HAS_EN_FRONT;
-												
+			
+		killAll <= execEventSignal or lateEventSignal;
+			
 	-- Fetched bits: input from instruction bus 
 	FETCH_BLOCK: for i in 0 to PIPE_WIDTH-1 generate
 		fetchBlock(2*i)	<= iin(i)(31 downto 16);
@@ -132,7 +140,7 @@ begin
 			sendingOut => sendingOutFetch,
 			stageDataOut => f0output,
 			
-			execEventSignal => killVector(1),
+			execEventSignal => killAll,--killVector(1),
 			execCausing => DEFAULT_INSTRUCTION_STATE,
 			lockCommand => '0'		
 		);	
@@ -143,14 +151,14 @@ begin
 	FETCH_DELAY: process (clk)
 	begin
 		if rising_edge(clk) then
-			if resetSig = '1' then
+			--if resetSig = '1' then
 			
-			elsif enSig = '1' then
+			--elsif enSig = '1' then
 				if sendingOutFetch = '1' then
 					ivalid1 <= ivalid;
 					fetchBlock1 <= fetchBlock;					
 				end if;
-			end if;
+			--end if;
 		end if;	
 	end process;				
 	
@@ -176,7 +184,7 @@ begin
 			sendingOut => sendingOutFetch1,
 			stageDataOut => f1output,
 			
-			execEventSignal => killVector(1),
+			execEventSignal => killAll,--killVector(1),
 			execCausing => DEFAULT_INSTRUCTION_STATE,
 			lockCommand => '0'		
 		);	
@@ -206,7 +214,7 @@ begin
 		sendingOut => sendingOutHbuffer,
 		stageDataOut => stageDataOutHbuffer,
 		
-		execEventSignal => killVector(3),
+		execEventSignal => killAll,--killVector(3),
 		execCausing => DEFAULT_INSTRUCTION_STATE		
 	);		
 	
@@ -244,7 +252,7 @@ begin
 			sendingOut => sendingOut0,
 			stageDataOut => stageDataDecodeOut,
 
-			execEventSignal => killVector(4),
+			execEventSignal => killAll,--killVector(4),
 			execCausing => DEFAULT_INSTRUCTION_STATE,
 			lockCommand => '0',
 			-- to event part
