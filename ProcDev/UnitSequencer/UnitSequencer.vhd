@@ -353,7 +353,7 @@ begin
 	-- Rename stage
 	RENAMING: block
 		-- INPUT: newPhysSources, newPhysDests
-		signal stageDataRenameIn: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;		
+		signal stageDataRenameIn, stageDataRenameInLinked: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;		
 		signal reserveSelSig, takeVec: std_logic_vector(0 to PIPE_WIDTH-1) := (others => '0' );
 		signal nToTake: integer := 0;
 	begin
@@ -386,13 +386,15 @@ begin
 				)	
 			);
 	
+		stageDataRenameInLinked <= work.ProcLogicRouting.setBranchLink(stageDataRenameIn);
+	
 		SUBUNIT_RENAME: entity work.GenericStageMulti(Renaming)
 		port map(
 			clk => clk, reset => resetSig, en => enSig,
 			
 			-- Interface with front
 			prevSending => frontLastSending,	
-			stageDataIn => stageDataRenameIn, --readyRegFlagsV),
+			stageDataIn => stageDataRenameInLinked, --readyRegFlagsV),
 			acceptingOut => acceptingOutRename,
 			
 			-- Interface with IQ
