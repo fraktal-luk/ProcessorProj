@@ -504,7 +504,8 @@ architecture BranchUnit of GenericStageMulti is
 	signal inputData: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
 	signal branchResolved: InstructionState := DEFAULT_INSTRUCTION_STATE;
 begin
-	inputData.data(0) <= branchResolved;
+	inputData.data(0) <= --branchResolved;
+								stageDataIn.data(0);
 	inputData.fullMask <= stageDataIn.fullMask;
 
 			IMPL: block
@@ -567,9 +568,9 @@ begin
 				stageEventsOut <= stageEvents;
 			end block;
 
-
-	branchResolved <= basicBranch(setInstructionTarget(stageDataIn.data(0),
-			stageDataIn.data(0).constantArgs.imm),
-											(others => '0'),
-											stageDataIn.data(0).result);
+--
+--	branchResolved <= basicBranch(setInstructionTarget(stageDataIn.data(0),
+--			stageDataIn.data(0).constantArgs.imm),
+--											(others => '0'),
+--											stageDataIn.data(0).result);
 end BranchUnit;

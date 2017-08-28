@@ -172,7 +172,12 @@ begin
 				
 ------------------------------------------------
 -- Branch
-					inputDataD.data(0) <= dataIQD;
+					inputDataD.data(0) <= --dataIQD;
+												 basicBranch(setInstructionTarget(dataIQD,
+																 dataIQD.constantArgs.imm),
+																 (others => '0'),
+																 dataIQD.result);					
+					
 					inputDataD.fullMask(0) <= sendingIQD;
 					
 					dataD0 <= outputDataD.data(0);
