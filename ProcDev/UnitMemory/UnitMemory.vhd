@@ -148,7 +148,13 @@ begin
 		activeCausing <= --execOrIntCausingIn;
 								setInterrupt(execCausing, lateEventSignal);
 
-			inputDataC.data(0) <= dataIQC;
+			inputDataC.data(0) <= --dataIQC;			
+	--aluResult <= addMwordFaster(stageDataIn.data(0).argValues.arg0, stageDataIn.data(0).argValues.arg1);
+	--aluOut <= 
+				 setExecState(dataIQC,
+								  addMwordFaster(dataIQC.argValues.arg0, dataIQC.argValues.arg1),
+								  '0', (others => '0'));
+	
 			inputDataC.fullMask(0) <= sendingIQC;
 
 			SUBPIPE_C: block
@@ -162,7 +168,8 @@ begin
 						 sendingMem0, sendingMem1: std_logic := '0';
 			begin
 				STAGE_AGU: entity work.--SimpleAlu(BehavioralAGU)
-												GenericStageMulti(BasicAgu)
+												GenericStageMulti(--BasicAgu)
+																		SingleTagged)
 				port map(
 					clk => clk, reset => reset, en => en,
 					

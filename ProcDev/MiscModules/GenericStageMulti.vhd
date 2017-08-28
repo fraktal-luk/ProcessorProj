@@ -339,162 +339,162 @@ begin
 	stageEventsOut <= DEFAULT_STAGE_MULTI_EVENT_INFO;	
 end Bypassed;
 
-
-architecture BasicAlu of GenericStageMulti is
-	use work.ProcLogicExec.all;
-
-	signal inputData: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
-	signal aluOut: InstructionState := defaultInstructionState;				
-	signal aluResult: Mword := (others => '0');
-	signal aluCarry: std_logic := '0';
-	signal aluException: std_logic_vector(3 downto 0) := (others => '0');
-		signal aluOut2: InstructionState := DEFAULT_INSTRUCTION_STATE;
-		signal ch: std_logic := '0';
-begin
-	inputData.data(0) <= aluOut; -- Output of ALU
-	inputData.fullMask <= stageDataIn.fullMask;
-
-			IMPL: block
-				signal flowDrive: FlowDriveSimple := (others=>'0');
-				signal flowResponse: FlowResponseSimple := (others=>'0');		
-				signal stageData, stageDataLiving, stageDataNext, stageDataNew:
-																	StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
-				signal partialKillMask: std_logic_vector(0 to PIPE_WIDTH-1) := (others => '0');
-				signal stageEvents: StageMultiEventInfo;	
-			begin
-				stageDataNew <= inputData;										
-				stageDataNext <= stageMultiNext(stageDataLiving, stageDataNew,
-											flowResponse.living, flowResponse.sending, flowDrive.prevSending);			
-				stageDataLiving <= stageMultiHandleKill(stageData, flowDrive.kill, partialKillMask);
-
-				PIPE_CLOCKED: process(clk) 	
-				begin
-					if rising_edge(clk) then
-						if reset = '1' then
-							
-						elsif en = '1' then	
-							stageData <= stageDataNext;
-
-							logMulti(stageData.data, stageData.fullMask, stageDataLiving.fullMask, flowResponse);
-							checkMulti(stageData, stageDataNext, flowDrive, flowResponse);
-						end if;
-					end if;
-				end process;
-
-				SIMPLE_SLOT_LOGIC: SimplePipeLogic port map(
-					clk => clk, reset => reset, en => en,
-					flowDrive => flowDrive,
-					flowResponse => flowResponse
-				);
-				
-				KILLER: block
-					signal before: std_logic;
-					signal a, b: std_logic_vector(7 downto 0);
-					signal c: SmallNumber := (others => '0');
-				begin
-					a <= execCausing.groupTag;
-					b <= stageData.data(0).groupTag;	
-					c <= subSN(a, b);
-					before <= c(7);
-					flowDrive.kill <= killByTag(before, execEventSignal,
-													execCausing.controlInfo.hasInterrupt);
-				end block;	
-
-					stageEvents <= stageMultiEvents(stageData, flowResponse.isNew);
-				
-				flowDrive.prevSending <= prevSending;
-				flowDrive.nextAccepting <= nextAccepting;
-				--flowDrive.kill <= execEventSignal;
-				flowDrive.lockAccept <= lockCommand;
-
-				acceptingOut <= flowResponse.accepting;		
-				sendingOut <= flowResponse.sending;
-				stageDataOut <= stageDataLiving; -- TODO: clear temp ctrl info?
-				
-				stageEventsOut <= stageEvents;
-			end block;
-
-	aluOut <= executeAlu(stageDataIn.data(0));		
-end BasicAlu;
-
-
-
-architecture BasicAgu of GenericStageMulti is
-	use work.ProcLogicExec.all;
-
-	signal inputData: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
-	signal aluOut: InstructionState := defaultInstructionState;				
-	signal aluResult: Mword := (others => '0');
-	signal aluCarry: std_logic := '0';
-	signal aluException: std_logic_vector(3 downto 0) := (others => '0');	
-begin
-	inputData.data(0) <= aluOut; -- Output of ALU
-	inputData.fullMask <= stageDataIn.fullMask;
-
-			IMPL: block
-				signal flowDrive: FlowDriveSimple := (others=>'0');
-				signal flowResponse: FlowResponseSimple := (others=>'0');		
-				signal stageData, stageDataLiving, stageDataNext, stageDataNew:
-																	StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
-				signal partialKillMask: std_logic_vector(0 to PIPE_WIDTH-1) := (others => '0');
-				signal stageEvents: StageMultiEventInfo;	
-			begin
-				stageDataNew <= inputData;										
-				stageDataNext <= stageMultiNext(stageDataLiving, stageDataNew,
-											flowResponse.living, flowResponse.sending, flowDrive.prevSending);			
-				stageDataLiving <= stageMultiHandleKill(stageData, flowDrive.kill, partialKillMask);
-
-				PIPE_CLOCKED: process(clk) 	
-				begin
-					if rising_edge(clk) then
-						if reset = '1' then
-							
-						elsif en = '1' then	
-							stageData <= stageDataNext;
-
-							logMulti(stageData.data, stageData.fullMask, stageDataLiving.fullMask, flowResponse);
-							checkMulti(stageData, stageDataNext, flowDrive, flowResponse);
-						end if;
-					end if;
-				end process;
-
-				SIMPLE_SLOT_LOGIC: SimplePipeLogic port map(
-					clk => clk, reset => reset, en => en,
-					flowDrive => flowDrive,
-					flowResponse => flowResponse
-				);
-				
-				KILLER: block
-					signal before: std_logic;
-					signal a, b: std_logic_vector(7 downto 0);
-					signal c: SmallNumber := (others => '0');
-				begin
-					a <= execCausing.groupTag;
-					b <= stageData.data(0).groupTag;	
-					c <= subSN(a, b);
-					before <= c(7);
-					flowDrive.kill <= killByTag(before, execEventSignal,
-													execCausing.controlInfo.hasInterrupt);
-				end block;	
-
-					stageEvents <= stageMultiEvents(stageData, flowResponse.isNew);
-				
-				flowDrive.prevSending <= prevSending;
-				flowDrive.nextAccepting <= nextAccepting;
-				--flowDrive.kill <= execEventSignal;
-				flowDrive.lockAccept <= lockCommand;
-
-				acceptingOut <= flowResponse.accepting;		
-				sendingOut <= flowResponse.sending;
-				stageDataOut <= stageDataLiving; -- TODO: clear temp ctrl info?
-				
-				stageEventsOut <= stageEvents;
-			end block;
-	
-	aluResult <= --addMwordBasic(stageDataIn.data(0).argValues.arg0, stageDataIn.data(0).argValues.arg1);
-					addMwordFaster(stageDataIn.data(0).argValues.arg0, stageDataIn.data(0).argValues.arg1);
-	aluOut <= setExecState(stageDataIn.data(0), aluResult, '0', (others => '0'));
-end BasicAgu;
+--
+--architecture BasicAlu of GenericStageMulti is
+--	use work.ProcLogicExec.all;
+--
+--	signal inputData: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
+--	signal aluOut: InstructionState := defaultInstructionState;				
+--	signal aluResult: Mword := (others => '0');
+--	signal aluCarry: std_logic := '0';
+--	signal aluException: std_logic_vector(3 downto 0) := (others => '0');
+--		signal aluOut2: InstructionState := DEFAULT_INSTRUCTION_STATE;
+--		signal ch: std_logic := '0';
+--begin
+--	inputData.data(0) <= aluOut; -- Output of ALU
+--	inputData.fullMask <= stageDataIn.fullMask;
+--
+--			IMPL: block
+--				signal flowDrive: FlowDriveSimple := (others=>'0');
+--				signal flowResponse: FlowResponseSimple := (others=>'0');		
+--				signal stageData, stageDataLiving, stageDataNext, stageDataNew:
+--																	StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
+--				signal partialKillMask: std_logic_vector(0 to PIPE_WIDTH-1) := (others => '0');
+--				signal stageEvents: StageMultiEventInfo;	
+--			begin
+--				stageDataNew <= inputData;										
+--				stageDataNext <= stageMultiNext(stageDataLiving, stageDataNew,
+--											flowResponse.living, flowResponse.sending, flowDrive.prevSending);			
+--				stageDataLiving <= stageMultiHandleKill(stageData, flowDrive.kill, partialKillMask);
+--
+--				PIPE_CLOCKED: process(clk) 	
+--				begin
+--					if rising_edge(clk) then
+--						if reset = '1' then
+--							
+--						elsif en = '1' then	
+--							stageData <= stageDataNext;
+--
+--							logMulti(stageData.data, stageData.fullMask, stageDataLiving.fullMask, flowResponse);
+--							checkMulti(stageData, stageDataNext, flowDrive, flowResponse);
+--						end if;
+--					end if;
+--				end process;
+--
+--				SIMPLE_SLOT_LOGIC: SimplePipeLogic port map(
+--					clk => clk, reset => reset, en => en,
+--					flowDrive => flowDrive,
+--					flowResponse => flowResponse
+--				);
+--				
+--				KILLER: block
+--					signal before: std_logic;
+--					signal a, b: std_logic_vector(7 downto 0);
+--					signal c: SmallNumber := (others => '0');
+--				begin
+--					a <= execCausing.groupTag;
+--					b <= stageData.data(0).groupTag;	
+--					c <= subSN(a, b);
+--					before <= c(7);
+--					flowDrive.kill <= killByTag(before, execEventSignal,
+--													execCausing.controlInfo.hasInterrupt);
+--				end block;	
+--
+--					stageEvents <= stageMultiEvents(stageData, flowResponse.isNew);
+--				
+--				flowDrive.prevSending <= prevSending;
+--				flowDrive.nextAccepting <= nextAccepting;
+--				--flowDrive.kill <= execEventSignal;
+--				flowDrive.lockAccept <= lockCommand;
+--
+--				acceptingOut <= flowResponse.accepting;		
+--				sendingOut <= flowResponse.sending;
+--				stageDataOut <= stageDataLiving; -- TODO: clear temp ctrl info?
+--				
+--				stageEventsOut <= stageEvents;
+--			end block;
+--
+--	aluOut <= executeAlu(stageDataIn.data(0));		
+--end BasicAlu;
+--
+--
+--
+--architecture BasicAgu of GenericStageMulti is
+--	use work.ProcLogicExec.all;
+--
+--	signal inputData: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
+--	signal aluOut: InstructionState := defaultInstructionState;				
+--	signal aluResult: Mword := (others => '0');
+--	signal aluCarry: std_logic := '0';
+--	signal aluException: std_logic_vector(3 downto 0) := (others => '0');	
+--begin
+--	inputData.data(0) <= aluOut; -- Output of ALU
+--	inputData.fullMask <= stageDataIn.fullMask;
+--
+--			IMPL: block
+--				signal flowDrive: FlowDriveSimple := (others=>'0');
+--				signal flowResponse: FlowResponseSimple := (others=>'0');		
+--				signal stageData, stageDataLiving, stageDataNext, stageDataNew:
+--																	StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
+--				signal partialKillMask: std_logic_vector(0 to PIPE_WIDTH-1) := (others => '0');
+--				signal stageEvents: StageMultiEventInfo;	
+--			begin
+--				stageDataNew <= inputData;										
+--				stageDataNext <= stageMultiNext(stageDataLiving, stageDataNew,
+--											flowResponse.living, flowResponse.sending, flowDrive.prevSending);			
+--				stageDataLiving <= stageMultiHandleKill(stageData, flowDrive.kill, partialKillMask);
+--
+--				PIPE_CLOCKED: process(clk) 	
+--				begin
+--					if rising_edge(clk) then
+--						if reset = '1' then
+--							
+--						elsif en = '1' then	
+--							stageData <= stageDataNext;
+--
+--							logMulti(stageData.data, stageData.fullMask, stageDataLiving.fullMask, flowResponse);
+--							checkMulti(stageData, stageDataNext, flowDrive, flowResponse);
+--						end if;
+--					end if;
+--				end process;
+--
+--				SIMPLE_SLOT_LOGIC: SimplePipeLogic port map(
+--					clk => clk, reset => reset, en => en,
+--					flowDrive => flowDrive,
+--					flowResponse => flowResponse
+--				);
+--				
+--				KILLER: block
+--					signal before: std_logic;
+--					signal a, b: std_logic_vector(7 downto 0);
+--					signal c: SmallNumber := (others => '0');
+--				begin
+--					a <= execCausing.groupTag;
+--					b <= stageData.data(0).groupTag;	
+--					c <= subSN(a, b);
+--					before <= c(7);
+--					flowDrive.kill <= killByTag(before, execEventSignal,
+--													execCausing.controlInfo.hasInterrupt);
+--				end block;	
+--
+--					stageEvents <= stageMultiEvents(stageData, flowResponse.isNew);
+--				
+--				flowDrive.prevSending <= prevSending;
+--				flowDrive.nextAccepting <= nextAccepting;
+--				--flowDrive.kill <= execEventSignal;
+--				flowDrive.lockAccept <= lockCommand;
+--
+--				acceptingOut <= flowResponse.accepting;		
+--				sendingOut <= flowResponse.sending;
+--				stageDataOut <= stageDataLiving; -- TODO: clear temp ctrl info?
+--				
+--				stageEventsOut <= stageEvents;
+--			end block;
+--	
+--	aluResult <= --addMwordBasic(stageDataIn.data(0).argValues.arg0, stageDataIn.data(0).argValues.arg1);
+--					addMwordFaster(stageDataIn.data(0).argValues.arg0, stageDataIn.data(0).argValues.arg1);
+--	aluOut <= setExecState(stageDataIn.data(0), aluResult, '0', (others => '0'));
+--end BasicAgu;
 
 
 architecture BranchUnit of GenericStageMulti is

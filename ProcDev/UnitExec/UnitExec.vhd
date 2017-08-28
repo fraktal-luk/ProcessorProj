@@ -124,12 +124,14 @@ begin
 		enSig <= en or not HAS_EN_EXEC; 
 
 
-					inputDataA.data(0) <= dataIQA;
+					inputDataA.data(0) <= --dataIQA;
+												 executeAlu(dataIQA);					
 					inputDataA.fullMask(0) <= sendingIQA;
 					
 					dataA0 <= outputDataA.data(0);
 					
-					SUBPIPE_A: entity work.GenericStageMulti(BasicAlu)
+					SUBPIPE_A: entity work.GenericStageMulti(--BasicAlu)
+																			SingleTagged)
 					port map(
 						clk => clk, reset => resetSig, en => enSig,
 						
