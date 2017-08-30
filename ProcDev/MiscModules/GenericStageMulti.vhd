@@ -140,7 +140,7 @@ architecture Renaming of GenericStageMulti is
 begin
 	stageDataNew <= stageDataIn;--work.ProcLogicRouting.setBranchLink(stageDataIn);
 	stageDataNext <= stageMultiNextCl(stageDataLiving, stageDataNew,
-								flowResponse.living, flowResponse.sending, flowDrive.prevSending, true);			
+								flowResponse.living, flowResponse.sending, flowDrive.prevSending, false);			
 	stageDataLiving <= stageMultiHandleKill(stageData, '0', partialKillMask);
 
 	PIPE_CLOCKED: process(clk) 	
@@ -518,7 +518,7 @@ begin
 			begin
 				stageDataNew <= inputData;										
 				stageDataNext <= stageMultiNextCl(stageDataLiving, stageDataNew, -- CAREFUL: diffrence from SingleTagged
-											flowResponse.living, flowResponse.sending, flowDrive.prevSending, true);			
+											flowResponse.living, flowResponse.sending, flowDrive.prevSending, false);			
 				stageDataLiving <= stageMultiHandleKill(stageData, flowDrive.kill, partialKillMask);
 
 				PIPE_CLOCKED: process(clk) 	
@@ -554,7 +554,7 @@ begin
 													execCausing.controlInfo.hasInterrupt);
 				end block;		-- CAREFUL: in this architecture 'isNew' is irrelevant because clearing vacating slot;
 									--				second difference from SingleTagged
-					stageEvents <= stageMultiEvents(stageData, flowResponse.isNew or '1');
+					stageEvents <= stageMultiEvents(stageData, flowResponse.isNew);
 				
 				flowDrive.prevSending <= prevSending;
 				flowDrive.nextAccepting <= nextAccepting;
