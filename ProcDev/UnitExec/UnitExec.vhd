@@ -182,7 +182,7 @@ begin
 					
 					dataD0 <= outputDataD.data(0);
 					
-					SUBPIPE_D: entity work.GenericStageMulti(BranchUnit)
+					SUBPIPE_D: entity work.GenericStageMulti(SingleTagged)
 					port map(
 						clk => clk, reset => resetSig, en => enSig,
 						
