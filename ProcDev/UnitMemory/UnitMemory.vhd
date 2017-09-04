@@ -182,6 +182,7 @@ begin
 					stageDataOut => stageDataOutAGU,
 					
 					execEventSignal => eventSignal,
+					lateEventSignal => lateEventSignal,
 					execCausing => activeCausing,
 					lockCommand => '0',
 					
@@ -227,6 +228,7 @@ begin
 					stageDataOut => stageDataOutMem0,
 					
 					execEventSignal => eventSignal,
+					lateEventSignal => lateEventSignal,					
 					execCausing => activeCausing,
 					lockCommand => '0',
 					
@@ -249,6 +251,7 @@ begin
 					stageDataOut => outputData,
 					
 					execEventSignal => eventSignal,
+					lateEventSignal => lateEventSignal,
 					execCausing => activeCausing,
 					lockCommand => '0',
 					

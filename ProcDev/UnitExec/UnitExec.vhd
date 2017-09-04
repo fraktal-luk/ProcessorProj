@@ -144,6 +144,7 @@ begin
 						stageDataOut => outputDataA,
 						
 						execEventSignal => eventSignal,
+						lateEventSignal => lateEventSignal,
 						execCausing => activeCausing,
 						lockCommand => '0',
 						
@@ -195,6 +196,7 @@ begin
 						stageDataOut => outputDataD,
 						
 						execEventSignal => eventSignal,
+						lateEventSignal => lateEventSignal,
 						execCausing => activeCausing,
 						lockCommand => '0',
 						

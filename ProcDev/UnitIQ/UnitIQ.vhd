@@ -153,6 +153,7 @@ begin
 	 	prevSending => queueSending,
 	 	nextAccepting => nextAccepting,
 		execEventSignal => execEventSignal,
+		lateEventSignal => lateEventSignal,
 		execCausing => eventCausing,
 		resultTags => fni.resultTags,
 		resultVals => fni.resultValues,

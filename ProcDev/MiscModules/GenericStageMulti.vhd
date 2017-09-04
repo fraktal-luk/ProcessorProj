@@ -63,6 +63,7 @@ entity GenericStageMulti is
 		stageDataOut: out StageDataMulti;
 		
 		execEventSignal: in std_logic;
+		lateEventSignal: in std_logic;
 		execCausing: in InstructionState;
 		lockCommand: in std_logic;
 		
@@ -119,7 +120,7 @@ begin
 	
 	flowDrive.prevSending <= prevSending;
 	flowDrive.nextAccepting <= nextAccepting;
-	flowDrive.kill <= execEventSignal;
+	flowDrive.kill <= execEventSignal or lateEventSignal;
 	flowDrive.lockAccept <= lockCommand;
 
 	acceptingOut <= flowResponse.accepting;		
@@ -168,7 +169,7 @@ begin
 	
 	flowDrive.prevSending <= prevSending;
 	flowDrive.nextAccepting <= nextAccepting;
-	flowDrive.kill <= execEventSignal;
+	flowDrive.kill <= execEventSignal or lateEventSignal;
 	flowDrive.lockAccept <= lockCommand;
 
 	acceptingOut <= flowResponse.accepting;		
@@ -223,7 +224,8 @@ begin
 		c <= subSN(a, b);
 		before <= c(7);
 		flowDrive.kill <= killByTag(before, execEventSignal,
-										execCausing.controlInfo.hasInterrupt);
+										lateEventSignal);
+										--execCausing.controlInfo.hasInterrupt);
 	end block;	
 
 		stageEvents <= stageMultiEvents(stageData, flowResponse.isNew);

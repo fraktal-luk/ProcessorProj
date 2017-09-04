@@ -141,6 +141,7 @@ begin
 			stageDataOut => f0output,
 			
 			execEventSignal => killAll,--killVector(1),
+			lateEventSignal => killAll,
 			execCausing => DEFAULT_INSTRUCTION_STATE,
 			lockCommand => '0'		
 		);	
@@ -185,6 +186,7 @@ begin
 			stageDataOut => f1output,
 			
 			execEventSignal => killAll,--killVector(1),
+			lateEventSignal => killAll,
 			execCausing => DEFAULT_INSTRUCTION_STATE,
 			lockCommand => '0'		
 		);	
@@ -253,6 +255,7 @@ begin
 			stageDataOut => stageDataDecodeOut,
 
 			execEventSignal => killAll,--killVector(4),
+			lateEventSignal => killAll,
 			execCausing => DEFAULT_INSTRUCTION_STATE,
 			lockCommand => '0',
 			-- to event part

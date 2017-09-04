@@ -262,6 +262,7 @@ begin
 			stageDataOut => tmpPcOut,
 			
 			execEventSignal => generalEvents.affectedVec(0),
+			lateEventSignal => TMP_phase0,
 			execCausing => DEFAULT_INSTRUCTION_STATE,
 			lockCommand => '0'		
 		);			
@@ -404,6 +405,7 @@ begin
 			
 			-- Event interface
 			execEventSignal => execOrIntEventSignal,
+			lateEventSignal => TMP_phase0,		
 			execCausing => execOrIntCausing,
 			lockCommand => renameLockState		
 		);
@@ -477,6 +479,7 @@ begin
 		
 		-- Event interface
 		execEventSignal => '0', -- CAREFUL: committed cannot be killed!
+		lateEventSignal => '0',	
 		execCausing => execOrIntCausing,		
 
 		lockCommand => '0'
@@ -518,6 +521,7 @@ begin
 				
 				-- Event interface
 				execEventSignal => '0', -- CAREFUL: committed cannot be killed!
+				lateEventSignal => '0',	
 				execCausing => interruptCause,		
 
 				lockCommand => not sbEmpty,

@@ -645,6 +645,7 @@ begin
 			prevSending => anySendingFromCQ,
 			nextAccepting => '1',
 			execEventSignal => '0',
+				lateEventSignal => '0',
 			execCausing => execCausing,
 			stageDataIn => cqDataLivingOut,
 			acceptingOut => open,

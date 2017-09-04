@@ -61,6 +61,7 @@ entity SubunitDispatch is
 		stageDataOut: out InstructionState;
 		
 		execEventSignal: in std_logic;
+		lateEventSignal: in std_logic;
 		execCausing: in InstructionState;
 		
 		resultTags: in PhysNameArray(0 to N_RES_TAGS-1);
@@ -95,6 +96,7 @@ begin
 		stageDataOut => stageDataStored,
 		
 		execEventSignal => execEventSignal,
+		lateEventSignal => lateEventSignal,
 		execCausing => execCausing,
 		lockCommand => '0'
 	);
