@@ -58,6 +58,11 @@ return InstructionState;
 										pcNext: Mword)
 	return GeneralEventInfo;
 
+-- BACK ROUTING
+-- Unifies content of ROB slot with BQ, others queues etc. to restore full state needed at Commit
+function recreateGroup(insVec: StageDataMulti; bqGroup: StageDataMulti;
+							  prevAddress: Mword--; tempValue: Mword; useTemp: std_logic
+							  ) return StageDataMulti;
 
 end ProcLogicSequence;
 
@@ -209,5 +214,47 @@ end function;
 		
 		return res;
 	end function;
+
+
+
+-- Unifies content of ROB slot with BQ, others queues etc. to restore full state needed at Commit
+function recreateGroup(insVec: StageDataMulti; bqGroup: StageDataMulti;
+							  prevAddress: Mword--; tempValue: Mword; useTemp: std_logic
+							  ) return StageDataMulti is
+	variable res: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
+	variable targets: MwordArray(0 to PIPE_WIDTH-1) := (others => (others => '0'));
+	variable ind: integer := 0;
+	variable prevAdr: Mword := (others => '0');
+begin
+	res := insVec;
 	
+	prevAdr := prevAddress;
+	
+	for i in 0 to PIPE_WIDTH-1 loop
+		targets(i) := bqGroup.data(i).target; -- Default to some input, not zeros 
+	end loop;
+	
+	-- Take branch targets to correct places
+	for i in 0 to PIPE_WIDTH-1 loop
+		if bqGroup.fullMask(i) = '1' then
+			ind := slv2u(getTagLow(bqGroup.data(i).groupTag));
+			targets(ind) := bqGroup.data(i).argValues.arg1;
+		end if;
+	end loop;
+
+	for i in 0 to PIPE_WIDTH-1 loop
+		if insVec.data(i).controlInfo.hasBranch = '1' then
+			null;
+		else
+			--targets(i) := i2slv(slv2u(prevAdr) + slv2u(getAddressIncrement(insVec.data(i))), MWORD_SIZE);
+			targets(i) := addMwordBasic(prevAdr, getAddressIncrement(insVec.data(i)));
+		end if;
+		res.data(i).basicInfo.ip := prevAdr; -- ??
+		prevAdr := targets(i);
+		res.data(i).target := targets(i);
+	end loop;
+	
+	return res;
+end function;
+
 end ProcLogicSequence;

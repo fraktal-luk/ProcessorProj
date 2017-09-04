@@ -84,8 +84,8 @@ entity MemoryUnit is
 		
 		nextAccepting: in std_logic;		
 		sendingSQOut: out std_logic;
-			dataOutV: out StageDataMulti;
-		dataOutSQ: out InstructionState
+			dataOutV: out StageDataMulti
+		--dataOutSQ: out InstructionState
 	);
 end MemoryUnit;
 
@@ -158,7 +158,7 @@ begin
 			sqOutData <= TMP_sendingData;
 					
 			sendingSQ <= isNonzero(sqOutData.fullMask);
-			dataOutSQ <= sqOutData.data(0); -- CAREFUL, TEMP!
+			--dataOutSQ <= sqOutData.data(0); -- CAREFUL, TEMP!
 				dataOutV <= sqOutData;
 			contentData <= extractData(content);
 			

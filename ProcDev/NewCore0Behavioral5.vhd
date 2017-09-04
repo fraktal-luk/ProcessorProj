@@ -14,8 +14,6 @@ architecture Behavioral5 of NewCore0 is
 	signal frontDataLastLiving: StageDataMulti;
 	signal frontLastSending, renameAccepting: std_logic := '0';
 
-	--signal killVec: std_logic_vector(0 to N_EVENT_AREAS-1) := (others => '0');	-- for Front
-
 	signal renamedDataLiving, stageDataCommittedOut: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;				
 	signal renamedSending, iqAccepts: std_logic := '0';			
 		
@@ -29,7 +27,6 @@ architecture Behavioral5 of NewCore0 is
 				std_logic_vector(0 to PIPE_WIDTH-1) := (others => '0');
 	
 	signal compactedToSQ, compactedToLQ, compactedToBQ: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
-		signal cc0, cc1: std_logic := '0';
 
 	signal dataOutIQA, dataOutIQB, dataOutIQC, dataOutIQD, dataOutIQE: InstructionState
 																	:= defaultInstructionState;	
@@ -157,7 +154,6 @@ begin
 		execOrIntEventSignalOut => execOrIntEventSignal,
 		execOrIntCausingOut => execOrIntCausing,
 			lateEventOut => lateEventSignal,
-		--killVecOut => killVec,
 		-- Data from front pipe interface		
 		renameAccepting => renameAccepting, -- to frontend
 		frontLastSending => frontLastSending,
@@ -222,9 +218,7 @@ begin
 		
 		stage0EventsOut => stage0Events,
 		execEventSignal => execEventSignal,
-		lateEventSignal => lateEventSignal
-		
-		--killVector => killVec		
+		lateEventSignal => lateEventSignal		
 	);
 	
 	ISSUE_ROUTING: entity work.SubunitIssueRouting(Behavioral)
@@ -258,6 +252,10 @@ begin
 		dataOutBQ => compactedToBQ
 	);
 
+
+	--------------------------------
+	--- Out of order domain
+
 	IQ_A: entity work.UnitIQ
 	generic map(
 		IQ_SIZE => IQ_A_SIZE
@@ -281,8 +279,7 @@ begin
 		dataOutIQ => dataOutIQA,
 		sendingOut => sendingSchedA,
 			
-		execCausing => --execOrIntCausing,
-							execCausing,
+		execCausing => execCausing,
 			lateEventSignal => lateEventSignal,
 		execEventSignal => execOrIntEventSignal			
 	);
@@ -310,8 +307,7 @@ begin
 		dataOutIQ => dataOutIQB,
 		sendingOut => sendingSchedB,		
 		
-		execCausing => --execOrIntCausing,
-							execCausing,
+		execCausing => execCausing,
 			lateEventSignal => lateEventSignal,
 		execEventSignal => execOrIntEventSignal
 	);
@@ -340,8 +336,7 @@ begin
 		dataOutIQ => dataOutIQC,
 		sendingOut => sendingSchedC,		
 		
-		execCausing => --execOrIntCausing,
-							execCausing,
+		execCausing => execCausing,
 			lateEventSignal => lateEventSignal,
 		execEventSignal => execOrIntEventSignal
 	);					
@@ -369,8 +364,7 @@ begin
 		dataOutIQ => dataOutIQD,
 		sendingOut => sendingSchedD,		
 		
-		execCausing => --execOrIntCausing,
-							execCausing,
+		execCausing => execCausing,
 			lateEventSignal => lateEventSignal,
 		execEventSignal => execOrIntEventSignal
 	);	
@@ -400,11 +394,11 @@ begin
 		regReadAllow => regsAllowE, -- TODO: change to individual for each port
 		regValues => regValsE,		
 		
-		execCausing => --execOrIntCausing,
-							execCausing,
+		execCausing => execCausing,
 			lateEventSignal => lateEventSignal,
 		execEventSignal => execOrIntEventSignal
 	);	
+	
 															
 	EXEC_BLOCK: entity work.UnitExec(Implem)
 	port map(
@@ -542,6 +536,128 @@ begin
 		
 			cqDataLivingOut.fullMask(0) <= cqMaskOut(0);
 			cqDataLivingOut.data(0) <= cqDataOut(0);
+
+		-- CAREFUL! This stage is needed to keep result tags 1 for cycle when writing to reg file,
+		--				so that "black hole" of invisible readiness doesn't occur
+		AFTER_CQ: entity work.GenericStageMulti(Behavioral) port map(
+			clk => clk, reset => resetSig, en => enSig,
+			
+			prevSending => anySendingFromCQ,
+			nextAccepting => '1',
+			execEventSignal => '0',
+				lateEventSignal => '0',
+			execCausing => execCausing,
+			stageDataIn => cqDataLivingOut,
+			acceptingOut => open,
+			sendingOut => open,
+			stageDataOut => stageDataAfterCQ,
+			
+			lockCommand => '0'			
+		);
+
+	
+	WRITTEN_TAG_GEN: if CQ_SINGLE_OUTPUT generate
+		writtenTags <= getWrittenTags(stageDataAfterCQ);
+	end generate;
+	
+		fni.writtenTags <= writtenTags;
+		fni.resultTags <= getResultTags(execEnds, cqBufferData, dataOutIQA, dataOutIQB, dataOutIQC, dataOutIQD,
+																											DEFAULT_STAGE_DATA_MULTI);
+		fni.nextResultTags <= getNextResultTags(execPreEnds, dataOutIQA, dataOutIQB, dataOutIQC, dataOutIQD);
+		fni.resultValues <= getResultValues(execEnds, cqBufferData, DEFAULT_STAGE_DATA_MULTI);
+			
+		-- Int register block
+			regsSelCE(0 to 1) <= regsSelC(0 to 1);
+			regsSelCE(2) <= regsSelE(2);
+			regsAllowCE <= regsAllowC or regsAllowE;
+				regValsC(0 to 1) <= regValsCE(0 to 1);
+				regValsE(2) <= regValsCE(2);	
+
+			rfWriteVec(0 to INTEGER_WRITE_WIDTH-1) <= getArrayDestMask(cqDataOut, cqMaskOut);
+			rfSelectWrite(0 to INTEGER_WRITE_WIDTH-1) <= getArrayPhysicalDests(cqDataOut);
+			rfWriteValues(0 to INTEGER_WRITE_WIDTH-1) <= getArrayResults(cqDataOut);
+		
+		GPR_FILE_DISPATCH: entity work.RegisterFile0 (Behavioral)
+																	--(Implem)
+		generic map(WIDTH => 4, WRITE_WIDTH => INTEGER_WRITE_WIDTH)
+		port map(
+			clk => clk, reset => resetSig, en => enSig,
+				
+			writeAllow => '1',
+			writeVec => rfWriteVec,
+			selectWrite => rfSelectWrite, -- NOTE: unneeded writing isn't harmful anyway
+			writeValues => rfWriteValues,
+			
+			readAllowVec => (others => '1'), -- TEMP!
+			
+			selectRead(0 to 2) => regsSelA,
+			selectRead(3 to 5) => regsSelB,
+			selectRead(6 to 8) => regsSelCE,
+			selectRead(9 to 11) => regsSelD,
+			
+			readValues(0 to 2) => regValsA,
+			readValues(3 to 5) => regValsB,
+			readValues(6 to 8) => regValsCE,						
+			readValues(9 to 11) => regValsD			
+		);
+		------------------------------
+
+
+			INT_READY_TABLE: entity work.ReadyRegisterTable(Behavioral)
+			generic map(
+				WRITE_WIDTH => INTEGER_WRITE_WIDTH
+			)
+			port map(
+				clk => clk, reset => resetSig, en => enSig, 
+				
+				sendingToReserve => frontLastSending,
+				stageDataToReserve => frontDataLastLiving,
+					
+				newPhysDests => newPhysDests,	-- FOR MAPPING
+				stageDataReserved => renamedDataLiving, --stageDataOutRename,
+				
+					writingMask => cqMaskOut,
+					writingData => cqDataOut,
+				readyRegFlagsNext => readyRegFlagsNext -- FOR IQs
+			);
+
+			READY_REGS_SYNCHRONOUS: process(clk) 	
+			begin
+				if rising_edge(clk) then
+					readyRegFlags_2 <= readyRegFlagsNext;
+					--	readyRegFlagsV <= readyRegFlagsNextV;
+				end if;
+			end process;
+
+			readyRegFlags <= readyRegFlags_2;
+
+
+	REORDER_BUFFER: entity work.ReorderBuffer(Implem)
+	port map(
+		clk => clk, reset => resetSig, en => enSig,
+		
+		lateEventSignal => lateEventSignal,
+		execEventSignal => execOrIntEventSignal,
+		execCausing => execCausing,
+		
+		commitGroupCtr => commitGroupCtrSig,
+		commitGroupCtrNext => commitGroupCtrNextSig,
+			
+		execEnds => execEnds,
+		execReady => execSending,
+		
+		execEnds2 => execEnds2,
+		execReady2 => execSending2,
+		
+		inputData => renamedDataLiving,
+		prevSending => renamedSending,
+		acceptingOut => robAccepting,
+		
+			nextAccepting => commitAccepting and sbAccepting,
+		sendingOut => robSending, 
+		outputData => dataOutROB		
+	);
+
 		
 	INT_REG_MAPPING: block
 		signal physStable, physStableDelayed: PhysNameArray(0 to PIPE_WIDTH-1) := (others=>(others=>'0'));
@@ -608,129 +724,9 @@ begin
 				physStableDelayed => physStableDelayed -- FOR MAPPING (from MAP)
 			);		
 
-			INT_READY_TABLE: entity work.ReadyRegisterTable(Behavioral)
-			generic map(
-				WRITE_WIDTH => INTEGER_WRITE_WIDTH
-			)
-			port map(
-				clk => clk, reset => resetSig, en => enSig, 
-				
-				sendingToReserve => frontLastSending,
-				stageDataToReserve => frontDataLastLiving,
-					
-				newPhysDests => newPhysDests,	-- FOR MAPPING
-				stageDataReserved => renamedDataLiving, --stageDataOutRename,
-				
-					writingMask => cqMaskOut,
-					writingData => cqDataOut,
-				readyRegFlagsNext => readyRegFlagsNext -- FOR IQs
-			);
-
-			READY_REGS_SYNCHRONOUS: process(clk) 	
-			begin
-				if rising_edge(clk) then
-					readyRegFlags_2 <= readyRegFlagsNext;
-					--	readyRegFlagsV <= readyRegFlagsNextV;
-				end if;
-			end process;
-
-			readyRegFlags <= readyRegFlags_2;		
 		end block;
-	
-		-- CAREFUL! This stage is needed to keep result tags 1 for cycle when writing to reg file,
-		--				so that "black hole" of invisible readiness doesn't occur
-		AFTER_CQ: entity work.GenericStageMulti(Behavioral) port map(
-			clk => clk, reset => resetSig, en => enSig,
-			
-			prevSending => anySendingFromCQ,
-			nextAccepting => '1',
-			execEventSignal => '0',
-				lateEventSignal => '0',
-			execCausing => execCausing,
-			stageDataIn => cqDataLivingOut,
-			acceptingOut => open,
-			sendingOut => open,
-			stageDataOut => stageDataAfterCQ,
-			
-			lockCommand => '0'			
-		);
-			
-		-- Int register block
-			regsSelCE(0 to 1) <= regsSelC(0 to 1);
-			regsSelCE(2) <= regsSelE(2);
-			regsAllowCE <= regsAllowC or regsAllowE;
-				regValsC(0 to 1) <= regValsCE(0 to 1);
-				regValsE(2) <= regValsCE(2);	
+		
 
-			rfWriteVec(0 to INTEGER_WRITE_WIDTH-1) <= getArrayDestMask(cqDataOut, cqMaskOut);
-			rfSelectWrite(0 to INTEGER_WRITE_WIDTH-1) <= getArrayPhysicalDests(cqDataOut);
-			rfWriteValues(0 to INTEGER_WRITE_WIDTH-1) <= getArrayResults(cqDataOut);
-		
-		GPR_FILE_DISPATCH: entity work.RegisterFile0 (Behavioral)
-																	--(Implem)
-		generic map(WIDTH => 4, WRITE_WIDTH => INTEGER_WRITE_WIDTH)
-		port map(
-			clk => clk, reset => resetSig, en => enSig,
-				
-			writeAllow => --anySendingFromCQ,
-								'1',
-			writeVec => rfWriteVec,
-			selectWrite => rfSelectWrite, -- NOTE: unneeded writing isn't harmful anyway
-			writeValues => rfWriteValues,
-			
-			readAllowVec => (others => '1'), -- TEMP!
-			
-			selectRead(0 to 2) => regsSelA,
-			selectRead(3 to 5) => regsSelB,
-			selectRead(6 to 8) => regsSelCE,
-			selectRead(9 to 11) => regsSelD,
-			
-			readValues(0 to 2) => regValsA,
-			readValues(3 to 5) => regValsB,
-			readValues(6 to 8) => regValsCE,						
-			readValues(9 to 11) => regValsD			
-		);
-		------------------------------
-	
-	REORDER_BUFFER: entity work.ReorderBuffer --(Behavioral) 
-															(Implem)
-	port map(
-		clk => clk, reset => resetSig, en => enSig,
-		
-		lateEventSignal => lateEventSignal,
-		execEventSignal => execOrIntEventSignal,
-		execCausing => --execOrIntCausing,
-							execCausing,
-		
-		commitGroupCtr => commitGroupCtrSig,
-		commitGroupCtrNext => commitGroupCtrNextSig,
-			
-		execEnds => execEnds,
-		execReady => execSending,
-		
-		execEnds2 => execEnds2,
-		execReady2 => execSending2,
-		
-		inputData => renamedDataLiving,
-		prevSending => renamedSending,
-		acceptingOut => robAccepting,
-		
-			nextAccepting => commitAccepting and sbAccepting,
-		sendingOut => robSending, 
-		outputData => dataOutROB		
-	);
-	
-	
-	WRITTEN_TAG_GEN: if CQ_SINGLE_OUTPUT generate
-		writtenTags <= getWrittenTags(stageDataAfterCQ);
-	end generate;
-	
-		fni.writtenTags <= writtenTags;
-		fni.resultTags <= getResultTags(execEnds, cqBufferData, dataOutIQA, dataOutIQB, dataOutIQC, dataOutIQD,
-																											DEFAULT_STAGE_DATA_MULTI);
-		fni.nextResultTags <= getNextResultTags(execPreEnds, dataOutIQA, dataOutIQB, dataOutIQC, dataOutIQD);
-		fni.resultValues <= getResultValues(execEnds, cqBufferData, DEFAULT_STAGE_DATA_MULTI);
-	
 	dadr <= memLoadAddress;
 	doutadr <= memStoreAddress;
 	dread <= memLoadAllow;

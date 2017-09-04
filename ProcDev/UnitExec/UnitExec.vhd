@@ -250,8 +250,7 @@ begin
 				nextAccepting => '1',
 				
 				sendingSQOut => sendingOutBQ, -- OUTPUT
-					dataOutV => dataOutBQV,
-				dataOutSQ => open--dataOutBQ
+					dataOutV => dataOutBQV
 			);
 			
 			SYS_REG_FF: process(clk)

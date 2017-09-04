@@ -111,7 +111,6 @@ architecture Behavioral of UnitMemory is
 	signal loadUnitSendingSig: std_logic := '0';
 	
 	signal sendingOutSQ: std_logic  := '0';
-	signal dataOutSQ: InstructionState := DEFAULT_INSTRUCTION_STATE;
 	signal dataOutSQV: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
 
 	signal dlqAccepting: std_logic := '1';	
@@ -145,12 +144,9 @@ architecture Behavioral of UnitMemory is
 	signal ch0, ch1, ch2, ch3, ch4, ch5, ch6, ch7: std_logic := '0';
 begin
 		eventSignal <= execOrIntEventSignalIn;	
-		activeCausing <= --execOrIntCausingIn;
-								setInterrupt(execCausing, lateEventSignal);
+		activeCausing <= setInterrupt(execCausing, lateEventSignal);
 
-			inputDataC.data(0) <= --dataIQC;			
-	--aluResult <= addMwordFaster(stageDataIn.data(0).argValues.arg0, stageDataIn.data(0).argValues.arg1);
-	--aluOut <= 
+		inputDataC.data(0) <=			
 				 setExecState(dataIQC,
 								  addMwordFaster(dataIQC.argValues.arg0, dataIQC.argValues.arg1),
 								  '0', (others => '0'));
@@ -167,9 +163,7 @@ begin
 				signal acceptingMem0, acceptingMem1,
 						 sendingMem0, sendingMem1: std_logic := '0';
 			begin
-				STAGE_AGU: entity work.--SimpleAlu(BehavioralAGU)
-												GenericStageMulti(--BasicAgu)
-																		SingleTagged)
+				STAGE_AGU: entity work.GenericStageMulti(SingleTagged)
 				port map(
 					clk => clk, reset => reset, en => en,
 					
@@ -310,14 +304,12 @@ begin
 						
 					lateEventSignal => lateEventSignal,	
 				execEventSignal => eventSignal,
-				execCausing => --activeCausing,
-									execCausing,
+				execCausing => execCausing,
 				
 				nextAccepting => '1',
 				
 				sendingSQOut => sendingOutSQ, -- OUTPUT
-					dataOutV => dataOutSQV,
-				dataOutSQ => dataOutSQ -- OUTPUT
+					dataOutV => dataOutSQV
 			);
 
 				-- NOTE: all ops committed in 1 cycle are from the same group, so they'll always fit into one
@@ -359,8 +351,7 @@ begin
 					dataIn => dataNewToLQ,
 				
 				storeAddressWr => sendingToLoadUnitSig or sendingToMfcSig, --?
-				storeValueWr => --'0',
-										sendingToLoadUnitSig or sendingToMfcSig,
+				storeValueWr => sendingToLoadUnitSig or sendingToMfcSig,
 
 				storeAddressDataIn => dataToLoadUnitSig, --?
 				storeValueDataIn => DEFAULT_INSTRUCTION_STATE,
@@ -371,14 +362,12 @@ begin
 
 					lateEventSignal => lateEventSignal,
 				execEventSignal => eventSignal,
-				execCausing => --activeCausing,
-									execCausing,
+				execCausing => execCausing,
 
 				nextAccepting => '1',
 
 				sendingSQOut => open,
-					dataOutV => open,
-				dataOutSQ => open 
+					dataOutV => open
 			);
 
 	
@@ -424,8 +413,7 @@ begin
 					
 					lateEventSignal => lateEventSignal,
 				execEventSignal => eventSignal,
-				execCausing => --activeCausing,
-									execCausing,
+				execCausing => execCausing,
 				
 				nextAccepting => not sendingFromSysReg,
 				
