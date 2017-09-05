@@ -84,6 +84,9 @@ begin
 		-- sys reg interface
 		sysRegReadSel => sysRegReadSel,
 		sysRegReadValue => sysRegReadValue,	
+			 sysStoreAllow => sysStoreAllow,
+			 sysStoreAddress => sysStoreAddress,
+			 sysStoreValue => sysStoreValue,
 
 		-- Icache interface
 		iadr => iadr,
@@ -103,7 +106,7 @@ begin
 		-- Events out
 		execOrIntEventSignalOut => execOrIntEventSignal,
 		execOrIntCausingOut => execOrIntCausing,
-			lateEventOut => lateEventSignal,
+		lateEventOut => lateEventSignal,
 		-- Data from front pipe interface		
 		renameAccepting => renameAccepting, -- to frontend
 		frontLastSending => frontLastSending,
@@ -118,9 +121,6 @@ begin
 		iqAccepts => iqAccepts,
 		renamedDataLiving => renamedDataLiving, -- !!!
 		renamedSending => renamedSending,
-
-		-- Signal about ready regs (version with virtual ready bits!)
-		--readyRegFlagsNextV => readyRegFlagsNextV,
 		
 		-- Interface from ROB
 		commitAccepting => commitAccepting,
@@ -130,16 +130,11 @@ begin
 
 		---
 		sendingFromBQ => sendingFromBQ,
-			dataFromBQV => dataOutBQV,
+		dataFromBQV => dataOutBQV,
 
-				sendingFromSB => '0',
-				dataFromSB => dataFromSB,
-					sbEmpty => sbEmpty,
-				sbSending => sbSending,
-
-			 sysStoreAllow => sysStoreAllow,
-			 sysStoreAddress => sysStoreAddress,
-			 sysStoreValue => sysStoreValue,
+		sbSending => sbSending,
+		dataFromSB => dataFromSB,
+		sbEmpty => sbEmpty,
 
 		-- Interface from committed stage
 		committedSending => committedSending,
@@ -212,7 +207,7 @@ begin
 			signal writtenTags: PhysNameArray(0 to PIPE_WIDTH-1) := (others => (others => '0'));
 
 			signal readyRegFlags: std_logic_vector(0 to 3*PIPE_WIDTH-1) := (others => '0');		
-			signal readyRegFlags_2: std_logic_vector(0 to 3*PIPE_WIDTH-1) := (others => '0');
+--			signal readyRegFlags_2: std_logic_vector(0 to 3*PIPE_WIDTH-1) := (others => '0');
 			signal readyRegFlagsNext: std_logic_vector(0 to 3*PIPE_WIDTH-1) := (others => '0');
 
 			signal outputA, outputB, outputC, outputD, outputE: InstructionSlot := DEFAULT_INSTRUCTION_SLOT;
@@ -279,7 +274,7 @@ begin
 					
 				execCausing => execCausing,
 					lateEventSignal => lateEventSignal,
-				execEventSignal => execOrIntEventSignal			
+				execEventSignal => execEventSignal			
 			);
 			
 			IQ_B: entity work.UnitIQ
@@ -306,7 +301,7 @@ begin
 				
 				execCausing => execCausing,
 					lateEventSignal => lateEventSignal,
-				execEventSignal => execOrIntEventSignal
+				execEventSignal => execEventSignal
 			);
 			
 				
@@ -334,7 +329,7 @@ begin
 				
 				execCausing => execCausing,
 					lateEventSignal => lateEventSignal,
-				execEventSignal => execOrIntEventSignal
+				execEventSignal => execEventSignal
 			);					
 			
 			IQ_D: entity work.UnitIQ
@@ -362,7 +357,7 @@ begin
 				
 				execCausing => execCausing,
 					lateEventSignal => lateEventSignal,
-				execEventSignal => execOrIntEventSignal
+				execEventSignal => execEventSignal
 			);	
 
 
@@ -391,7 +386,7 @@ begin
 				
 				execCausing => execCausing,
 					lateEventSignal => lateEventSignal,
-				execEventSignal => execOrIntEventSignal
+				execEventSignal => execEventSignal
 			);	
 			
 																	
@@ -512,8 +507,8 @@ begin
 			port map(
 				clk => clk, reset => resetSig, en => enSig,
 				
-				execEventSignal => execOrIntEventSignal,
-				execCausing => execOrIntCausing,
+				execEventSignal => '0',
+				execCausing => DEFAULT_INSTRUCTION_STATE,
 				
 					maskIn => execSending(0 to 2),
 					dataIn => execEnds(0 to 2),
@@ -546,11 +541,8 @@ begin
 					
 					lockCommand => '0'			
 				);
-
-			
-			WRITTEN_TAG_GEN: if CQ_SINGLE_OUTPUT generate
-				writtenTags <= getWrittenTags(stageDataAfterCQ);
-			end generate;
+		
+			writtenTags <= getPhysicalDests(stageDataAfterCQ) when CQ_SINGLE_OUTPUT else (others => (others => '0'));
 			
 				fni.writtenTags <= writtenTags;
 				fni.resultTags <= getResultTags(execEnds, cqBufferData, dataOutIQA, dataOutIQB, dataOutIQC, dataOutIQD,
@@ -614,19 +606,16 @@ begin
 				READY_REGS_SYNCHRONOUS: process(clk) 	
 				begin
 					if rising_edge(clk) then
-						readyRegFlags_2 <= readyRegFlagsNext;
+						readyRegFlags <= readyRegFlagsNext;
 					end if;
 				end process;
-
-				readyRegFlags <= readyRegFlags_2;
-
 
 		REORDER_BUFFER: entity work.ReorderBuffer(Implem)
 		port map(
 			clk => clk, reset => resetSig, en => enSig,
 			
 			lateEventSignal => lateEventSignal,
-			execEventSignal => execOrIntEventSignal,
+			execEventSignal => execEventSignal,
 			execCausing => execCausing,
 			
 			commitGroupCtr => commitGroupCtrSig,

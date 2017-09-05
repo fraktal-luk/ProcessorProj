@@ -95,7 +95,7 @@ function getSendingFromCQ(livingMask: std_logic_vector) return std_logic_vector;
 function killByTag(before, ei, int: std_logic) return std_logic;
 	
 -- FORWARDING NETWORK ------------
-function getWrittenTags(lastCommitted: StageDataMulti) return PhysNameArray;
+function getWrittenTags(lastCommitted: StageDataMulti) return PhysNameArray; -- DEPREC
 
 function getResultTags(execEnds: InstructionStateArray;
 			stageDataCQ: InstructionStateArray;

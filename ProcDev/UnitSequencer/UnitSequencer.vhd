@@ -69,12 +69,9 @@ entity UnitSequencer is
 		stage0EventInfo: in StageMultiEventInfo;	
 		
 		execOrIntEventSignalOut: out std_logic;
-		execOrIntCausingOut: out InstructionState;
-			
+		execOrIntCausingOut: out InstructionState;	
 			lateEventOut: out std_logic;
 		
-		--killVecOut: out std_logic_vector(0 to N_EVENT_AREAS-1);
-
 		-- Interface PC <-> front pipe
 		frontAccepting: in std_logic;
 		pcSending: out std_logic;		
@@ -98,7 +95,6 @@ entity UnitSequencer is
 			sendingFromBQ: in std_logic;
 				dataFromBQV: in StageDataMulti;
 		
-				sendingFromSB: in std_logic;
 				dataFromSB: in InstructionState;
 					sbEmpty: in std_logic;
 					sbSending: in std_logic;
