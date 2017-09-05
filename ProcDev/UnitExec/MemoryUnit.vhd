@@ -75,7 +75,7 @@ entity MemoryUnit is
 		storeValueDataIn: in InstructionState;
 
 		committing: in std_logic;
-		groupCtrNext: in SmallNumber;
+		groupCtrNext: in SmallNumber; -- DEPREC?
 		groupCtrInc: in SmallNumber;
 
 		lateEventSignal: in std_logic;
@@ -85,7 +85,6 @@ entity MemoryUnit is
 		nextAccepting: in std_logic;		
 		sendingSQOut: out std_logic;
 			dataOutV: out StageDataMulti
-		--dataOutSQ: out InstructionState
 	);
 end MemoryUnit;
 

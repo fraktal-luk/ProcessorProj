@@ -15,11 +15,7 @@ architecture Behavioral5 of NewCore0 is
 	signal frontLastSending, renameAccepting: std_logic := '0';
 
 	signal renamedDataLiving, stageDataCommittedOut: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;				
-	signal renamedSending, iqAccepts: std_logic := '0';			
-		
-	-- DEPREC?  CAREFUL, TODO: make this robust for changes in renaming details!
-	--signal readyRegs, readyRegsSig, readyRegsPrev: std_logic_vector(0 to N_PHYSICAL_REGS-1)
-	--	:= (0 to 31 => '1', others=>'0'); -- p0-p31 are initially mapped to logical regs and ready
+	signal renamedSending, iqAccepts: std_logic := '0';
 		
 	signal dataToA, dataToB, dataToC, dataToD, dataToE: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;						
 
@@ -70,11 +66,6 @@ architecture Behavioral5 of NewCore0 is
 			
 		signal committedSending, renameLockEnd: std_logic := '0';
 		signal committedDataOut: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
-
-	signal readyRegFlags, readyRegFlagsV: std_logic_vector(0 to 3*PIPE_WIDTH-1) := (others => '0');
-			
-		signal readyRegFlags_2: std_logic_vector(0 to 3*PIPE_WIDTH-1) := (others => '0');
-		signal readyRegFlagsNext, readyRegFlagsNextV: std_logic_vector(0 to 3*PIPE_WIDTH-1) := (others => '0');
 
 		signal sysStoreAllow: std_logic := '0';
 		signal sysStoreAddress: slv5 := (others => '0'); 
@@ -129,7 +120,7 @@ begin
 		renamedSending => renamedSending,
 
 		-- Signal about ready regs (version with virtual ready bits!)
-		readyRegFlagsNextV => readyRegFlagsNextV,
+		--readyRegFlagsNextV => readyRegFlagsNextV,
 		
 		-- Interface from ROB
 		commitAccepting => commitAccepting,
@@ -220,6 +211,10 @@ begin
 			--		rather than from forw. network, but readyRegFlags are not available in the 1st cycle after WB.
 			signal writtenTags: PhysNameArray(0 to PIPE_WIDTH-1) := (others => (others => '0'));
 
+			signal readyRegFlags: std_logic_vector(0 to 3*PIPE_WIDTH-1) := (others => '0');		
+			signal readyRegFlags_2: std_logic_vector(0 to 3*PIPE_WIDTH-1) := (others => '0');
+			signal readyRegFlagsNext: std_logic_vector(0 to 3*PIPE_WIDTH-1) := (others => '0');
+
 			signal outputA, outputB, outputC, outputD, outputE: InstructionSlot := DEFAULT_INSTRUCTION_SLOT;
 			signal outputOpPreB, outputOpPreC: InstructionState := DEFAULT_INSTRUCTION_STATE;
 
@@ -243,15 +238,14 @@ begin
 		INNER_OOO_AREA: block
 			signal dataOutIQA, dataOutIQB, dataOutIQC, dataOutIQD, dataOutIQE: InstructionState
 																			:= defaultInstructionState;	
-			signal sendingSchedA, sendingSchedB, sendingSchedC, sendingSchedD, sendingSchedE: std_logic := '0';
-			
+			signal sendingSchedA, sendingSchedB, sendingSchedC, sendingSchedD, sendingSchedE,
+					execAcceptingA, execAcceptingB, execAcceptingC, execAcceptingD, execAcceptingE: std_logic := '0';
+						
 			-- Physical register interface
 			signal regsSelA, regsSelB, regsSelC, regsSelD, regsSelE, regsSelCE: PhysNameArray(0 to 2)
 							:= (others => (others => '0'));
 			signal regValsA, regValsB, regValsC, regValsD, regValsE, regValsCE: MwordArray(0 to 2)
 									:= (others => (others => '0'));
-			signal regsAllowA, regsAllowB, regsAllowC, regsAllowD, regsAllowE, regsAllowCE,
-					execAcceptingA, execAcceptingB, execAcceptingC, execAcceptingD, execAcceptingE: std_logic := '0'; 
 				
 			signal fni: ForwardingInfo := DEFAULT_FORWARDING_INFO;
 
@@ -277,7 +271,6 @@ begin
 				
 				readyRegFlags => readyRegFlags,
 				regsForDispatch => regsSelA,
-				regReadAllow => regsAllowA,	
 				regValues => regValsA,
 					
 				nextAccepting => execAcceptingA,			
@@ -305,7 +298,6 @@ begin
 						
 				readyRegFlags => readyRegFlags,		
 				regsForDispatch => regsSelB,
-				regReadAllow => regsAllowB,
 				regValues => regValsB,
 				
 				nextAccepting => execAcceptingB,	
@@ -334,7 +326,6 @@ begin
 						
 				readyRegFlags => readyRegFlags,
 				regsForDispatch => regsSelC,
-				regReadAllow => regsAllowC,	
 				regValues => regValsC,
 					
 				nextAccepting => execAcceptingC,
@@ -361,8 +352,8 @@ begin
 				fni => fni,
 						
 				readyRegFlags => readyRegFlags,
+				
 				regsForDispatch => regsSelD,
-				regReadAllow => regsAllowD,
 				regValues => regValsD,
 					
 				nextAccepting => execAcceptingD,
@@ -396,7 +387,6 @@ begin
 				
 				-- Interface for reading registers
 				regsForDispatch => regsSelE,
-				regReadAllow => regsAllowE, -- TODO: change to individual for each port
 				regValues => regValsE,		
 				
 				execCausing => execCausing,
@@ -444,8 +434,7 @@ begin
 				execCausingOut => execCausing,
 						
 					lateEventSignal => lateEventSignal,
-				execOrIntEventSignalIn => execOrIntEventSignal,
-				execOrIntCausingIn => execOrIntCausing
+				execOrIntEventSignalIn => execOrIntEventSignal
 			);	
 
 				NEW_MEM_UNIT: entity work.UnitMemory(Behavioral)
@@ -493,8 +482,7 @@ begin
 						sysStoreValue => sysStoreValue,
 
 					committing => committingSig,
-					groupCtrNext => commitGroupCtrNextSig,
-					
+					groupCtrNext => commitGroupCtrNextSig,				
 					groupCtrInc => commitGroupCtrIncSig,
 
 						sbAccepting => sbAccepting,
@@ -504,8 +492,7 @@ begin
 											
 						lateEventSignal => lateEventSignal,	
 					execOrIntEventSignalIn => execOrIntEventSignal,
-						execCausing => execCausing,
-					execOrIntCausingIn => execOrIntCausing
+						execCausing => execCausing
 				);
 
 						sysRegReadSel <= memLoadAddress(4 downto 0);
@@ -574,16 +561,14 @@ begin
 				-- Int register block
 					regsSelCE(0 to 1) <= regsSelC(0 to 1);
 					regsSelCE(2) <= regsSelE(2);
-					regsAllowCE <= regsAllowC or regsAllowE;
-						regValsC(0 to 1) <= regValsCE(0 to 1);
-						regValsE(2) <= regValsCE(2);	
+					regValsC(0 to 1) <= regValsCE(0 to 1);
+					regValsE(2) <= regValsCE(2);	
 
 					rfWriteVec(0 to INTEGER_WRITE_WIDTH-1) <= getArrayDestMask(cqDataOut, cqMaskOut);
 					rfSelectWrite(0 to INTEGER_WRITE_WIDTH-1) <= getArrayPhysicalDests(cqDataOut);
 					rfWriteValues(0 to INTEGER_WRITE_WIDTH-1) <= getArrayResults(cqDataOut);
 				
 				GPR_FILE_DISPATCH: entity work.RegisterFile0 (Behavioral)
-																			--(Implem)
 				generic map(WIDTH => 4, WRITE_WIDTH => INTEGER_WRITE_WIDTH)
 				port map(
 					clk => clk, reset => resetSig, en => enSig,
@@ -630,7 +615,6 @@ begin
 				begin
 					if rising_edge(clk) then
 						readyRegFlags_2 <= readyRegFlagsNext;
-						--	readyRegFlagsV <= readyRegFlagsNextV;
 					end if;
 				end process;
 
@@ -688,9 +672,7 @@ begin
 						newPhysSources => newPhysSources,	-- TO SEQ
 						
 						prevStablePhysDests => physStable,  -- FOR MAPPING (to FREE LIST)
-						stablePhysSources => open,
-							
-						readyRegFlagsNext => readyRegFlagsNextV
+						stablePhysSources => open							
 					);
 
 				LAST_COMMITTED_SYNCHRONOUS: process(clk) 	

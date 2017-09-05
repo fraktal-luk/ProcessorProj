@@ -97,8 +97,7 @@ entity UnitMemory is
 			
 		lateEventSignal: in std_logic;	
 		execOrIntEventSignalIn: in std_logic;
-			execCausing: in InstructionState;
-		execOrIntCausingIn: in InstructionState			
+			execCausing: in InstructionState
 	);
 end UnitMemory;
 

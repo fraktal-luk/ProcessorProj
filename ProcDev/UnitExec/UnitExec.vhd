@@ -87,8 +87,7 @@ entity UnitExec is
 		execEvent: out std_logic;
 		execCausingOut: out InstructionState;
 		
-		execOrIntEventSignalIn: in std_logic;
-		execOrIntCausingIn: in InstructionState
+		execOrIntEventSignalIn: in std_logic
 	);
 end UnitExec;
 
@@ -271,8 +270,7 @@ begin
 		execCausing <= eventsD.causing;
 
 		eventSignal <= execOrIntEventSignalIn;	
-		activeCausing <= --execOrIntCausingIn;
-								setInterrupt(execCausing, lateEventSignal);
+		activeCausing <= setInterrupt(execCausing, lateEventSignal);
 
 		execAcceptingA <= execAcceptingASig;
 		execAcceptingB <= execAcceptingBSig;

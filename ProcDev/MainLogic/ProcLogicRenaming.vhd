@@ -42,7 +42,7 @@ function renameRegs2(insVec: StageDataMulti; takeVec, destMask: std_logic_vector
 								psVec, pdVec: PhysNameArray) 		
 return StageDataMulti;
 
-function setArgStatus(insVec: StageDataMulti; readyRegFlagsVirtualNext: std_logic_vector) 
+function setArgStatus(insVec: StageDataMulti)--; readyRegFlagsVirtualNext: std_logic_vector) 
 return StageDataMulti;
 
 	
@@ -179,7 +179,7 @@ begin
 end function;
 
 
-function setArgStatus(insVec: StageDataMulti; readyRegFlagsVirtualNext: std_logic_vector) 
+function setArgStatus(insVec: StageDataMulti)--; readyRegFlagsVirtualNext: std_logic_vector) 
 return StageDataMulti is
 	variable res: StageDataMulti := insVec;
 begin
@@ -222,15 +222,15 @@ begin
 	
 	return res; -- CAREFUL: this must be removed if using virtual ready map
 	
-		-- Virtual ready table
-		for i in 0 to PIPE_WIDTH-1 loop
-			res.data(i).argValues.missing(0) := res.data(i).argValues.missing(0) 
-					and not readyRegFlagsVirtualNext(3*i + 0);
-			res.data(i).argValues.missing(1) := res.data(i).argValues.missing(1)
-					and not readyRegFlagsVirtualNext(3*i + 1);
-			res.data(i).argValues.missing(2) := res.data(i).argValues.missing(2)
-					and not readyRegFlagsVirtualNext(3*i + 2);
-		end loop;	
+--		-- Virtual ready table
+--		for i in 0 to PIPE_WIDTH-1 loop
+--			res.data(i).argValues.missing(0) := res.data(i).argValues.missing(0) 
+--					and not readyRegFlagsVirtualNext(3*i + 0);
+--			res.data(i).argValues.missing(1) := res.data(i).argValues.missing(1)
+--					and not readyRegFlagsVirtualNext(3*i + 1);
+--			res.data(i).argValues.missing(2) := res.data(i).argValues.missing(2)
+--					and not readyRegFlagsVirtualNext(3*i + 2);
+--		end loop;	
 	
 	return res;
 end function;

@@ -124,7 +124,7 @@ entity UnitSequencer is
 			newPhysDestPointerIn: in SmallNumber;
 			newPhysSourcesIn: in PhysNameArray(0 to 3*PIPE_WIDTH-1);
 		
-		     readyRegFlagsNextV: in std_logic_vector(0 to 3*PIPE_WIDTH-1);
+		  --   readyRegFlagsNextV: in std_logic_vector(0 to 3*PIPE_WIDTH-1);
 		
 		start: in std_logic	
 	);
@@ -382,8 +382,8 @@ begin
 							frontDataLastLiving, takeVec, reserveSelSig, newPhysSources, newPhysDests
 						),
 						newNumberTags, renameGroupCtrNext, newGprTags
-					),
-					readyRegFlagsNextV
+					)--,
+					--readyRegFlagsNextV
 				)	
 			);
 	

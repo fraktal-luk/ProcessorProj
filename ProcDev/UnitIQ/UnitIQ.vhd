@@ -66,10 +66,11 @@ entity UnitIQ is
 			
 		-- Phys regs to read - only for "full read ports" configuration 
 		regsForDispatch: out PhysNameArray(0 to 2);
-		regReadAllow: out std_logic;			
+		--regReadAllow: out std_logic;			
+		regValues: in MwordArray(0 to 2);
+
 
 		readyRegFlags: in std_logic_vector(0 to 3*PIPE_WIDTH-1);			
-		regValues: in MwordArray(0 to 2);
 			
 			acceptingVec: out std_logic_vector(0 to PIPE_WIDTH-1);		
 		dataOutIQ: out InstructionState;
@@ -166,7 +167,7 @@ begin
 	
 	regsForDispatch <=
 			(0 => toDispatch.physicalArgs.s0, 1 => toDispatch.physicalArgs.s1, 2 => toDispatch.physicalArgs.s2);
-	regReadAllow <= queueSending;
+	--regReadAllow <= queueSending;
 		
 end Behavioral;
 
