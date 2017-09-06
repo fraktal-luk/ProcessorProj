@@ -45,10 +45,10 @@ USE ieee.std_logic_1164.ALL;
  
 	use work.ProgramCode4.all; 
  
-ENTITY NewCoreTB3 IS
-END NewCoreTB3;
+ENTITY NewCoreTB4 IS
+END NewCoreTB4;
  
-ARCHITECTURE behavior OF NewCoreTB3 IS 
+ARCHITECTURE behavior OF NewCoreTB4 IS 
 
     -- Component Declaration for the Unit Under Test (UUT)
 

@@ -16,13 +16,6 @@ architecture Behavioral5 of NewCore0 is
 
 	signal renamedDataLiving, stageDataCommittedOut: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;				
 	signal renamedSending, iqAccepts: std_logic := '0';
-		
-	signal dataToA, dataToB, dataToC, dataToD, dataToE: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;						
-
-	signal acceptingVecA, acceptingVecB, acceptingVecC, acceptingVecD, acceptingVecE:
-				std_logic_vector(0 to PIPE_WIDTH-1) := (others => '0');
-	
-	signal compactedToSQ, compactedToLQ, compactedToBQ: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
 
 	-- Mem interface
 	signal memLoadAddress, memStoreAddress, memLoadValue, memStoreValue: Mword := (others => '0');
@@ -165,43 +158,17 @@ begin
 		execEventSignal => execEventSignal,
 		lateEventSignal => lateEventSignal		
 	);
-	
-	ISSUE_ROUTING: entity work.SubunitIssueRouting(Behavioral)
-	port map(
-		renamedDataLiving => renamedDataLiving,
-
-		acceptingVecA => acceptingVecA,
-		acceptingVecB => acceptingVecB,
-		acceptingVecC => acceptingVecC,
-		acceptingVecD => acceptingVecD,
-		acceptingVecE => acceptingVecE,
-
-		acceptingROB => robAccepting,
-		acceptingSQ => acceptingNewSQ,
-		acceptingLQ => acceptingNewLQ,
-		acceptingBQ => acceptingNewBQ,
-
-		renamedSendingIn => renamedSending,
-		
-		renamedSendingOut => open, -- DEPREC??
-		iqAccepts => iqAccepts,		
-		
-		dataOutA => dataToA,
-		dataOutB => dataToB,
-		dataOutC => dataToC,
-		dataOutD => dataToD,
-		dataOutE => dataToE,
-		
-		dataOutSQ => compactedToSQ,
-		dataOutLQ => compactedToLQ,
-		dataOutBQ => compactedToBQ
-	);
 
 
 	--------------------------------
 	--- Out of order domain
 	
 	OUTER_OOO_AREA: block
+		signal dataToA, dataToB, dataToC, dataToD, dataToE: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;						
+		signal acceptingVecA, acceptingVecB, acceptingVecC, acceptingVecD, acceptingVecE:
+					std_logic_vector(0 to PIPE_WIDTH-1) := (others => '0');
+		signal compactedToSQ, compactedToLQ, compactedToBQ: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
+		
 			-- writtenTags indicate registers written to GPR file in last cycle, so they can be read from there
 			--		rather than from forw. network, but readyRegFlags are not available in the 1st cycle after WB.
 			signal writtenTags: PhysNameArray(0 to PIPE_WIDTH-1) := (others => (others => '0'));
@@ -229,6 +196,39 @@ begin
 			signal cqDataOut: InstructionStateArray(0 to INTEGER_WRITE_WIDTH-1)
 					:= (others => DEFAULT_INSTRUCTION_STATE);		
 	begin
+
+	
+		ISSUE_ROUTING: entity work.SubunitIssueRouting(Behavioral)
+		port map(
+			renamedDataLiving => renamedDataLiving,
+
+			acceptingVecA => acceptingVecA,
+			acceptingVecB => acceptingVecB,
+			acceptingVecC => acceptingVecC,
+			acceptingVecD => acceptingVecD,
+			acceptingVecE => acceptingVecE,
+
+			acceptingROB => robAccepting,
+			acceptingSQ => acceptingNewSQ,
+			acceptingLQ => acceptingNewLQ,
+			acceptingBQ => acceptingNewBQ,
+
+			renamedSendingIn => renamedSending,
+			
+			renamedSendingOut => open, -- DEPREC??
+			iqAccepts => iqAccepts,		
+			
+			dataOutA => dataToA,
+			dataOutB => dataToB,
+			dataOutC => dataToC,
+			dataOutD => dataToD,
+			dataOutE => dataToE,
+			
+			dataOutSQ => compactedToSQ,
+			dataOutLQ => compactedToLQ,
+			dataOutBQ => compactedToBQ
+		);
+
 	
 		INNER_OOO_AREA: block
 			signal dataOutIQA, dataOutIQB, dataOutIQC, dataOutIQD, dataOutIQE: InstructionState
