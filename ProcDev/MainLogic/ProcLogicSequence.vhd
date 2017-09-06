@@ -201,13 +201,13 @@ end function;
 		if commitEvent = '1' then 
 			res.killPC := '1';
 			res.causing := commitCausing;
-			res.affectedVec(0 to 4) := (others => '1');
+			--res.affectedVec(0 to 4) := (others => '1');
 		elsif execEvent = '1' then
 			res.causing := execCausing;
-			res.affectedVec(0 to 4) := (others => '1');
+			--res.affectedVec(0 to 4) := (others => '1');
 		elsif decodeEvent = '1' then
 			res.causing := decodeCausing;
-			res.affectedVec(0 to 3) := (others => '1');
+			--res.affectedVec(0 to 3) := (others => '1');
 		else
 			res.eventOccured := '0';
 		end if;

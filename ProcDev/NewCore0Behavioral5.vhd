@@ -429,7 +429,7 @@ begin
 				execCausingOut => execCausing,
 						
 					lateEventSignal => lateEventSignal,
-				execOrIntEventSignalIn => execOrIntEventSignal
+				execOrIntEventSignalIn => execEventSignal
 			);	
 
 				NEW_MEM_UNIT: entity work.UnitMemory(Behavioral)
@@ -486,7 +486,7 @@ begin
 							dataFromSB => dataFromSB,
 											
 						lateEventSignal => lateEventSignal,	
-					execOrIntEventSignalIn => execOrIntEventSignal,
+					execOrIntEventSignalIn => execEventSignal,
 						execCausing => execCausing
 				);
 

@@ -188,13 +188,9 @@ architecture Behavioral of UnitSequencer is
 begin	 
 	resetSig <= reset and HAS_RESET_SEQ;
 	enSig <= en or not HAS_EN_SEQ;
-
-	pcBase <= stageDataOutPC.basicInfo.ip and i2slv(-PIPE_WIDTH*4, MWORD_SIZE); -- Clearing low bits
-
-		pcNext <= addMwordBasic(pcBase, PC_INC);
 		
-		TMP_phase0 <= eiEvents.causing.controlInfo.phase0;
-		TMP_phase2 <= eiEvents.causing.controlInfo.phase2;
+	TMP_phase0 <= eiEvents.causing.controlInfo.phase0;
+	TMP_phase2 <= eiEvents.causing.controlInfo.phase2;
 
 	EVENTS: block
 	begin	
@@ -210,10 +206,13 @@ begin
 			lateEventOut <= TMP_phase0;
 		execOrIntEventSignal <= execEventSignal or TMP_phase0;
 		execOrIntCausing <= eiEvents.causing when TMP_phase0 = '1' else execCausing;
-		
+									--execCausing;
 		execOrIntEventSignalOut <= execOrIntEventSignal;	-- $MODULE_OUT
 		execOrIntCausingOut <= execOrIntCausing; -- $MODULE_OUT
 	end block;
+
+	pcBase <= stageDataOutPC.basicInfo.ip and i2slv(-PIPE_WIDTH*4, MWORD_SIZE); -- Clearing low bits
+	pcNext <= addMwordBasic(pcBase, PC_INC);
 
 			stageDataToPC <= newPCData(
 											stageDataOutPC,
@@ -257,7 +256,8 @@ begin
 			sendingOut => sendingOutPC,
 			stageDataOut => tmpPcOut,
 			
-			execEventSignal => generalEvents.affectedVec(0),
+			execEventSignal => --generalEvents.affectedVec(0),
+										generalEvents.eventOccured,
 			lateEventSignal => TMP_phase0,
 			execCausing => DEFAULT_INSTRUCTION_STATE,
 			lockCommand => '0'		
@@ -341,7 +341,7 @@ begin
 	end block;
 
 
-	iadr <= stageDataOutPC.basicInfo.ip and i2slv(-PIPE_WIDTH*4, MWORD_SIZE); -- Clearing low bits				
+	iadr <= pcBase; -- Clearing low bits				
 	iadrvalid <= sendingOutPC;
 	
 	pcDataLiving <= stageDataOutPC;
@@ -406,18 +406,6 @@ begin
 			lockCommand => renameLockState		
 		);
 	end block;
-				
-		RENAME_SEQ_SYNCHRONOUS: process(clk) 	
-		begin
-			if rising_edge(clk) then
-				-- Lock when exec part causes event
-				if execOrIntEventSignal = '1' then -- CAREFUL
-					renameLockState <= '1';	
-				elsif renameLockRelease = '1' then
-					renameLockState <= '0';
-				end if;					
-			end if;	
-		end process;
 			
 		-- Re-allow renaming when everything from rename/exec is committed - reg map will be well defined now
 		renameLockRelease <= '1' when commitGroupCtr = renameGroupCtr else '0';
@@ -444,15 +432,22 @@ begin
 
 		effectiveMask <= getEffectiveMask(stageDataToCommit);
 			
-		PIPE_SYNCHRONOUS: process(clk) 	
+		COMMON_SYNCHRONOUS: process(clk) 	
 		begin
 			if rising_edge(clk) then
 				renameCtr <= renameCtrNext;
 				commitCtr <= commitCtrNext;					
 				renameGroupCtr <= renameGroupCtrNext;
 				commitGroupCtr <= commitGroupCtrNext;
-			end if;
-		end process;	
+
+				-- Lock when exec part causes event
+				if execOrIntEventSignal = '1' then -- CAREFUL
+					renameLockState <= '1';	
+				elsif renameLockRelease = '1' then
+					renameLockState <= '0';
+				end if;					
+			end if;	
+		end process;		
 	end block;
 
 	sendingToCommit <= sendingFromROB;
