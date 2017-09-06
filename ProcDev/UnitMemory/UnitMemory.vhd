@@ -74,14 +74,14 @@ entity UnitMemory is
 			memLoadReady: in std_logic;
 			memLoadValue: in Mword;
 			memLoadAddress: out Mword;
-			memStoreAddress: out Mword;
+			--memStoreAddress: out Mword;
 			memLoadAllow: out std_logic;
-			memStoreAllow: out std_logic;
-			memStoreValue: out Mword;
+			--memStoreAllow: out std_logic;
+			--memStoreValue: out Mword;
 			
-			sysStoreAllow: out std_logic;
-			sysStoreAddress: out slv5;
-			sysStoreValue: out Mword;
+			--sysStoreAllow: out std_logic;
+			--sysStoreAddress: out slv5;
+			--sysStoreValue: out Mword;
 
 			sysLoadAllow: out std_logic;
 			sysLoadVal: in Mword;
@@ -90,10 +90,14 @@ entity UnitMemory is
 			groupCtrNext: in SmallNumber;
 			groupCtrInc: in SmallNumber;
 			
-			sbAccepting: out std_logic;
-			sbEmpty: out std_logic;
-			sbSendingOut: out std_logic;
-			dataFromSB: out InstructionState;
+			
+			sbAcceptingIn: in std_logic;
+			dataOutSQ: out StageDataMulti;
+			
+			--	sbAccepting: out std_logic;
+			--	sbEmpty: out std_logic;
+			--	sbSendingOut: out std_logic;
+			--	dataFromSB: out InstructionState;
 			
 		lateEventSignal: in std_logic;	
 		execOrIntEventSignalIn: in std_logic;
@@ -311,7 +315,7 @@ begin
 					dataOutV => dataOutSQV
 			);
 
-				-- NOTE: all ops committed in 1 cycle are from the same group, so they'll always fit into one
+
 					STORE_BUFFER: entity work.TestCQPart0(WriteBuffer)
 					generic map(
 						INPUT_WIDTH => PIPE_WIDTH,
@@ -433,24 +437,28 @@ begin
 				else stageDataAfterCache;
 
 				-- Mem interface
-				memStoreAddress <= sbDataOut(0).argValues.arg1;
-				memStoreValue <= sbDataOut(0).argValues.arg2;
+				--memStoreAddress <= sbDataOut(0).argValues.arg1;
+				--memStoreValue <= sbDataOut(0).argValues.arg2;
 		
 				memLoadAddress <= dataToLoadUnitSig.result; -- in LoadUnit
 		
 				memLoadAllow <= sendingToLoadUnitSig;
-				memStoreAllow <= sbSending when sbDataOut(0).operation = (Memory, store) else '0';
+				--memStoreAllow <= sbSending when sbDataOut(0).operation = (Memory, store) else '0';
 									
 					sysLoadAllow <= sendingToMfcSig;
 									
-				 sysStoreAllow <= sbSending when sbDataOut(0).operation = (System, sysMTC) 
-								 else '0'; 
-				 sysStoreAddress <= sbDataOut(0).argValues.arg1(4 downto 0);
-				 sysStoreValue <= sbDataOut(0).argValues.arg2;
+				 --sysStoreAllow <= sbSending when sbDataOut(0).operation = (System, sysMTC) 
+				--				 else '0'; 
+				 --sysStoreAddress <= sbDataOut(0).argValues.arg1(4 downto 0);
+				 --sysStoreValue <= sbDataOut(0).argValues.arg2;
 				 
-		sbAccepting <= sbAcceptingV(0);	
-			sbEmpty <= not sbFullMask(0);
-			sbSendingOut <= sbSending;
-			dataFromSB <= sbDataOut(0);
+				 
+				 
+			dataOutSQ <= dataOutSQV;	 
+				 
+		--sbAccepting <= sbAcceptingV(0);	
+		--	sbEmpty <= not sbFullMask(0);
+		--	sbSendingOut <= sbSending;
+		--	dataFromSB <= sbDataOut(0);
 end Behavioral;
 

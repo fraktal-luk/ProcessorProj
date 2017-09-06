@@ -24,7 +24,19 @@ architecture Behavioral5 of NewCore0 is
 	-- Sys reg interface	
 	signal sysRegReadSel: slv5 := (others => '0');
 	signal sysRegReadValue: Mword := (others => '0');
+
+		signal sysStoreAllow: std_logic := '0';
+		signal sysStoreAddress: slv5 := (others => '0'); 
+		signal sysStoreValue: Mword := (others => '0');
+
+		signal dataOutSQ: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
+
+		signal sbAcceptingV: std_logic_vector(0 to 3) := (others => '0');				
+		signal sbMaskOut: std_logic_vector(0 to 0) := (others => '0');
+		signal sbDataOut: InstructionStateArray(0 to 0) := (others => DEFAULT_INSTRUCTION_STATE);
 	
+		signal sbFullMask: std_logic_vector(0 to SB_SIZE-1) := (others => '0');
+
 	-- evt
 	signal execEventSignal, execOrIntEventSignal, lateEventSignal: std_logic := '0';					
 	-- This will take the value of operation that causes jump or exception
@@ -59,10 +71,6 @@ architecture Behavioral5 of NewCore0 is
 			
 		signal committedSending, renameLockEnd: std_logic := '0';
 		signal committedDataOut: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
-
-		signal sysStoreAllow: std_logic := '0';
-		signal sysStoreAddress: slv5 := (others => '0'); 
-		signal sysStoreValue: Mword := (others => '0');
 			
 	constant HAS_RESET: std_logic := '0';
 	constant HAS_EN: std_logic := '0';
@@ -464,26 +472,30 @@ begin
 					memLoadValue => memLoadValue,
 					
 					memLoadAddress => memLoadAddress,
-					memStoreAddress => memStoreAddress,
+					--memStoreAddress => open,--memStoreAddress,
 					memLoadAllow => memLoadAllow,
-					memStoreAllow => memStoreAllow,
-					memStoreValue => memStoreValue,
+					--memStoreAllow => open,--memStoreAllow,
+					--memStoreValue => open,--memStoreValue,
 
 							sysLoadAllow => open,
 								sysLoadVal => sysRegReadValue,
 
-						sysStoreAllow => sysStoreAllow,
-						sysStoreAddress => sysStoreAddress,
-						sysStoreValue => sysStoreValue,
+					--	sysStoreAllow => open,--sysStoreAllow,
+					--	sysStoreAddress => open,--sysStoreAddress,
+					--	sysStoreValue => open,--sysStoreValue,
 
 					committing => committingSig,
 					groupCtrNext => commitGroupCtrNextSig,				
 					groupCtrInc => commitGroupCtrIncSig,
 
-						sbAccepting => sbAccepting,
-							sbEmpty => sbEmpty,
-							sbSendingOut => sbSending,
-							dataFromSB => dataFromSB,
+
+							sbAcceptingIn => sbAccepting,
+							dataOutSQ => dataOutSQ,
+
+					--	sbAccepting => open,--sbAccepting,
+					--		sbEmpty => open,--sbEmpty,
+					--		sbSendingOut => open,--sbSending,
+					--		dataFromSB => open,--dataFromSB,
 											
 						lateEventSignal => lateEventSignal,	
 					execOrIntEventSignalIn => execEventSignal,
@@ -703,6 +715,46 @@ begin
 			end block;
 	
 	end block; -- OUTER_OOO
+
+
+					sbAccepting <= sbAcceptingV(0);
+
+					STORE_BUFFER: entity work.TestCQPart0(WriteBuffer)
+					generic map(
+						INPUT_WIDTH => PIPE_WIDTH,
+						QUEUE_SIZE => SB_SIZE,
+						OUTPUT_SIZE => 1
+					)
+					port map(
+						clk => clk, reset => reset, en => en,
+						
+						whichAcceptedCQ => sbAcceptingV,
+						maskIn => dataOutSQ.fullMask,
+						dataIn => dataOutSQ.data,
+						
+						bufferMaskOut => sbFullMask,
+						bufferDataOut => open,
+						
+						anySending => sbSending,
+						cqMaskOut => sbMaskOut,
+						cqDataOut => sbDataOut,
+						
+						execEventSignal => '0',
+						execCausing => DEFAULT_INSTRUCTION_STATE
+					);
+
+				sbEmpty <= not sbFullMask(0);
+				dataFromSB <= sbDataOut(0);
+
+				memStoreAddress <= sbDataOut(0).argValues.arg1;
+				memStoreValue <= sbDataOut(0).argValues.arg2;
+				memStoreAllow <= sbSending when sbDataOut(0).operation = (Memory, store) else '0';
+				
+				sysStoreAllow <= sbSending when sbDataOut(0).operation = (System, sysMTC) 
+							 else '0'; 
+				sysStoreAddress <= sbDataOut(0).argValues.arg1(4 downto 0);
+				sysStoreValue <= sbDataOut(0).argValues.arg2;				
+
 
 	dadr <= memLoadAddress;
 	doutadr <= memStoreAddress;
