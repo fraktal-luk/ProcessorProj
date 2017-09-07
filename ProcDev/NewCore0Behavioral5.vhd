@@ -15,34 +15,35 @@ architecture Behavioral5 of NewCore0 is
 	signal frontLastSending, renameAccepting: std_logic := '0';
 
 ---------------------------------
-	signal renamedDataLiving: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;				
-	signal renamedSending, iqAccepts: std_logic := '0';
+	signal renamedDataLiving: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;	-- INPUT			
+	signal renamedSending, -- INPUT
+				iqAccepts: std_logic := '0'; -- OUTPUT
 
 	-- Sys reg interface	
-	signal sysRegReadSel: slv5 := (others => '0');   -- Doesn't need to be a port of OOO part
-	signal sysRegReadValue: Mword := (others => '0');
+	signal sysRegReadSel: slv5 := (others => '0'); -- OUTPUT  -- Doesn't need to be a port of OOO part
+	signal sysRegReadValue: Mword := (others => '0'); -- INPUT
 
 	-- Mem interface
-	signal memLoadAddress, memLoadValue: Mword := (others => '0');
-	signal memLoadAllow, memLoadReady: std_logic := '0';
+	signal memLoadAddress, memLoadValue: Mword := (others => '0');  -- OUTPUT, INPUT
+	signal memLoadAllow, memLoadReady: std_logic := '0';  -- OUTPUT, INPUT
 
 	-- evt
-	signal execEventSignal, lateEventSignal: std_logic := '0';					
-	signal execCausing: InstructionState := defaultInstructionState;
+	signal execEventSignal, lateEventSignal: std_logic := '0';	-- OUTPUT/SIG, INPUT 	
+	signal execCausing: InstructionState := defaultInstructionState; -- OUTPUT/SIG
 
 	-- Hidden to some degree, but may be useful for sth
-	signal commitGroupCtrSig, commitGroupCtrNextSig: SmallNumber := (others => '0');
-	signal commitGroupCtrIncSig: SmallNumber := (others => '0');
+	signal commitGroupCtrSig, commitGroupCtrNextSig: SmallNumber := (others => '0'); -- INPUT
+	signal commitGroupCtrIncSig: SmallNumber := (others => '0');	-- INPUT
 												
 	-- ROB interface	
-	signal robSending: std_logic := '0';		
-	signal dataOutROB: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;					
+	signal robSending: std_logic := '0';		-- OUTPUT
+	signal dataOutROB: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;		-- OUTPUT
 
-		signal sbAccepting: std_logic := '0';
-		signal commitAccepting: std_logic := '0';
+		signal sbAccepting: std_logic := '0';	-- INPUT
+		signal commitAccepting: std_logic := '0'; -- INPUT
 
-		signal dataOutBQV: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
-		signal dataOutSQ: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;		
+		signal dataOutBQV: StageDataMulti := DEFAULT_STAGE_DATA_MULTI; -- OUTPUT
+		signal dataOutSQ: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;	-- OUTPUT
 -------------------------------------------------------
 
 	signal execOrIntCausing: InstructionState := defaultInstructionState;
@@ -170,6 +171,48 @@ begin
 
 	--------------------------------
 	--- Out of order domain
+	
+	OOO_BOX: entity work.OutOfOrderBox(Behavioral)
+	port map(
+           clk => clk, reset => resetSig, en => enSig,
+			  
+			  renamedDataLiving => renamedDataLiving,--: in StageDataMulti;	-- INPUT			
+			  renamedSending => renamedSending,--: in std_logic;
+			  
+			  iqAccepts => open,--: out std_logic; -- OUTPUT
+
+	-- Sys reg interface	
+			  sysRegReadSel => open,--: out slv5; -- OUTPUT  -- Doesn't need to be a port of OOO part
+			  sysRegReadValue => sysRegReadValue,--: in Mword; -- INPUT
+
+	-- Mem interface
+	        memLoadAddress => open,--: out Mword;
+			  memLoadValue => memLoadValue,--: in Mword;
+			  memLoadAllow => open,--: out std_logic;
+			  memLoadReady => memLoadReady,--: in std_logic;
+
+	-- evt
+			 execEventSignalOut => open,--: out std_logic; -- OUTPUT/SIG
+			 lateEventSignal => lateEventSignal,--: in std_logic;
+			 execCausingOut => open,--: out InstructionState;
+
+	-- Hidden to some degree, but may be useful for sth
+			commitGroupCtrSig => commitGroupCtrSig,--: in SmallNumber;
+			commitGroupCtrNextSig => commitGroupCtrNextSig,--: in SmallNumber; -- INPUT
+		   commitGroupCtrIncSig => commitGroupCtrIncSig,--: in SmallNumber;	-- INPUT
+												
+	-- ROB interface	
+			robSending => open,--: out std_logic;		-- OUTPUT
+			dataOutROB => open,--: out StageDataMulti;		-- OUTPUT
+
+			sbAccepting => sbAccepting,--: in std_logic;	-- INPUT
+			commitAccepting => commitAccepting,--: in std_logic; -- INPUT
+
+			dataOutBQV => open,--: out StageDataMulti; -- OUTPUT
+			dataOutSQ => open --: out StageDataMulti -- OUTPUT		
+	);
+	
+	
 	
 	OUTER_OOO_AREA: block
 		signal dataToA, dataToB, dataToC, dataToD, dataToE: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;						
