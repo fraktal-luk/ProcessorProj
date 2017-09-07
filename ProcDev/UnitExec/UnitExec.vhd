@@ -66,7 +66,7 @@ entity UnitExec is
 		execAcceptingD: out std_logic;
 			
 			acceptingNewBQ: out std_logic;
-			sendingOutBQ: out std_logic;
+			--sendingOutBQ: out std_logic;
 				dataOutBQV: out StageDataMulti;
 			prevSendingToBQ: in std_logic;
 			dataNewToBQ: in StageDataMulti;
@@ -248,7 +248,7 @@ begin
 				
 				nextAccepting => '1',
 				
-				sendingSQOut => sendingOutBQ, -- OUTPUT
+				sendingSQOut => open,--sendingOutBQ, -- OUTPUT
 					dataOutV => dataOutBQV
 			);
 			

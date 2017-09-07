@@ -92,7 +92,7 @@ entity UnitSequencer is
 		robDataLiving: in StageDataMulti;
 		sendingFromROB: in std_logic;
 		
-			sendingFromBQ: in std_logic;
+		--	sendingFromBQ: in std_logic;
 				dataFromBQV: in StageDataMulti;
 		
 				dataFromSB: in InstructionState;

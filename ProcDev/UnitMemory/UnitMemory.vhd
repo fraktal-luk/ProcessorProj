@@ -316,29 +316,29 @@ begin
 			);
 
 
-					STORE_BUFFER: entity work.TestCQPart0(WriteBuffer)
-					generic map(
-						INPUT_WIDTH => PIPE_WIDTH,
-						QUEUE_SIZE => SB_SIZE,
-						OUTPUT_SIZE => 1
-					)
-					port map(
-						clk => clk, reset => reset, en => en,
-						
-						whichAcceptedCQ => sbAcceptingV,
-						maskIn => dataOutSQV.fullMask,
-						dataIn => dataOutSQV.data,
-						
-						bufferMaskOut => sbFullMask,
-						bufferDataOut => open,
-						
-						anySending => sbSending,
-						cqMaskOut => sbMaskOut,
-						cqDataOut => sbDataOut,
-						
-						execEventSignal => '0',
-						execCausing => DEFAULT_INSTRUCTION_STATE
-					);
+--					STORE_BUFFER: entity work.TestCQPart0(WriteBuffer)
+--					generic map(
+--						INPUT_WIDTH => PIPE_WIDTH,
+--						QUEUE_SIZE => SB_SIZE,
+--						OUTPUT_SIZE => 1
+--					)
+--					port map(
+--						clk => clk, reset => reset, en => en,
+--						
+--						whichAcceptedCQ => sbAcceptingV,
+--						maskIn => dataOutSQV.fullMask,
+--						dataIn => dataOutSQV.data,
+--						
+--						bufferMaskOut => sbFullMask,
+--						bufferDataOut => open,
+--						
+--						anySending => sbSending,
+--						cqMaskOut => sbMaskOut,
+--						cqDataOut => sbDataOut,
+--						
+--						execEventSignal => '0',
+--						execCausing => DEFAULT_INSTRUCTION_STATE
+--					);
 
 			MEM_LOAD_QUEUE: entity work.MemoryUnit(Behavioral)
 			generic map(

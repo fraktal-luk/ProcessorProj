@@ -14,33 +14,21 @@ architecture Behavioral5 of NewCore0 is
 	signal frontDataLastLiving: StageDataMulti;
 	signal frontLastSending, renameAccepting: std_logic := '0';
 
-	signal renamedDataLiving, stageDataCommittedOut: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;				
+---------------------------------
+	signal renamedDataLiving: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;				
 	signal renamedSending, iqAccepts: std_logic := '0';
 
-	-- Mem interface
-	signal memLoadAddress, memStoreAddress, memLoadValue, memStoreValue: Mword := (others => '0');
-	signal memStoreAllow, memLoadAllow, memLoadReady: std_logic := '0';
-		
 	-- Sys reg interface	
 	signal sysRegReadSel: slv5 := (others => '0');
 	signal sysRegReadValue: Mword := (others => '0');
 
-		signal sysStoreAllow: std_logic := '0';
-		signal sysStoreAddress: slv5 := (others => '0'); 
-		signal sysStoreValue: Mword := (others => '0');
-
-		signal dataOutSQ: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
-
-		signal sbAcceptingV: std_logic_vector(0 to 3) := (others => '0');				
-		signal sbMaskOut: std_logic_vector(0 to 0) := (others => '0');
-		signal sbDataOut: InstructionStateArray(0 to 0) := (others => DEFAULT_INSTRUCTION_STATE);
-	
-		signal sbFullMask: std_logic_vector(0 to SB_SIZE-1) := (others => '0');
+	-- Mem interface
+	signal memLoadAddress, memLoadValue: Mword := (others => '0');
+	signal memLoadAllow, memLoadReady: std_logic := '0';
 
 	-- evt
-	signal execEventSignal, execOrIntEventSignal, lateEventSignal: std_logic := '0';					
-	-- This will take the value of operation that causes jump or exception
-	signal execCausing, execOrIntCausing: InstructionState := defaultInstructionState;																		
+	signal execEventSignal, lateEventSignal: std_logic := '0';					
+	signal execCausing: InstructionState := defaultInstructionState;
 
 	-- Hidden to some degree, but may be useful for sth
 	signal renameCtrSig, renameCtrNextSig, commitCtrSig, commitCtrNextSig: SmallNumber := (others=>'0');
@@ -51,26 +39,39 @@ architecture Behavioral5 of NewCore0 is
 	signal robSending, robAccepting: std_logic := '0';
 	signal dataOutROB: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;					
 
-		signal sbAccepting, sbEmpty, sbSending: std_logic := '0';
-			signal dataFromSB: InstructionState := DEFAULT_INSTRUCTION_STATE;
-			
+		signal sbAccepting: std_logic := '0';
+		
 		signal commitAccepting: std_logic := '0';
 		signal committingSig: std_logic := '0';
 
-		signal acceptingNewSQ, acceptingNewLQ, acceptingNewBQ: std_logic := '0';
-		signal sendingQueueE: std_logic := '0';
+		--	signal sendingFromBQ: std_logic := '0';		
+		signal dataOutBQV: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
+		signal dataOutSQ: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;		
+-------------------------------------------------------
 
-			signal sendingFromBQ: std_logic := '0';
-			signal dataOutBQV: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
+	signal execOrIntCausing: InstructionState := defaultInstructionState;
+	signal execOrIntEventSignal: std_logic := '0';
 
-	
-				
 		signal newPhysDests: PhysNameArray(0 to PIPE_WIDTH-1) := (others => (others => '0'));
 		signal newPhysDestPointer: SmallNumber := (others => '0');
 		signal newPhysSources: PhysNameArray(0 to 3*PIPE_WIDTH-1) := (others => (others => '0'));
 			
 		signal committedSending, renameLockEnd: std_logic := '0';
 		signal committedDataOut: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
+
+			signal sbEmpty, sbSending: std_logic := '0';
+			signal dataFromSB: InstructionState := DEFAULT_INSTRUCTION_STATE;
+			signal sbAcceptingV: std_logic_vector(0 to 3) := (others => '0');				
+			signal sbMaskOut: std_logic_vector(0 to 0) := (others => '0');
+			signal sbDataOut: InstructionStateArray(0 to 0) := (others => DEFAULT_INSTRUCTION_STATE);	
+			signal sbFullMask: std_logic_vector(0 to SB_SIZE-1) := (others => '0');
+
+		signal sysStoreAllow: std_logic := '0';
+		signal sysStoreAddress: slv5 := (others => '0'); 
+		signal sysStoreValue: Mword := (others => '0');
+		
+		signal memStoreAddress, memStoreValue: Mword := (others => '0');
+		signal memStoreAllow: std_logic := '0';
 			
 	constant HAS_RESET: std_logic := '0';
 	constant HAS_EN: std_logic := '0';
@@ -130,7 +131,7 @@ begin
 		committing => committingSig,
 
 		---
-		sendingFromBQ => sendingFromBQ,
+		--sendingFromBQ => sendingFromBQ,
 		dataFromBQV => dataOutBQV,
 
 		sbSending => sbSending,
@@ -176,7 +177,9 @@ begin
 		signal acceptingVecA, acceptingVecB, acceptingVecC, acceptingVecD, acceptingVecE:
 					std_logic_vector(0 to PIPE_WIDTH-1) := (others => '0');
 		signal compactedToSQ, compactedToLQ, compactedToBQ: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
-		
+
+		signal acceptingNewSQ, acceptingNewLQ, acceptingNewBQ: std_logic := '0';
+	
 			-- writtenTags indicate registers written to GPR file in last cycle, so they can be read from there
 			--		rather than from forw. network, but readyRegFlags are not available in the 1st cycle after WB.
 			signal writtenTags: PhysNameArray(0 to PIPE_WIDTH-1) := (others => (others => '0'));
@@ -423,7 +426,7 @@ begin
 				whichAcceptedCQ => whichAcceptedCQ,
 				
 				acceptingNewBQ => acceptingNewBQ,
-				sendingOutBQ => sendingFromBQ,
+				--sendingOutBQ => sendingFromBQ,
 					dataOutBQV => dataOutBQV,
 				prevSendingToBQ => renamedSending,
 				dataNewToBQ => compactedToBQ,
@@ -467,22 +470,15 @@ begin
 					outputOpPreC => outputOpPreC,
 
 					whichAcceptedCQ => whichAcceptedCQ,
+					
+					memLoadAddress => memLoadAddress,
+					memLoadAllow => memLoadAllow,
 
 					memLoadReady => memLoadReady,
 					memLoadValue => memLoadValue,
-					
-					memLoadAddress => memLoadAddress,
-					--memStoreAddress => open,--memStoreAddress,
-					memLoadAllow => memLoadAllow,
-					--memStoreAllow => open,--memStoreAllow,
-					--memStoreValue => open,--memStoreValue,
 
-							sysLoadAllow => open,
-								sysLoadVal => sysRegReadValue,
-
-					--	sysStoreAllow => open,--sysStoreAllow,
-					--	sysStoreAddress => open,--sysStoreAddress,
-					--	sysStoreValue => open,--sysStoreValue,
+						sysLoadAllow => open,
+						sysLoadVal => sysRegReadValue,
 
 					committing => committingSig,
 					groupCtrNext => commitGroupCtrNextSig,				
@@ -491,11 +487,6 @@ begin
 
 							sbAcceptingIn => sbAccepting,
 							dataOutSQ => dataOutSQ,
-
-					--	sbAccepting => open,--sbAccepting,
-					--		sbEmpty => open,--sbEmpty,
-					--		sbSendingOut => open,--sbSending,
-					--		dataFromSB => open,--dataFromSB,
 											
 						lateEventSignal => lateEventSignal,	
 					execOrIntEventSignalIn => execEventSignal,
