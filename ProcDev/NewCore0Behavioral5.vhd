@@ -19,7 +19,7 @@ architecture Behavioral5 of NewCore0 is
 	signal renamedSending, iqAccepts: std_logic := '0';
 
 	-- Sys reg interface	
-	signal sysRegReadSel: slv5 := (others => '0');
+	signal sysRegReadSel: slv5 := (others => '0');   -- Doesn't need to be a port of OOO part
 	signal sysRegReadValue: Mword := (others => '0');
 
 	-- Mem interface
@@ -31,20 +31,16 @@ architecture Behavioral5 of NewCore0 is
 	signal execCausing: InstructionState := defaultInstructionState;
 
 	-- Hidden to some degree, but may be useful for sth
-	signal renameCtrSig, renameCtrNextSig, commitCtrSig, commitCtrNextSig: SmallNumber := (others=>'0');
 	signal commitGroupCtrSig, commitGroupCtrNextSig: SmallNumber := (others => '0');
 	signal commitGroupCtrIncSig: SmallNumber := (others => '0');
 												
 	-- ROB interface	
-	signal robSending, robAccepting: std_logic := '0';
+	signal robSending: std_logic := '0';		
 	signal dataOutROB: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;					
 
 		signal sbAccepting: std_logic := '0';
-		
 		signal commitAccepting: std_logic := '0';
-		signal committingSig: std_logic := '0';
 
-		--	signal sendingFromBQ: std_logic := '0';		
 		signal dataOutBQV: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
 		signal dataOutSQ: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;		
 -------------------------------------------------------
@@ -55,6 +51,9 @@ architecture Behavioral5 of NewCore0 is
 		signal newPhysDests: PhysNameArray(0 to PIPE_WIDTH-1) := (others => (others => '0'));
 		signal newPhysDestPointer: SmallNumber := (others => '0');
 		signal newPhysSources: PhysNameArray(0 to 3*PIPE_WIDTH-1) := (others => (others => '0'));
+
+
+		signal committingSig: std_logic := '0';	-- !! Just a copy of robSending
 			
 		signal committedSending, renameLockEnd: std_logic := '0';
 		signal committedDataOut: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
@@ -179,6 +178,7 @@ begin
 		signal compactedToSQ, compactedToLQ, compactedToBQ: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
 
 		signal acceptingNewSQ, acceptingNewLQ, acceptingNewBQ: std_logic := '0';
+		signal robAccepting: std_logic := '0';
 	
 			-- writtenTags indicate registers written to GPR file in last cycle, so they can be read from there
 			--		rather than from forw. network, but readyRegFlags are not available in the 1st cycle after WB.
@@ -431,7 +431,7 @@ begin
 				prevSendingToBQ => renamedSending,
 				dataNewToBQ => compactedToBQ,
 					
-				committing => committingSig,
+				committing => robSending,
 					
 				groupCtrNext => commitGroupCtrNextSig,
 				groupCtrInc => commitGroupCtrIncSig,
@@ -480,7 +480,7 @@ begin
 						sysLoadAllow => open,
 						sysLoadVal => sysRegReadValue,
 
-					committing => committingSig,
+					committing => robSending,
 					groupCtrNext => commitGroupCtrNextSig,				
 					groupCtrInc => commitGroupCtrIncSig,
 
