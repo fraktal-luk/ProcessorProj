@@ -47,6 +47,7 @@ use work.ProcComponents.all;
 
 
 entity SubunitDispatch is
+	generic(USE_IMM: boolean := true);
 	port(
 		clk: in std_logic;
 		reset: in std_logic;
@@ -79,7 +80,7 @@ architecture Alternative of SubunitDispatch is
 	signal writtenTags: PhysNameArray(0 to PIPE_WIDTH-1) := (others => (others => '0'));
 begin
 
-	inputDataWithArgs <= getDispatchArgValues(stageDataIn, resultVals);
+	inputDataWithArgs <= getDispatchArgValues(stageDataIn, resultVals,USE_IMM);
 	stageDataM.fullMask(0) <= prevSending;
 	stageDataM.data(0) <= inputDataWithArgs;
 	
