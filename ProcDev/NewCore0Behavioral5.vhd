@@ -171,120 +171,72 @@ begin
 
 	--------------------------------
 	--- Out of order domain
-	
-	OOO_BOX: entity work.OutOfOrderBox(Behavioral)
-	port map(
-           clk => clk, reset => resetSig, en => enSig,
-			  
-			  renamedDataLiving => renamedDataLiving,--: in StageDataMulti;	-- INPUT			
-			  renamedSending => renamedSending,--: in std_logic;
-			  
-			  iqAccepts => open,--: out std_logic; -- OUTPUT
-
-	-- Sys reg interface	
-			  sysRegReadSel => open,--: out slv5; -- OUTPUT  -- Doesn't need to be a port of OOO part
-			  sysRegReadValue => sysRegReadValue,--: in Mword; -- INPUT
-
-	-- Mem interface
-	        memLoadAddress => open,--: out Mword;
-			  memLoadValue => memLoadValue,--: in Mword;
-			  memLoadAllow => open,--: out std_logic;
-			  memLoadReady => memLoadReady,--: in std_logic;
-
-	-- evt
-			 execEventSignalOut => open,--: out std_logic; -- OUTPUT/SIG
-			 lateEventSignal => lateEventSignal,--: in std_logic;
-			 execCausingOut => open,--: out InstructionState;
-
-	-- Hidden to some degree, but may be useful for sth
-			commitGroupCtrSig => commitGroupCtrSig,--: in SmallNumber;
-			commitGroupCtrNextSig => commitGroupCtrNextSig,--: in SmallNumber; -- INPUT
-		   commitGroupCtrIncSig => commitGroupCtrIncSig,--: in SmallNumber;	-- INPUT
-												
-	-- ROB interface	
-			robSending => open,--: out std_logic;		-- OUTPUT
-			dataOutROB => open,--: out StageDataMulti;		-- OUTPUT
-
-			sbAccepting => sbAccepting,--: in std_logic;	-- INPUT
-			commitAccepting => commitAccepting,--: in std_logic; -- INPUT
-
-			dataOutBQV => open,--: out StageDataMulti; -- OUTPUT
-			dataOutSQ => open --: out StageDataMulti -- OUTPUT		
-	);
-	
-	
+		
 	
 	OUTER_OOO_AREA: block
-		signal dataToA, dataToB, dataToC, dataToD, dataToE: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;						
-		signal acceptingVecA, acceptingVecB, acceptingVecC, acceptingVecD, acceptingVecE:
-					std_logic_vector(0 to PIPE_WIDTH-1) := (others => '0');
-		signal compactedToSQ, compactedToLQ, compactedToBQ: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
-
-		signal acceptingNewSQ, acceptingNewLQ, acceptingNewBQ: std_logic := '0';
-		signal robAccepting: std_logic := '0';
-	
-			-- writtenTags indicate registers written to GPR file in last cycle, so they can be read from there
-			--		rather than from forw. network, but readyRegFlags are not available in the 1st cycle after WB.
-			signal writtenTags: PhysNameArray(0 to PIPE_WIDTH-1) := (others => (others => '0'));
-
-			signal readyRegFlags: std_logic_vector(0 to 3*PIPE_WIDTH-1) := (others => '0');		
---			signal readyRegFlags_2: std_logic_vector(0 to 3*PIPE_WIDTH-1) := (others => '0');
-			signal readyRegFlagsNext: std_logic_vector(0 to 3*PIPE_WIDTH-1) := (others => '0');
-
-			signal outputA, outputB, outputC, outputD, outputE: InstructionSlot := DEFAULT_INSTRUCTION_SLOT;
-			signal outputOpPreB, outputOpPreC: InstructionState := DEFAULT_INSTRUCTION_STATE;
-
-			signal execEnds, execEnds2: InstructionStateArray(0 to 3) := (others => DEFAULT_INSTRUCTION_STATE);
-			signal execPreEnds: InstructionStateArray(0 to 3) := (others => DEFAULT_INSTRUCTION_STATE);
-			signal execSending, execSending2: std_logic_vector(0 to 3) := (others => '0');
-		
-			-- back end interfaces
-			signal whichAcceptedCQ: std_logic_vector(0 to 3) := (others=>'0');	
-			signal anySendingFromCQ: std_logic := '0';
-	
-			signal cqBufferMask: std_logic_vector(0 to CQ_SIZE-1) := (others => '0');
-			signal cqBufferData: InstructionStateArray(0 to CQ_SIZE-1) := (others => DEFAULT_INSTRUCTION_STATE);
-			signal cqDataLivingOut: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
-
 			signal cqMaskOut: std_logic_vector(0 to INTEGER_WRITE_WIDTH-1) := (others => '0');
 			signal cqDataOut: InstructionStateArray(0 to INTEGER_WRITE_WIDTH-1)
-					:= (others => DEFAULT_INSTRUCTION_STATE);		
+					:= (others => DEFAULT_INSTRUCTION_STATE);
+			signal readyRegFlags: std_logic_vector(0 to 3*PIPE_WIDTH-1) := (others => '0');		
+			signal readyRegFlagsNext: std_logic_vector(0 to 3*PIPE_WIDTH-1) := (others => '0');					
 	begin
 
-	
-		ISSUE_ROUTING: entity work.SubunitIssueRouting(Behavioral)
+		OOO_BOX: entity work.OutOfOrderBox(Behavioral)
 		port map(
-			renamedDataLiving => renamedDataLiving,
+				  clk => clk, reset => resetSig, en => enSig,
+				  
+				  renamedDataLiving => renamedDataLiving,--: in StageDataMulti;	-- INPUT			
+				  renamedSending => renamedSending,--: in std_logic;
+				  
+				  iqAccepts => open,--: out std_logic; -- OUTPUT
 
-			acceptingVecA => acceptingVecA,
-			acceptingVecB => acceptingVecB,
-			acceptingVecC => acceptingVecC,
-			acceptingVecD => acceptingVecD,
-			acceptingVecE => acceptingVecE,
+		-- Sys reg interface	
+				  sysRegReadSel => open,--: out slv5; -- OUTPUT  -- Doesn't need to be a port of OOO part
+				  sysRegReadValue => sysRegReadValue,--: in Mword; -- INPUT
 
-			acceptingROB => robAccepting,
-			acceptingSQ => acceptingNewSQ,
-			acceptingLQ => acceptingNewLQ,
-			acceptingBQ => acceptingNewBQ,
+		-- Mem interface
+				  memLoadAddressOut => open,--: out Mword;
+				  memLoadValue => memLoadValue,--: in Mword;
+				  memLoadAllow => open,--: out std_logic;
+				  memLoadReady => memLoadReady,--: in std_logic;
 
-			renamedSendingIn => renamedSending,
-			
-			renamedSendingOut => open, -- DEPREC??
-			iqAccepts => iqAccepts,		
-			
-			dataOutA => dataToA,
-			dataOutB => dataToB,
-			dataOutC => dataToC,
-			dataOutD => dataToD,
-			dataOutE => dataToE,
-			
-			dataOutSQ => compactedToSQ,
-			dataOutLQ => compactedToLQ,
-			dataOutBQ => compactedToBQ
+		-- evt
+				 execEventSignalOut => open,--: out std_logic; -- OUTPUT/SIG
+				 lateEventSignal => lateEventSignal,--: in std_logic;
+				 execCausingOut => open,--: out InstructionState;
+
+		-- Hidden to some degree, but may be useful for sth
+				commitGroupCtrSig => commitGroupCtrSig,--: in SmallNumber;
+				commitGroupCtrNextSig => commitGroupCtrNextSig,--: in SmallNumber; -- INPUT
+				commitGroupCtrIncSig => commitGroupCtrIncSig,--: in SmallNumber;	-- INPUT
+													
+		-- ROB interface	
+				robSendingOut => open,--: out std_logic;		-- OUTPUT
+				dataOutROB => open,--: out StageDataMulti;		-- OUTPUT
+
+				sbAccepting => sbAccepting,--: in std_logic;	-- INPUT
+				commitAccepting => commitAccepting,--: in std_logic; -- INPUT
+
+				dataOutBQV => open,--: out StageDataMulti; -- OUTPUT
+				dataOutSQ => open, --: out StageDataMulti -- OUTPUT		
+				
+				readyRegFlags => readyRegFlags,
+				
+				cqMaskOut => open,
+				cqDataOut => open			
 		);
 
-	
+
 		INNER_OOO_AREA: block
+			signal dataToA, dataToB, dataToC, dataToD, dataToE: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;						
+			signal acceptingVecA, acceptingVecB, acceptingVecC, acceptingVecD, acceptingVecE:
+						std_logic_vector(0 to PIPE_WIDTH-1) := (others => '0');
+			signal compactedToSQ, compactedToLQ, compactedToBQ: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
+
+			signal acceptingNewSQ, acceptingNewLQ, acceptingNewBQ: std_logic := '0';
+			signal robAccepting: std_logic := '0';
+				
+		
 			signal dataOutIQA, dataOutIQB, dataOutIQC, dataOutIQD, dataOutIQE: InstructionState
 																			:= defaultInstructionState;	
 			signal sendingSchedA, sendingSchedB, sendingSchedC, sendingSchedD, sendingSchedE,
@@ -302,8 +254,63 @@ begin
 			signal rfSelectWrite: PhysNameArray(0 to 3) := (others => (others => '0'));
 			signal rfWriteValues: MwordArray(0 to 3) := (others => (others => '0'));
 	
-			signal stageDataAfterCQ: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;			
+			signal stageDataAfterCQ: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
+
+
+			-- writtenTags indicate registers written to GPR file in last cycle, so they can be read from there
+			--		rather than from forw. network, but readyRegFlags are not available in the 1st cycle after WB.
+			signal writtenTags: PhysNameArray(0 to PIPE_WIDTH-1) := (others => (others => '0'));
+
+			signal outputA, outputB, outputC, outputD, outputE: InstructionSlot := DEFAULT_INSTRUCTION_SLOT;
+			signal outputOpPreB, outputOpPreC: InstructionState := DEFAULT_INSTRUCTION_STATE;
+
+			signal execEnds, execEnds2: InstructionStateArray(0 to 3) := (others => DEFAULT_INSTRUCTION_STATE);
+			signal execPreEnds: InstructionStateArray(0 to 3) := (others => DEFAULT_INSTRUCTION_STATE);
+			signal execSending, execSending2: std_logic_vector(0 to 3) := (others => '0');
+		
+			-- back end interfaces
+			signal whichAcceptedCQ: std_logic_vector(0 to 3) := (others=>'0');	
+			signal anySendingFromCQ: std_logic := '0';
+	
+			signal cqBufferMask: std_logic_vector(0 to CQ_SIZE-1) := (others => '0');
+			signal cqBufferData: InstructionStateArray(0 to CQ_SIZE-1) := (others => DEFAULT_INSTRUCTION_STATE);
+			signal cqDataLivingOut: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
+				
 		begin
+			
+			ISSUE_ROUTING: entity work.SubunitIssueRouting(Behavioral)
+			port map(
+				renamedDataLiving => renamedDataLiving,
+
+				acceptingVecA => acceptingVecA,
+				acceptingVecB => acceptingVecB,
+				acceptingVecC => acceptingVecC,
+				acceptingVecD => acceptingVecD,
+				acceptingVecE => acceptingVecE,
+
+				acceptingROB => robAccepting,
+				acceptingSQ => acceptingNewSQ,
+				acceptingLQ => acceptingNewLQ,
+				acceptingBQ => acceptingNewBQ,
+
+				renamedSendingIn => renamedSending,
+				
+				renamedSendingOut => open, -- DEPREC??
+				iqAccepts => iqAccepts,		
+				
+				dataOutA => dataToA,
+				dataOutB => dataToB,
+				dataOutC => dataToC,
+				dataOutD => dataToD,
+				dataOutE => dataToE,
+				
+				dataOutSQ => compactedToSQ,
+				dataOutLQ => compactedToLQ,
+				dataOutBQ => compactedToBQ
+			);
+
+					
+		
 			IQ_A: entity work.UnitIQ
 			generic map(
 				IQ_SIZE => IQ_A_SIZE
@@ -629,7 +636,35 @@ begin
 					readValues(9 to 11) => regValsD			
 				);
 				------------------------------
+		--end block;
+
+			REORDER_BUFFER: entity work.ReorderBuffer(Implem)
+			port map(
+				clk => clk, reset => resetSig, en => enSig,
+				
+				lateEventSignal => lateEventSignal,
+				execEventSignal => execEventSignal,
+				execCausing => execCausing,
+				
+				commitGroupCtr => commitGroupCtrSig,
+				commitGroupCtrNext => commitGroupCtrNextSig,
+					
+				execEnds => execEnds,
+				execReady => execSending,
+				
+				execEnds2 => execEnds2,
+				execReady2 => execSending2,
+				
+				inputData => renamedDataLiving,
+				prevSending => renamedSending,
+				acceptingOut => robAccepting,
+				
+					nextAccepting => commitAccepting and sbAccepting,
+				sendingOut => robSending, 
+				outputData => dataOutROB		
+			);
 		end block;
+
 
 				INT_READY_TABLE: entity work.ReadyRegisterTable(Behavioral)
 				generic map(
@@ -655,32 +690,6 @@ begin
 						readyRegFlags <= readyRegFlagsNext;
 					end if;
 				end process;
-
-		REORDER_BUFFER: entity work.ReorderBuffer(Implem)
-		port map(
-			clk => clk, reset => resetSig, en => enSig,
-			
-			lateEventSignal => lateEventSignal,
-			execEventSignal => execEventSignal,
-			execCausing => execCausing,
-			
-			commitGroupCtr => commitGroupCtrSig,
-			commitGroupCtrNext => commitGroupCtrNextSig,
-				
-			execEnds => execEnds,
-			execReady => execSending,
-			
-			execEnds2 => execEnds2,
-			execReady2 => execSending2,
-			
-			inputData => renamedDataLiving,
-			prevSending => renamedSending,
-			acceptingOut => robAccepting,
-			
-				nextAccepting => commitAccepting and sbAccepting,
-			sendingOut => robSending, 
-			outputData => dataOutROB		
-		);
 
 			
 		INT_REG_MAPPING: block
