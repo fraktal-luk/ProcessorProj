@@ -223,16 +223,16 @@ architecture Behavioral of OutOfOrderBox is
 				fni => fni,
 				
 				readyRegFlags => readyRegFlags,
-				regsForDispatch => open,--regsSelA,
-				regValues => regValsA,
+--				regsForDispatch => open,--regsSelA,
+--				regValues => regValsA,
 					
 					issueAccepting => issueAcceptingA, --
 					queueSendingOut => queueSendingA,
 					queueDataOut => queueDataA,
 					
-				nextAccepting => execAcceptingA,			
-				dataOutIQ => open,--dataOutIQA,
-				sendingOut => open,--sendingSchedA,
+--				nextAccepting => execAcceptingA,			
+--				dataOutIQ => open,--dataOutIQA,
+--				sendingOut => open,--sendingSchedA,
 					
 				execCausing => execCausing,
 					lateEventSignal => lateEventSignal,
@@ -274,16 +274,16 @@ architecture Behavioral of OutOfOrderBox is
 				fni => fni,	
 						
 				readyRegFlags => readyRegFlags,		
-				regsForDispatch => open,--regsSelB,
-				regValues => regValsB,
+--				regsForDispatch => open,--regsSelB,
+--				regValues => regValsB,
 
 					issueAccepting => issueAcceptingB,
 					queueSendingOut => queueSendingB,
 					queueDataOut => queueDataB,
 					
-				nextAccepting => execAcceptingB,	
-				dataOutIQ => open,--dataOutIQB,
-				sendingOut => open,--sendingSchedB,		
+--				nextAccepting => execAcceptingB,	
+--				dataOutIQ => open,--dataOutIQB,
+--				sendingOut => open,--sendingSchedB,		
 				
 				execCausing => execCausing,
 					lateEventSignal => lateEventSignal,
@@ -324,17 +324,17 @@ architecture Behavioral of OutOfOrderBox is
 				fni => fni,
 						
 				readyRegFlags => readyRegFlags,
-				regsForDispatch => open,--regsSelC,
-				regValues => regValsC,
+--				regsForDispatch => open,--regsSelC,
+--				regValues => regValsC,
 
 					issueAccepting => issueAcceptingC,
 					queueSendingOut => queueSendingC,
 					queueDataOut => queueDataC,
 					
-				nextAccepting => execAcceptingC,
-				dataOutIQ => open,--
+--				nextAccepting => execAcceptingC,
+--				dataOutIQ => open,--
 									--dataOutIQC,
-				sendingOut => open,--
+--				sendingOut => open,--
 									--sendingSchedC,		
 				
 				execCausing => execCausing,
@@ -381,12 +381,12 @@ architecture Behavioral of OutOfOrderBox is
 					queueSendingOut => queueSendingD,
 					queueDataOut => queueDataD,
 					
-				regsForDispatch => open,--regsSelD,
-				regValues => regValsD,
+--				regsForDispatch => open,--regsSelD,
+--				regValues => regValsD,
 					
-				nextAccepting => execAcceptingD,
-				dataOutIQ => open,--dataOutIQD,
-				sendingOut => open,--sendingSchedD,		
+--				nextAccepting => execAcceptingD,
+--				dataOutIQ => open,--dataOutIQD,
+--				sendingOut => open,--sendingSchedD,		
 				
 				execCausing => execCausing,
 					lateEventSignal => lateEventSignal,
@@ -423,10 +423,10 @@ architecture Behavioral of OutOfOrderBox is
 				prevSendingOK => renamedSending,
 				newData => dataToE,
 
-				nextAccepting => execAcceptingE,
-				dataOutIQ => open,--
+--				nextAccepting => execAcceptingE,
+--				dataOutIQ => open,--
 									--dataOutIQE,
-				sendingOut => open,--
+--				sendingOut => open,--
 									--sendingSchedE,
 						
 				fni => fni,	
@@ -438,8 +438,8 @@ architecture Behavioral of OutOfOrderBox is
 					queueDataOut => queueDataE,
 					
 				-- Interface for reading registers
-				regsForDispatch => open,--regsSelE,
-				regValues => regValsE,		
+--				regsForDispatch => open,--regsSelE,
+--				regValues => regValsE,		
 				
 				execCausing => execCausing,
 					lateEventSignal => lateEventSignal,

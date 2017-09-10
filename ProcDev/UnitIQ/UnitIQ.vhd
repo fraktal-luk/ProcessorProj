@@ -69,17 +69,17 @@ entity UnitIQ is
 		execEventSignal: in std_logic;		
 		lateEventSignal: in std_logic;
 			
-		fni: in ForwardingInfo;
+		fni: in ForwardingInfo
 			
 
 		-- Phys regs to read - only for "full read ports" configuration 
-		regsForDispatch: out PhysNameArray(0 to 2);
+--		regsForDispatch: out PhysNameArray(0 to 2);
 		--regReadAllow: out std_logic;			
-		regValues: in MwordArray(0 to 2);
+--		regValues: in MwordArray(0 to 2);
 
-			nextAccepting: in std_logic; -- from exec	
-		dataOutIQ: out InstructionState;
-		sendingOut: out std_logic
+--			nextAccepting: in std_logic; -- from exec	
+--		dataOutIQ: out InstructionState;
+--		sendingOut: out std_logic
 	);
 
 end UnitIQ;
@@ -174,8 +174,8 @@ begin
 --		stageDataOut => dataOutIQ
 --	);
 	
-	regsForDispatch <=
-			(0 => toDispatch.physicalArgs.s0, 1 => toDispatch.physicalArgs.s1, 2 => toDispatch.physicalArgs.s2);
+--	regsForDispatch <=
+--			(0 => toDispatch.physicalArgs.s0, 1 => toDispatch.physicalArgs.s1, 2 => toDispatch.physicalArgs.s2);
 	--regReadAllow <= queueSending;
 		
 end Behavioral;
