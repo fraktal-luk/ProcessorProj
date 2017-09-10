@@ -156,7 +156,20 @@ architecture Behavioral of OutOfOrderBox is
 			signal	cqMaskSig: std_logic_vector(0 to INTEGER_WRITE_WIDTH-1) := (others => '0');
 			signal	cqDataSig: InstructionStateArray(0 to INTEGER_WRITE_WIDTH-1)
 											:= (others => DEFAULT_INSTRUCTION_STATE);
-				
+			
+				signal queueDataA, queueDataB, queueDataC, queueDataD, queueDataE:
+								InstructionState := DEFAULT_INSTRUCTION_STATE;
+				signal queueSendingA, queueSendingB, queueSendingC, queueSendingD, queueSendingE:
+								std_logic := '0';
+				signal issueAcceptingA, issueAcceptingB, issueAcceptingC, issueAcceptingD, issueAcceptingE:
+								std_logic := '0';
+			
+			function getPhysicalSources(ins: InstructionState) return PhysNameArray is
+				variable res: PhysNameArray(0 to 2) := (others => (others => '0'));
+			begin
+				res := (0 => ins.physicalArgs.s0, 1 => ins.physicalArgs.s1, 2 => ins.physicalArgs.s2);			
+				return res;
+			end function;
 		begin
 		
 	resetSig <= reset;
@@ -210,17 +223,41 @@ architecture Behavioral of OutOfOrderBox is
 				fni => fni,
 				
 				readyRegFlags => readyRegFlags,
-				regsForDispatch => regsSelA,
+				regsForDispatch => open,--regsSelA,
 				regValues => regValsA,
 					
+					issueAccepting => issueAcceptingA, --
+					queueSendingOut => queueSendingA,
+					queueDataOut => queueDataA,
+					
 				nextAccepting => execAcceptingA,			
-				dataOutIQ => dataOutIQA,
-				sendingOut => sendingSchedA,
+				dataOutIQ => open,--dataOutIQA,
+				sendingOut => open,--sendingSchedA,
 					
 				execCausing => execCausing,
 					lateEventSignal => lateEventSignal,
 				execEventSignal => execEventSignal			
 			);
+
+				regsSelA <= getPhysicalSources(queueDataA);
+
+			ISSUE_A: entity work.SubunitDispatch(Alternative)	
+			port map(
+				clk => clk, reset => resetSig, en => enSig,
+				prevSending => queueSendingA,
+				nextAccepting => execAcceptingA,
+				execEventSignal => execEventSignal,
+				lateEventSignal => lateEventSignal,
+				execCausing => execCausing,
+				resultTags => fni.resultTags,
+				resultVals => fni.resultValues,
+				regValues => regValsA,
+				stageDataIn => queueDataA,		
+				acceptingOut => issueAcceptingA,
+				sendingOut => sendingSchedA,
+				stageDataOut => dataOutIQA
+			);
+
 			
 			IQ_B: entity work.UnitIQ
 			generic map(
@@ -237,19 +274,41 @@ architecture Behavioral of OutOfOrderBox is
 				fni => fni,	
 						
 				readyRegFlags => readyRegFlags,		
-				regsForDispatch => regsSelB,
+				regsForDispatch => open,--regsSelB,
 				regValues => regValsB,
-				
+
+					issueAccepting => issueAcceptingB,
+					queueSendingOut => queueSendingB,
+					queueDataOut => queueDataB,
+					
 				nextAccepting => execAcceptingB,	
-				dataOutIQ => dataOutIQB,
-				sendingOut => sendingSchedB,		
+				dataOutIQ => open,--dataOutIQB,
+				sendingOut => open,--sendingSchedB,		
 				
 				execCausing => execCausing,
 					lateEventSignal => lateEventSignal,
 				execEventSignal => execEventSignal
 			);
+
+				regsSelB <= getPhysicalSources(queueDataB);
 			
-				
+			ISSUE_B: entity work.SubunitDispatch(Alternative)	
+			port map(
+				clk => clk, reset => resetSig, en => enSig,
+				prevSending => queueSendingB,
+				nextAccepting => execAcceptingB,
+				execEventSignal => execEventSignal,
+				lateEventSignal => lateEventSignal,
+				execCausing => execCausing,
+				resultTags => fni.resultTags,
+				resultVals => fni.resultValues,
+				regValues => regValsB,
+				stageDataIn => queueDataB,		
+				acceptingOut => issueAcceptingB,
+				sendingOut => sendingSchedB,
+				stageDataOut => dataOutIQB
+			);
+			
 			IQ_C: entity work.UnitIQ
 			generic map(
 				IQ_SIZE => IQ_C_SIZE
@@ -265,17 +324,42 @@ architecture Behavioral of OutOfOrderBox is
 				fni => fni,
 						
 				readyRegFlags => readyRegFlags,
-				regsForDispatch => regsSelC,
+				regsForDispatch => open,--regsSelC,
 				regValues => regValsC,
+
+					issueAccepting => issueAcceptingC,
+					queueSendingOut => queueSendingC,
+					queueDataOut => queueDataC,
 					
 				nextAccepting => execAcceptingC,
-				dataOutIQ => dataOutIQC,
-				sendingOut => sendingSchedC,		
+				dataOutIQ => open,--
+									--dataOutIQC,
+				sendingOut => open,--
+									--sendingSchedC,		
 				
 				execCausing => execCausing,
 					lateEventSignal => lateEventSignal,
 				execEventSignal => execEventSignal
 			);					
+
+				regsSelC <= getPhysicalSources(queueDataC);
+
+			ISSUE_C: entity work.SubunitDispatch(Alternative)	
+			port map(
+				clk => clk, reset => resetSig, en => enSig,
+				prevSending => queueSendingC,
+				nextAccepting => execAcceptingC,
+				execEventSignal => execEventSignal,
+				lateEventSignal => lateEventSignal,
+				execCausing => execCausing,
+				resultTags => fni.resultTags,
+				resultVals => fni.resultValues,
+				regValues => regValsC,
+				stageDataIn => queueDataC,		
+				acceptingOut => issueAcceptingC,
+				sendingOut => sendingSchedC,
+				stageDataOut => dataOutIQC
+			);
 			
 			IQ_D: entity work.UnitIQ
 			generic map(
@@ -292,20 +376,42 @@ architecture Behavioral of OutOfOrderBox is
 				fni => fni,
 						
 				readyRegFlags => readyRegFlags,
-				
-				regsForDispatch => regsSelD,
+
+					issueAccepting => issueAcceptingD,
+					queueSendingOut => queueSendingD,
+					queueDataOut => queueDataD,
+					
+				regsForDispatch => open,--regsSelD,
 				regValues => regValsD,
 					
 				nextAccepting => execAcceptingD,
-				dataOutIQ => dataOutIQD,
-				sendingOut => sendingSchedD,		
+				dataOutIQ => open,--dataOutIQD,
+				sendingOut => open,--sendingSchedD,		
 				
 				execCausing => execCausing,
 					lateEventSignal => lateEventSignal,
 				execEventSignal => execEventSignal
 			);	
 
+				regsSelD <= getPhysicalSources(queueDataD);
 
+			ISSUE_D: entity work.SubunitDispatch(Alternative)	
+			port map(
+				clk => clk, reset => resetSig, en => enSig,
+				prevSending => queueSendingD,
+				nextAccepting => execAcceptingD,
+				execEventSignal => execEventSignal,
+				lateEventSignal => lateEventSignal,
+				execCausing => execCausing,
+				resultTags => fni.resultTags,
+				resultVals => fni.resultValues,
+				regValues => regValsD,
+				stageDataIn => queueDataD,		
+				acceptingOut => issueAcceptingD,
+				sendingOut => sendingSchedD,
+				stageDataOut => dataOutIQD
+			);
+			
 			IQ_E: entity work.UnitIQ
 			generic map(
 				IQ_SIZE => IQ_E_SIZE
@@ -318,23 +424,48 @@ architecture Behavioral of OutOfOrderBox is
 				newData => dataToE,
 
 				nextAccepting => execAcceptingE,
-				dataOutIQ => dataOutIQE,
-				sendingOut => sendingSchedE,
+				dataOutIQ => open,--
+									--dataOutIQE,
+				sendingOut => open,--
+									--sendingSchedE,
 						
 				fni => fni,	
 						
 				readyRegFlags => readyRegFlags, -- bits generated for input group
-				
+
+					issueAccepting => issueAcceptingE,
+					queueSendingOut => queueSendingE,
+					queueDataOut => queueDataE,
+					
 				-- Interface for reading registers
-				regsForDispatch => regsSelE,
+				regsForDispatch => open,--regsSelE,
 				regValues => regValsE,		
 				
 				execCausing => execCausing,
 					lateEventSignal => lateEventSignal,
 				execEventSignal => execEventSignal
 			);	
+
+				regsSelE <= getPhysicalSources(queueDataE);
 			
-																	
+			ISSUE_E: entity work.SubunitDispatch(Alternative)	
+			port map(
+				clk => clk, reset => resetSig, en => enSig,
+				prevSending => queueSendingE,
+				nextAccepting => execAcceptingE,
+				execEventSignal => execEventSignal,
+				lateEventSignal => lateEventSignal,
+				execCausing => execCausing,
+				resultTags => fni.resultTags,
+				resultVals => fni.resultValues,
+				regValues => regValsE,
+				stageDataIn => queueDataE,		
+				acceptingOut => issueAcceptingE,
+				sendingOut => sendingSchedE,
+				stageDataOut => dataOutIQE
+			);
+
+			
 			EXEC_BLOCK: entity work.UnitExec(Implem)
 			port map(
 				clk => clk, reset => resetSig, en => enSig,
