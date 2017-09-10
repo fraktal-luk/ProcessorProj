@@ -549,6 +549,9 @@ architecture Behavioral of OutOfOrderBox is
 			);
 
 
+	execEventSignalOut <= execEventSignal;
+	execCausingOut <= execCausing;
+
 	robSendingOut <= robSending;
 	memLoadAddressOut <= memLoadAddress;
 	

@@ -188,42 +188,53 @@ begin
 				  renamedDataLiving => renamedDataLiving,--: in StageDataMulti;	-- INPUT			
 				  renamedSending => renamedSending,--: in std_logic;
 				  
-				  iqAccepts => open,--: out std_logic; -- OUTPUT
+				  iqAccepts => --open,--: out std_logic; -- OUTPUT
+									iqAccepts,
 
 		-- Sys reg interface	
-				  sysRegReadSel => open,--: out slv5; -- OUTPUT  -- Doesn't need to be a port of OOO part
+				  sysRegReadSel => --open,--: out slv5; -- OUTPUT  -- Doesn't need to be a port of OOO part
+											sysRegReadSel,
 				  sysRegReadValue => sysRegReadValue,--: in Mword; -- INPUT
 
 		-- Mem interface
-				  memLoadAddressOut => open,--: out Mword;
+				  memLoadAddressOut => --open,--: out Mword;
+												memLoadAddress,
 				  memLoadValue => memLoadValue,--: in Mword;
-				  memLoadAllow => open,--: out std_logic;
+				  memLoadAllow => --open,--: out std_logic;
+												memLoadAllow,
 				  memLoadReady => memLoadReady,--: in std_logic;
 
 		-- evt
-				 execEventSignalOut => open,--: out std_logic; -- OUTPUT/SIG
+				 execEventSignalOut => --open,--: out std_logic; -- OUTPUT/SIG
+												execEventSignal,
 				 lateEventSignal => lateEventSignal,--: in std_logic;
-				 execCausingOut => open,--: out InstructionState;
-
+				 execCausingOut => --open,--: out InstructionState;
+											execCausing,
+											
 		-- Hidden to some degree, but may be useful for sth
 				commitGroupCtrSig => commitGroupCtrSig,--: in SmallNumber;
 				commitGroupCtrNextSig => commitGroupCtrNextSig,--: in SmallNumber; -- INPUT
 				commitGroupCtrIncSig => commitGroupCtrIncSig,--: in SmallNumber;	-- INPUT
 													
 		-- ROB interface	
-				robSendingOut => open,--: out std_logic;		-- OUTPUT
-				dataOutROB => open,--: out StageDataMulti;		-- OUTPUT
+				robSendingOut => --open,--: out std_logic;		-- OUTPUT
+										robSending,
+				dataOutROB => --open,--: out StageDataMulti;		-- OUTPUT
+										dataOutROB,
 
 				sbAccepting => sbAccepting,--: in std_logic;	-- INPUT
 				commitAccepting => commitAccepting,--: in std_logic; -- INPUT
 
-				dataOutBQV => open,--: out StageDataMulti; -- OUTPUT
-				dataOutSQ => open, --: out StageDataMulti -- OUTPUT		
-				
+				dataOutBQV => --open,--: out StageDataMulti; -- OUTPUT
+									dataOutBQV,
+				dataOutSQ => --open, --: out StageDataMulti -- OUTPUT		
+									dataOutSQ,
 				readyRegFlags => readyRegFlags,
 				
-				cqMaskOut => open,
-				cqDataOut => open			
+				cqMaskOut => --open,
+									cqMaskOut,
+				cqDataOut => --open			
+									cqDataOut
 		);
 
 
@@ -296,7 +307,8 @@ begin
 				renamedSendingIn => renamedSending,
 				
 				renamedSendingOut => open, -- DEPREC??
-				iqAccepts => iqAccepts,		
+				iqAccepts => open,
+									--iqAccepts,		
 				
 				dataOutA => dataToA,
 				dataOutB => dataToB,
@@ -477,7 +489,8 @@ begin
 				
 				acceptingNewBQ => acceptingNewBQ,
 				--sendingOutBQ => sendingFromBQ,
-					dataOutBQV => dataOutBQV,
+					dataOutBQV => open,
+										--dataOutBQV,
 				prevSendingToBQ => renamedSending,
 				dataNewToBQ => compactedToBQ,
 					
@@ -486,8 +499,10 @@ begin
 				groupCtrNext => commitGroupCtrNextSig,
 				groupCtrInc => commitGroupCtrIncSig,
 				
-				execEvent => execEventSignal,
-				execCausingOut => execCausing,
+				execEvent => open,
+									--execEventSignal,
+				execCausingOut => open,
+										--execCausing,
 						
 					lateEventSignal => lateEventSignal,
 				execOrIntEventSignalIn => execEventSignal
@@ -521,8 +536,10 @@ begin
 
 					whichAcceptedCQ => whichAcceptedCQ,
 					
-					memLoadAddress => memLoadAddress,
-					memLoadAllow => memLoadAllow,
+					memLoadAddress => open,
+											--memLoadAddress,
+					memLoadAllow => open,
+											--memLoadAllow,
 
 					memLoadReady => memLoadReady,
 					memLoadValue => memLoadValue,
@@ -536,14 +553,15 @@ begin
 
 
 							sbAcceptingIn => sbAccepting,
-							dataOutSQ => dataOutSQ,
+							dataOutSQ => open,
+												--dataOutSQ,
 											
 						lateEventSignal => lateEventSignal,	
 					execOrIntEventSignalIn => execEventSignal,
 						execCausing => execCausing
 				);
 
-						sysRegReadSel <= memLoadAddress(4 downto 0);
+					--	sysRegReadSel <= memLoadAddress(4 downto 0);
 
 					execSending <= getExecSending(outputA, outputB, outputC, outputD, outputE);
 					execSending2 <= getExecSending2(outputA, outputB, outputC, outputD, outputE);
@@ -568,8 +586,10 @@ begin
 				
 				whichAcceptedCQ => whichAcceptedCQ,
 				anySending => anySendingFromCQ,
-					cqMaskOut => cqMaskOut,
-					cqDataOut => cqDataOut,
+					cqMaskOut => open,
+										--cqMaskOut,
+					cqDataOut => open,
+										--cqDataOut,
 						bufferMaskOut => cqBufferMask,
 						bufferDataOut => cqBufferData
 			);
@@ -660,8 +680,10 @@ begin
 				acceptingOut => robAccepting,
 				
 					nextAccepting => commitAccepting and sbAccepting,
-				sendingOut => robSending, 
-				outputData => dataOutROB		
+				sendingOut => open,
+									--robSending, 
+				outputData => open
+									--dataOutROB		
 			);
 		end block;
 
