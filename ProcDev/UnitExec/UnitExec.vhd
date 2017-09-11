@@ -97,11 +97,6 @@ architecture Implem of UnitExec is
 	signal execEventSignal, eventSignal: std_logic := '0';
 	signal execCausing: InstructionState := defaultInstructionState;
 	signal activeCausing: InstructionState := defaultInstructionState;
-	
-	signal sysRegValue, sysRegValueReg: Mword := (others => '0');
-	signal sysRegReadSel: slv5 := (others => '0');
-
-		signal sysRegData: InstructionState := DEFAULT_INSTRUCTION_STATE;
 
 	signal dataA0, dataB0, dataB1, dataB2, dataC0, dataC1, dataC2, dataD0: InstructionState
 					:= DEFAULT_INSTRUCTION_STATE;
@@ -123,8 +118,7 @@ begin
 		enSig <= en or not HAS_EN_EXEC; 
 
 
-					inputDataA.data(0) <= --dataIQA;
-												 executeAlu(dataIQA);					
+					inputDataA.data(0) <= executeAlu(dataIQA);					
 					inputDataA.fullMask(0) <= sendingIQA;
 					
 					dataA0 <= outputDataA.data(0);
@@ -172,8 +166,7 @@ begin
 				
 ------------------------------------------------
 -- Branch
-					inputDataD.data(0) <= --dataIQD;
-												 basicBranch(setInstructionTarget(dataIQD,
+					inputDataD.data(0) <= basicBranch(setInstructionTarget(dataIQD,
 																 dataIQD.constantArgs.imm),
 																 (others => '0'),
 																 dataIQD.result);					
@@ -206,13 +199,8 @@ begin
 	BQ_BLOCK: block
 		signal storeTargetWrSig: std_logic := '0';
 		signal storeTargetDataSig: InstructionState := DEFAULT_INSTRUCTION_STATE;
-			signal storeTargetDataSRSig: InstructionState := DEFAULT_INSTRUCTION_STATE;		
-	begin
-		sysRegData <= setInsResult(dataD0, sysRegValueReg);
-	
-		storeTargetDataSig <= trgToResult(dataD0);		
-		storeTargetDataSRSig <= trgToSR(dataD0);
-
+	begin	
+		storeTargetDataSig <= trgToResult(dataD0);
 		storeTargetWrSig <= execSendingD and
 										((dataD0.controlInfo.hasBranch and --dataD0.classInfo.branchReg)
 																					  not dataD0.constantArgs.immSel)
@@ -236,7 +224,7 @@ begin
 				storeValueWr => storeTargetWrSig,
 
 				storeAddressDataIn => storeTargetDataSig,
-				storeValueDataIn => storeTargetDataSRSig,
+				storeValueDataIn => DEFAULT_INSTRUCTION_STATE,
 				
 					committing => committing,
 					groupCtrNext => groupCtrNext,
@@ -251,14 +239,7 @@ begin
 				sendingSQOut => open,--sendingOutBQ, -- OUTPUT
 					dataOutV => dataOutBQV
 			);
-			
-			SYS_REG_FF: process(clk)
-			begin
-				if rising_edge(clk) then
-					sysRegValueReg <= sysRegValue;
-				end if;
-			end process;
-			
+
 	end block;
 -------------------------------------
 

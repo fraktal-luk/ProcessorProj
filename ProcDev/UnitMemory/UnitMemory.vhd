@@ -74,14 +74,7 @@ entity UnitMemory is
 			memLoadReady: in std_logic;
 			memLoadValue: in Mword;
 			memLoadAddress: out Mword;
-			--memStoreAddress: out Mword;
 			memLoadAllow: out std_logic;
-			--memStoreAllow: out std_logic;
-			--memStoreValue: out Mword;
-			
-			--sysStoreAllow: out std_logic;
-			--sysStoreAddress: out slv5;
-			--sysStoreValue: out Mword;
 
 			sysLoadAllow: out std_logic;
 			sysLoadVal: in Mword;
@@ -89,16 +82,10 @@ entity UnitMemory is
 			committing: in std_logic;
 			groupCtrNext: in SmallNumber;
 			groupCtrInc: in SmallNumber;
-			
-			
+		
 			sbAcceptingIn: in std_logic;
 			dataOutSQ: out StageDataMulti;
-			
-			--	sbAccepting: out std_logic;
-			--	sbEmpty: out std_logic;
-			--	sbSendingOut: out std_logic;
-			--	dataFromSB: out InstructionState;
-			
+
 		lateEventSignal: in std_logic;	
 		execOrIntEventSignalIn: in std_logic;
 			execCausing: in InstructionState
@@ -136,14 +123,7 @@ architecture Behavioral of UnitMemory is
 				 storeAddressWrSig, storeValueWrSig: std_logic := '0';
 	signal dataToLoadUnitSig, storeAddressDataSig, storeValueDataSig:
 																		InstructionState := DEFAULT_INSTRUCTION_STATE;					
-	signal sbAcceptingV: std_logic_vector(0 to 3) := (others => '0');				
-	signal sbSending: std_logic := '0';
-	
-	signal sbMaskOut: std_logic_vector(0 to 0) := (others => '0');
-	signal sbDataOut: InstructionStateArray(0 to 0) := (others => DEFAULT_INSTRUCTION_STATE);
-	
-	signal sbFullMask: std_logic_vector(0 to SB_SIZE-1) := (others => '0');	
-----------------	
+
 	signal ch0, ch1, ch2, ch3, ch4, ch5, ch6, ch7: std_logic := '0';
 begin
 		eventSignal <= execOrIntEventSignalIn;	
@@ -315,31 +295,6 @@ begin
 					dataOutV => dataOutSQV
 			);
 
-
---					STORE_BUFFER: entity work.TestCQPart0(WriteBuffer)
---					generic map(
---						INPUT_WIDTH => PIPE_WIDTH,
---						QUEUE_SIZE => SB_SIZE,
---						OUTPUT_SIZE => 1
---					)
---					port map(
---						clk => clk, reset => reset, en => en,
---						
---						whichAcceptedCQ => sbAcceptingV,
---						maskIn => dataOutSQV.fullMask,
---						dataIn => dataOutSQV.data,
---						
---						bufferMaskOut => sbFullMask,
---						bufferDataOut => open,
---						
---						anySending => sbSending,
---						cqMaskOut => sbMaskOut,
---						cqDataOut => sbDataOut,
---						
---						execEventSignal => '0',
---						execCausing => DEFAULT_INSTRUCTION_STATE
---					);
-
 			MEM_LOAD_QUEUE: entity work.MemoryUnit(Behavioral)
 			generic map(
 				QUEUE_SIZE => LQ_SIZE
@@ -437,28 +392,13 @@ begin
 				else stageDataAfterCache;
 
 				-- Mem interface
-				--memStoreAddress <= sbDataOut(0).argValues.arg1;
-				--memStoreValue <= sbDataOut(0).argValues.arg2;
-		
 				memLoadAddress <= dataToLoadUnitSig.result; -- in LoadUnit
 		
 				memLoadAllow <= sendingToLoadUnitSig;
-				--memStoreAllow <= sbSending when sbDataOut(0).operation = (Memory, store) else '0';
 									
-					sysLoadAllow <= sendingToMfcSig;
-									
-				 --sysStoreAllow <= sbSending when sbDataOut(0).operation = (System, sysMTC) 
-				--				 else '0'; 
-				 --sysStoreAddress <= sbDataOut(0).argValues.arg1(4 downto 0);
-				 --sysStoreValue <= sbDataOut(0).argValues.arg2;
-				 
-				 
+				sysLoadAllow <= sendingToMfcSig;	 
 				 
 			dataOutSQ <= dataOutSQV;	 
-				 
-		--sbAccepting <= sbAcceptingV(0);	
-		--	sbEmpty <= not sbFullMask(0);
-		--	sbSendingOut <= sbSending;
-		--	dataFromSB <= sbDataOut(0);
+
 end Behavioral;
 

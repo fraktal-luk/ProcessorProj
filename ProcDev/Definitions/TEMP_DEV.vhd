@@ -57,7 +57,6 @@ return InstructionStateArray;
 
 function trgForBQ(insVec: StageDataMulti) return StageDataMulti;
 function trgToResult(ins: InstructionState) return InstructionState;
-function trgToSR(ins: InstructionState) return InstructionState;
 function setInsResult(ins: InstructionState; result: Mword) return InstructionState;
 
 
@@ -286,16 +285,6 @@ end function;
 			res.result := ins.target;
 			return res;
 		end function;
-		
-		function trgToSR(ins: InstructionState) return InstructionState is
-			variable res: InstructionState := ins;
-		begin
-			-- CAREFUL! Here we use 'result' because it is the field copied to arg1 in mem queue!
-			-- TODO: regularize usage of such fields, maybe remove 'target' from InstructionState?
-			res.argValues.arg2(4 downto 0) := ins.constantArgs.c0;
-			res.argValues.arg2(MWORD_SIZE-1 downto 5) := (others => '0');
-			return res;
-		end function;
 
 		function setInsResult(ins: InstructionState; result: Mword) return InstructionState is
 			variable res: InstructionState := ins;
@@ -303,55 +292,6 @@ end function;
 			res.result := result;
 			return res;
 		end function;
-
-
---	
---function getStoreAddressPart(ins: InstructionState)
---return InstructionState is
---	variable res: InstructionState := ins;
---	constant srcs: std_logic_vector(0 to 2) := ('1', '1', '0');
---begin
---	res := isolateArgSubset(res, '1', srcs);
---	return res;
---end function;
---
---function getLoadAddressPart(ins: InstructionState)
---return InstructionState is
---	variable res: InstructionState := ins;
---	constant srcs: std_logic_vector(0 to 2) := ('1', '1', '0');
---begin
---	res := isolateArgSubset(res, '0', srcs);
---	return res;
---end function;
---
---function getStoreDataPart(ins: InstructionState)
---return InstructionState is
---	variable res: InstructionState := ins;
---	constant srcs: std_logic_vector(0 to 2) := ('0', '0', '1');
---begin
---	res := isolateArgSubset(res, '1', srcs);
---	return res;
---end function;
---
---function getResultPart(ins: InstructionState)
---return InstructionState is
---	variable res: InstructionState := ins;
---	constant srcs: std_logic_vector(0 to 2) := ('0', '0', '0');
---begin
---	res := isolateArgSubset(res, '1', srcs);
---	return res;
---end function;
---
---function getSourcePart(ins: InstructionState)
---return InstructionState is
---	variable res: InstructionState := ins;
---	constant srcs: std_logic_vector(0 to 2) := ('1', '1', '1');
---begin
---	res := isolateArgSubset(res, '0', srcs);
---	return res;
---end function;
-
-
 
 function addMwordBasic(a, b: Mword) return Mword is
 	variable res: Mword := (others => '0');
