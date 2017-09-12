@@ -46,10 +46,7 @@ entity OutOfOrderBox is
     Port ( clk : in  STD_LOGIC;
            reset : in  STD_LOGIC;
            en : in  STD_LOGIC;
-			  
-			  
-			  
-			  
+			  		  
 			  renamedDataLiving: in StageDataMulti;	-- INPUT			
 			  renamedSending: in std_logic;
 			  
@@ -164,6 +161,7 @@ architecture Behavioral of OutOfOrderBox is
 				signal issueAcceptingA, issueAcceptingB, issueAcceptingC, issueAcceptingD, issueAcceptingE:
 								std_logic := '0';
 			
+			-- TODO: move to package
 			function getPhysicalSources(ins: InstructionState) return PhysNameArray is
 				variable res: PhysNameArray(0 to 2) := (others => (others => '0'));
 			begin
@@ -206,7 +204,6 @@ architecture Behavioral of OutOfOrderBox is
 				dataOutBQ => compactedToBQ
 			);
 
-					
 		
 			IQ_A: entity work.UnitIQ
 			generic map(
@@ -223,24 +220,16 @@ architecture Behavioral of OutOfOrderBox is
 				fni => fni,
 				
 				readyRegFlags => readyRegFlags,
---				regsForDispatch => open,--regsSelA,
---				regValues => regValsA,
-					
+
 					issueAccepting => issueAcceptingA, --
 					queueSendingOut => queueSendingA,
 					queueDataOut => queueDataA,
-					
---				nextAccepting => execAcceptingA,			
---				dataOutIQ => open,--dataOutIQA,
---				sendingOut => open,--sendingSchedA,
-					
+			
 				execCausing => execCausing,
 					lateEventSignal => lateEventSignal,
 				execEventSignal => execEventSignal			
 			);
-
-
-			
+		
 			IQ_B: entity work.UnitIQ
 			generic map(
 				IQ_SIZE => IQ_B_SIZE
@@ -256,23 +245,15 @@ architecture Behavioral of OutOfOrderBox is
 				fni => fni,	
 						
 				readyRegFlags => readyRegFlags,		
---				regsForDispatch => open,--regsSelB,
---				regValues => regValsB,
 
 					issueAccepting => issueAcceptingB,
 					queueSendingOut => queueSendingB,
 					queueDataOut => queueDataB,
-					
---				nextAccepting => execAcceptingB,	
---				dataOutIQ => open,--dataOutIQB,
---				sendingOut => open,--sendingSchedB,		
-				
+
 				execCausing => execCausing,
 					lateEventSignal => lateEventSignal,
 				execEventSignal => execEventSignal
 			);
-
-
 			
 			IQ_C: entity work.UnitIQ
 			generic map(
@@ -289,25 +270,15 @@ architecture Behavioral of OutOfOrderBox is
 				fni => fni,
 						
 				readyRegFlags => readyRegFlags,
---				regsForDispatch => open,--regsSelC,
---				regValues => regValsC,
 
 					issueAccepting => issueAcceptingC,
 					queueSendingOut => queueSendingC,
 					queueDataOut => queueDataC,
-					
---				nextAccepting => execAcceptingC,
---				dataOutIQ => open,--
-									--dataOutIQC,
---				sendingOut => open,--
-									--sendingSchedC,		
-				
+	
 				execCausing => execCausing,
 					lateEventSignal => lateEventSignal,
 				execEventSignal => execEventSignal
 			);					
-
-
 			
 			IQ_D: entity work.UnitIQ
 			generic map(
@@ -328,21 +299,12 @@ architecture Behavioral of OutOfOrderBox is
 					issueAccepting => issueAcceptingD,
 					queueSendingOut => queueSendingD,
 					queueDataOut => queueDataD,
-					
---				regsForDispatch => open,--regsSelD,
---				regValues => regValsD,
-					
---				nextAccepting => execAcceptingD,
---				dataOutIQ => open,--dataOutIQD,
---				sendingOut => open,--sendingSchedD,		
-				
+
 				execCausing => execCausing,
 					lateEventSignal => lateEventSignal,
 				execEventSignal => execEventSignal
 			);	
-
-
-			
+		
 			IQ_E: entity work.UnitIQ
 			generic map(
 				IQ_SIZE => IQ_E_SIZE
@@ -353,13 +315,7 @@ architecture Behavioral of OutOfOrderBox is
 				acceptingVec => acceptingVecE,		
 				prevSendingOK => renamedSending,
 				newData => dataToE,
-
---				nextAccepting => execAcceptingE,
---				dataOutIQ => open,--
-									--dataOutIQE,
---				sendingOut => open,--
-									--sendingSchedE,
-						
+				
 				fni => fni,	
 						
 				readyRegFlags => readyRegFlags, -- bits generated for input group
@@ -367,11 +323,7 @@ architecture Behavioral of OutOfOrderBox is
 					issueAccepting => issueAcceptingE,
 					queueSendingOut => queueSendingE,
 					queueDataOut => queueDataE,
-					
-				-- Interface for reading registers
---				regsForDispatch => open,--regsSelE,
---				regValues => regValsE,		
-				
+
 				execCausing => execCausing,
 					lateEventSignal => lateEventSignal,
 				execEventSignal => execEventSignal
