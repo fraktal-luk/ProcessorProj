@@ -41,7 +41,8 @@ function getLinkInfoSuper(ins: InstructionState) return InstructionBasicInfo;
 ----------------
 
 
-function getLatePCData(commitEvent: std_logic; commitCausing: InstructionState)
+function getLatePCData(commitEvent: std_logic; commitCausing: InstructionState;
+								linkExc, linkInt, stateExc, stateInt: Mword)
 return InstructionState;
 
 function newPCData(content: InstructionState;
@@ -122,7 +123,8 @@ begin
 end function;
 
 
-function getLatePCData(commitEvent: std_logic; commitCausing: InstructionState)
+function getLatePCData(commitEvent: std_logic; commitCausing: InstructionState;
+								linkExc, linkInt, stateExc, stateInt: Mword)
 return InstructionState is
 	variable res: InstructionState := DEFAULT_INSTRUCTION_STATE;-- content;
 	variable newPC: Mword := (others=>'0');
@@ -150,9 +152,13 @@ begin
 				elsif commitCausing.operation.func = sysHalt then
 					res.basicInfo.ip := commitCausing.target; -- ???
 				elsif commitCausing.operation.func = sysRetI then
-						res.basicInfo.ip := X"00000020";  --TEMP!!
+					res.basicInfo.ip := linkInt;
+					res.basicInfo.systemLevel := stateInt(15 downto 8);
+					res.basicInfo.intLevel := stateInt(7 downto 0);
 				elsif commitCausing.operation.func = sysRetE then
-						res.basicInfo.ip := X"00000030";  --TEMP!!					
+					res.basicInfo.ip := linkExc;
+					res.basicInfo.systemLevel := stateExc(15 downto 8);
+					res.basicInfo.intLevel := stateExc(7 downto 0); 
 				end if;				
 		end if;		
 	

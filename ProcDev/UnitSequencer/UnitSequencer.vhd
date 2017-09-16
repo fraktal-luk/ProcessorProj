@@ -313,6 +313,8 @@ begin
 						currentState <= X"0000" & TMP_targetIns.basicInfo.systemLevel & TMP_targetIns.basicInfo.intLevel;
 					end if;
 					
+					currentState <= currentState and X"FFFF0303";
+					
 					-- NOTE: writing to link registers after sys reg writing gives priority to the former,
 					--			but committing a sysMtc shouldn't happen in parallel with any control event
 					-- Writing exc status registers
@@ -338,6 +340,12 @@ begin
 		end process;
 		
 		currentStateSig <= currentState;
+		
+		
+		TMP_targetIns <= getLatePCData('1', eiEvents.causing,
+													linkRegExc, linkRegInt,
+													savedStateExc, savedStateInt); -- Here, becaue needs sys regs
+		
 	end block;
 
 
@@ -486,9 +494,7 @@ begin
 			--			The 'target' field will be used to update return address for exc/int
 			stageDataToCommit <= recreateGroup(robDataLiving, dataFromBQV, dataFromLastEffective.data(0).target);
 			insToLastEffective <= getLastEffective(stageDataToCommit);		
-				
-				TMP_targetIns <= getLatePCData('1', eiEvents.causing);
-											
+															
 				interruptCause.controlInfo.hasInterrupt <= intSignal;
 				interruptCause.controlInfo.hasReset <= start;
 				interruptCause.target <= TMP_targetIns.basicInfo.ip;
