@@ -83,7 +83,8 @@ package ProgramCode4 is
 			67 => ins6556X(ext2, r21, 0, mfc, 4), -- 4: Exc saved state
 			68 => ins6556X(ext2, r21, 0, mtc, 1),   -- 1: current state
 				69 => ins655655(ext2, 0, 0, sync, 0, 0),
-			70 => ins655655(ext1, r0, r0, jzR, r20, 0),	-- Jump to saved link address	
+			70 => --ins655655(ext1, r0, r0, jzR, r20, 0),	-- Jump to saved link address
+					ins655655(ext2, 0, 0, retE, 0, 0), -- Proper return instruction
 			
 			-- On interrupt
 			-- @512
@@ -94,7 +95,8 @@ package ProgramCode4 is
 			132 => ins6556X(ext2, r21, 0, mfc, 5), -- 5: Int saved state
 			133 => ins6556X(ext2, r21, 0, mtc, 1),   -- 1: current state
 				134 => ins655655(ext2, 0, 0, sync, 0, 0),			
-			135 => ins655655(ext1, r0, r0, jzR, r20, 0),	-- Jump to saved link address	
+			135 => --ins655655(ext1, r0, r0, jzR, r20, 0),	-- Jump to saved link address
+					ins655655(ext2, 0, 0, retI, 0, 0), -- Proper return instruction
 			
 			-- Clear registers
 			-- @800
