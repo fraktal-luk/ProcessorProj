@@ -143,6 +143,7 @@ begin
 				if res.operation.unit = System and
 						(	res.operation.func = sysRetI or res.operation.func = sysRetE
 						or res.operation.func = sysSync or res.operation.func = sysReplay
+						or res.operation.func = sysError
 						or res.operation.func = sysHalt) then 		
 					res.controlInfo.specialAction := '1';
 					

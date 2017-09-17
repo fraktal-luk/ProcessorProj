@@ -295,7 +295,11 @@ begin
 					elsif evtPhase2 = '1' then
 						evtPhase2 <= '0';
 					end if;
-					
+				
+				
+				if evtPhase0 = '1' and stageData.data(0).operation.func = sysError then
+					report "Error found!" severity error;
+				end if;
 			end if;
 		end if;
 	end process;

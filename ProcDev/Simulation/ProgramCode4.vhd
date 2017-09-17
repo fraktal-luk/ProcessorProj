@@ -22,8 +22,7 @@ package ProgramCode4 is
 		type WordMem is array (0 to 511 + 512) of word;
 		
 		constant insRET: word := ins655655(ext1, r0, r0, jzR, r31, 0); -- j to r31
-		constant insERROR: word := ins6556X(ext1, r0, r0, store, 255);
-		
+		constant insERROR: word := ins655655(ext2, 0, 0, error, 0, 0);		
 		constant insNOP: word := ins655H(addI, r0, r0, 0);
 		function insCLEAR(reg: integer) return word is begin return ins655H(addI, reg, r0, 0); end function;
 		function insSET(reg, num: integer) return word is
@@ -36,13 +35,16 @@ package ProgramCode4 is
 			begin return ins6556X(ext1, ra, rb, load, num); end function;		
 
 		
+		-- Address of handling function
+		constant ERR_HANDLER: integer := 4000;
+		
 		constant testProg1: WordMem := ( -- mem load testing 
 			0 => insNOP, --ins655H(addI, r1, r0, 300),
 			1 => insNOP, --ins655H(subI, r30, r0, 1),
 			2 => insNOP,
 					--ins655655(ext2, 0, 0, halt, 0, 0),
 			3 => insNOP,			
-			
+						
 			4 => ins65J(jl, r31, 4*(320-4)), -- Test result forwarding src1
 			5 => ins65J(jl, r31, 4*(350-5)), -- Test result forwarding src0
 			6 => ins65J(jl, r31, 4*(380-6)), -- Test 0+1 forwarding
@@ -209,7 +211,8 @@ package ProgramCode4 is
 			
 			-- Test result forwarding as src1
 			-- @1280
-			320 => insNOP,
+			320 => --insNOP,
+						insSET(r30, ERR_HANDLER),
 			321 => ins655H(addI, r1, r0, 300),
 			322 => ins655655(ext0, r2, r0, addR, r1, 0),
 			323 => ins655655(ext0, r3, r0, addR, r1, 0),
@@ -220,7 +223,8 @@ package ProgramCode4 is
 			-- Now check that it was passed everywhere
 			328 => insMOVE(r10, r1),
 			329 => ins655H(subI, r10, r10, 300), -- result must be 0
-			330 => ins65J(jnz, r10, 4*(1023 - 330)), -- if not, jump to illegal addr
+			330 => --ins65J(jnz, r10, 4*(1023 - 330)), -- if not, jump to illegal addr
+						ins655655(ext1, r29, r10, jnzR, r30, 0),
 			331 => insMOVE(r10, r2),
 			332 => ins655H(subI, r10, r10, 300), -- result must be 0
 			333 => ins65J(jnz, r10, 4*(1023 - 333)), -- if not, jump to illegal addr
@@ -305,6 +309,16 @@ package ProgramCode4 is
 			404 => ins655H(subI, r10, r10, 1093), -- result must be 0
 			405 => ins65J(jnz, r10, 4*(1023 - 405)),
 			406 => insRET,
+			
+			-- Error handler
+			-- @4000
+			1000 => insNOP,
+				-- r29 will hold return address
+			1001 => --insNOP,
+						insSTORE(r29, r0, 0), -- save r29 to address 0
+			1002 => --insNOP,
+						insERROR,
+			1003 => ins655655(ext1, r0, r0, jzR, r29, 0), -- Return to r29 			
 			
 			
 			others => insERROR -- undefined

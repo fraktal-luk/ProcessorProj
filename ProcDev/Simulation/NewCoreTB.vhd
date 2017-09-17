@@ -45,10 +45,10 @@ USE ieee.std_logic_1164.ALL;
  
 	use work.ProgramCode4.all; 
  
-ENTITY NewCoreTB1 IS
-END NewCoreTB1;
+ENTITY NewCoreTB5 IS
+END NewCoreTB5;
  
-ARCHITECTURE behavior OF NewCoreTB1 IS 
+ARCHITECTURE behavior OF NewCoreTB5 IS 
 
     -- Component Declaration for the Unit Under Test (UUT)
 
@@ -232,11 +232,6 @@ BEGIN
 	begin
 		if rising_edge(clk) then
 			if en = '1' then
-				if dwrite = '1' then
-					assert doutadr /= X"000000ff" 
-						report "Store to address 255 - illegal!" severity error;
-				end if;
-			
 				-- TODO: define effective address exact size
 			
 				-- Reading

@@ -236,6 +236,7 @@ package Decoding2 is
 					27 => (ext2, retE, System, sysRetE, fmtNoArgs),
 					28 => (ext2, sync,	System, sysSync,	 fmtNoArgs),
 					29 => (ext2, replay, System, sysReplay, fmtNoArgs),
+					30 => (ext2, error,  System, sysError, fmtNoArgs),
 				
 				others => (ext2, undef, System, sysUndef, fmtUndef)
 				);

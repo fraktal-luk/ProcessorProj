@@ -122,6 +122,8 @@ type ExecFunc is (unknown,
 										sysHalt,
 										sysSync, sysReplay,
 										sysMTC, sysMFC, -- move to/from control
+										sysError,
+										
 										sysUndef
 							);	
 							
