@@ -73,6 +73,8 @@ function addMwordFasterExt(a, b: Mword; carryIn: std_logic) return std_logic_vec
 
 function setInterrupt(ins: InstructionState; int: std_logic) return InstructionState;
 
+function checkIvalid(ins: InstructionState; ivalid: std_logic) return InstructionState;
+
 end TEMP_DEV;
 
 
@@ -473,6 +475,14 @@ function setInterrupt(ins: InstructionState; int: std_logic) return InstructionS
 	variable res: InstructionState := ins;
 begin
 	res.controlInfo.hasInterrupt := int;
+	return res;
+end function;
+
+
+function checkIvalid(ins: InstructionState; ivalid: std_logic) return InstructionState is
+	variable res: InstructionState := ins;
+begin
+	res.controlInfo.squashed := not ivalid; -- CAREFUL: here we'll use 'squashed', must be cleared before ROB 
 	return res;
 end function;
 

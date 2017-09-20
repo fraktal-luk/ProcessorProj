@@ -38,7 +38,7 @@ return HbuffOutData;
 
 function getFetchOffset(ip: Mword) return SmallNumber;
 
-function getAnnotatedHwords(fetchBasicInfo: InstructionBasicInfo; 
+function getAnnotatedHwords(fetchIns: InstructionState;
 									 fetchBlock: HwordArray)
 return InstructionStateArray;
 
@@ -153,12 +153,17 @@ begin
 				end if;	
 	
 		if --res.classInfo.undef = '1' then
-			res.operation.func = sysUndef then
+				res.operation.func = sysUndef 
+		then
 			res.controlInfo.hasException := '1';
 			res.controlInfo.exceptionCode := i2slv(ExceptionType'pos(undefinedInstruction), SMALL_NUMBER_SIZE);
 		end if;
 		
+		if res.controlInfo.squashed = '1' then	-- CAREFUL: ivalid was '0'
+			report "Instruction from HBuffer was read from Fetch after stall!" severity error;
+		end if;
 		
+			res.controlInfo.squashed := '0';
 		
 		res.target := (others => '0');		
 	return res;
@@ -186,6 +191,7 @@ begin
 	for i in 0 to PIPE_WIDTH-1 loop
 		res.data(i).bits := content(i).bits(15 downto 0) & content(i+1).bits(15 downto 0);		
 		res.data(i).basicInfo := content(i).basicInfo;
+			res.data(i).controlInfo.squashed := content(i).controlInfo.squashed;
 	end loop;
 
 	for i in 0 to PIPE_WIDTH-1 loop
@@ -194,11 +200,13 @@ begin
 			res.fullMask(i) := '1';
 			res.data(i).bits := content(j).bits(15 downto 0) & content(j+1).bits(15 downto 0);			
 			res.data(i).basicInfo := content(j).basicInfo;
+				res.data(i).controlInfo.squashed := content(j).controlInfo.squashed;			
 			j := j + 1;
 		elsif (fullMask(j) and fullMask(j+1)) = '1' then
 			res.fullMask(i) := '1';
 			res.data(i).bits := content(j).bits(15 downto 0) & content(j+1).bits(15 downto 0);
-			res.data(i).basicInfo := content(j).basicInfo;	
+			res.data(i).basicInfo := content(j).basicInfo;
+				res.data(i).controlInfo.squashed := content(j).controlInfo.squashed;			
 			j := j + 2;
 		else
 			nOut := i;
@@ -220,12 +228,13 @@ end function;
 		end function;
 
 
-function getAnnotatedHwords(fetchBasicInfo: InstructionBasicInfo; 
+function getAnnotatedHwords(fetchIns: InstructionState; 
 									 fetchBlock: HwordArray)
 return InstructionStateArray is
 	variable res: InstructionStateArray(0 to 2*PIPE_WIDTH-1) := (others => DEFAULT_ANNOTATED_HWORD);
-	variable hwordBasicInfo: InstructionBasicInfo := fetchBasicInfo;
 	variable	tempWord: word := (others => '0');
+	constant fetchBasicInfo: InstructionBasicInfo := fetchIns.basicInfo;
+	variable hwordBasicInfo: InstructionBasicInfo := fetchBasicInfo;	
 begin
 	for i in 0 to 2*PIPE_WIDTH-1 loop
 		hwordBasicInfo.ip := fetchBasicInfo.ip(MWORD_SIZE-1 downto ALIGN_BITS) & i2slv(2*i, ALIGN_BITS);
@@ -235,7 +244,8 @@ begin
 
 		res(i).bits := tempWord;
 		res(i).basicInfo := hwordBasicInfo;
-		res(i).classInfo.short := '0'; -- TEMP!	
+		res(i).classInfo.short := '0'; -- TEMP!
+			res(i).controlInfo.squashed := fetchIns.controlInfo.squashed; -- CAREFUL: guarding from wrong reading 
 	end loop;
 	return res;
 end function;

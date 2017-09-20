@@ -136,7 +136,7 @@ begin
 	nHIn <= i2slv(FETCH_BLOCK_SIZE - (slv2u(stageDataIn.basicInfo.ip(ALIGN_BITS-1 downto 1))),
 					  SMALL_NUMBER_SIZE);
 
-	hbufferDataANew <= getAnnotatedHwords(stageDataIn.basicInfo, fetchBlock);					
+	hbufferDataANew <= getAnnotatedHwords(stageDataIn, fetchBlock);					
 
 		-- TODO: handle possibility of partial killing by partialKillMask?
 		livingMask <= fullMask when execEventSignal = '0' else (others => '0');
@@ -191,7 +191,6 @@ begin
 
 	stageDataOut <= hbuffOut.sd;				
 	acceptingOut <= not isNonzero(fullMask(HBUFFER_SIZE - FETCH_BLOCK_SIZE to HBUFFER_SIZE-1));
-							
 	sendingOut <= isNonzero(sendingSig);	
 
 end Implem;

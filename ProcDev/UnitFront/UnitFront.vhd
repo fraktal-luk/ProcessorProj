@@ -199,7 +199,7 @@ begin
 	
 	acceptingForFetchFirst <= acceptingOutFetch1;
 	
-	hbufferDataIn <= stageDataOutFetchFinal;
+	hbufferDataIn <= checkIvalid(stageDataOutFetchFinal, ivalidFinal);
 	
 	-- Hword buffer		
 	SUBUNIT_HBUFFER: entity work.SubunitHbuffer(--Behavioral)
@@ -270,6 +270,7 @@ begin
 	lastSending <= sendingOut0;
 	
 	frontAccepting <= acceptingOutFetch;
+							--acceptingOutHbuffer;
 	stage0EventsOut <= stage0Events; -- TODO: change this awkward construct to a general one
 												-- 		(probably chain through stages backwards to find oldest)
 end Behavioral;
