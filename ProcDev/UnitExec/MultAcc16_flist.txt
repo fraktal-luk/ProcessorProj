@@ -1,0 +1,15 @@
+# Output products list for <MultAcc16>
+MultAcc16.asy
+MultAcc16.gise
+MultAcc16.ngc
+MultAcc16.sym
+MultAcc16.vhd
+MultAcc16.vho
+MultAcc16.xco
+MultAcc16.xise
+MultAcc16\doc\dsp48_macro_ds754.pdf
+MultAcc16\doc\xbip_dsp48_macro_v2_1_readme.txt
+MultAcc16\doc\xbip_dsp48_macro_v2_1_vinfo.html
+MultAcc16_flist.txt
+MultAcc16_xmdf.tcl
+_xmsgs\pn_parser.xmsgs
