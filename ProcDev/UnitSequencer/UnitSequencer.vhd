@@ -66,7 +66,10 @@ entity UnitSequencer is
 		intSignal: in std_logic;
 		execEventSignal: in std_logic;
 		execCausing: in InstructionState;		
-		stage0EventInfo: in StageMultiEventInfo;	
+		--stage0EventInfo: in StageMultiEventInfo;	
+		
+			frontEventSignal: in std_logic;
+			frontCausing: in InstructionState;
 		
 		execOrIntEventSignalOut: out std_logic;
 		execOrIntCausingOut: out InstructionState;	
@@ -199,7 +202,7 @@ begin
 												TMP_phase0,--eiEvents.eventOccured, 
 											eiEvents.causing,
 											execEventSignal, execCausing,
-											stage0EventInfo.eventOccured, stage0EventInfo.causing,
+											frontEventSignal, frontCausing,
 											pcNext
 										);
 
@@ -219,7 +222,7 @@ begin
 											TMP_phase2,
 											eiEvents.causing,
 											execEventSignal, execCausing,
-											stage0EventInfo.eventOccured, stage0EventInfo.causing,
+											frontEventSignal, frontCausing,
 											pcNext
 										);
 

@@ -48,14 +48,14 @@ return InstructionState;
 function newPCData(content: InstructionState;
 						  commitEvent: std_logic; commitCausing: InstructionState;
 						  execEvent: std_logic; execCausing: InstructionState;	
-						  decodeEvent: std_logic; decodeCausing: InstructionState;
+						  frontEvent: std_logic; frontCausing: InstructionState;
 						  pcNext: Mword)
 return InstructionState;
 
 	function NEW_generalEvents(pcData: InstructionState;
 										commitEvent: std_logic; commitCausing: InstructionState;
 										execEvent: std_logic; execCausing: InstructionState;	
-										decodeEvent: std_logic; decodeCausing: InstructionState;
+										frontEvent: std_logic; frontCausing: InstructionState;
 										pcNext: Mword)
 	return GeneralEventInfo;
 
@@ -169,7 +169,7 @@ end function;
 function newPCData(content: InstructionState;
 						  commitEvent: std_logic; commitCausing: InstructionState;
 						  execEvent: std_logic; execCausing: InstructionState;	
-						  decodeEvent: std_logic; decodeCausing: InstructionState;
+						  frontEvent: std_logic; frontCausing: InstructionState;
 						  pcNext: Mword)
 return InstructionState is
 	variable res: InstructionState := content;
@@ -179,10 +179,9 @@ begin
 		res.basicInfo.ip := commitCausing.target;
 	elsif execEvent = '1' then		
 		res.basicInfo.ip := execCausing.target;
-	elsif decodeEvent = '1' then
-			if BRANCH_AT_DECODE then
-				res.basicInfo.ip := decodeCausing.target;	
-			end if;
+	elsif frontEvent = '1' then
+			report "front event!";
+		res.basicInfo.ip := frontCausing.target;	
 	else	-- Increment by the width of fetch group
 		res.basicInfo.ip := pcNext;
 	end if;	
@@ -193,7 +192,7 @@ end function;
 	function NEW_generalEvents(pcData: InstructionState;
 										commitEvent: std_logic; commitCausing: InstructionState;
 										execEvent: std_logic; execCausing: InstructionState;	
-										decodeEvent: std_logic; decodeCausing: InstructionState;
+										frontEvent: std_logic; frontCausing: InstructionState;
 										pcNext: Mword)
 	return GeneralEventInfo is
 		variable res: GeneralEventInfo;
@@ -202,7 +201,7 @@ end function;
 		res.eventOccured := '1';
 			res.killPC := '0';
 			
-		res.causing := decodeCausing;
+		res.causing := frontCausing;
 	
 		if commitEvent = '1' then 
 			res.killPC := '1';
@@ -211,8 +210,8 @@ end function;
 		elsif execEvent = '1' then
 			res.causing := execCausing;
 			--res.affectedVec(0 to 4) := (others => '1');
-		elsif decodeEvent = '1' then
-			res.causing := decodeCausing;
+		elsif frontEvent = '1' then
+			res.causing := frontCausing;
 			--res.affectedVec(0 to 3) := (others => '1');
 		else
 			res.eventOccured := '0';

@@ -60,13 +60,16 @@ entity UnitFront is
 		pcSending: in std_logic;
 		frontAccepting: out std_logic;
 
-		stage0EventsOut: out StageMultiEventInfo;
+		--stage0EventsOut: out StageMultiEventInfo;
 
 		-- Interface front to renaming
 		renameAccepting: in std_logic;		
 		dataLastLiving: out StageDataMulti; 
 		lastSending: out std_logic;
 		-------
+		
+		frontEventSignal: out std_logic;
+		frontCausing: out InstructionState;
 		
 		execEventSignal: in std_logic;
 		lateEventSignal: in std_logic
@@ -107,6 +110,11 @@ architecture Behavioral of UnitFront is
 		signal hbufferDataIn: InstructionState := DEFAULT_INSTRUCTION_STATE;
 	
 		signal killAll: std_logic := '0';
+	
+		signal earlyBranchDataIn: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
+	
+		signal sendingToEarlyBranch, stallAtFetchLast: std_logic := '0'; 
+		signal pcSendingDelayed0, pcSendingDelayed1, pcSendingDelayedFinal: std_logic := '0';
 	
 	constant HAS_RESET_FRONT: std_logic := '0';
 	constant HAS_EN_FRONT: std_logic := '0';	
@@ -156,6 +164,9 @@ begin
 			
 			--elsif enSig = '1' then
 				if sendingOutFetch = '1' then
+					pcSendingDelayed0 <= pcSending;
+					pcSendingDelayed1 <= pcSendingDelayed0;
+					
 					ivalid1 <= ivalid;
 					fetchBlock1 <= fetchBlock;					
 				end if;
@@ -163,6 +174,7 @@ begin
 		end if;	
 	end process;				
 	
+	pcSendingDelayedFinal <= pcSendingDelayed1 when FETCH_DELAYED else pcSendingDelayed0;
 	ivalidFinal <= ivalid1 when FETCH_DELAYED else ivalid;
 	fetchBlockFinal <= fetchBlock1 when FETCH_DELAYED else fetchBlock;
 	
@@ -178,7 +190,7 @@ begin
 			clk => clk, reset => resetSig, en => enSig,
 					
 			prevSending => sendingOutFetch,	
-			nextAccepting => acceptingoutHbuffer,
+			nextAccepting => acceptingOutHbuffer,
 			stageDataIn => f1input,
 			
 			acceptingOut => acceptingOutFetch1,
@@ -220,6 +232,38 @@ begin
 		execCausing => DEFAULT_INSTRUCTION_STATE		
 	);		
 	
+		
+		-- Branch prediction stub. This stage is in parallel with Hbuff
+			earlyBranchDataIn.data(0) <= getFrontEvent(hbufferDataIn, pcSendingDelayedFinal, ivalidFinal);
+			earlyBranchdataIn.fullMask(0) <= pcSendingDelayedFinal;
+			
+			sendingToEarlyBranch <= pcSendingDelayedFinal; -- ??
+										--	sendingOutFetchFinal -- Good, no stall
+										--	stallAtFetchLast 	-- Wrong, fetched line must be refetched
+										--	pcSendingDelayedFinal and not ivalidFinal -- invalid fetch
+			--stallAtFetchLast <= ivalidFinal and not acceptingOutHbuffer;	
+											
+			SUBUNIT_EARLY_BRANCH: entity work.GenericStageMulti(Behavioral)
+			port map(
+					clk => clk, reset => resetSig, en => enSig,
+							
+					prevSending => sendingToEarlyBranch,	
+					nextAccepting => '1',
+					stageDataIn => earlyBranchDataIn,
+					
+					acceptingOut => open,
+					sendingOut => open,
+					stageDataOut => open,
+					
+					execEventSignal => killAll,--killVector(1),
+					lateEventSignal => killAll,
+					execCausing => DEFAULT_INSTRUCTION_STATE,
+					lockCommand => '0',
+
+					stageEventsOut => stage0Events
+			);
+	
+	
 	-- Decode stage				
 	STAGE_DECODE: block
 		signal newDecoded, newDecodedWithTargets, stageDataDecodeNew, stageDataDecodeOut: StageDataMulti
@@ -259,7 +303,7 @@ begin
 			execCausing => DEFAULT_INSTRUCTION_STATE,
 			lockCommand => '0',
 			-- to event part
-			stageEventsOut => stage0Events
+			stageEventsOut => open--stage0Events
 		);	
 		
 		stageDataOut0 <= clearTempControlInfoMulti(stageDataDecodeOut);
@@ -270,8 +314,8 @@ begin
 	lastSending <= sendingOut0;
 	
 	frontAccepting <= acceptingOutFetch;
-							--acceptingOutHbuffer;
-	stage0EventsOut <= stage0Events; -- TODO: change this awkward construct to a general one
-												-- 		(probably chain through stages backwards to find oldest)
+	
+		frontEventSignal <= stage0Events.eventOccured;
+		frontCausing <= stage0Events.causing;
 end Behavioral;
 
