@@ -46,14 +46,26 @@ return InstructionStateArray;
 function stageMultiEvents(sd: StageDataMulti; isNew: std_logic) return StageMultiEventInfo;
 
 
-function getFrontEvent(ins: InstructionState; receiving: std_logic; valid: std_logic)
+function getFrontEvent(ins: InstructionState; receiving: std_logic; valid: std_logic;
+							  hbuffAccepting: std_logic)
 return InstructionState is
 	variable res: InstructionState := ins;
 begin
-	if false then
+	-- receiving, valid, accepting	-> good
+	-- receiving, valid, not accepting -> refetch
+	-- receiving, invalid, accepting -> error, will cause exception, but handled later, from decode on
+	-- receiving, invalid, not accepting -> refetch??
+
+	if (receiving and not hbuffAccepting) = '1' then -- When need to refetch
+		res.target := res.basicInfo.ip;
+	
 		res.controlInfo.newEvent := '1';
 		res.controlInfo.hasBranch := '1';
 	end if;
+	
+	-- Check if it's a branch
+	-- TODO: (should be done in predecode when loading to cache)
+	
 	
 	return res;
 end function;

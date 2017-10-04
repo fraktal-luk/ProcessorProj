@@ -109,7 +109,7 @@ architecture Behavioral of UnitFront is
 		
 		signal hbufferDataIn: InstructionState := DEFAULT_INSTRUCTION_STATE;
 	
-		signal killAll: std_logic := '0';
+		signal killAll, frontKill: std_logic := '0';
 	
 		signal earlyBranchDataIn: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
 	
@@ -148,7 +148,7 @@ begin
 			sendingOut => sendingOutFetch,
 			stageDataOut => f0output,
 			
-			execEventSignal => killAll,--killVector(1),
+			execEventSignal => killAll or frontKill,--killVector(1),
 			lateEventSignal => killAll,
 			execCausing => DEFAULT_INSTRUCTION_STATE,
 			lockCommand => '0'		
@@ -197,7 +197,7 @@ begin
 			sendingOut => sendingOutFetch1,
 			stageDataOut => f1output,
 			
-			execEventSignal => killAll,--killVector(1),
+			execEventSignal => killAll or frontKill, --killVector(1),
 			lateEventSignal => killAll,
 			execCausing => DEFAULT_INSTRUCTION_STATE,
 			lockCommand => '0'		
@@ -234,7 +234,8 @@ begin
 	
 		
 		-- Branch prediction stub. This stage is in parallel with Hbuff
-			earlyBranchDataIn.data(0) <= getFrontEvent(hbufferDataIn, pcSendingDelayedFinal, ivalidFinal);
+			earlyBranchDataIn.data(0) <= getFrontEvent(hbufferDataIn,
+															pcSendingDelayedFinal, ivalidFinal, acceptingOutHbuffer);
 			earlyBranchdataIn.fullMask(0) <= pcSendingDelayedFinal;
 			
 			sendingToEarlyBranch <= pcSendingDelayedFinal; -- ??
@@ -262,7 +263,8 @@ begin
 
 					stageEventsOut => stage0Events
 			);
-	
+		
+			frontKill <= stage0Events.eventOccured;
 	
 	-- Decode stage				
 	STAGE_DECODE: block
