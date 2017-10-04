@@ -190,7 +190,7 @@ begin
 			clk => clk, reset => resetSig, en => enSig,
 					
 			prevSending => sendingOutFetch,	
-			nextAccepting => acceptingOutHbuffer,
+			nextAccepting => '1' or acceptingOutHbuffer,
 			stageDataIn => f1input,
 			
 			acceptingOut => acceptingOutFetch1,
@@ -219,7 +219,7 @@ begin
 	port map(
 		clk => clk, reset => resetSig, en => enSig,
 		
-		prevSending => sendingOutFetchFinal,	
+		prevSending => sendingOutFetchFinal and acceptingOutHbuffer,
 		nextAccepting => acceptingOut0,
 		stageDataIn => hbufferDataIn,
 		fetchBlock => fetchBlockFinal,
@@ -235,10 +235,11 @@ begin
 		
 		-- Branch prediction stub. This stage is in parallel with Hbuff
 			earlyBranchDataIn.data(0) <= getFrontEvent(hbufferDataIn,
-															pcSendingDelayedFinal, ivalidFinal, acceptingOutHbuffer);
+															pcSendingDelayedFinal, ivalidFinal, acceptingOutHbuffer,
+															fetchBlockFinal);
 			earlyBranchdataIn.fullMask(0) <= pcSendingDelayedFinal;
 			
-			sendingToEarlyBranch <= pcSendingDelayedFinal; -- ??
+			sendingToEarlyBranch <= sendingOutFetchFinal; --pcSendingDelayedFinal; -- ??
 										--	sendingOutFetchFinal -- Good, no stall
 										--	stallAtFetchLast 	-- Wrong, fetched line must be refetched
 										--	pcSendingDelayedFinal and not ivalidFinal -- invalid fetch

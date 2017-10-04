@@ -47,7 +47,7 @@ function stageMultiEvents(sd: StageDataMulti; isNew: std_logic) return StageMult
 
 
 function getFrontEvent(ins: InstructionState; receiving: std_logic; valid: std_logic;
-							  hbuffAccepting: std_logic)
+							  hbuffAccepting: std_logic; fetchBlock: HwordArray(0 to FETCH_BLOCK_SIZE-1))
 return InstructionState is
 	variable res: InstructionState := ins;
 begin
@@ -55,7 +55,7 @@ begin
 	-- receiving, valid, not accepting -> refetch
 	-- receiving, invalid, accepting -> error, will cause exception, but handled later, from decode on
 	-- receiving, invalid, not accepting -> refetch??
-
+--return res;
 	if (receiving and not hbuffAccepting) = '1' then -- When need to refetch
 		res.target := res.basicInfo.ip;
 	
@@ -65,6 +65,8 @@ begin
 	
 	-- Check if it's a branch
 	-- TODO: (should be done in predecode when loading to cache)
+	-- CAREFUL: Only without hword instructions now!
+		-- TMP
 	
 	
 	return res;
