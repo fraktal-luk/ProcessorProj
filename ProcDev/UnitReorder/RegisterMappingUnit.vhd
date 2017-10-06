@@ -66,9 +66,9 @@ entity RegisterMappingUnit is
 		newPhysSources: out PhysNameArray(0 to 3*PIPE_WIDTH-1);
 		
 		prevStablePhysDests: out PhysNameArray(0 to PIPE_WIDTH-1);
-		stablePhysSources: out PhysNameArray(0 to 3*PIPE_WIDTH-1);
+		stablePhysSources: out PhysNameArray(0 to 3*PIPE_WIDTH-1)
 	
-		readyRegFlagsNext: out std_logic_vector(0 to 3*PIPE_WIDTH-1) -- MAYBE IN THE FUTURE		
+		--readyRegFlagsNext: out std_logic_vector(0 to 3*PIPE_WIDTH-1) -- MAYBE IN THE FUTURE		
 	);
 end RegisterMappingUnit;
 

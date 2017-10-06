@@ -22,41 +22,8 @@ use work.NewPipelineData.all;
 
 package TEMP_DEV is
 
--- Type for table: ExecUnit -> exec subpipe number
-type ExecUnitToNaturalTable is array(ExecUnit'left to ExecUnit'right) of integer;
-
--- Routing table for issue queues
--- 0 - ALU, Div
--- 1 - MAC
--- 2 - Memory
--- 3 - Jump, System
-constant N_ISSUE_QUEUES: natural := 4;
-constant ISSUE_ROUTING_TABLE: ExecUnitToNaturalTable := (
-		General => -1, -- Should never happen!
-		ALU => 0,
-		MAC => 1,
-		Divide => 0,
-		Jump => 3,
-		Memory => 2,
-		System => 3 + 1);
-
-	-- TODO: automatically handle 32/64b config
-	function TEMP_addMword(a, b: Mword) return Mword;
-
-	function addMword(a, b: Mword) return Mword;
-
-
 function setInstructionTarget(ins: InstructionState; target: Mword) return InstructionState;
 
--- Gives queue number based on functional unit
-function unit2queue(unit: ExecUnit) return natural;
-function findByExecUnit(iv: InstructionStateArray; seeking: ExecUnit) return std_logic_vector;
-function routeToIQ(sd: StageDataMulti; srcVec: std_logic_vector) return StageDataMulti;	
-
-	function routeToIQ2(sd: StageDataMulti; srcVec: std_logic_vector) return StageDataMulti;	
-	
-	-- Tells if 'a' is older than 'b'
-	function tagBefore(a, b: SmallNumber) return std_logic;
 
 function extractReadyRegBits(bits: std_logic_vector; data: InstructionStateArray)
 return std_logic_vector;
@@ -64,28 +31,15 @@ return std_logic_vector;
 function extractReadyRegBitsV(bits: std_logic_vector; data: InstructionStateArray)
 return std_logic_vector;
 
--- Next address, even if after a taken branch -- UNUSED
-function getIncrementedAddress(ins: InstructionState) return Mword;
 
+-- SEQUENCE??
 function getAddressIncrement(ins: InstructionState) return Mword;
-
--- What would be next in flow without exceptions - that is next one or jump target 
-function getNormalTargetAddress(ins: InstructionState) return Mword;
-
--- Address to go to if exception happens
-function getHandlerAddress(ins: InstructionState) return Mword;
-
--- Jump target, increment if not jump 
-function getLinkInfoNormal(ins: InstructionState) return InstructionBasicInfo;
--- Handler address and system state
-function getExceptionTarget(ins: InstructionState) return InstructionBasicInfo;
--- Target, which may be exception handler call
-function getLinkInfoSuper(ins: InstructionState) return InstructionBasicInfo;
 
 
 function clearTempControlInfoSimple(ins: InstructionState) return InstructionState;
 function clearTempControlInfoMulti(sd: StageDataMulti) return StageDataMulti;
 
+-- SEQUENCE ------
 function setPhase(ins: InstructionState;
 							 phase0, phase1, phase2: std_logic)
 return InstructionState;
@@ -96,26 +50,15 @@ return InstructionState;
 
 function setLateTargetAndLink(ins: InstructionState; target: Mword; link: Mword; phase1: std_logic)
 return InstructionState;
-
+-------------------
 
 function clearEmptyResultTags(insVec: InstructionStateArray; fullMask: std_logic_vector)
 return InstructionStateArray;
 
 function trgForBQ(insVec: StageDataMulti) return StageDataMulti;
 function trgToResult(ins: InstructionState) return InstructionState;
-function trgToSR(ins: InstructionState) return InstructionState;
 function setInsResult(ins: InstructionState; result: Mword) return InstructionState;
 
-
-function findForALU(iv: InstructionStateArray) return std_logic_vector;
-
-function findBranchLink(insv: StageDataMulti) return std_logic_vector;
-
-function whichBranchLink(insv: StageDataMulti) return std_logic_vector;
-function setBranchLink(insv: StageDataMulti) return StageDataMulti;
-
-function findStores(insv: StageDataMulti) return std_logic_vector;
-function findLoads(insv: StageDataMulti) return std_logic_vector;
 
 function addMwordBasic(a, b: Mword) return Mword;
 function subMwordBasic(a, b: Mword) return Mword;
@@ -130,41 +73,13 @@ function addMwordFasterExt(a, b: Mword; carryIn: std_logic) return std_logic_vec
 
 function setInterrupt(ins: InstructionState; int: std_logic) return InstructionState;
 
+function checkIvalid(ins: InstructionState; ivalid: std_logic) return InstructionState;
+
 end TEMP_DEV;
 
 
 
 package body TEMP_DEV is
-
-		function TEMP_addMword(a, b: Mword) return Mword is
-			variable res: Mword := (others => '0');
-			variable al, ah, bl, bh, cl, ch: integer := 0;
-			variable ta, tb: hword := (others => '0'); 
-		begin
-			ta := a(31 downto 16);
-			ah := slv2u(ta);
-			al := slv2u(a(15 downto 0));
-			tb := b(31 downto 16);
-			bh := slv2u(tb);
-			bl := slv2u(b(15 downto 0));
-			
-			cl := bl + al;
-			ch := ah + bh;
-			
-			if cl >= 2**16 then
-				ch := ch + 1;
-			end if;
-			
-			res(31 downto 16) := i2slv(ch, 16);
-			res(15 downto 0) := i2slv(cl, 16);			
-			return res;
-		end function;
-
-		function addMword(a, b: Mword) return Mword is
-		begin
-			-- TODO: handle 64b config
-			return addWord(a, b);
-		end function;
 
 	function setInstructionTarget(ins: InstructionState; target: Mword) return InstructionState is
 		variable res: InstructionState := ins;
@@ -173,146 +88,19 @@ package body TEMP_DEV is
 		return res;
 	end function;
 
+--		WHAT IS THIS?	
+--		function shiftedIndex(startInd: integer; mask: std_logic_vector) return integer is
+--			variable res: integer := mask'length-1;
+--		begin
+--			for i in startInd to mask'length-2 loop -- ignoring last mask bit, because it's neutral for content
+--				if mask(i) = '1' then
+--					res := res - 1;
+--				end if;
+--			end loop;
+--			
+--			return res;
+--		end function;
 
-function unit2queue(unit: ExecUnit) return natural is
-begin
-	return ISSUE_ROUTING_TABLE(unit);
-end function;
-
-function findByExecUnit(iv: InstructionStateArray; seeking: ExecUnit) return std_logic_vector is
-	variable res: std_logic_vector(iv'range) := (others=>'0');
-begin
-	for i in iv'range loop
-		if iv(i).operation.unit = seeking then
-			res(i) := '1';
-		end if;
-	end loop;
-	return res;
-end function;
-
-	-- New routing to IQ, to replace IssueRouting
-	function routeToIQ(sd: StageDataMulti; srcVec: std_logic_vector) return StageDataMulti is
-		variable res: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
-		variable k: natural := 0;
-			constant CLEAR_EMPTY_SLOTS_IQ_ROUTING: boolean := false;
-	begin
-		if not CLEAR_EMPTY_SLOTS_IQ_ROUTING then
-			res.data := sd.data;
-		end if;
-	
-		for i in sd.fullMask'range loop
-			if srcVec(i) = '1' then
-				if sd.fullMask(k) = '0' then -- If no more instructions in packet, stop
-					exit;
-				end if;
-				res.fullMask(k) := '1';
-				res.data(k) := sd.data(i);
-				k := k + 1;
-			end if;
-		end loop;
-		return res;
-	end function;	
-
-		function routeToIQ2(sd: StageDataMulti; srcVec: std_logic_vector) return StageDataMulti is
-			variable res: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
-			variable k: natural := 0;
-				constant CLEAR_EMPTY_SLOTS_IQ_ROUTING: boolean := false;
-		begin
-			if not CLEAR_EMPTY_SLOTS_IQ_ROUTING then
-				res.data := sd.data;
-			end if;
-		
-			for i in sd.fullMask'range loop
-				-- Fill with input(j) where j is index of i-th '1' in srcVec
-				-- For output(0):
-				--	"0000" -> 3?
-				-- "0001" -> 3
-				-- "0010" -> 2
-				-- "0011" -> 2
-				-- "0100" -> 1
-				-- "0101" -> 1
-				-- "0110" -> 1 etc.
-				--		 ^ last bit is neutral for data, only matters for 'full' bit
-				-- For output(1):
-				-- "0000" -> 3?
-				-- "0001" -> 3?
-				-- "0010" -> 3?
-				-- "0011" -> 3
-				-- "0100" -> 3? 2?
-				-- "0101" -> 3
-				-- "0110" -> 2
-				-- "0111" -> 2
-				-- "1000" -> 1? 2? 3? 
-				-- "1001" -> 3
-				-- "1010" -> 2
-				-- "1011" -> 2
-				-- "1100" -> 1
-				-- "1101" -> 1
-				-- "1110" -> 1
-				-- "1111" -> 1
-				-- 	 ^ last bit is neutral, penult is not
-				--			Formula: 1 + ofs, ofs = 0 when "11__", 1 when "101_" or "011_", else 2 ??
-				-- For output(2):
-				-- "0000" -> ?
-				-- "0001" -> ?
-				-- "0010" -> ?
-				-- "0011" -> ?
-				-- "0100" -> ?
-				-- "0101" -> ?
-				-- "0110" -> ?
-				-- "0111" -> 3
-				-- "1000" -> ?
-				-- "1001" -> ?
-				-- "1010" -> ?
-				-- "1011" -> 3
-				-- "1100" -> ?
-				-- "1101" -> 3
-				-- "1110" -> 2
-				-- "1111" -> 2
-				-- 	^ last bit neutral. 2 when "111_", 3 when "110_"
-				--		formula": 2 + ofs, ofs = 0 when "111_", else 1
-				
-				-- Idea: separate the logic for each output. index(0) = f0(mask), index(1) = f1(mask) etc.
-				-- So in this place make inner loop with each possible mux index
-				for j in 0 to PIPE_WIDTH-1 loop
-					-- Select route input(j)->output(i) if condition met
-					res.data(i) := sd.data(j);
-					if countOnes(srcVec(0 to j-1)) = i and srcVec(j) = '1' then
-						res.fullMask(i) := '1';
-						exit;
-					end if;
-				end loop;
-			end loop;
-			return res;
-		end function;
-	
-		function shiftedIndex(startInd: integer; mask: std_logic_vector) return integer is
-			variable res: integer := mask'length-1;
-		begin
-			for i in startInd to mask'length-2 loop -- ignoring last mask bit, because it's neutral for content
-				if mask(i) = '1' then
-					res := res - 1;
-				end if;
-			end loop;
-			
-			return res;
-		end function;
-
-
-	-- CAREFUL! In this version (ci = ai - bi, no negatio on return) "10...0" WILL be after "0...0"!
-	--				Generally, "0..01" to "10..0" will be.
-	function tagBefore(a, b: SmallNumber) return std_logic is
-		variable ai, bi, ci: integer;
-		variable c: SmallNumber;
-	begin
-		ai := slv2u(a);
-		bi := slv2u(b);
-		ci := ai - bi;
-		c := i2slv(ci, SMALL_NUMBER_SIZE);
-		return c(c'high);
-	end function;
-	
-	
 function extractReadyRegBits(bits: std_logic_vector; data: InstructionStateArray) return std_logic_vector is
 	variable res: std_logic_vector(0 to 3*data'length-1) := (others => '0'); -- 31) := (others=>'0');
 begin
@@ -335,18 +123,6 @@ begin
 	return res;
 end function;
 
-function getIncrementedAddress(ins: InstructionState) return Mword is
-	variable nBytes: natural;
-begin
-	-- TODO: when short instructions introduced, differentiate into 2B and 4B 
-	if false then -- For short ones
-		nBytes := 2;			
-	else
-		nBytes := 4;
-	end if;	
-	--return i2slv( slv2s(ins.basicInfo.ip) + nBytes, MWORD_SIZE);
-	return addMword(ins.basicInfo.ip, getAddressIncrement(ins));
-end function;
 
 function getAddressIncrement(ins: InstructionState) return Mword is
 	variable res: Mword := (others => '0');
@@ -358,65 +134,6 @@ begin
 		res(2) := '1'; -- 4
 	end if;
 	return res;
-end function;
-
-
--- CAREFUL:
--- 		When committing a write to system reg, if it's the status reg, it must be incorporated
---			into target. It means that PC value for fetching must be updated with the status reg new value,
---			and if interrupt comes after that, the savedStateInt also must include the written change!
---			It seems that PC basicInfo must be constantly mapped from statusReg: it thus becomes a physical
---			register valid for instructions to be fetched. If so, writing to it obviously must prevent
---			any instruction from being fetched before the change is committed. Or otherwise it would be allowed
---			normally, with an exception occuring in writing makes younger ops in the pipeline invalid,
---			but this would be very complex.
-
--- "Normal target" is sequential/branch, without exceptions
-function getNormalTargetAddress(ins: InstructionState) return Mword is
-begin
-	return ins.target;
-end function;
-
-function getHandlerAddress(ins: InstructionState) return Mword is
-begin
-			-- TODO, FIX: exceptionCode sliced - shift left by ALIGN_BITS? or leave just base address
-			return EXC_BASE(MWORD_SIZE-1 downto ins.controlInfo.exceptionCode'length)
-									& ins.controlInfo.exceptionCode(
-															ins.controlInfo.exceptionCode'length-1 downto ALIGN_BITS)
-									& EXC_BASE(ALIGN_BITS-1 downto 0);			
-			--res.basicInfo.systemLevel := "00000001";
-end function;
-
-
-function getLinkInfoNormal(ins: InstructionState) return InstructionBasicInfo is
-	variable res: InstructionBasicInfo := ins.basicInfo;
-begin
-	res.ip := ins.result;
-	return res;
-end function;
-
-
-function getExceptionTarget(ins: InstructionState) return InstructionBasicInfo is
-	variable res: InstructionBasicInfo := ins.basicInfo;
-begin
-	-- get handler adr and system level 
-	res.ip := getHandlerAddress(ins);
-	res.systemLevel := "00000001";	
-	return res;
-end function;
-
-
-function getLinkInfoSuper(ins: InstructionState) return InstructionBasicInfo is
-	variable res: InstructionBasicInfo := ins.basicInfo;
-begin
-	if ins.controlInfo.hasException = '1' then 
-		return getExceptionTarget(ins);
-	-- > NOTE, TODO: Interupt chaining can be implemented in a simple way: when another interrupt appears, 
-	--		jump to handler directly from currently running handler, but don't set ILR.
-	--		ILR will remain from the first interrupt in chain, just like in tail function call
-	else
-		return getLinkInfoNormal(ins);
-	end if;
 end function;
 
 
@@ -570,16 +287,6 @@ end function;
 			res.result := ins.target;
 			return res;
 		end function;
-		
-		function trgToSR(ins: InstructionState) return InstructionState is
-			variable res: InstructionState := ins;
-		begin
-			-- CAREFUL! Here we use 'result' because it is the field copied to arg1 in mem queue!
-			-- TODO: regularize usage of such fields, maybe remove 'target' from InstructionState?
-			res.argValues.arg2(4 downto 0) := ins.constantArgs.c0;
-			res.argValues.arg2(MWORD_SIZE-1 downto 5) := (others => '0');
-			return res;
-		end function;
 
 		function setInsResult(ins: InstructionState; result: Mword) return InstructionState is
 			variable res: InstructionState := ins;
@@ -587,131 +294,6 @@ end function;
 			res.result := result;
 			return res;
 		end function;
-
-
-	
-function getStoreAddressPart(ins: InstructionState)
-return InstructionState is
-	variable res: InstructionState := ins;
-	constant srcs: std_logic_vector(0 to 2) := ('1', '1', '0');
-begin
-	res := isolateArgSubset(res, '1', srcs);
-	return res;
-end function;
-
-function getLoadAddressPart(ins: InstructionState)
-return InstructionState is
-	variable res: InstructionState := ins;
-	constant srcs: std_logic_vector(0 to 2) := ('1', '1', '0');
-begin
-	res := isolateArgSubset(res, '0', srcs);
-	return res;
-end function;
-
-function getStoreDataPart(ins: InstructionState)
-return InstructionState is
-	variable res: InstructionState := ins;
-	constant srcs: std_logic_vector(0 to 2) := ('0', '0', '1');
-begin
-	res := isolateArgSubset(res, '1', srcs);
-	return res;
-end function;
-
-function getResultPart(ins: InstructionState)
-return InstructionState is
-	variable res: InstructionState := ins;
-	constant srcs: std_logic_vector(0 to 2) := ('0', '0', '0');
-begin
-	res := isolateArgSubset(res, '1', srcs);
-	return res;
-end function;
-
-function getSourcePart(ins: InstructionState)
-return InstructionState is
-	variable res: InstructionState := ins;
-	constant srcs: std_logic_vector(0 to 2) := ('1', '1', '1');
-begin
-	res := isolateArgSubset(res, '0', srcs);
-	return res;
-end function;
-
-
-function findForALU(iv: InstructionStateArray) return std_logic_vector is
-	constant LEN: integer := iv'length;
-	variable res: std_logic_vector(0 to LEN-1) := (others => '0'); 
-begin
-	for i in 0 to LEN-1 loop
-		if iv(i).operation.unit = ALU then
-			res(i) := '1';
-		end if;
-	end loop;
-	return res;
-end function;
-
-function findBranchLink(insv: StageDataMulti) return std_logic_vector is
-	variable res: std_logic_vector(0 to PIPE_WIDTH-1) := (others => '0');
-begin
-	for i in 0 to PIPE_WIDTH-1 loop
-		if 	 insv.data(i).operation = (Jump, jump)
-			and isNonzero(insv.data(i).virtualDestArgs.d0) = '1'
-			and insv.data(i).virtualDestArgs.sel(0) = '1'
-		then
-			res(i) := '1';
-		end if;
-	end loop;
-	return res;
-end function;
-
-
-function whichBranchLink(insv: StageDataMulti) return std_logic_vector is
-	variable res: std_logic_vector(0 to PIPE_WIDTH-1) := (others => '0');
-begin
-	for i in 0 to PIPE_WIDTH-1 loop
-		res(i) := insv.data(i).classInfo.branchLink;
-	end loop;
-	
-	return res;
-end function;
-
-function setBranchLink(insv: StageDataMulti) return StageDataMulti is
-	variable res: StageDataMulti := insv;
-	variable bl: std_logic_vector(0 to PIPE_WIDTH-1) := (others => '0');
-begin
-	bl := findBranchLink(insv);
-	for i in 0 to PIPE_WIDTH-1 loop
-		res.data(i).classInfo.branchLink := bl(i);
-	end loop;
-	
-	return res;
-end function;
-
-
-function findStores(insv: StageDataMulti) return std_logic_vector is
-	variable res: std_logic_vector(0 to PIPE_WIDTH-1) := (others => '0');
-begin
-	for i in 0 to PIPE_WIDTH-1 loop
-		if 	insv.data(i).operation = (Memory, store) 
-			or	insv.data(i).operation = (System, sysMTC)
-		then
-			res(i) := '1';
-		end if;
-	end loop;
-	return res;
-end function;
-
-function findLoads(insv: StageDataMulti) return std_logic_vector is
-	variable res: std_logic_vector(0 to PIPE_WIDTH-1) := (others => '0');
-begin
-	for i in 0 to PIPE_WIDTH-1 loop
-		if 	insv.data(i).operation = (Memory, load)
-			or	insv.data(i).operation = (System, sysMFC)
-		then
-			res(i) := '1';
-		end if;
-	end loop;
-	return res;
-end function;
-
 
 function addMwordBasic(a, b: Mword) return Mword is
 	variable res: Mword := (others => '0');
@@ -893,6 +475,14 @@ function setInterrupt(ins: InstructionState; int: std_logic) return InstructionS
 	variable res: InstructionState := ins;
 begin
 	res.controlInfo.hasInterrupt := int;
+	return res;
+end function;
+
+
+function checkIvalid(ins: InstructionState; ivalid: std_logic) return InstructionState is
+	variable res: InstructionState := ins;
+begin
+	res.controlInfo.squashed := not ivalid; -- CAREFUL: here we'll use 'squashed', must be cleared before ROB 
 	return res;
 end function;
 

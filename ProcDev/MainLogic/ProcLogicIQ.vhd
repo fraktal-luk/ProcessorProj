@@ -23,7 +23,7 @@ use work.GeneralPipeDev.all;
 package ProcLogicIQ is				
 
 function getDispatchArgValues(ins: InstructionState;-- ai: ArgStatusInfo;
-										vals: MwordArray)
+										vals: MwordArray; USE_IMM: boolean)
 return InstructionState;
 
 function updateDispatchArgs(ins: InstructionState; vals: MwordArray; regValues: MwordArray) --;
@@ -227,7 +227,7 @@ end function;
 
 
 function getDispatchArgValues(ins: InstructionState;-- ai: ArgStatusInfo;
-										vals: MwordArray)
+										vals: MwordArray; USE_IMM: boolean)
 return InstructionState is
 	variable res: InstructionState := ins;
 		variable v0, v1: std_logic_vector(1 downto 0) := "00";
@@ -235,8 +235,9 @@ return InstructionState is
 begin			
 	res.argValues.arg0 := vals(slv2u(res.argValues.locs(0)));
 	
-	if res.argValues.immediate = '1' then
+	if res.argValues.immediate = '1' and USE_IMM then
 		res.argValues.arg1 := res.constantArgs.imm;
+			--res.argValues.arg1(31 downto 16) := (others => res.constantArgs.imm(15));
 	else
 		res.argValues.arg1 := vals(slv2u(res.argValues.locs(1)));
 	end if;

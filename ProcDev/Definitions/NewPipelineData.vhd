@@ -17,7 +17,7 @@ package NewPipelineData is
 
 	constant BASIC_CHECKS: boolean := true;
 	constant LOG_PIPELINE: boolean := false;
-		constant LOG_FREE_LIST: boolean := false;
+	constant LOG_FREE_LIST: boolean := false;
 
 	-- Configuration defs 
 	constant MW: natural := 4; -- Max pipe width  
@@ -34,7 +34,6 @@ package NewPipelineData is
 	constant PROPAGATE_MODE: boolean := false;--true; -- Int/exc level marked in instruction throughout pipeline
 	
 	constant EARLY_TARGET_ENABLE: boolean := true; -- Calc branch targets in front pipe
-	constant BRANCH_AT_DECODE: boolean := false;
 	
 	constant CQ_SINGLE_OUTPUT: boolean := (LOG2_PIPE_WIDTH = 0);
 	constant CQ_THREE_OUTPUTS: boolean := not CQ_SINGLE_OUTPUT;
@@ -49,12 +48,6 @@ package NewPipelineData is
 	end function;
 	
 	constant INTEGER_WRITE_WIDTH: integer := getIntegerWriteWidth(CQ_SINGLE_OUTPUT);
-	
-	-- TODO: eliminate, change to chained implementation
-	constant N_EVENT_AREAS: natural := 8;-- How many distinct stages or groups of stages have own event signals
-	-- PC, Fetch0, Fetch1, Hbuffer, Decode, Rename, OOO, Committed
-	--	 0			1		  2 		  3		 4			5 	  6			 7	
-	
 	
 	constant IQ_A_SIZE: natural := PIPE_WIDTH * 2;
 	constant IQ_B_SIZE: natural := PIPE_WIDTH * 2;
@@ -78,14 +71,11 @@ package NewPipelineData is
 		
 		-- Allows to raise 'lockSend' for instruction before Exec when source which was 'readyNext'
 		--	doesn't show in 'ready'	when expected	
-		constant BLOCK_ISSUE_WHEN_MISSING: std_logic := '0';
+		constant BLOCK_ISSUE_WHEN_MISSING: std_logic := '0'; -- 
 		
 	constant N_RES_TAGS: natural := 4-1 + CQ_SIZE;
 						-- Above: num subpipe results + CQ slots + max commited slots + pre-IQ red ports
 	constant N_NEXT_RES_TAGS: natural := 2; 
-
-	
-	constant zerosPW: std_logic_vector(0 to PIPE_WIDTH-1) := (others=>'0');	
 	------
 
 	-- TODO: move config info to general config file included in higher level definition files
@@ -93,7 +83,7 @@ package NewPipelineData is
 	constant N_PHYS: natural := N_PHYSICAL_REGS;
 	
 	constant FREE_LIST_SIZE: natural := N_PHYS; -- CAREFUL: must be enough for N_PHYS-32
-		constant FREE_LIST_COARSE_REWIND: std_logic := '0';
+	constant FREE_LIST_COARSE_REWIND: std_logic := '0';
 	
 	constant PHYS_NAME_SIZE: integer := 6; -- CAREFUL: 2**PHYS_NAME_SIZE must be not less than n_PHYS!
 	subtype PhysName is std_logic_vector(PHYS_NAME_SIZE-1 downto 0);
@@ -104,8 +94,8 @@ package NewPipelineData is
 
 	function getTagHigh(tag: std_logic_vector) return std_logic_vector;
 	function getTagLow(tag: std_logic_vector) return std_logic_vector;
-		function getTagHighSN(tag: SmallNumber) return SmallNumber;
-		function getTagLowSN(tag: SmallNumber) return SmallNumber;	
+	function getTagHighSN(tag: SmallNumber) return SmallNumber;
+	function getTagLowSN(tag: SmallNumber) return SmallNumber;	
 	function clearTagLow(tag: std_logic_vector) return std_logic_vector;	
 	function clearTagHigh(tag: std_logic_vector) return std_logic_vector;	
 	function alignAddress(adr: std_logic_vector) return std_logic_vector;
@@ -131,6 +121,8 @@ type ExecFunc is (unknown,
 										sysHalt,
 										sysSync, sysReplay,
 										sysMTC, sysMFC, -- move to/from control
+										sysError,
+										
 										sysUndef
 							);	
 							

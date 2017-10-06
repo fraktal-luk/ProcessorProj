@@ -83,6 +83,7 @@ architecture Behavioral of IntegerMultiplier is
 	
 	signal dataM: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
 		signal eventCausing: InstructionState := DEFAULT_INSTRUCTION_STATE;
+	signal multResult: dword := (others => '0');
 begin
 		eventCausing <= setInterrupt(execCausing, lateEventSignal);
 
@@ -102,6 +103,7 @@ begin
 		stageDataOut => data0,
 		
 		execEventSignal => execEventSignal,
+		lateEventSignal => lateEventSignal,
 		execCausing => eventCausing,
 		lockCommand => '0',
 		
@@ -121,6 +123,7 @@ begin
 		stageDataOut => data1,
 		
 		execEventSignal => execEventSignal,
+		lateEventSignal => lateEventSignal,
 		execCausing => eventCausing,
 		lockCommand => '0',
 		
@@ -143,6 +146,7 @@ begin
 		stageDataOut => outputData,
 		
 		execEventSignal => execEventSignal,
+		lateEventSignal => lateEventSignal,
 		execCausing => eventCausing,
 		lockCommand => '0',
 		
@@ -150,6 +154,18 @@ begin
 	);		
 	
 	data1Prev <= data1.data(0);				
-	dataOut <= outputData.data(0);
+	dataOut <= setInsResult(outputData.data(0), multResult(31 downto 0));
+	
+	
+	MP: entity work.NewMultiplierPipe(Behavioral)
+	port map(
+		clk => clk, reset => reset, en => en,
+		inA => dataIn.argValues.arg0,
+		inB => dataIn.argValues.arg1,
+		inC => (others => '0'),
+		result => multResult
+	);
+	
+	
 end Behavioral;
 

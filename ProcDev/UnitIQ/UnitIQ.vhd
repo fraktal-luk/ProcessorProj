@@ -54,26 +54,32 @@ entity UnitIQ is
 		reset: in std_logic;
 		en: in std_logic;		
 
-		prevSendingOK: in std_logic;		
-		nextAccepting: in std_logic; -- from exec			
+		prevSendingOK: in std_logic;
+		acceptingVec: out std_logic_vector(0 to PIPE_WIDTH-1);
+			issueAccepting: in std_logic;
+		
+			queueSendingOut: out std_logic;
+			queueDataOut: out InstructionState;
+		
 		newData: in StageDataMulti;			
+
+		readyRegFlags: in std_logic_vector(0 to 3*PIPE_WIDTH-1);
 		
 		execCausing: in InstructionState;
 		execEventSignal: in std_logic;		
-			lateEventSignal: in std_logic;
+		lateEventSignal: in std_logic;
 			
-		fni: in ForwardingInfo;
+		fni: in ForwardingInfo
 			
-		-- Phys regs to read - only for "full read ports" configuration 
-		regsForDispatch: out PhysNameArray(0 to 2);
-		regReadAllow: out std_logic;			
 
-		readyRegFlags: in std_logic_vector(0 to 3*PIPE_WIDTH-1);			
-		regValues: in MwordArray(0 to 2);
-			
-			acceptingVec: out std_logic_vector(0 to PIPE_WIDTH-1);		
-		dataOutIQ: out InstructionState;
-			sendingOut: out std_logic
+		-- Phys regs to read - only for "full read ports" configuration 
+--		regsForDispatch: out PhysNameArray(0 to 2);
+		--regReadAllow: out std_logic;			
+--		regValues: in MwordArray(0 to 2);
+
+--			nextAccepting: in std_logic; -- from exec	
+--		dataOutIQ: out InstructionState;
+--		sendingOut: out std_logic
 	);
 
 end UnitIQ;
@@ -114,7 +120,8 @@ begin
 	 	clk => clk, reset => resetSig, en => enSig,
 	 	prevSendingOK => prevSendingOK,
 	 	newData => newData,
-	 	nextAccepting => dispatchAccepting,
+	 	nextAccepting => --dispatchAccepting,
+								issueAccepting,
 		execEventSignal => execEventSignal,
 		execCausing => eventCausing,
 		aiArray => aiArray,
@@ -146,26 +153,30 @@ begin
 		aiArray => aiArray
 	);
 
-	-- Dispatch stage			
-	DISPATCH_MAIN_LOGIC: entity work.SubunitDispatch(Alternative)	
-	port map(
-	 	clk => clk, reset => resetSig, en => enSig,
-	 	prevSending => queueSending,
-	 	nextAccepting => nextAccepting,
-		execEventSignal => execEventSignal,
-		execCausing => eventCausing,
-		resultTags => fni.resultTags,
-		resultVals => fni.resultValues,
-		regValues => regValues,
-	 	stageDataIn => toDispatch,		
-		acceptingOut => dispatchAccepting,
-		sendingOut => sendingOut,
-		stageDataOut => dataOutIQ
-	);
+		queueSendingOut <= queueSending;
+		queueDataOut <= toDispatch;
 	
-	regsForDispatch <=
-			(0 => toDispatch.physicalArgs.s0, 1 => toDispatch.physicalArgs.s1, 2 => toDispatch.physicalArgs.s2);
-	regReadAllow <= queueSending;
+--	-- Dispatch stage			
+--	DISPATCH_MAIN_LOGIC: entity work.SubunitDispatch(Alternative)	
+--	port map(
+--	 	clk => clk, reset => resetSig, en => enSig,
+--	 	prevSending => queueSending,
+--	 	nextAccepting => nextAccepting,
+--		execEventSignal => execEventSignal,
+--		lateEventSignal => lateEventSignal,
+--		execCausing => eventCausing,
+--		resultTags => fni.resultTags,
+--		resultVals => fni.resultValues,
+--		regValues => regValues,
+--	 	stageDataIn => toDispatch,		
+--		acceptingOut => dispatchAccepting,
+--		sendingOut => sendingOut,
+--		stageDataOut => dataOutIQ
+--	);
+	
+--	regsForDispatch <=
+--			(0 => toDispatch.physicalArgs.s0, 1 => toDispatch.physicalArgs.s1, 2 => toDispatch.physicalArgs.s2);
+	--regReadAllow <= queueSending;
 		
 end Behavioral;
 

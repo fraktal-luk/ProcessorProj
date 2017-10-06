@@ -107,7 +107,7 @@ type ProcOpcont is ( -- ALU functions
 							halt,
 							sync,
 							replay,
-							
+							error,
 							
 							mfc,
 							mtc,

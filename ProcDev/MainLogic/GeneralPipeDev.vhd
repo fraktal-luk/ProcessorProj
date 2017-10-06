@@ -24,14 +24,6 @@ use work.TEMP_DEV.all;
 
 package GeneralPipeDev is
 
-		-- group:  revTag = causing.groupTag and i2slv(-PIPE_WIDTH, SMALL_NUMBER_SIZE), mask = all ones
-		-- sequential: revTag = causing.numberTag, mask = new group's fullMask		
-		function nextCtr(ctr: SmallNumber; rewind: std_logic; revTag: SmallNumber;
-									 allow: std_logic; mask: std_logic_vector) 
-		return SmallNumber;
-		
-		constant ALL_FULL: std_logic_vector(0 to PIPE_WIDTH-1) := (others => '1');
-
 function makeSlotArray(insVec: InstructionStateArray; mask: std_logic_vector) return InstructionSlotArray;
 
 function extractFullMask(queueContent: InstructionSlotArray) return std_logic_vector;
@@ -50,12 +42,6 @@ function compactMask(data: InstructionStateArray; mask: std_logic_vector) return
 
 function findMatching(content: InstructionSlotArray; ins: InstructionState)
 return std_logic_vector;
-
-function queueMaskNext(livingMask: std_logic_vector;
-					  newMask: std_logic_vector;
-					  nLivingIn: integer;
-					  sending: integer;
-					  receiving: std_logic) return std_logic_vector;
 
 function stageSimpleNext(content, newContent: InstructionState; full, sending, receiving: std_logic)
 return InstructionState;
@@ -101,20 +87,15 @@ function getPhysicalDestMask(insVec: StageDataMulti) return std_logic_vector;
 
 function getExceptionMask(insVec: StageDataMulti) return std_logic_vector;
 
-function getLastFull(newContent: StageDataMulti) return InstructionState;
 function getEffectiveMask(newContent: StageDataMulti) return std_logic_vector;
 function getLastEffective(newContent: StageDataMulti) return InstructionState;
-function groupHasException(newContent: StageDataMulti) return std_logic;
-
 
 function getSendingFromCQ(livingMask: std_logic_vector) return std_logic_vector;
 
-
 function killByTag(before, ei, int: std_logic) return std_logic;
-
 	
 -- FORWARDING NETWORK ------------
-function getWrittenTags(lastCommitted: StageDataMulti) return PhysNameArray;
+function getWrittenTags(lastCommitted: StageDataMulti) return PhysNameArray; -- DEPREC
 
 function getResultTags(execEnds: InstructionStateArray;
 			stageDataCQ: InstructionStateArray;
@@ -130,18 +111,16 @@ function getResultValues(execEnds: InstructionStateArray;
 										stageDataCQ: InstructionStateArray;
 										lastCommitted: StageDataMulti)
 return MwordArray;	
+---------------------
 
+-- OTHER EXEC -----------
 function getExecEnds(oA, oB, oC, oD, oE: InstructionSlot) return InstructionStateArray;
 function getExecEnds2(oA, oB, oC, oD, oE: InstructionSlot) return InstructionStateArray;
 function getExecSending(oA, oB, oC, oD, oE: InstructionSlot) return std_logic_vector;
 function getExecSending2(oA, oB, oC, oD, oE: InstructionSlot) return std_logic_vector;
 function getExecPreEnds(opB, opC: InstructionState) return InstructionStateArray;
+-----------------------
 
-
--- Unifies content of ROB slot with BQ, others queues etc. to restore full state needed at Commit
-function recreateGroup(insVec: StageDataMulti; bqGroup: StageDataMulti;
-							  prevAddress: Mword--; tempValue: Mword; useTemp: std_logic
-							  ) return StageDataMulti;
 
 function simpleQueueNext(content: InstructionStateArray; newContent: InstructionStateArray;
 		livingMask: std_logic_vector;
@@ -152,11 +131,6 @@ function simpleQueueNext(content: InstructionStateArray; newContent: Instruction
 return InstructionSlotArray;
 
 
-function combineMulti(vec0, vec1: StageDataMulti) return StageDataMulti;
-
-function findWhichTakeReg(sd: StageDataMulti) return std_logic_vector;
-function findWhichPutReg(sd: StageDataMulti) return std_logic_vector;
-
 function getKillMask(content: InstructionStateArray; fullMask: std_logic_vector;
 							causing: InstructionState; execEventSig: std_logic; lateEventSig: std_logic)
 return std_logic_vector;
@@ -166,21 +140,6 @@ end GeneralPipeDev;
 
 
 package body GeneralPipeDev is
-
-		-- group:  revTag = causing.groupTag and i2slv(-PIPE_WIDTH, SMALL_NUMBER_SIZE), mask = all ones
-		-- sequential: revTag = causing.numberTag, mask = new group's fullMask		
-		function nextCtr(ctr: SmallNumber; rewind: std_logic; revTag: SmallNumber;
-									 allow: std_logic; mask: std_logic_vector) 
-		return SmallNumber is			
-		begin
-			if rewind = '1' then
-				return revTag;
-			elsif allow = '1' then
-				return i2slv(slv2u(ctr) + countOnes(mask), SMALL_NUMBER_SIZE);
-			else
-				return ctr;
-			end if;
-		end function;
 
 function makeSlotArray(insVec: InstructionStateArray; mask: std_logic_vector) return InstructionSlotArray is
 	variable res: InstructionSlotArray(0 to insVec'length-1) := (others => DEFAULT_INSTRUCTION_SLOT);
@@ -297,35 +256,6 @@ begin
 		end if;
 	end loop;							
 	return res;
-end function;
-
-
-function queueMaskNext(livingMask: std_logic_vector;
-					  newMask: std_logic_vector;
-					  nLivingIn: integer;
-					  sending: integer;
-					  receiving: std_logic) return std_logic_vector is
-	variable nLiving: integer := nLivingIn;
-	constant LEN: integer := livingMask'length;
-	variable tempMask: std_logic_vector(0 to LEN + PIPE_WIDTH-1) := (others => '0');
-	variable outMask: std_logic_vector(0 to LEN-1) := (others => '0');
-begin
-	if nLiving < 0  or nLiving > LEN then
-		nLiving := 0;
-	end if;
-								
-	tempMask(0 to LEN-1) := livingMask;
-
-	-- Append new data
-	if receiving = '1' then
-		tempMask(nLiving to nLiving + PIPE_WIDTH-1) := newMask;
-	end if;
-
-	-- Shift by n of sending
-	-- CAREFUL: tempMask must have enough zeros at the end to clear outdated 'ones'!
-	outMask(0 to LEN-1) := tempMask(sending to sending + LEN-1); 
-
-	return outMask;
 end function;
 
 
@@ -536,8 +466,7 @@ function getPhysicalDestMask(insVec: StageDataMulti) return std_logic_vector is
 	variable res: std_logic_vector(insVec.fullMask'range) := (others=>'0');
 begin
 	for i in insVec.fullMask'range loop
-		res(i) := '1'--insVec.fullMask(i) 
-				and insVec.data(i).physicalDestArgs.sel(0);
+		res(i) := insVec.data(i).physicalDestArgs.sel(0);
 	end loop;			
 	return res;
 end function;
@@ -546,9 +475,7 @@ function getExceptionMask(insVec: StageDataMulti) return std_logic_vector is
 	variable res: std_logic_vector(insVec.fullMask'range) := (others=>'0');
 begin
 	for i in insVec.fullMask'range loop
-		res(i) := '1'--insVec.fullMask(i) 
-				and insVec.data(i).controlInfo.--newException;
-														 hasException;
+		res(i) := insVec.data(i).controlInfo.hasException;
 	end loop;			
 	return res;
 end function;
@@ -660,21 +587,6 @@ begin
 	return res;
 end function;
 
-			
-	function getLastFull(newContent: StageDataMulti) return InstructionState is
-		variable res: InstructionState := defaultInstructionState;
-	begin
-		-- Seeking from right side cause we need the last one 
-		for i in newContent.fullMask'reverse_range loop
-			if newContent.fullMask(i) = '1' then
-				res := newContent.data(i);				
-				exit;
-			end if;
-		end loop;
-		return res;
-	end function;			
-
-
 	function getLastEffective(newContent: StageDataMulti) return InstructionState is
 		variable res: InstructionState := newContent.data(0);
 	begin
@@ -721,28 +633,9 @@ end function;
 		end loop;
 		return res;
 	end function;
-
-		function groupHasException(newContent: StageDataMulti) return std_logic is
-		begin			
-			for i in newContent.fullMask'range loop
-				-- Count only full instructions
-				if newContent.fullMask(i) = '1' then
-					if newContent.data(i).controlInfo.hasException = '1' then
-						return '1';
-					end if;
-				else 	
-					exit;
-				end if;
-				
-			end loop;			
-			return '0';
-		end function;
 	
 	function killByTag(before, ei, int: std_logic) return std_logic is
 	begin
-		-- Version with unified exec/interrupt event
-		--return before and ei;
-		-- Version with separate interrupt 
 		return (before and ei) or int;
 	end function;
 
@@ -891,44 +784,6 @@ begin
 	return res;		
 end function;
 
--- Unifies content of ROB slot with BQ, others queues etc. to restore full state needed at Commit
-function recreateGroup(insVec: StageDataMulti; bqGroup: StageDataMulti;
-							  prevAddress: Mword--; tempValue: Mword; useTemp: std_logic
-							  ) return StageDataMulti is
-	variable res: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
-	variable targets: MwordArray(0 to PIPE_WIDTH-1) := (others => (others => '0'));
-	variable ind: integer := 0;
-	variable prevAdr: Mword := (others => '0');
-begin
-	res := insVec;
-	
-	prevAdr := prevAddress;
-	
-	for i in 0 to PIPE_WIDTH-1 loop
-		targets(i) := bqGroup.data(i).target; -- Default to some input, not zeros 
-	end loop;
-	
-	-- Take branch targets to correct places
-	for i in 0 to PIPE_WIDTH-1 loop
-		if bqGroup.fullMask(i) = '1' then
-			ind := slv2u(getTagLow(bqGroup.data(i).groupTag));
-			targets(ind) := bqGroup.data(i).argValues.arg1;
-		end if;
-	end loop;
-
-	for i in 0 to PIPE_WIDTH-1 loop
-		if insVec.data(i).controlInfo.hasBranch = '1' then
-			null;
-		else
-			targets(i) := i2slv(slv2u(prevAdr) + slv2u(getAddressIncrement(insVec.data(i))), MWORD_SIZE);
-		end if;
-		res.data(i).basicInfo.ip := prevAdr; -- ??
-		prevAdr := targets(i);
-		res.data(i).target := targets(i);
-	end loop;
-	
-	return res;
-end function;
 
 function simpleQueueNext(content: InstructionStateArray; newContent: InstructionStateArray;
 		livingMask: std_logic_vector;
@@ -985,48 +840,6 @@ begin
 	return res;		
 end function;
 
-function combineMulti(vec0, vec1: StageDataMulti) return StageDataMulti is
-	variable res: StageDataMulti := vec0;
-	variable j: integer := 0;
-begin
-	for i in 0 to PIPE_WIDTH-1 loop
-		if vec0.fullMask(i) = '1' then
-			next;
-		else
-			res.fullMask(i) := vec1.fullMask(j);
-			res.data(i) := vec1.data(j);
-			j := j + 1;
-		end if;
-		
-	end loop;
-	
-	return res;
-end function;
-
-
-
-function findWhichTakeReg(sd: StageDataMulti) return std_logic_vector is
-	variable res: std_logic_vector(0 to PIPE_WIDTH-1) := (others => '0');
-begin
-	for i in 0 to PIPE_WIDTH-1 loop
-		res(i) := sd.fullMask(i); -- CAREFUL, TEMP: every in the group (can be previosuly separated for rename, etc)
-	end loop;
-	
-	return res;
-end function;
-
-
-function findWhichPutReg(sd: StageDataMulti) return std_logic_vector is
-	variable res: std_logic_vector(0 to PIPE_WIDTH-1) := (others => '0');
-begin
-	for i in 0 to PIPE_WIDTH-1 loop
-		res(i) :=	 sd.fullMask(i) 
-					or  (sd.data(i).controlInfo.squashed and FREE_LIST_COARSE_REWIND); -- CAREFUL: for whole group
-	end loop;
-	
-	return res;
-end function;
-
 
 function getKillMask(content: InstructionStateArray; fullMask: std_logic_vector;
 							causing: InstructionState; execEventSig: std_logic; lateEventSig: std_logic)
@@ -1040,7 +853,6 @@ begin
 	end loop;
 	return res;
 end function;
-
 
 
 end GeneralPipeDev;

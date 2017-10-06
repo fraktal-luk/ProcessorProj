@@ -45,6 +45,9 @@ use work.ProcComponents.all;
 use work.ProcLogicFront.all;
 use work.ProcLogicRenaming.all;
 
+use work.ProcLogicSequence.all;
+
+
 entity UnitSequencer is
 	port(
 		clk: in std_logic;
@@ -63,15 +66,15 @@ entity UnitSequencer is
 		intSignal: in std_logic;
 		execEventSignal: in std_logic;
 		execCausing: in InstructionState;		
-		stage0EventInfo: in StageMultiEventInfo;	
+		--stage0EventInfo: in StageMultiEventInfo;	
+		
+			frontEventSignal: in std_logic;
+			frontCausing: in InstructionState;
 		
 		execOrIntEventSignalOut: out std_logic;
-		execOrIntCausingOut: out InstructionState;
-			
+		execOrIntCausingOut: out InstructionState;	
 			lateEventOut: out std_logic;
 		
-		killVecOut: out std_logic_vector(0 to N_EVENT_AREAS-1);
-
 		-- Interface PC <-> front pipe
 		frontAccepting: in std_logic;
 		pcSending: out std_logic;		
@@ -92,10 +95,9 @@ entity UnitSequencer is
 		robDataLiving: in StageDataMulti;
 		sendingFromROB: in std_logic;
 		
-			sendingFromBQ: in std_logic;
+		--	sendingFromBQ: in std_logic;
 				dataFromBQV: in StageDataMulti;
 		
-				sendingFromSB: in std_logic;
 				dataFromSB: in InstructionState;
 					sbEmpty: in std_logic;
 					sbSending: in std_logic;
@@ -121,7 +123,7 @@ entity UnitSequencer is
 			newPhysDestPointerIn: in SmallNumber;
 			newPhysSourcesIn: in PhysNameArray(0 to 3*PIPE_WIDTH-1);
 		
-		     readyRegFlagsNextV: in std_logic_vector(0 to 3*PIPE_WIDTH-1);
+		  --   readyRegFlagsNextV: in std_logic_vector(0 to 3*PIPE_WIDTH-1);
 		
 		start: in std_logic	
 	);
@@ -184,52 +186,43 @@ architecture Behavioral of UnitSequencer is
 			
 			signal ch0, ch1: std_logic := '0';
 				
-	constant HAS_RESET_SEQ: std_logic := '1';
-	constant HAS_EN_SEQ: std_logic := '1';			
+	constant HAS_RESET_SEQ: std_logic := '0';
+	constant HAS_EN_SEQ: std_logic := '0';			
 begin	 
 	resetSig <= reset and HAS_RESET_SEQ;
 	enSig <= en or not HAS_EN_SEQ;
-
-	pcBase <= stageDataOutPC.basicInfo.ip and i2slv(-PIPE_WIDTH*4, MWORD_SIZE); -- Clearing low bits
-
-		pcNext <= addMwordBasic(pcBase, PC_INC);
 		
-		TMP_phase0 <= eiEvents.causing.controlInfo.phase0;
-		TMP_phase2 <= eiEvents.causing.controlInfo.phase2;
+	TMP_phase0 <= eiEvents.causing.controlInfo.phase0;
+	TMP_phase2 <= eiEvents.causing.controlInfo.phase2;
 
 	EVENTS: block
-		-- $INPUT: 
-		--		stage0EventInfo, execEventSignal, execCausing, eiEvents
-		-- $OUTPUT:
-		-- 	execOrIntCausing, execOrIntEventSignal, killVecOut, generalEvents,
 	begin	
-			killVecOut(6) <= TMP_phase0;
-			killVecOut(5) <= execOrIntEventSignal;
-			killVecOut(0 to 4) <= generalEvents.affectedVec;
-
-			generalEvents <= NEW_generalEvents(
+		generalEvents <= NEW_generalEvents(
 											stageDataOutPC,
 												TMP_phase0,--eiEvents.eventOccured, 
 											eiEvents.causing,
 											execEventSignal, execCausing,
-											stage0EventInfo.eventOccured, stage0EventInfo.causing,
+											frontEventSignal, frontCausing,
 											pcNext
 										);
 
 			lateEventOut <= TMP_phase0;
 		execOrIntEventSignal <= execEventSignal or TMP_phase0;
 		execOrIntCausing <= eiEvents.causing when TMP_phase0 = '1' else execCausing;
-		
+									--execCausing;
 		execOrIntEventSignalOut <= execOrIntEventSignal;	-- $MODULE_OUT
 		execOrIntCausingOut <= execOrIntCausing; -- $MODULE_OUT
 	end block;
+
+	pcBase <= stageDataOutPC.basicInfo.ip and i2slv(-PIPE_WIDTH*4, MWORD_SIZE); -- Clearing low bits
+	pcNext <= addMwordBasic(pcBase, PC_INC);
 
 			stageDataToPC <= newPCData(
 											stageDataOutPC,
 											TMP_phase2,
 											eiEvents.causing,
 											execEventSignal, execCausing,
-											stage0EventInfo.eventOccured, stage0EventInfo.causing,
+											frontEventSignal, frontCausing,
 											pcNext
 										);
 
@@ -266,7 +259,9 @@ begin
 			sendingOut => sendingOutPC,
 			stageDataOut => tmpPcOut,
 			
-			execEventSignal => generalEvents.affectedVec(0),
+			execEventSignal => --generalEvents.affectedVec(0),
+										generalEvents.eventOccured,
+			lateEventSignal => TMP_phase0,
 			execCausing => DEFAULT_INSTRUCTION_STATE,
 			lockCommand => '0'		
 		);			
@@ -321,6 +316,8 @@ begin
 						currentState <= X"0000" & TMP_targetIns.basicInfo.systemLevel & TMP_targetIns.basicInfo.intLevel;
 					end if;
 					
+					currentState <= currentState and X"FFFF0303";
+					
 					-- NOTE: writing to link registers after sys reg writing gives priority to the former,
 					--			but committing a sysMtc shouldn't happen in parallel with any control event
 					-- Writing exc status registers
@@ -346,10 +343,16 @@ begin
 		end process;
 		
 		currentStateSig <= currentState;
+		
+		
+		TMP_targetIns <= getLatePCData('1', eiEvents.causing,
+													linkRegExc, linkRegInt,
+													savedStateExc, savedStateInt); -- Here, becaue needs sys regs
+		
 	end block;
 
 
-	iadr <= stageDataOutPC.basicInfo.ip and i2slv(-PIPE_WIDTH*4, MWORD_SIZE); -- Clearing low bits				
+	iadr <= pcBase; -- Clearing low bits				
 	iadrvalid <= sendingOutPC;
 	
 	pcDataLiving <= stageDataOutPC;
@@ -358,7 +361,7 @@ begin
 	-- Rename stage
 	RENAMING: block
 		-- INPUT: newPhysSources, newPhysDests
-		signal stageDataRenameIn: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;		
+		signal stageDataRenameIn, stageDataRenameInLinked: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;		
 		signal reserveSelSig, takeVec: std_logic_vector(0 to PIPE_WIDTH-1) := (others => '0' );
 		signal nToTake: integer := 0;
 	begin
@@ -386,10 +389,12 @@ begin
 							frontDataLastLiving, takeVec, reserveSelSig, newPhysSources, newPhysDests
 						),
 						newNumberTags, renameGroupCtrNext, newGprTags
-					),
-					readyRegFlagsNextV
+					)--,
+					--readyRegFlagsNextV
 				)	
 			);
+	
+		stageDataRenameInLinked <= work.ProcLogicRouting.setBranchLink(stageDataRenameIn);
 	
 		SUBUNIT_RENAME: entity work.GenericStageMulti(Renaming)
 		port map(
@@ -397,7 +402,7 @@ begin
 			
 			-- Interface with front
 			prevSending => frontLastSending,	
-			stageDataIn => stageDataRenameIn, --readyRegFlagsV),
+			stageDataIn => stageDataRenameInLinked, --readyRegFlagsV),
 			acceptingOut => acceptingOutRename,
 			
 			-- Interface with IQ
@@ -407,22 +412,11 @@ begin
 			
 			-- Event interface
 			execEventSignal => execOrIntEventSignal,
+			lateEventSignal => TMP_phase0,		
 			execCausing => execOrIntCausing,
 			lockCommand => renameLockState		
 		);
 	end block;
-				
-		RENAME_SEQ_SYNCHRONOUS: process(clk) 	
-		begin
-			if rising_edge(clk) then
-				-- Lock when exec part causes event
-				if execOrIntEventSignal = '1' then -- CAREFUL
-					renameLockState <= '1';	
-				elsif renameLockRelease = '1' then
-					renameLockState <= '0';
-				end if;					
-			end if;	
-		end process;
 			
 		-- Re-allow renaming when everything from rename/exec is committed - reg map will be well defined now
 		renameLockRelease <= '1' when commitGroupCtr = renameGroupCtr else '0';
@@ -449,15 +443,22 @@ begin
 
 		effectiveMask <= getEffectiveMask(stageDataToCommit);
 			
-		PIPE_SYNCHRONOUS: process(clk) 	
+		COMMON_SYNCHRONOUS: process(clk) 	
 		begin
 			if rising_edge(clk) then
 				renameCtr <= renameCtrNext;
 				commitCtr <= commitCtrNext;					
 				renameGroupCtr <= renameGroupCtrNext;
 				commitGroupCtr <= commitGroupCtrNext;
-			end if;
-		end process;	
+
+				-- Lock when exec part causes event
+				if execOrIntEventSignal = '1' then -- CAREFUL
+					renameLockState <= '1';	
+				elsif renameLockRelease = '1' then
+					renameLockState <= '0';
+				end if;					
+			end if;	
+		end process;		
 	end block;
 
 	sendingToCommit <= sendingFromROB;
@@ -480,6 +481,7 @@ begin
 		
 		-- Event interface
 		execEventSignal => '0', -- CAREFUL: committed cannot be killed!
+		lateEventSignal => '0',	
 		execCausing => execOrIntCausing,		
 
 		lockCommand => '0'
@@ -495,9 +497,7 @@ begin
 			--			The 'target' field will be used to update return address for exc/int
 			stageDataToCommit <= recreateGroup(robDataLiving, dataFromBQV, dataFromLastEffective.data(0).target);
 			insToLastEffective <= getLastEffective(stageDataToCommit);		
-				
-				TMP_targetIns <= getLatePCData('1', eiEvents.causing);
-											
+															
 				interruptCause.controlInfo.hasInterrupt <= intSignal;
 				interruptCause.controlInfo.hasReset <= start;
 				interruptCause.target <= TMP_targetIns.basicInfo.ip;
@@ -521,6 +521,7 @@ begin
 				
 				-- Event interface
 				execEventSignal => '0', -- CAREFUL: committed cannot be killed!
+				lateEventSignal => '0',	
 				execCausing => interruptCause,		
 
 				lockCommand => not sbEmpty,

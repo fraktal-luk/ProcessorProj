@@ -75,7 +75,7 @@ entity MemoryUnit is
 		storeValueDataIn: in InstructionState;
 
 		committing: in std_logic;
-		groupCtrNext: in SmallNumber;
+		groupCtrNext: in SmallNumber; -- DEPREC?
 		groupCtrInc: in SmallNumber;
 
 		lateEventSignal: in std_logic;
@@ -84,8 +84,7 @@ entity MemoryUnit is
 		
 		nextAccepting: in std_logic;		
 		sendingSQOut: out std_logic;
-			dataOutV: out StageDataMulti;
-		dataOutSQ: out InstructionState
+			dataOutV: out StageDataMulti
 	);
 end MemoryUnit;
 
@@ -158,7 +157,7 @@ begin
 			sqOutData <= TMP_sendingData;
 					
 			sendingSQ <= isNonzero(sqOutData.fullMask);
-			dataOutSQ <= sqOutData.data(0); -- CAREFUL, TEMP!
+			--dataOutSQ <= sqOutData.data(0); -- CAREFUL, TEMP!
 				dataOutV <= sqOutData;
 			contentData <= extractData(content);
 			

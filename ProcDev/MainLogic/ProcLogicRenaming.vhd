@@ -42,14 +42,11 @@ function renameRegs2(insVec: StageDataMulti; takeVec, destMask: std_logic_vector
 								psVec, pdVec: PhysNameArray) 		
 return StageDataMulti;
 
-function setArgStatus(insVec: StageDataMulti; readyRegFlagsVirtualNext: std_logic_vector) 
+function setArgStatus(insVec: StageDataMulti)--; readyRegFlagsVirtualNext: std_logic_vector) 
 return StageDataMulti;
 
 	
-function prepareForAGU(insVec: StageDataMulti) return StageDataMulti;
-function prepareForBranch(insVec: StageDataMulti) return StageDataMulti;
-function prepareForAlu(insVec: StageDataMulti; bl: std_logic_vector) return StageDataMulti;
-function prepareForStoreData(insVec: StageDataMulti) return StageDataMulti;
+
 
 
 function getStableDestsParallel(insVec: StageDataMulti; pdVec: PhysNameArray) return PhysNameArray;
@@ -69,6 +66,7 @@ function getSysRegWriteSel(sd: StageDataMulti) return slv5;
 -- CAREFUL: this seems not used and would choose the last value in group
 function getSysRegWriteValue(sd: StageDataMulti) return Mword;
 
+-- TODO: move to package body
 -- FUNCTION BODY
 function TMP_handleSpecial(sd: StageDataMulti) return StageDataMulti is
 	variable res: StageDataMulti := sd;
@@ -90,6 +88,10 @@ begin
 	
 	return res;
 end function;
+
+
+function findWhichTakeReg(sd: StageDataMulti) return std_logic_vector;
+function findWhichPutReg(sd: StageDataMulti) return std_logic_vector;
 
 
 function initList return PhysNameArray;
@@ -177,7 +179,7 @@ begin
 end function;
 
 
-function setArgStatus(insVec: StageDataMulti; readyRegFlagsVirtualNext: std_logic_vector) 
+function setArgStatus(insVec: StageDataMulti)--; readyRegFlagsVirtualNext: std_logic_vector) 
 return StageDataMulti is
 	variable res: StageDataMulti := insVec;
 begin
@@ -220,87 +222,16 @@ begin
 	
 	return res; -- CAREFUL: this must be removed if using virtual ready map
 	
-		-- Virtual ready table
-		for i in 0 to PIPE_WIDTH-1 loop
-			res.data(i).argValues.missing(0) := res.data(i).argValues.missing(0) 
-					and not readyRegFlagsVirtualNext(3*i + 0);
-			res.data(i).argValues.missing(1) := res.data(i).argValues.missing(1)
-					and not readyRegFlagsVirtualNext(3*i + 1);
-			res.data(i).argValues.missing(2) := res.data(i).argValues.missing(2)
-					and not readyRegFlagsVirtualNext(3*i + 2);
-		end loop;	
+--		-- Virtual ready table
+--		for i in 0 to PIPE_WIDTH-1 loop
+--			res.data(i).argValues.missing(0) := res.data(i).argValues.missing(0) 
+--					and not readyRegFlagsVirtualNext(3*i + 0);
+--			res.data(i).argValues.missing(1) := res.data(i).argValues.missing(1)
+--					and not readyRegFlagsVirtualNext(3*i + 1);
+--			res.data(i).argValues.missing(2) := res.data(i).argValues.missing(2)
+--					and not readyRegFlagsVirtualNext(3*i + 2);
+--		end loop;	
 	
-	return res;
-end function;
-
-function prepareForAGU(insVec: StageDataMulti) return StageDataMulti is
-	variable res: StageDataMulti := insVec;
-begin
-	for i in 0 to PIPE_WIDTH-1 loop
-		res.data(i).virtualArgs.sel(2) := '0';
-		res.data(i).physicalArgs.sel(2) := '0';
-		res.data(i).argValues.missing(2) := '0';
-	end loop;
-	return res;
-end function;
-
-function prepareForBranch(insVec: StageDataMulti) return StageDataMulti is
-	variable res: StageDataMulti := insVec;
-begin
-	for i in 0 to PIPE_WIDTH-1 loop
-		if res.data(i).operation /= (System, sysMfc) then
-			res.data(i).virtualDestArgs.sel := (others => '0');		
-			res.data(i).virtualDestArgs.d0 := (others => '0');
-			res.data(i).physicalDestArgs.sel := (others => '0');			
-			res.data(i).physicalDestArgs.d0 := (others => '0');
-		end if;
-		
-		if insVec.data(i).controlInfo.hasBranch = '1' then
-			res.data(i).constantArgs.imm := res.data(i).result;			
-		else
-			res.data(i).constantArgs.imm := res.data(i).target;
-		end if;
-		
-	end loop;
-	return res;
-end function;
-
-function prepareForAlu(insVec: StageDataMulti; bl: std_logic_vector) return StageDataMulti is
-	variable res: StageDataMulti := insVec;
-begin
-	for i in 0 to PIPE_WIDTH-1 loop
-		--if 	 res.data(i).operation = (Jump, jump) and isNonzero(res.data(i).virtualDestArgs.d0) = '1'
-		--	and res.data(i).virtualDestArgs.sel(0) = '1'
-		if bl(i) = '1'
-		then
-			--		assert bl(i) = '1' report "ttttt";
-		
-			res.data(i).operation := (Alu, arithAdd);
-		
-			res.data(i).physicalArgs.s0 := (others => '0');
-			res.data(i).argValues.zero(0) := '1';
-			res.data(i).argValues.missing(0) := '0';
-			
-			res.data(i).constantArgs.imm := res.data(i).result;
-		--else	
-			--		assert bl(i) = '0' report "rrrrrrrrrr";
-		end if;
-	end loop;
-	return res;
-end function;
-
-function prepareForStoreData(insVec: StageDataMulti) return StageDataMulti is
-	variable res: StageDataMulti := insVec;
-begin
-	for i in 0 to PIPE_WIDTH-1 loop
-		res.data(i).virtualArgs.sel(0) := '0';
-		res.data(i).virtualArgs.sel(1) := '0';		
-		res.data(i).physicalArgs.sel(0) := '0';
-		res.data(i).physicalArgs.sel(1) := '0';		
-		res.data(i).constantArgs.immSel := '0';
-		res.data(i).virtualDestArgs.sel(0) := '0';
-		res.data(i).physicalDestArgs.sel(0) := '0';
-	end loop;
 	return res;
 end function;
 
@@ -402,6 +333,30 @@ end function;
 		end loop;
 		return res;
 	end function;
+
+
+
+function findWhichTakeReg(sd: StageDataMulti) return std_logic_vector is
+	variable res: std_logic_vector(0 to PIPE_WIDTH-1) := (others => '0');
+begin
+	for i in 0 to PIPE_WIDTH-1 loop
+		res(i) := sd.fullMask(i); -- CAREFUL, TEMP: every in the group (can be previosuly separated for rename, etc)
+	end loop;
+	
+	return res;
+end function;
+
+
+function findWhichPutReg(sd: StageDataMulti) return std_logic_vector is
+	variable res: std_logic_vector(0 to PIPE_WIDTH-1) := (others => '0');
+begin
+	for i in 0 to PIPE_WIDTH-1 loop
+		res(i) :=	 sd.fullMask(i) 
+					or  (sd.data(i).controlInfo.squashed and FREE_LIST_COARSE_REWIND); -- CAREFUL: for whole group
+	end loop;
+	
+	return res;
+end function;
 
 function initList return PhysNameArray is
 	variable res: PhysNameArray(0 to FREE_LIST_SIZE-1) := (others => (others=> '0'));

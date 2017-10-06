@@ -74,14 +74,7 @@ entity UnitMemory is
 			memLoadReady: in std_logic;
 			memLoadValue: in Mword;
 			memLoadAddress: out Mword;
-			memStoreAddress: out Mword;
 			memLoadAllow: out std_logic;
-			memStoreAllow: out std_logic;
-			memStoreValue: out Mword;
-			
-			sysStoreAllow: out std_logic;
-			sysStoreAddress: out slv5;
-			sysStoreValue: out Mword;
 
 			sysLoadAllow: out std_logic;
 			sysLoadVal: in Mword;
@@ -89,16 +82,13 @@ entity UnitMemory is
 			committing: in std_logic;
 			groupCtrNext: in SmallNumber;
 			groupCtrInc: in SmallNumber;
-			
-			sbAccepting: out std_logic;
-			sbEmpty: out std_logic;
-			sbSendingOut: out std_logic;
-			dataFromSB: out InstructionState;
-			
+		
+			sbAcceptingIn: in std_logic;
+			dataOutSQ: out StageDataMulti;
+
 		lateEventSignal: in std_logic;	
 		execOrIntEventSignalIn: in std_logic;
-			execCausing: in InstructionState;
-		execOrIntCausingIn: in InstructionState			
+			execCausing: in InstructionState
 	);
 end UnitMemory;
 
@@ -111,7 +101,6 @@ architecture Behavioral of UnitMemory is
 	signal loadUnitSendingSig: std_logic := '0';
 	
 	signal sendingOutSQ: std_logic  := '0';
-	signal dataOutSQ: InstructionState := DEFAULT_INSTRUCTION_STATE;
 	signal dataOutSQV: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
 
 	signal dlqAccepting: std_logic := '1';	
@@ -134,21 +123,17 @@ architecture Behavioral of UnitMemory is
 				 storeAddressWrSig, storeValueWrSig: std_logic := '0';
 	signal dataToLoadUnitSig, storeAddressDataSig, storeValueDataSig:
 																		InstructionState := DEFAULT_INSTRUCTION_STATE;					
-	signal sbAcceptingV: std_logic_vector(0 to 3) := (others => '0');				
-	signal sbSending: std_logic := '0';
-	
-	signal sbMaskOut: std_logic_vector(0 to 0) := (others => '0');
-	signal sbDataOut: InstructionStateArray(0 to 0) := (others => DEFAULT_INSTRUCTION_STATE);
-	
-	signal sbFullMask: std_logic_vector(0 to SB_SIZE-1) := (others => '0');	
-----------------	
+
 	signal ch0, ch1, ch2, ch3, ch4, ch5, ch6, ch7: std_logic := '0';
 begin
 		eventSignal <= execOrIntEventSignalIn;	
-		activeCausing <= --execOrIntCausingIn;
-								setInterrupt(execCausing, lateEventSignal);
+		activeCausing <= setInterrupt(execCausing, lateEventSignal);
 
-			inputDataC.data(0) <= dataIQC;
+		inputDataC.data(0) <=			
+				 setExecState(dataIQC,
+								  addMwordFaster(dataIQC.argValues.arg0, dataIQC.argValues.arg1),
+								  '0', (others => '0'));
+	
 			inputDataC.fullMask(0) <= sendingIQC;
 
 			SUBPIPE_C: block
@@ -161,8 +146,7 @@ begin
 				signal acceptingMem0, acceptingMem1,
 						 sendingMem0, sendingMem1: std_logic := '0';
 			begin
-				STAGE_AGU: entity work.--SimpleAlu(BehavioralAGU)
-												GenericStageMulti(BasicAgu)
+				STAGE_AGU: entity work.GenericStageMulti(SingleTagged)
 				port map(
 					clk => clk, reset => reset, en => en,
 					
@@ -175,6 +159,7 @@ begin
 					stageDataOut => stageDataOutAGU,
 					
 					execEventSignal => eventSignal,
+					lateEventSignal => lateEventSignal,
 					execCausing => activeCausing,
 					lockCommand => '0',
 					
@@ -220,6 +205,7 @@ begin
 					stageDataOut => stageDataOutMem0,
 					
 					execEventSignal => eventSignal,
+					lateEventSignal => lateEventSignal,					
 					execCausing => activeCausing,
 					lockCommand => '0',
 					
@@ -242,6 +228,7 @@ begin
 					stageDataOut => outputData,
 					
 					execEventSignal => eventSignal,
+					lateEventSignal => lateEventSignal,
 					execCausing => activeCausing,
 					lockCommand => '0',
 					
@@ -300,40 +287,13 @@ begin
 						
 					lateEventSignal => lateEventSignal,	
 				execEventSignal => eventSignal,
-				execCausing => --activeCausing,
-									execCausing,
+				execCausing => execCausing,
 				
 				nextAccepting => '1',
 				
 				sendingSQOut => sendingOutSQ, -- OUTPUT
-					dataOutV => dataOutSQV,
-				dataOutSQ => dataOutSQ -- OUTPUT
+					dataOutV => dataOutSQV
 			);
-
-				-- NOTE: all ops committed in 1 cycle are from the same group, so they'll always fit into one
-					STORE_BUFFER: entity work.TestCQPart0(WriteBuffer)
-					generic map(
-						INPUT_WIDTH => PIPE_WIDTH,
-						QUEUE_SIZE => SB_SIZE,
-						OUTPUT_SIZE => 1
-					)
-					port map(
-						clk => clk, reset => reset, en => en,
-						
-						whichAcceptedCQ => sbAcceptingV,
-						maskIn => dataOutSQV.fullMask,
-						dataIn => dataOutSQV.data,
-						
-						bufferMaskOut => sbFullMask,
-						bufferDataOut => open,
-						
-						anySending => sbSending,
-						cqMaskOut => sbMaskOut,
-						cqDataOut => sbDataOut,
-						
-						execEventSignal => '0',
-						execCausing => DEFAULT_INSTRUCTION_STATE
-					);
 
 			MEM_LOAD_QUEUE: entity work.MemoryUnit(Behavioral)
 			generic map(
@@ -349,8 +309,7 @@ begin
 					dataIn => dataNewToLQ,
 				
 				storeAddressWr => sendingToLoadUnitSig or sendingToMfcSig, --?
-				storeValueWr => --'0',
-										sendingToLoadUnitSig or sendingToMfcSig,
+				storeValueWr => sendingToLoadUnitSig or sendingToMfcSig,
 
 				storeAddressDataIn => dataToLoadUnitSig, --?
 				storeValueDataIn => DEFAULT_INSTRUCTION_STATE,
@@ -361,14 +320,12 @@ begin
 
 					lateEventSignal => lateEventSignal,
 				execEventSignal => eventSignal,
-				execCausing => --activeCausing,
-									execCausing,
+				execCausing => execCausing,
 
 				nextAccepting => '1',
 
 				sendingSQOut => open,
-					dataOutV => open,
-				dataOutSQ => open 
+					dataOutV => open
 			);
 
 	
@@ -414,8 +371,7 @@ begin
 					
 					lateEventSignal => lateEventSignal,
 				execEventSignal => eventSignal,
-				execCausing => --activeCausing,
-									execCausing,
+				execCausing => execCausing,
 				
 				nextAccepting => not sendingFromSysReg,
 				
@@ -436,24 +392,13 @@ begin
 				else stageDataAfterCache;
 
 				-- Mem interface
-				memStoreAddress <= sbDataOut(0).argValues.arg1;
-				memStoreValue <= sbDataOut(0).argValues.arg2;
-		
 				memLoadAddress <= dataToLoadUnitSig.result; -- in LoadUnit
 		
 				memLoadAllow <= sendingToLoadUnitSig;
-				memStoreAllow <= sbSending when sbDataOut(0).operation = (Memory, store) else '0';
 									
-					sysLoadAllow <= sendingToMfcSig;
-									
-				 sysStoreAllow <= sbSending when sbDataOut(0).operation = (System, sysMTC) 
-								 else '0'; 
-				 sysStoreAddress <= sbDataOut(0).argValues.arg1(4 downto 0);
-				 sysStoreValue <= sbDataOut(0).argValues.arg2;
+				sysLoadAllow <= sendingToMfcSig;	 
 				 
-		sbAccepting <= sbAcceptingV(0);	
-			sbEmpty <= not sbFullMask(0);
-			sbSendingOut <= sbSending;
-			dataFromSB <= sbDataOut(0);
+			dataOutSQ <= dataOutSQV;	 
+
 end Behavioral;
 
