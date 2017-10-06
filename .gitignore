@@ -48,6 +48,11 @@ ProcDev/fuse.*
 ProcDev/fuseRelaunch.cmd
 ProcDev/xilinxsim.ini
 
+# IP code docs
+ProcDev/UnitExec/Mult16/doc
+ProcDev/UnitExec/MultAcc16/doc
+
+
 # Output texts
 **/_xmsgs/**
 

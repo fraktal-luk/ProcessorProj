@@ -45,6 +45,34 @@ return InstructionStateArray;
 
 function stageMultiEvents(sd: StageDataMulti; isNew: std_logic) return StageMultiEventInfo;
 
+
+function getFrontEvent(ins: InstructionState; receiving: std_logic; valid: std_logic;
+							  hbuffAccepting: std_logic; fetchBlock: HwordArray(0 to FETCH_BLOCK_SIZE-1))
+return InstructionState is
+	variable res: InstructionState := ins;
+begin
+	-- receiving, valid, accepting	-> good
+	-- receiving, valid, not accepting -> refetch
+	-- receiving, invalid, accepting -> error, will cause exception, but handled later, from decode on
+	-- receiving, invalid, not accepting -> refetch??
+--return res;
+	if (receiving and not hbuffAccepting) = '1' then -- When need to refetch
+		res.target := res.basicInfo.ip;
+	
+		res.controlInfo.newEvent := '1';
+		res.controlInfo.hasBranch := '1';
+	end if;
+	
+	-- Check if it's a branch
+	-- TODO: (should be done in predecode when loading to cache)
+	-- CAREFUL: Only without hword instructions now!
+		-- TMP
+	
+	
+	return res;
+end function;
+
+
 end ProcLogicFront;
 
 
@@ -130,14 +158,14 @@ begin
 	
 	res.classInfo := getInstructionClassInfo(res);	
 
-				-- TEMP: code for predicting every regular jump (even "branch never"!) as taken
-				if ((res.classInfo.branchAlways or res.classInfo.branchCond)
-					and not res.classInfo.branchReg)	= '1' and BRANCH_AT_DECODE then
-					res.controlInfo.newEvent := '1';
-					--res.controlInfo.hasEvent := '1';
-					res.controlInfo.newBranch := '1';
-					res.controlInfo.hasBranch := '1';					
-				end if;
+--				-- TEMP: code for predicting every regular jump (even "branch never"!) as taken
+--				if ((res.classInfo.branchAlways or res.classInfo.branchCond)
+--					and not res.classInfo.branchReg)	= '1' and BRANCH_AT_DECODE then
+--					res.controlInfo.newEvent := '1';
+--					--res.controlInfo.hasEvent := '1';
+--					res.controlInfo.newBranch := '1';
+--					res.controlInfo.hasBranch := '1';					
+--				end if;
 
 
 				if res.operation.unit = System and
@@ -160,7 +188,7 @@ begin
 		end if;
 		
 		if res.controlInfo.squashed = '1' then	-- CAREFUL: ivalid was '0'
-			report "Instruction from HBuffer was read from Fetch after stall!" severity error;
+			--report "Instruction from HBuffer was read from Fetch after stall!" severity error;
 		end if;
 		
 			res.controlInfo.squashed := '0';

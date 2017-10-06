@@ -9,10 +9,13 @@ architecture Behavioral5 of NewCore0 is
 	signal pcSendingSig: std_logic := '0';
 
 	signal acceptingOutFront: std_logic := '0';
-	signal stage0Events: StageMultiEventInfo;
+	--signal stage0Events: StageMultiEventInfo;
 	
 	signal frontDataLastLiving: StageDataMulti;
 	signal frontLastSending, renameAccepting: std_logic := '0';
+
+		signal frontEventSignal: std_logic := '0';
+		signal frontCausing: InstructionState := DEFAULT_INSTRUCTION_STATE;
 
 ---------------------------------
 	signal renamedDataLiving: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;	-- INPUT			
@@ -104,7 +107,11 @@ begin
 		start => int1,		
 		execEventSignal => execEventSignal,
 		execCausing => execCausing,
-		stage0EventInfo => stage0Events, -- from front
+		
+		frontEventSignal => frontEventSignal,
+		frontCausing => frontCausing,
+		
+		--stage0EventInfo => stage0Events, -- from front
 		-- Events out
 		execOrIntEventSignalOut => execOrIntEventSignal,
 		execOrIntCausingOut => execOrIntCausing,
@@ -162,7 +169,10 @@ begin
 		dataLastLiving => frontDataLastLiving,
 		lastSending => frontLastSending,
 		
-		stage0EventsOut => stage0Events,
+		--stage0EventsOut => stage0Events,
+			frontEventSignal => frontEventSignal,
+			frontCausing => frontCausing,
+		
 		execEventSignal => execEventSignal,
 		lateEventSignal => lateEventSignal		
 	);

@@ -45,10 +45,10 @@ USE ieee.std_logic_1164.ALL;
  
 	use work.ProgramCode4.all; 
  
-ENTITY NewCoreTB1 IS
-END NewCoreTB1;
+ENTITY NewCoreTB3 IS
+END NewCoreTB3;
  
-ARCHITECTURE behavior OF NewCoreTB1 IS 
+ARCHITECTURE behavior OF NewCoreTB3 IS 
 
     -- Component Declaration for the Unit Under Test (UUT)
 
@@ -214,15 +214,12 @@ BEGIN
 										 --prog0 -- CAREFUL! if using prog0, PM_SIZE may be wrong
 										 --prog1
 										 testProg1
-										(slv2u(iadr(11 downto 2)) + i); -- CAREFUL! 2 low bits unused (32b memory) 									
+										(slv2u(iadr(10 downto 2)) + i); -- CAREFUL! 2 low bits unused (32b memory) 									
 						end loop;
 					end if;
 					
-					if iadrvalid = '1' and countOnes(iadr(iadr'high downto 12)) = 0 then
-						ivalid <= '1';	
-							if slv2u(iadr(11 downto 0)) = 1240 then
-							--	ivalid <= '0';
-							end if;
+					if iadrvalid = '1' and countOnes(iadr(iadr'high downto 10)) = 0 then
+						ivalid <= '1';					
 					else
 						ivalid <= '0';	
 					end if;			
@@ -235,6 +232,11 @@ BEGIN
 	begin
 		if rising_edge(clk) then
 			if en = '1' then
+				if dwrite = '1' then
+					assert doutadr /= X"000000ff" 
+						report "Store to address 255 - illegal!" severity error;
+				end if;
+			
 				-- TODO: define effective address exact size
 			
 				-- Reading

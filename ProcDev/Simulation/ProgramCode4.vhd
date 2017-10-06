@@ -39,9 +39,12 @@ package ProgramCode4 is
 		constant ERR_HANDLER: integer := 4000;
 		
 		constant testProg1: WordMem := ( -- mem load testing 
-			0 => insNOP, --ins655H(addI, r1, r0, 300),
-			1 => insNOP, --ins655H(subI, r30, r0, 1),
+			0 => insNOP, --
+					--	ins655H(addI, r2, r0, 10000),
+			1 => insNOP, --
+					--	ins655H(addI, r3, r0, 200),
 			2 => insNOP,
+					--	ins655655(ext0, r31, r2, mulu, r3, 0),
 					--ins655655(ext2, 0, 0, halt, 0, 0),
 			3 => insNOP,			
 						
