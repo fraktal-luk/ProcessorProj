@@ -160,8 +160,8 @@ begin
 		ta <= flowDriveQ.nextAccepting;
 		tb <= flowDriveQ.prevSending;		
 		qs1 <= TMP_change_Shifting(qs0, ta, tb, fullMask, killMask,
-											execEventSignal or execCausing.controlInfo.hasInterrupt,
-											fullMaskNext);
+											execEventSignal or execCausing.controlInfo.hasInterrupt);--,
+											--fullMaskNext);
 		
 		sendingMask <= getFirstOne(readyMask2 and livingMask) when nextAccepting = '1'
 					else	(others => '0');

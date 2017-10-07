@@ -170,7 +170,7 @@ end function;
 
 
 function TMP_change_Shifting(qs: TMP_queueState; nSend, nRec: SmallNumber;
-						fullMask, killMask: std_logic_vector; killSig: std_logic; maskNext: std_logic_vector)
+						fullMask, killMask: std_logic_vector; killSig: std_logic)--; maskNext: std_logic_vector)
 return TMP_queueState is
 	constant LEN: integer := fullMask'length;
 

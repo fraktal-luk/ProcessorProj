@@ -50,6 +50,7 @@ function getFrontEvent(ins: InstructionState; receiving: std_logic; valid: std_l
 							  hbuffAccepting: std_logic; fetchBlock: HwordArray(0 to FETCH_BLOCK_SIZE-1))
 return InstructionState is
 	variable res: InstructionState := ins;
+	variable tempOffset, tempTarget: Mword := (others => '0');
 begin
 	-- receiving, valid, accepting	-> good
 	-- receiving, valid, not accepting -> refetch
@@ -67,7 +68,22 @@ begin
 	-- TODO: (should be done in predecode when loading to cache)
 	-- CAREFUL: Only without hword instructions now!
 		-- TMP
-	
+	if (receiving and valid and hbuffAccepting) = '1' then
+		if 	fetchBlock(0)(15 downto 10) = opcode2slv(jl) 
+			or fetchBlock(0)(15 downto 10) = opcode2slv(jz) 
+			or fetchBlock(0)(15 downto 10) = opcode2slv(jnz)
+		then
+			report "brnch fetched!";
+			
+			tempOffset := "00000000000" & fetchBlock(0)(4 downto 0) & fetchBlock(1);
+			tempTarget := addMwordFaster(res.basicInfo.ip, tempOffset);
+		elsif fetchBlock(0)(15 downto 10) = opcode2slv(j)
+		then
+			report "long branch fetched";
+			tempOffset := "000000" & fetchBlock(0)(9 downto 0) & fetchBlock(1);
+			tempTarget := addMwordFaster(res.basicInfo.ip, tempOffset);			
+		end if;
+	end if;
 	
 	return res;
 end function;
