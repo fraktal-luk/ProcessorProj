@@ -339,7 +339,7 @@ end function;
 	end function;
 
 		function getQueueIndicesForInput_Shifting(qs: TMP_queueState; mask: std_logic_vector;
-																ilen: integer; nSend: SmallNumber)
+																nSend: SmallNumber; ilen: integer)
 		return SmallNumberArray is
 		begin
 			return trimSNA(getQueueIndicesFrom(mask, subSN(qs.pEnd, nSend)), smallNum(ilen-1));
@@ -347,7 +347,7 @@ end function;
 		
 		-- CAREFUL: needed for hbuffer
 		function getQueueIndicesForInput_ShiftingHbuff(qs: TMP_queueState; mask: std_logic_vector;
-																ilen: integer; nSend: SmallNumber; offset: SmallNumber)
+																nSend: SmallNumber; ilen: integer; offset: SmallNumber)
 		return SmallNumberArray is
 		begin
 			return trimSNA(getQueueIndicesFrom(mask, subSN(subSN(qs.pEnd, nSend), offset)), smallNum(ilen-1));

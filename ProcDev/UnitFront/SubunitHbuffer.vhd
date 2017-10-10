@@ -107,12 +107,15 @@ begin
 				TMP_killMask <= getKillMask(TMP_stageData, TMP_mask, execCausing, '0', execEventSignal);
 				ta <= hbufferDrive.nextAccepting;
 				tb <= hbufferDrive.prevSending;
-				qs1 <= TMP_change_Shifting(qs0, ta, tb, TMP_mask, TMP_killMask, execEventSignal);
+				--qs1 <= TMP_change_Shifting(qs0, ta, tb, TMP_mask, TMP_killMask, execEventSignal);
+				qs1 <= TMP_change_Shifting(
+									qs0, hbufferDrive.nextAccepting, hbufferDrive.prevSending,
+										TMP_mask, TMP_killMask, execEventSignal);
 										
 									--getQueueIndicesForInput_Shifting(qs0, TMP_mask, 2*PIPE_WIDTH,
 									--												hbufferDrive.nextAccepting);
 				inputIndices <= getQueueIndicesForInput_ShiftingHbuff(
-										qs0, TMP_mask, 2*PIPE_WIDTH, hbufferDrive.nextAccepting, TMP_offset);																					
+										qs0, TMP_mask, hbufferDrive.nextAccepting, 2*PIPE_WIDTH, TMP_offset);																					
 				TMP_ckEnForInput <= getEnableForInput_Shifting(
 										qs0, TMP_mask, hbufferDrive.nextAccepting, hbufferDrive.prevSending);
 
