@@ -57,7 +57,7 @@ begin
 	-- receiving, invalid, accepting -> error, will cause exception, but handled later, from decode on
 	-- receiving, invalid, not accepting -> refetch??
 --return res;
-	if (receiving and not hbuffAccepting) = '1' then -- When need to refetch
+	if false and (receiving and not hbuffAccepting) = '1' then -- When need to refetch
 		res.target := res.basicInfo.ip;
 	
 		res.controlInfo.newEvent := '1';
