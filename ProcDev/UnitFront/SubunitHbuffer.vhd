@@ -105,8 +105,8 @@ architecture Implem of SubunitHbuffer is
 begin
 
 				TMP_killMask <= getKillMask(TMP_stageData, TMP_mask, execCausing, '0', execEventSignal);
-				ta <= hbufferDrive.nextAccepting;
-				tb <= hbufferDrive.prevSending;
+				--ta <= hbufferDrive.nextAccepting;
+				--tb <= hbufferDrive.prevSending;
 				--qs1 <= TMP_change_Shifting(qs0, ta, tb, TMP_mask, TMP_killMask, execEventSignal);
 				qs1 <= TMP_change_Shifting(
 									qs0, hbufferDrive.nextAccepting, hbufferDrive.prevSending,

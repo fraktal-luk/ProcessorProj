@@ -116,9 +116,12 @@ begin
 	enSig <= en or not ROB_HAS_EN;
 	
 	
-				ta <= flowDrive.nextAccepting;
-				tb <= flowDrive.prevSending;
-				qs1 <= TMP_change(qs0, ta, tb, TMP_mask, TMP_killMask, lateEventSignal or execEventSignal,
+				--ta <= flowDrive.nextAccepting;
+				--tb <= flowDrive.prevSending;
+				qs1 <= TMP_change(qs0,-- ta, tb,
+									flowDrive.nextAccepting,
+									flowDrive.prevSending,
+										TMP_mask, TMP_killMask, lateEventSignal or execEventSignal,
 										TMP_maskNext);
 										
 				inputIndices <= getQueueIndicesForInput(qs0, TMP_mask, 1);

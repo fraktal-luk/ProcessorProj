@@ -110,19 +110,17 @@ architecture Behavioral of MemoryUnit is
 	signal bufferResponse: FlowResponseBuffer := (others=>(others=>'0'));
 	
 		signal qs0, qs1: TMP_queueState := TMP_defaultQueueState;
-		signal ta, tb: SmallNumber := (others => '0');
+		--signal ta, tb: SmallNumber := (others => '0');
 		signal contentView, contentNextView:
 					InstructionStateArray(0 to QUEUE_SIZE-1) := (others => DEFAULT_INSTRUCTION_STATE);
 		signal maskView, liveMaskView, maskNextView: std_logic_vector(0 to QUEUE_SIZE-1) := (others => '0');
 		
-		signal inputIndices: SmallNumberArray(0 to QUEUE_SIZE-1) := (others => (others => '0'));
-	
-	signal inputIndices_T: SmallNumberArray(0 to QUEUE_SIZE-1) := (others => (others => '0'));
-	signal ckEnForInput_T, sendingMask_T: std_logic_vector(0 to QUEUE_SIZE-1) := (others => '0');
+		signal inputIndices: SmallNumberArray(0 to QUEUE_SIZE-1) := (others => (others => '0'));	
 begin				
-	ta <= bufferDrive.nextAccepting;
-	tb <= bufferDrive.prevSending;
-	qs1 <= TMP_change(qs0, ta, tb, TMP_mask, TMP_killMask, lateEventSignal or execEventSignal, TMP_maskNext);
+	qs1 <= TMP_change(qs0,
+							bufferDrive.nextAccepting,
+							bufferDrive.prevSending,
+							TMP_mask, TMP_killMask, lateEventSignal or execEventSignal, TMP_maskNext);
 			
 	inputIndices <= getQueueIndicesForInput(qs0, TMP_mask, PIPE_WIDTH);
 	-- indices for moved part in shifting queue would be nSend (bufferResponse.sending) everywhere
@@ -141,7 +139,7 @@ begin
 												storeAddressWr, storeValueWr, storeAddressDataIn, storeValueDataIn,
 												CLEAR_COMPLETED, KEEP_INPUT_CONTENT);
 
-	TMP_maskA <= findMatching(makeSlotArray(TMP_content, TMP_mask), storeAddressDataIn); --dataA);
+	TMP_maskA <= findMatching(makeSlotArray(TMP_content, TMP_mask), storeAddressDataIn);
 	TMP_maskD <= findMatching(makeSlotArray(TMP_content, TMP_mask), storeValueDataIn);
 
 		contentView <= normalizeInsArray(qs0, TMP_content);
@@ -157,8 +155,7 @@ begin
 			sqOutData <= TMP_sendingData;
 					
 			sendingSQ <= isNonzero(sqOutData.fullMask);
-			--dataOutSQ <= sqOutData.data(0); -- CAREFUL, TEMP!
-				dataOutV <= sqOutData;
+			dataOutV <= sqOutData;
 			contentData <= extractData(content);
 			
 			process (clk)
@@ -190,8 +187,7 @@ begin
 			);						
 
 	bufferDrive.prevSending <=num2flow(countOnes(dataIn.fullMask)) when prevSending = '1' else (others => '0');
-	bufferDrive.kill <= num2flow(countOnes(--killMask));
-														TMP_killMask));
+	bufferDrive.kill <= num2flow(countOnes(TMP_killMask));
 	bufferDrive.nextAccepting <= num2flow(countOnes(sqOutData.fullMask));
 					
 	acceptingOut <= not TMP_preFrontW.fullMask(0);

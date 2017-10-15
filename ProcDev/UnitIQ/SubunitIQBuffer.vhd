@@ -157,9 +157,12 @@ begin
 		end if;
 	end process;	
 
-		ta <= flowDriveQ.nextAccepting;
-		tb <= flowDriveQ.prevSending;		
-		qs1 <= TMP_change_Shifting(qs0, ta, tb, fullMask, killMask,
+		--ta <= flowDriveQ.nextAccepting;
+		--tb <= flowDriveQ.prevSending;		
+		qs1 <= TMP_change_Shifting(qs0,-- ta, tb,
+											flowDriveQ.nextAccepting,
+											flowDriveQ.prevSending,
+											fullMask, killMask,
 											execEventSignal or execCausing.controlInfo.hasInterrupt);
 		
 		sendingMask <= getFirstOne(readyMask2 and livingMask) when nextAccepting = '1'
