@@ -52,6 +52,10 @@ return InstructionState is
 	variable res: InstructionState := ins;
 	variable tempOffset, tempTarget: Mword := (others => '0');
 begin
+	if valid = '0' then
+		res.controlInfo.squashed := '1';
+	end if;
+
 	-- receiving, valid, accepting	-> good
 	-- receiving, valid, not accepting -> refetch
 	-- receiving, invalid, accepting -> error, will cause exception, but handled later, from decode on
@@ -60,8 +64,7 @@ begin
 	if false and (receiving and not hbuffAccepting) = '1' then -- When need to refetch
 		res.target := res.basicInfo.ip;
 	
-		res.controlInfo.newEvent := '1';
-		res.controlInfo.hasBranch := '1';
+
 	end if;
 	
 	-- Check if it's a branch
@@ -75,13 +78,18 @@ begin
 		then
 			report "brnch fetched!";
 			
+				--res.controlInfo.newEvent := '1';
+				--res.controlInfo.hasBranch := '1';			
+			
 			tempOffset := "00000000000" & fetchBlock(0)(4 downto 0) & fetchBlock(1);
 			tempTarget := addMwordFaster(res.basicInfo.ip, tempOffset);
+			res.target := tempTarget;
 		elsif fetchBlock(0)(15 downto 10) = opcode2slv(j)
 		then
 			report "long branch fetched";
 			tempOffset := "000000" & fetchBlock(0)(9 downto 0) & fetchBlock(1);
-			tempTarget := addMwordFaster(res.basicInfo.ip, tempOffset);			
+			tempTarget := addMwordFaster(res.basicInfo.ip, tempOffset);
+			res.target := tempTarget;
 		end if;
 	end if;
 	
@@ -204,7 +212,7 @@ begin
 		end if;
 		
 		if res.controlInfo.squashed = '1' then	-- CAREFUL: ivalid was '0'
-			--report "Instruction from HBuffer was read from Fetch after stall!" severity error;
+			report "Trying to decode invalid locaiton" severity error;
 		end if;
 		
 			res.controlInfo.squashed := '0';

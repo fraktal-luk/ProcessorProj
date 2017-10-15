@@ -240,7 +240,7 @@ begin
 					sendingOut => earlyBranchSending,
 					stageDataOut => earlyBranchDataOut,
 					
-					execEventSignal => killAll,--killVector(1),
+					execEventSignal => killAll, -- CAREFUL: not killing on stall, because is sent to void
 					lateEventSignal => killAll,
 					execCausing => DEFAULT_INSTRUCTION_STATE,
 					lockCommand => '0',
