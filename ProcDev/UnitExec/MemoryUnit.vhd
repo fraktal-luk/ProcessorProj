@@ -117,21 +117,17 @@ architecture Behavioral of MemoryUnit is
 		
 		signal inputIndices: SmallNumberArray(0 to QUEUE_SIZE-1) := (others => (others => '0'));	
 begin				
-	qs1 <= TMP_change(qs0,
-							bufferDrive.nextAccepting,
-							bufferDrive.prevSending,
+	qs1 <= TMP_change(qs0, bufferDrive.nextAccepting, bufferDrive.prevSending,
 							TMP_mask, TMP_killMask, lateEventSignal or execEventSignal, TMP_maskNext);
 			
-	inputIndices <= getQueueIndicesForInput(qs0, TMP_mask, PIPE_WIDTH);
-	-- indices for moved part in shifting queue would be nSend (bufferResponse.sending) everywhere
-	TMP_ckEnForInput <= getQueueEnableForInput(qs0, TMP_mask, bufferDrive.prevSending);
+	inputIndices <= getQueueIndicesForInput(qs0, QUEUE_SIZE, PIPE_WIDTH);
+	TMP_ckEnForInput <= getQueueEnableForInput(qs0, QUEUE_SIZE, bufferDrive.prevSending);
 	-- in shifting queue this would be shfited by nSend
-	-- Also slots for moved part would have enable, found from (i < nRemaining), only if nSend /= 0
-	TMP_sendingMask <= getQueueSendingMask(qs0, TMP_mask, bufferDrive.nextAccepting);
+	TMP_sendingMask <= getQueueSendingMask(qs0, QUEUE_SIZE, bufferDrive.nextAccepting);
 	TMP_killMask <= getKillMask(TMP_content, TMP_mask, execCausing, execEventSignal, lateEventSignal);
 	TMP_livingMask <= TMP_mask and not TMP_killMask;			
 				
-	TMP_maskNext <= (TMP_mask and not TMP_killMask and not TMP_sendingMask) or TMP_ckEnForInput;
+	TMP_maskNext <= (TMP_livingMask and not TMP_sendingMask) or TMP_ckEnForInput;
 	-- in shifting queue generated from (i < nFullNext)
 	TMP_contentNext <=
 				TMP_getNewContentUpdate(TMP_content, dataIn.data, TMP_ckEnForInput, inputIndices,
@@ -142,11 +138,13 @@ begin
 	TMP_maskA <= findMatching(makeSlotArray(TMP_content, TMP_mask), storeAddressDataIn);
 	TMP_maskD <= findMatching(makeSlotArray(TMP_content, TMP_mask), storeValueDataIn);
 
-		contentView <= normalizeInsArray(qs0, TMP_content);
-		maskView <= normalizeMask(qs0, TMP_mask);
-		liveMaskView <= normalizeMask(qs0, TMP_livingMask);
-		contentNextView <= normalizeInsArray(qs1, TMP_contentNext);
-		maskNextView <= normalizeMask(qs1, TMP_maskNext);
+	-- View
+	contentView <= normalizeInsArray(qs0, TMP_content);
+	maskView <= normalizeMask(qs0, TMP_mask);
+	liveMaskView <= normalizeMask(qs0, TMP_livingMask);
+	contentNextView <= normalizeInsArray(qs1, TMP_contentNext);
+	maskNextView <= normalizeMask(qs1, TMP_maskNext);
+	------
 
 	TMP_frontW <= getQueueFrontWindow(qs0, TMP_content, TMP_mask);
 	TMP_preFrontW <= getQueuePreFrontWindow(qs0, TMP_content, TMP_mask);
@@ -161,9 +159,9 @@ begin
 			process (clk)
 			begin
 				if rising_edge(clk) then	
-						qs0 <= qs1;
-						TMP_mask <= TMP_maskNext;	
-						TMP_content <= TMP_contentNext;
+					qs0 <= qs1;
+					TMP_mask <= TMP_maskNext;	
+					TMP_content <= TMP_contentNext;
 					
 					logBuffer(contentView, maskView, liveMaskView, bufferResponse);					
 					

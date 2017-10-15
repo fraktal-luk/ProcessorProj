@@ -115,18 +115,18 @@ begin
 									--getQueueIndicesForInput_Shifting(qs0, TMP_mask, 2*PIPE_WIDTH,
 									--												hbufferDrive.nextAccepting);
 				inputIndices <= getQueueIndicesForInput_ShiftingHbuff(
-										qs0, TMP_mask, hbufferDrive.nextAccepting, 2*PIPE_WIDTH, TMP_offset);																					
+										qs0, HBUFFER_SIZE, hbufferDrive.nextAccepting, 2*PIPE_WIDTH, TMP_offset);																					
 				TMP_ckEnForInput <= getEnableForInput_Shifting(
-										qs0, TMP_mask, hbufferDrive.nextAccepting, hbufferDrive.prevSending);
+										qs0, HBUFFER_SIZE, hbufferDrive.nextAccepting, hbufferDrive.prevSending);
 
 
 				movedIndices <= getQueueIndicesForMoved_Shifting(
-										qs0, TMP_mask,	hbufferDrive.nextAccepting, hbufferDrive.prevSending);
+										qs0, HBUFFER_SIZE,	hbufferDrive.nextAccepting, hbufferDrive.prevSending);
 				TMP_ckEnForMoved <= getEnableForMoved_Shifting(
-										qs0, TMP_mask, hbufferDrive.nextAccepting, hbufferDrive.prevSending);
+										qs0, HBUFFER_SIZE, hbufferDrive.nextAccepting, hbufferDrive.prevSending);
 
 
-				TMP_maskNext <= getQueueMaskNext_Shifting(qs1, TMP_mask);
+				TMP_maskNext <= getQueueMaskNext_Shifting(qs1, HBUFFER_SIZE);
 
 				TMP_stageDataNext <= TMP_getNewContent_General(TMP_stageData, hbufferDataANew,
 																		 TMP_ckEnForMoved, movedIndices,
