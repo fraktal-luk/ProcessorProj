@@ -124,6 +124,9 @@ architecture Behavioral of UnitMemory is
 	signal dataToLoadUnitSig, storeAddressDataSig, storeValueDataSig:
 																		InstructionState := DEFAULT_INSTRUCTION_STATE;					
 
+	signal storeForwardData, stageDataAfterForward: InstructionState := DEFAULT_INSTRUCTION_STATE;
+	signal storeForwardSending: std_logic := '0'; 
+
 	signal ch0, ch1, ch2, ch3, ch4, ch5, ch6, ch7: std_logic := '0';
 begin
 		eventSignal <= execOrIntEventSignalIn;	
@@ -235,6 +238,8 @@ begin
 					stageEventsOut => open					
 				);
 
+				stageDataAfterForward <= setExecState(storeForwardData, storeForwardData.argValues.arg2,
+																		'0', "0000");
 				stageDataAfterCache <= setExecState(stageDataOutMem0.data(0), memLoadValue, '0', "0000");
 				stageDataAfterSysRegs <= setExecState(stageDataOutMem0.data(0), sysLoadVal, '0', "0000");
 
@@ -285,8 +290,8 @@ begin
 													dataToLoadUnitSig,
 					compareAddressReady => sendingToLoadUnitSig or sendingToMfcSig, -- ??
 				
-					selecteddataOut => open,
-					selectedSending => open,
+					selectedDataOut => storeForwardData,
+					selectedSending => storeForwardSending,
 				
 					committing => committing,
 					--groupCtrNext => groupCtrNext,
@@ -325,7 +330,7 @@ begin
 													storeAddressDataSig,
 					compareAddressReady => storeAddressWrSig,
 
-					selecteddataOut => open,
+					selecteDdataOut => open,
 					selectedSending => open,
 					
 					committing => committing,
@@ -398,11 +403,14 @@ begin
 				execAcceptingC <= execAcceptingCSig;
 				execAcceptingE <= '1'; --???  -- execAcceptingESig;
 
-			loadResultSending <= sendingFromSysReg or sendingFromDLQ or sendingMem0;
+			loadResultSending <= sendingFromSysReg or sendingFromDLQ or sendingMem0
+																								or storeForwardSending;		
 					-- CAREFUL, TODO: ^ memLoadReady needed to ack that not a miss? But would block when a store!
+					
 			loadResultData <=
 					  stageDataAfterSysRegs when sendingFromSysReg = '1'
 				else dataFromDLQ when sendingFromDLQ = '1'
+				else stageDataAfterForward when storeForwardSending = '1'
 				else stageDataAfterCache;
 
 				-- Mem interface

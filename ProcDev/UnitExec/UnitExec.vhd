@@ -229,7 +229,7 @@ begin
 				compareAddressDataIn => DEFAULT_INSTRUCTION_STATE,
 				compareAddressReady => '0',
 
-					selecteddataOut => open,
+					selectedDataOut => open,
 					selectedSending => open,
 					
 					committing => committing,

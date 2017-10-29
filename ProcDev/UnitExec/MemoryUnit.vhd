@@ -120,7 +120,10 @@ architecture Behavioral of MemoryUnit is
 		
 		signal inputIndices: SmallNumberArray(0 to QUEUE_SIZE-1) := (others => (others => '0'));
 
-		signal cmpMask: std_logic_vector(0 to QUEUE_SIZE-1) := (others => '0');
+		signal cmpMask, newestMatch: std_logic_vector(0 to QUEUE_SIZE-1) := (others => '0');
+		
+		signal selectedData: InstructionState := DEFAULT_INSTRUCTION_STATE;
+		signal selectedSendingSig: std_logic := '0';
 		
 		
 		function compareAddress(content: InstructionStateArray; ins: InstructionState) return std_logic_vector is
@@ -135,6 +138,51 @@ architecture Behavioral of MemoryUnit is
 					report "gaggagaa";
 					report integer'image(slv2u(ins.argValues.arg1)) & ", " &
 							 integer'image(slv2u(content(i).argValues.arg1));
+				end if;
+			end loop;
+			
+			return res;
+		end function;
+		
+		function findNewestMatch(qs: TMP_queueState; cmpMask: std_logic_vector; ins: InstructionState)
+		return std_logic_vector is
+			variable res, older, before: std_logic_vector(0 to QUEUE_SIZE-1) := (others => '0');
+			variable indices, rawIndices: SmallNumberArray(0 to QUEUE_SIZE-1) := (others => (others => '0'));
+			variable matchBefore: std_logic := '0';
+		begin
+			-- From qs we must check which are older than ins
+			indices := getQueueIndicesFrom(QUEUE_SIZE, qs.pStart);
+			rawIndices := getQueueIndicesFrom(QUEUE_SIZE, (others => '0'));
+			older := compareIndicesSmaller(indices, ins.groupTag);
+			before := compareIndicesSmaller(rawIndices, ins.groupTag);
+			-- Use priority enc. to find last in the older ones. But they may be divided:
+			--		V  1 1 1 0 0 0 0 1 1 1 and cmp  V
+			--		   0 1 0 0 0 0 0 1 0 1
+			-- and then there are 2 runs of bits and those at the enc must be ignored (r older than first run)
+			
+			-- So, elems at the end are ignored when those conditions cooccur:
+			--		pStart > ins.groupTag and [match exists that match.groupTag < ins.groupTag]
+			matchBefore := isNonzero(cmpMask and before);
+			
+			if matchBefore = '1' then
+				-- Ignore those after
+				res := invertVec(getFirstOne(invertVec(cmpMask and before)));
+			else
+				-- Don't ignore any matches
+				res := invertVec(getFirstOne(invertVec(cmpMask)));				
+			end if;
+			
+			return res;
+		end function;
+		
+		function chooseIns(content: InstructionStateArray; which: std_logic_vector)
+		return InstructionState is
+			variable res: InstructionState := DEFAULT_INSTRUCTION_STATE;
+		begin
+			for i in 0 to which'length-1 loop
+				if which(i) = '1' then
+					res := content(i);
+					exit;
 				end if;
 			end loop;
 			
@@ -182,8 +230,11 @@ begin
 	contentData <= extractData(content);
 
 
-		cmpMask <= compareAddress(TMP_content, compareAddressDataIn);
-
+		cmpMask <= compareAddress(TMP_content, compareAddressDataIn) and TMP_Mask;
+		newestMatch <= findNewestMatch(qs0, cmpMask, compareAddressDataIn);
+		selectedSendingSig <= isNonzero(newestMatch) and compareAddressReady;
+		selectedData <= chooseIns(TMP_content, newestMatch);
+	
 	
 	process (clk)
 	begin
@@ -218,6 +269,9 @@ begin
 					
 	acceptingOut <= not TMP_preFrontW.fullMask(0);
 	
-	sendingSQOut <= sendingSQ;	
+	sendingSQOut <= sendingSQ;
+	
+	selectedDataOut <= selectedData;
+	selectedSending <= selectedSendingSig;
 end Behavioral;
 
