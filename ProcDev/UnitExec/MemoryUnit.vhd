@@ -74,8 +74,13 @@ entity MemoryUnit is
 		storeAddressDataIn: in InstructionState;
 		storeValueDataIn: in InstructionState;
 
+			compareAddressDataIn: in InstructionState;
+			compareAddressReady: in std_logic;
+
+			selectedDataOut: out InstructionState;
+			selectedSending: out std_logic;
+
 		committing: in std_logic;
-		groupCtrNext: in SmallNumber; -- DEPREC?
 		groupCtrInc: in SmallNumber;
 
 		lateEventSignal: in std_logic;
@@ -99,7 +104,6 @@ architecture Behavioral of MemoryUnit is
 	signal contentData, contentDataNext,  TMP_content, TMP_contentNext: InstructionStateArray(0 to QUEUE_SIZE-1)
 																			:= (others => DEFAULT_INSTRUCTION_STATE);
 	signal fullMask, livingMask, killMask, contentMaskNext, matchingA, matchingD,
-				matchingShA, matchingShD,  
 				TMP_mask, TMP_ckEnForInput, TMP_sendingMask, TMP_killMask, TMP_livingMask,
 				TMP_maskNext,	TMP_maskA, TMP_maskD
 								: std_logic_vector(0 to QUEUE_SIZE-1) := (others => '0'); 
@@ -110,12 +114,33 @@ architecture Behavioral of MemoryUnit is
 	signal bufferResponse: FlowResponseBuffer := (others=>(others=>'0'));
 	
 		signal qs0, qs1: TMP_queueState := TMP_defaultQueueState;
-		--signal ta, tb: SmallNumber := (others => '0');
 		signal contentView, contentNextView:
 					InstructionStateArray(0 to QUEUE_SIZE-1) := (others => DEFAULT_INSTRUCTION_STATE);
 		signal maskView, liveMaskView, maskNextView: std_logic_vector(0 to QUEUE_SIZE-1) := (others => '0');
 		
-		signal inputIndices: SmallNumberArray(0 to QUEUE_SIZE-1) := (others => (others => '0'));	
+		signal inputIndices: SmallNumberArray(0 to QUEUE_SIZE-1) := (others => (others => '0'));
+
+		signal cmpMask: std_logic_vector(0 to QUEUE_SIZE-1) := (others => '0');
+		
+		
+		function compareAddress(content: InstructionStateArray; ins: InstructionState) return std_logic_vector is
+			variable res: std_logic_vector(0 to QUEUE_SIZE-1) := (others => '0');
+		begin
+			for i in 0 to res'length-1 loop
+				if ins.argValues.arg1 = content(i).argValues.arg1 then
+					res(i) := '1';
+				end if;
+				
+				if ins.argValues.arg1(4) = '1' then
+					report "gaggagaa";
+					report integer'image(slv2u(ins.argValues.arg1)) & ", " &
+							 integer'image(slv2u(content(i).argValues.arg1));
+				end if;
+			end loop;
+			
+			return res;
+		end function;
+		
 begin				
 	qs1 <= TMP_change(qs0, bufferDrive.nextAccepting, bufferDrive.prevSending,
 							TMP_mask, TMP_killMask, lateEventSignal or execEventSignal, TMP_maskNext);
@@ -150,47 +175,49 @@ begin
 	TMP_preFrontW <= getQueuePreFrontWindow(qs0, TMP_content, TMP_mask);
 	TMP_sendingData <= findCommittingSQ(TMP_frontW.data, TMP_frontW.fullMask, groupCtrInc, committing);
 		
-			sqOutData <= TMP_sendingData;
-					
-			sendingSQ <= isNonzero(sqOutData.fullMask);
-			dataOutV <= sqOutData;
-			contentData <= extractData(content);
+	sqOutData <= TMP_sendingData;
 			
-			process (clk)
-			begin
-				if rising_edge(clk) then	
-					qs0 <= qs1;
-					TMP_mask <= TMP_maskNext;	
-					TMP_content <= TMP_contentNext;
-					
-					logBuffer(contentView, maskView, liveMaskView, bufferResponse);					
-					
-					-- NOTE: below has no info about flow constraints. It just checks data against
-					--			flow numbers, while the validity of those numbers is checked by slot logic	
-					checkBuffer(contentView, maskView, contentNextView, maskNextView,
-									bufferDrive, bufferResponse);
-				end if;
-			end process;
-					
-			SLOT_BUFF: entity work.BufferPipeLogic(BehavioralDirect)
-			generic map(
-				CAPACITY => QUEUE_SIZE, -- PIPE_WIDTH*2*2
-				MAX_OUTPUT => PIPE_WIDTH,
-				MAX_INPUT => PIPE_WIDTH
-			)		
-			port map(
-				clk => clk, reset => reset, en => en,
-				flowDrive => bufferDrive,
-				flowResponse => bufferResponse
-			);						
+	sendingSQ <= isNonzero(sqOutData.fullMask);
+	dataOutV <= sqOutData;
+	contentData <= extractData(content);
+
+
+		cmpMask <= compareAddress(TMP_content, compareAddressDataIn);
+
+	
+	process (clk)
+	begin
+		if rising_edge(clk) then	
+			qs0 <= qs1;
+			TMP_mask <= TMP_maskNext;	
+			TMP_content <= TMP_contentNext;
+			
+			logBuffer(contentView, maskView, liveMaskView, bufferResponse);					
+			
+			-- NOTE: below has no info about flow constraints. It just checks data against
+			--			flow numbers, while the validity of those numbers is checked by slot logic	
+			checkBuffer(contentView, maskView, contentNextView, maskNextView, bufferDrive, bufferResponse);
+		end if;
+	end process;
+			
+	SLOT_BUFF: entity work.BufferPipeLogic(BehavioralDirect)
+	generic map(
+		CAPACITY => QUEUE_SIZE, -- PIPE_WIDTH*2*2
+		MAX_OUTPUT => PIPE_WIDTH,
+		MAX_INPUT => PIPE_WIDTH
+	)
+	port map(
+		clk => clk, reset => reset, en => en,
+		flowDrive => bufferDrive,
+		flowResponse => bufferResponse
+	);						
 
 	bufferDrive.prevSending <=num2flow(countOnes(dataIn.fullMask)) when prevSending = '1' else (others => '0');
 	bufferDrive.kill <= num2flow(countOnes(TMP_killMask));
 	bufferDrive.nextAccepting <= num2flow(countOnes(sqOutData.fullMask));
 					
 	acceptingOut <= not TMP_preFrontW.fullMask(0);
-
 	
-	sendingSQOut <= sendingSQ;
+	sendingSQOut <= sendingSQ;	
 end Behavioral;
 

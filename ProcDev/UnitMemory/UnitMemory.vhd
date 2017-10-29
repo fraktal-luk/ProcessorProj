@@ -281,8 +281,15 @@ begin
 				storeAddressDataIn => storeAddressDataSig,
 				storeValueDataIn => storeValueDataSig,
 				
+					compareAddressDataIn => --DEFAULT_INSTRUCTION_STATE,--
+													dataToLoadUnitSig,
+					compareAddressReady => sendingToLoadUnitSig or sendingToMfcSig, -- ??
+				
+					selecteddataOut => open,
+					selectedSending => open,
+				
 					committing => committing,
-					groupCtrNext => groupCtrNext,
+					--groupCtrNext => groupCtrNext,
 						groupCtrInc => groupCtrInc,
 						
 					lateEventSignal => lateEventSignal,	
@@ -314,8 +321,15 @@ begin
 				storeAddressDataIn => dataToLoadUnitSig, --?
 				storeValueDataIn => DEFAULT_INSTRUCTION_STATE,
 
+					compareAddressDataIn => --DEFAULT_INSTRUCTION_STATE,--
+													storeAddressDataSig,
+					compareAddressReady => storeAddressWrSig,
+
+					selecteddataOut => open,
+					selectedSending => open,
+					
 					committing => committing,
-					groupCtrNext => groupCtrNext,
+					--groupCtrNext => groupCtrNext,
 						groupCtrInc => groupCtrInc,
 
 					lateEventSignal => lateEventSignal,

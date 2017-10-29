@@ -226,8 +226,14 @@ begin
 				storeAddressDataIn => storeTargetDataSig,
 				storeValueDataIn => DEFAULT_INSTRUCTION_STATE,
 				
+				compareAddressDataIn => DEFAULT_INSTRUCTION_STATE,
+				compareAddressReady => '0',
+
+					selecteddataOut => open,
+					selectedSending => open,
+					
 					committing => committing,
-					groupCtrNext => groupCtrNext,
+					--groupCtrNext => groupCtrNext,
 						groupCtrInc => groupCtrInc,
 						
 				lateEventSignal => lateEventSignal,
