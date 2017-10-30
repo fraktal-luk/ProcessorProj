@@ -134,12 +134,6 @@ architecture Behavioral of MemoryUnit is
 				if ins.argValues.arg1 = content(i).argValues.arg1 then
 					res(i) := '1';
 				end if;
-				
-				if ins.argValues.arg1(4) = '1' then
-					report "gaggagaa";
-					report integer'image(slv2u(ins.argValues.arg1)) & ", " &
-							 integer'image(slv2u(content(i).argValues.arg1));
-				end if;
 			end loop;
 			
 			return res;
@@ -231,6 +225,7 @@ architecture Behavioral of MemoryUnit is
 			for i in 0 to which'length-1 loop
 				if which(i) = '1' then
 					res := content(i);
+							report integer'image(slv2u(content(i).argValues.arg1));
 					exit;
 				end if;
 			end loop;

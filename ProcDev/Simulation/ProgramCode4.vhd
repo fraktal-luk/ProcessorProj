@@ -63,13 +63,14 @@ package ProgramCode4 is
 			22 => insNOP,--ins65J(jl, r31, 4*(380-22)), -- Test 0+1 forwarding 
 			
 			-- Check sysReg storage
-			23 => insSet(r25, 491),
+			23 => insSET(r25, 491),
 			24 => ins6556X(ext2, r25, 0, mtc, 2),
 				25 => ins655655(ext2, 0, 0, sync, 0, 0),
 			26 => ins6556X(ext2, r26, 0, mfc, 2),
 			27 => ins655655(ext0, r25, r25, subR, r26, 0),
 			28 => ins65J(jnz, r25, 4*(1023 - 28)), -- if not, jump to illegal addr
-			29 => insNOP,
+			29 => --insNOP,
+					ins65J(jl, r31, 4*(410-29)), -- Test store to load forwarding
 					--ins655655(ext0, r0, r26, shlC, 5, 5), -- Shifts
 			30 => insNOP,
 					--ins655655(ext0, r0, r26, shraC, 5, 5),
@@ -312,6 +313,25 @@ package ProgramCode4 is
 			404 => ins655H(subI, r10, r10, 1093), -- result must be 0
 			405 => ins65J(jnz, r10, 4*(1023 - 405)),
 			406 => insRET,
+			
+			-- Test store to load forwarding
+			-- @1640
+			410 => --insNOP,
+					 ins655655(ext2, 0, 0, sync, 0, 0),
+			411 => insCLEAR(r1),
+			412 => insSET(r2, 22),
+			413 => insSET(r3, 33),
+			414 => insLOAD(r1, r0, 4*64), -- Should be 0
+			415 => insSTORE(r2, r0, 4*64),
+			416 => insLOAD(r5, r0, 4*64), -- Should be forwarded as 22
+			417 => insSTORE(r3, r0, 4*64),
+			418 => insLOAD(r6, r0, 4*64), -- Should be forwarded as 33
+			419 => ins655H(subI, r5, r5, 22),
+			420 => ins65J(jnz, r5, 4*(1023 - 420)),
+			421 => ins655H(subI, r6, r6, 33),
+			422 => ins65J(jnz, r6, 4*(1023 - 422)),
+			423 => insNOP,
+			424 => insRET,
 			
 			-- Error handler
 			-- @4000

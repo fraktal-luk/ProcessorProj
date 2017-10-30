@@ -125,7 +125,7 @@ architecture Behavioral of UnitMemory is
 																		InstructionState := DEFAULT_INSTRUCTION_STATE;					
 
 	signal storeForwardData, stageDataAfterForward: InstructionState := DEFAULT_INSTRUCTION_STATE;
-	signal storeForwardSending: std_logic := '0'; 
+	signal storeForwardSending, storeForwardSendingDelay: std_logic := '0'; 
 
 	signal ch0, ch1, ch2, ch3, ch4, ch5, ch6, ch7: std_logic := '0';
 begin
@@ -353,11 +353,12 @@ begin
 			
 	
 	
-				TMP_SYS_REG: process(clk)
+				TMP_REG: process(clk)
 				begin
 					if rising_edge(clk) then
 						sendingFromSysReg <= sendingToMfcSig;
 						
+						storeForwardSendingDelay <= storeForwardSending;						
 					end if;
 				end process;
 
@@ -415,7 +416,7 @@ begin
 			loadResultData <=
 					  stageDataAfterSysRegs when sendingFromSysReg = '1'
 				else dataFromDLQ when sendingFromDLQ = '1'
-				else stageDataAfterForward when storeForwardSending = '1'
+				else stageDataAfterForward when storeForwardSendingDelay = '1'
 				else stageDataAfterCache;
 
 				-- Mem interface
