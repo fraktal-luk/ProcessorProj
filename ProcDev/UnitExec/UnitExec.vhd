@@ -109,6 +109,9 @@ architecture Implem of UnitExec is
 		signal inputDataA, outputDataA: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
 		signal inputDataD, outputDataD: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
 
+	signal branchQueueSelectedOut: InstructionState := DEFAULT_INSTRUCTION_STATE;
+	signal branchQueueSelectedSending: std_logic := '0';
+
 			signal ch0, ch1: std_logic := '0';
 
 	constant HAS_RESET_EXEC: std_logic := '1';
@@ -209,7 +212,8 @@ begin
 			BRANCH_QUEUE: entity work.MemoryUnit(Behavioral)
 			generic map(
 				QUEUE_SIZE => BQ_SIZE,
-				KEEP_INPUT_CONTENT => true
+				KEEP_INPUT_CONTENT => true,
+				MODE => branch
 			)
 			port map(
 				clk => clk,
@@ -226,8 +230,14 @@ begin
 				storeAddressDataIn => storeTargetDataSig,
 				storeValueDataIn => DEFAULT_INSTRUCTION_STATE,
 				
+				compareAddressDataIn => dataIQD,
+				compareAddressReady => sendingIQD,
+
+					selectedDataOut => branchQueueSelectedOut,
+					selectedSending => branchQueueSelectedSending,
+					
 					committing => committing,
-					groupCtrNext => groupCtrNext,
+					--groupCtrNext => groupCtrNext,
 						groupCtrInc => groupCtrInc,
 						
 				lateEventSignal => lateEventSignal,

@@ -157,30 +157,33 @@ begin
 		end if;
 	end process;	
 
-		ta <= flowDriveQ.nextAccepting;
-		tb <= flowDriveQ.prevSending;		
-		qs1 <= TMP_change_Shifting(qs0, ta, tb, fullMask, killMask,
-											execEventSignal or execCausing.controlInfo.hasInterrupt,
-											fullMaskNext);
+		--ta <= flowDriveQ.nextAccepting;
+		--tb <= flowDriveQ.prevSending;		
+		qs1 <= TMP_change_Shifting(qs0,-- ta, tb,
+											flowDriveQ.nextAccepting,
+											flowDriveQ.prevSending,
+											fullMask, killMask,
+											execEventSignal or execCausing.controlInfo.hasInterrupt);
 		
 		sendingMask <= getFirstOne(readyMask2 and livingMask) when nextAccepting = '1'
 					else	(others => '0');
 		
 
-		inputEnable <= getEnableForInput_Shifting(qs0, fullMask,
-																				flowDriveQ.nextAccepting, flowDriveQ.prevSending);
-		inputIndices <= getQueueIndicesForInput_Shifting(qs0, fullMask, PIPE_WIDTH, flowDriveQ.nextAccepting);
+		inputEnable <= getEnableForInput_Shifting(
+											qs0, IQ_SIZE, flowDriveQ.nextAccepting, flowDriveQ.prevSending);
+		inputIndices <= getQueueIndicesForInput_Shifting(
+											qs0, IQ_SIZE, flowDriveQ.nextAccepting, PIPE_WIDTH);
 		
 		-- CAREFUL: here we need to enable only those from sending, not from first
 			-- find index of sending - probably not used
 			sendingIndex <= findQueueIndex(sendingMask);
 			
-		movedEnable <= getEnableForMoved_Shifting(qs0, fullMask,
-																				flowDriveQ.nextAccepting, flowDriveQ.prevSending)
+		movedEnable <= getEnableForMoved_Shifting(
+											qs0, IQ_SIZE, flowDriveQ.nextAccepting, flowDriveQ.prevSending)
 						and setFromFirstOne(sendingMask);
 		movedIndices <= (others => (others => '0')); -- Always moved by 1 or not at all, so 0-th moved elem
 		
-		TMP_maskNext <= getQueueMaskNext_Shifting(qs1, fullMask);
+		TMP_maskNext <= getQueueMaskNext_Shifting(qs1, IQ_SIZE);
 
 			TMP_dataNext <= TMP_getNewContent_General(queueDataUpdated,
 																	newDataU.data,

@@ -66,6 +66,8 @@ package NewPipelineData is
 	
 	constant ROB_SIZE: natural := 8; -- ??
 	
+		type MemQueueMode is (none, store, load, branch);
+	
 		constant INITIAL_GROUP_TAG: SmallNumber := (others => '0');
 															-- i2slv(-PIPE_WIDTH, SMALL_NUMBER_SIZE)
 		

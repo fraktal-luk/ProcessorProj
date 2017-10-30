@@ -170,7 +170,7 @@ end function;
 
 
 function TMP_change_Shifting(qs: TMP_queueState; nSend, nRec: SmallNumber;
-						fullMask, killMask: std_logic_vector; killSig: std_logic; maskNext: std_logic_vector)
+						fullMask, killMask: std_logic_vector; killSig: std_logic)--; maskNext: std_logic_vector)
 return TMP_queueState is
 	constant LEN: integer := fullMask'length;
 
@@ -263,8 +263,8 @@ end function;
 
 
 -- Indices in numbers modulo length, where 0 is at given position
-function getQueueIndicesFrom(mask: std_logic_vector; start: SmallNumber) return SmallNumberArray is
-	constant LEN: integer := mask'length;	
+function getQueueIndicesFrom(size: integer; start: SmallNumber) return SmallNumberArray is
+	constant LEN: integer := size;
 	variable res: SmallNumberArray(0 to LEN-1) := (others => (others => '0'));
 	variable sn: SmallNumber := (others => '0');
 begin
@@ -324,58 +324,58 @@ begin
 	return res;
 end function;
 
-		function getQueueIndicesForInput(qs: TMP_queueState; mask: std_logic_vector; ilen: integer)
+		function getQueueIndicesForInput(qs: TMP_queueState; len: integer; ilen: integer)
 		return SmallNumberArray is
 		begin
-			return trimSNA(getQueueIndicesFrom(mask, qs.pEnd), smallNum(ilen-1));
+			return trimSNA(getQueueIndicesFrom(len, qs.pEnd), smallNum(ilen-1));
 		end function;
 
 -- CAREFUL: if buff size is not greater than PIPE_WIDTH, comparisons using MASK_NUM are not valid!
 --				Applies to a number of functions below.
-	function getQueueEnableForInput(qs: TMP_queueState; mask: std_logic_vector; nRec: SmallNumber)
+	function getQueueEnableForInput(qs: TMP_queueState; len: integer; nRec: SmallNumber)
 	return std_logic_vector is
 	begin
-		return compareIndicesSmaller(getQueueIndicesFrom(mask, qs.pEnd), nRec);
+		return compareIndicesSmaller(getQueueIndicesFrom(len, qs.pEnd), nRec);
 	end function;
 
-		function getQueueIndicesForInput_Shifting(qs: TMP_queueState; mask: std_logic_vector;
-																ilen: integer; nSend: SmallNumber)
+		function getQueueIndicesForInput_Shifting(qs: TMP_queueState; len: integer;
+																nSend: SmallNumber; ilen: integer)
 		return SmallNumberArray is
 		begin
-			return trimSNA(getQueueIndicesFrom(mask, subSN(qs.pEnd, nSend)), smallNum(ilen-1));
+			return trimSNA(getQueueIndicesFrom(len, subSN(qs.pEnd, nSend)), smallNum(ilen-1));
 		end function;
 		
 		-- CAREFUL: needed for hbuffer
-		function getQueueIndicesForInput_ShiftingHbuff(qs: TMP_queueState; mask: std_logic_vector;
-																ilen: integer; nSend: SmallNumber; offset: SmallNumber)
+		function getQueueIndicesForInput_ShiftingHbuff(qs: TMP_queueState; len: integer;
+																nSend: SmallNumber; ilen: integer; offset: SmallNumber)
 		return SmallNumberArray is
 		begin
-			return trimSNA(getQueueIndicesFrom(mask, subSN(subSN(qs.pEnd, nSend), offset)), smallNum(ilen-1));
+			return trimSNA(getQueueIndicesFrom(len, subSN(subSN(qs.pEnd, nSend), offset)), smallNum(ilen-1));
 		end function;
 
 
-	function getEnableForInput_Shifting(qs: TMP_queueState; mask: std_logic_vector; nSend, nRec: SmallNumber)
+	function getEnableForInput_Shifting(qs: TMP_queueState; len: integer; nSend, nRec: SmallNumber)
 	return std_logic_vector is
 	begin
-		return compareIndicesSmaller(getQueueIndicesFrom(mask, subSN(qs.pEnd, nSend)), nRec);
+		return compareIndicesSmaller(getQueueIndicesFrom(len, subSN(qs.pEnd, nSend)), nRec);
 	end function;
 
 
-	function getEnableForMoved_Shifting(qs: TMP_queueState; mask: std_logic_vector; nSend, nRec: SmallNumber)
+	function getEnableForMoved_Shifting(qs: TMP_queueState; size: integer; nSend, nRec: SmallNumber)
 	return std_logic_vector is
-		constant LEN: integer := mask'length;
+		constant LEN: integer := size;
 		variable res: std_logic_vector(0 to LEN-1) := (others => '0');
 	begin
 		if isNonzero(nSend) = '1' then
-			return compareIndicesSmaller(getQueueIndicesFrom(mask, qs.pStart), subSN(qs.pEnd, nSend));
+			return compareIndicesSmaller(getQueueIndicesFrom(LEN, qs.pStart), subSN(qs.pEnd, nSend));
 		else
 			return res;
 		end if;
 	end function;
 
-	function getQueueIndicesForMoved_Shifting(qs: TMP_queueState; mask: std_logic_vector; nSend, nRec: SmallNumber)
+	function getQueueIndicesForMoved_Shifting(qs: TMP_queueState; size: integer; nSend, nRec: SmallNumber)
 	return SmallNumberArray is
-		constant LEN: integer := mask'length;
+		constant LEN: integer := size;
 		variable res: SmallNumberArray(0 to LEN-1) := (others => (others => '0'));
 	begin
 		for i in 0 to LEN-1 loop
@@ -385,16 +385,16 @@ end function;
 	end function;
 
 
-	function getQueueSendingMask(qs: TMP_queueState; mask: std_logic_vector; nSend: SmallNumber)
+	function getQueueSendingMask(qs: TMP_queueState; len: integer; nSend: SmallNumber)
 	return std_logic_vector is
 	begin
-		return compareIndicesSmaller(getQueueIndicesFrom(mask, qs.pStart), nSend);
+		return compareIndicesSmaller(getQueueIndicesFrom(len, qs.pStart), nSend);
 	end function;
 
 
-	function getQueueMaskNext_Shifting(qsNew: TMP_queueState; mask: std_logic_vector) return std_logic_vector is
+	function getQueueMaskNext_Shifting(qsNew: TMP_queueState; len: integer) return std_logic_vector is
 	begin
-		return compareIndicesSmaller(getQueueIndicesFrom(mask, smallNum(0)), qsNew.pEnd);
+		return compareIndicesSmaller(getQueueIndicesFrom(len, smallNum(0)), qsNew.pEnd);
 	end function;
 
 

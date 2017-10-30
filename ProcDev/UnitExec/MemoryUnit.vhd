@@ -57,7 +57,8 @@ entity MemoryUnit is
 	generic(
 		QUEUE_SIZE: integer := 4;
 		CLEAR_COMPLETED: boolean := true;
-		KEEP_INPUT_CONTENT: boolean := false
+		KEEP_INPUT_CONTENT: boolean := false;
+		MODE: MemQueueMode := none
 	);
 	port(
 		clk: in std_logic;
@@ -74,8 +75,13 @@ entity MemoryUnit is
 		storeAddressDataIn: in InstructionState;
 		storeValueDataIn: in InstructionState;
 
+			compareAddressDataIn: in InstructionState;
+			compareAddressReady: in std_logic;
+
+			selectedDataOut: out InstructionState;
+			selectedSending: out std_logic;
+
 		committing: in std_logic;
-		groupCtrNext: in SmallNumber; -- DEPREC?
 		groupCtrInc: in SmallNumber;
 
 		lateEventSignal: in std_logic;
@@ -99,7 +105,6 @@ architecture Behavioral of MemoryUnit is
 	signal contentData, contentDataNext,  TMP_content, TMP_contentNext: InstructionStateArray(0 to QUEUE_SIZE-1)
 																			:= (others => DEFAULT_INSTRUCTION_STATE);
 	signal fullMask, livingMask, killMask, contentMaskNext, matchingA, matchingD,
-				matchingShA, matchingShD,  
 				TMP_mask, TMP_ckEnForInput, TMP_sendingMask, TMP_killMask, TMP_livingMask,
 				TMP_maskNext,	TMP_maskA, TMP_maskD
 								: std_logic_vector(0 to QUEUE_SIZE-1) := (others => '0'); 
@@ -110,30 +115,141 @@ architecture Behavioral of MemoryUnit is
 	signal bufferResponse: FlowResponseBuffer := (others=>(others=>'0'));
 	
 		signal qs0, qs1: TMP_queueState := TMP_defaultQueueState;
-		signal ta, tb: SmallNumber := (others => '0');
 		signal contentView, contentNextView:
 					InstructionStateArray(0 to QUEUE_SIZE-1) := (others => DEFAULT_INSTRUCTION_STATE);
 		signal maskView, liveMaskView, maskNextView: std_logic_vector(0 to QUEUE_SIZE-1) := (others => '0');
 		
 		signal inputIndices: SmallNumberArray(0 to QUEUE_SIZE-1) := (others => (others => '0'));
-	
-	signal inputIndices_T: SmallNumberArray(0 to QUEUE_SIZE-1) := (others => (others => '0'));
-	signal ckEnForInput_T, sendingMask_T: std_logic_vector(0 to QUEUE_SIZE-1) := (others => '0');
-begin				
-	ta <= bufferDrive.nextAccepting;
-	tb <= bufferDrive.prevSending;
-	qs1 <= TMP_change(qs0, ta, tb, TMP_mask, TMP_killMask, lateEventSignal or execEventSignal, TMP_maskNext);
+
+		signal cmpMask, matchedSlot: std_logic_vector(0 to QUEUE_SIZE-1) := (others => '0');
+		
+		signal selectedData: InstructionState := DEFAULT_INSTRUCTION_STATE;
+		signal selectedSendingSig: std_logic := '0';
+		
+		
+		function compareAddress(content: InstructionStateArray; ins: InstructionState) return std_logic_vector is
+			variable res: std_logic_vector(0 to QUEUE_SIZE-1) := (others => '0');
+		begin
+			for i in 0 to res'length-1 loop
+				if ins.argValues.arg1 = content(i).argValues.arg1 then
+					res(i) := '1';
+				end if;
+				
+				if ins.argValues.arg1(4) = '1' then
+					report "gaggagaa";
+					report integer'image(slv2u(ins.argValues.arg1)) & ", " &
+							 integer'image(slv2u(content(i).argValues.arg1));
+				end if;
+			end loop;
 			
-	inputIndices <= getQueueIndicesForInput(qs0, TMP_mask, PIPE_WIDTH);
-	-- indices for moved part in shifting queue would be nSend (bufferResponse.sending) everywhere
-	TMP_ckEnForInput <= getQueueEnableForInput(qs0, TMP_mask, bufferDrive.prevSending);
+			return res;
+		end function;
+		
+		-- To find what to forward from StoreQueue
+		function findNewestMatch(qs: TMP_queueState; cmpMask: std_logic_vector; ins: InstructionState)
+		return std_logic_vector is
+			variable res, older, before: std_logic_vector(0 to QUEUE_SIZE-1) := (others => '0');
+			variable indices, rawIndices: SmallNumberArray(0 to QUEUE_SIZE-1) := (others => (others => '0'));
+			variable matchBefore: std_logic := '0';
+		begin
+			-- From qs we must check which are older than ins
+			indices := getQueueIndicesFrom(QUEUE_SIZE, qs.pStart);
+			rawIndices := getQueueIndicesFrom(QUEUE_SIZE, (others => '0'));
+			older := compareIndicesSmaller(indices, ins.groupTag);
+			before := compareIndicesSmaller(rawIndices, ins.groupTag);
+			-- Use priority enc. to find last in the older ones. But they may be divided:
+			--		V  1 1 1 0 0 0 0 1 1 1 and cmp  V
+			--		   0 1 0 0 0 0 0 1 0 1
+			-- and then there are 2 runs of bits and those at the enc must be ignored (r older than first run)
+			
+			-- So, elems at the end are ignored when those conditions cooccur:
+			--		pStart > ins.groupTag and [match exists that match.groupTag < ins.groupTag]
+			matchBefore := isNonzero(cmpMask and before);
+			
+			if matchBefore = '1' then
+				-- Ignore those after
+				res := invertVec(getFirstOne(invertVec(cmpMask and before)));
+			else
+				-- Don't ignore any matches
+				res := invertVec(getFirstOne(invertVec(cmpMask)));				
+			end if;
+			
+			return res;
+		end function;
+		
+		-- To check what in the LoadQueue has an error
+		function findOldestMatch(qs: TMP_queueState; cmpMask: std_logic_vector; ins: InstructionState)
+		return std_logic_vector is
+			variable res, newer, areAfter: std_logic_vector(0 to QUEUE_SIZE-1) := (others => '0');
+			variable indices, rawIndices: SmallNumberArray(0 to QUEUE_SIZE-1) := (others => (others => '0'));
+			variable matchAfter: std_logic := '0';
+		begin
+			-- From qs we must check which are newer than ins
+			indices := getQueueIndicesFrom(QUEUE_SIZE, qs.pStart);
+			rawIndices := getQueueIndicesFrom(QUEUE_SIZE, (others => '0'));
+			newer := compareIndicesGreater(indices, ins.groupTag);
+			areAfter := compareIndicesGreater(rawIndices, ins.groupTag);
+			-- Use priority enc. to find first in the newer ones. But they may be divided:
+			--		V  1 1 1 0 0 0 0 1 1 1 and cmp  V
+			--		   0 1 0 0 0 0 0 1 0 1
+			-- and then there are 2 runs of bits and those at the enc must be ignored (r newer than first run)
+			
+			-- So, elems at the end are ignored when those conditions cooccur:
+			--		pStart > ins.groupTag and [match exists that match.groupTag < ins.groupTag]
+			matchAfter := isNonzero(cmpMask and areAfter);
+			
+			if matchAfter = '1' then
+				-- Ignore those before
+				res := getFirstOne(cmpMask and areAfter);
+			else
+				-- Don't ignore any matches
+				res := getFirstOne(cmpMask);
+			end if;
+			
+			return res;
+		end function;
+		
+		-- To check what in the LoadQueue has an error
+		function findMatchingGroupTag(arr: InstructionStateArray; ins: InstructionState)
+		return std_logic_vector is
+			variable res: std_logic_vector(0 to QUEUE_SIZE-1) := (others => '0');
+		begin
+			for i in 0 to arr'length-1 loop
+				if arr(i).groupTag = ins.groupTag then
+					res(i) := '1';
+				end if;
+			end loop;
+			
+			return res;
+		end function;		
+		
+		-- TODO: MOVE to general logic
+		function chooseIns(content: InstructionStateArray; which: std_logic_vector)
+		return InstructionState is
+			variable res: InstructionState := DEFAULT_INSTRUCTION_STATE;
+		begin
+			for i in 0 to which'length-1 loop
+				if which(i) = '1' then
+					res := content(i);
+					exit;
+				end if;
+			end loop;
+			
+			return res;
+		end function;
+		
+begin				
+	qs1 <= TMP_change(qs0, bufferDrive.nextAccepting, bufferDrive.prevSending,
+							TMP_mask, TMP_killMask, lateEventSignal or execEventSignal, TMP_maskNext);
+			
+	inputIndices <= getQueueIndicesForInput(qs0, QUEUE_SIZE, PIPE_WIDTH);
+	TMP_ckEnForInput <= getQueueEnableForInput(qs0, QUEUE_SIZE, bufferDrive.prevSending);
 	-- in shifting queue this would be shfited by nSend
-	-- Also slots for moved part would have enable, found from (i < nRemaining), only if nSend /= 0
-	TMP_sendingMask <= getQueueSendingMask(qs0, TMP_mask, bufferDrive.nextAccepting);
+	TMP_sendingMask <= getQueueSendingMask(qs0, QUEUE_SIZE, bufferDrive.nextAccepting);
 	TMP_killMask <= getKillMask(TMP_content, TMP_mask, execCausing, execEventSignal, lateEventSignal);
 	TMP_livingMask <= TMP_mask and not TMP_killMask;			
 				
-	TMP_maskNext <= (TMP_mask and not TMP_killMask and not TMP_sendingMask) or TMP_ckEnForInput;
+	TMP_maskNext <= (TMP_livingMask and not TMP_sendingMask) or TMP_ckEnForInput;
 	-- in shifting queue generated from (i < nFullNext)
 	TMP_contentNext <=
 				TMP_getNewContentUpdate(TMP_content, dataIn.data, TMP_ckEnForInput, inputIndices,
@@ -141,62 +257,75 @@ begin
 												storeAddressWr, storeValueWr, storeAddressDataIn, storeValueDataIn,
 												CLEAR_COMPLETED, KEEP_INPUT_CONTENT);
 
-	TMP_maskA <= findMatching(makeSlotArray(TMP_content, TMP_mask), storeAddressDataIn); --dataA);
+	TMP_maskA <= findMatching(makeSlotArray(TMP_content, TMP_mask), storeAddressDataIn);
 	TMP_maskD <= findMatching(makeSlotArray(TMP_content, TMP_mask), storeValueDataIn);
 
-		contentView <= normalizeInsArray(qs0, TMP_content);
-		maskView <= normalizeMask(qs0, TMP_mask);
-		liveMaskView <= normalizeMask(qs0, TMP_livingMask);
-		contentNextView <= normalizeInsArray(qs1, TMP_contentNext);
-		maskNextView <= normalizeMask(qs1, TMP_maskNext);
+	-- View
+	contentView <= normalizeInsArray(qs0, TMP_content);
+	maskView <= normalizeMask(qs0, TMP_mask);
+	liveMaskView <= normalizeMask(qs0, TMP_livingMask);
+	contentNextView <= normalizeInsArray(qs1, TMP_contentNext);
+	maskNextView <= normalizeMask(qs1, TMP_maskNext);
+	------
 
 	TMP_frontW <= getQueueFrontWindow(qs0, TMP_content, TMP_mask);
 	TMP_preFrontW <= getQueuePreFrontWindow(qs0, TMP_content, TMP_mask);
 	TMP_sendingData <= findCommittingSQ(TMP_frontW.data, TMP_frontW.fullMask, groupCtrInc, committing);
 		
-			sqOutData <= TMP_sendingData;
-					
-			sendingSQ <= isNonzero(sqOutData.fullMask);
-			--dataOutSQ <= sqOutData.data(0); -- CAREFUL, TEMP!
-				dataOutV <= sqOutData;
-			contentData <= extractData(content);
+	sqOutData <= TMP_sendingData;
 			
-			process (clk)
-			begin
-				if rising_edge(clk) then	
-						qs0 <= qs1;
-						TMP_mask <= TMP_maskNext;	
-						TMP_content <= TMP_contentNext;
-					
-					logBuffer(contentView, maskView, liveMaskView, bufferResponse);					
-					
-					-- NOTE: below has no info about flow constraints. It just checks data against
-					--			flow numbers, while the validity of those numbers is checked by slot logic	
-					checkBuffer(contentView, maskView, contentNextView, maskNextView,
-									bufferDrive, bufferResponse);
-				end if;
-			end process;
-					
-			SLOT_BUFF: entity work.BufferPipeLogic(BehavioralDirect)
-			generic map(
-				CAPACITY => QUEUE_SIZE, -- PIPE_WIDTH*2*2
-				MAX_OUTPUT => PIPE_WIDTH,
-				MAX_INPUT => PIPE_WIDTH
-			)		
-			port map(
-				clk => clk, reset => reset, en => en,
-				flowDrive => bufferDrive,
-				flowResponse => bufferResponse
-			);						
+	sendingSQ <= isNonzero(sqOutData.fullMask);
+	dataOutV <= sqOutData;
+	contentData <= extractData(content);
+
+
+		cmpMask <= compareAddress(TMP_content, compareAddressDataIn) and TMP_Mask;
+		-- TEMP selection of hit checking mechanism 
+		matchedSlot <= findNewestMatch(qs0, cmpMask, compareAddressDataIn) when MODE = store
+					else	findOldestMatch(qs0, cmpMask, compareAddressDataIn) when MODE = load
+					else  findMatchingGroupTag(TMP_content, compareAddressDataIn) and TMP_mask
+																								 when MODE = branch
+					else	(others => '0');
+		selectedSendingSig <= isNonzero(matchedSlot) and compareAddressReady;
+		selectedData <= chooseIns(TMP_content, matchedSlot);
+	
+	
+	process (clk)
+	begin
+		if rising_edge(clk) then	
+			qs0 <= qs1;
+			TMP_mask <= TMP_maskNext;	
+			TMP_content <= TMP_contentNext;
+			
+			logBuffer(contentView, maskView, liveMaskView, bufferResponse);					
+			
+			-- NOTE: below has no info about flow constraints. It just checks data against
+			--			flow numbers, while the validity of those numbers is checked by slot logic	
+			checkBuffer(contentView, maskView, contentNextView, maskNextView, bufferDrive, bufferResponse);
+		end if;
+	end process;
+			
+	SLOT_BUFF: entity work.BufferPipeLogic(BehavioralDirect)
+	generic map(
+		CAPACITY => QUEUE_SIZE, -- PIPE_WIDTH*2*2
+		MAX_OUTPUT => PIPE_WIDTH,
+		MAX_INPUT => PIPE_WIDTH
+	)
+	port map(
+		clk => clk, reset => reset, en => en,
+		flowDrive => bufferDrive,
+		flowResponse => bufferResponse
+	);						
 
 	bufferDrive.prevSending <=num2flow(countOnes(dataIn.fullMask)) when prevSending = '1' else (others => '0');
-	bufferDrive.kill <= num2flow(countOnes(--killMask));
-														TMP_killMask));
+	bufferDrive.kill <= num2flow(countOnes(TMP_killMask));
 	bufferDrive.nextAccepting <= num2flow(countOnes(sqOutData.fullMask));
 					
 	acceptingOut <= not TMP_preFrontW.fullMask(0);
-
 	
 	sendingSQOut <= sendingSQ;
+	
+	selectedDataOut <= selectedData;
+	selectedSending <= selectedSendingSig;
 end Behavioral;
 

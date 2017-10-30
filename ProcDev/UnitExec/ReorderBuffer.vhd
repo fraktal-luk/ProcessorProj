@@ -116,17 +116,20 @@ begin
 	enSig <= en or not ROB_HAS_EN;
 	
 	
-				ta <= flowDrive.nextAccepting;
-				tb <= flowDrive.prevSending;
-				qs1 <= TMP_change(qs0, ta, tb, TMP_mask, TMP_killMask, lateEventSignal or execEventSignal,
+				--ta <= flowDrive.nextAccepting;
+				--tb <= flowDrive.prevSending;
+				qs1 <= TMP_change(qs0,-- ta, tb,
+									flowDrive.nextAccepting,
+									flowDrive.prevSending,
+										TMP_mask, TMP_killMask, lateEventSignal or execEventSignal,
 										TMP_maskNext);
 										
-				inputIndices <= getQueueIndicesForInput(qs0, TMP_mask, 1);
+				inputIndices <= getQueueIndicesForInput(qs0, ROB_SIZE, 1);
 					-- indices for moved part in shifting queue would be nSend (bufferResponse.sending) everywhere
-				TMP_ckEnForInput <= getQueueEnableForInput(qs0, TMP_mask, flowDrive.prevSending);
+				TMP_ckEnForInput <= getQueueEnableForInput(qs0, ROB_SIZE, flowDrive.prevSending);
 					-- in shifting queue this would be shfited by nSend
 					-- Also slots for moved part would have enable, found from (i < nRemaining), only if nSend /= 0
-				TMP_sendingMask <= getQueueSendingMask(qs0, TMP_mask, flowDrive.nextAccepting);
+				TMP_sendingMask <= getQueueSendingMask(qs0, ROB_SIZE, flowDrive.nextAccepting);
 				TMP_killMask <= getKillMaskROB(qs0, TMP_mask, --execCausing,
 																				execEnds2(3),
 																				execEventSignal, lateEventSignal);

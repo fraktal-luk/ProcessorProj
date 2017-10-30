@@ -124,6 +124,9 @@ architecture Behavioral of UnitMemory is
 	signal dataToLoadUnitSig, storeAddressDataSig, storeValueDataSig:
 																		InstructionState := DEFAULT_INSTRUCTION_STATE;					
 
+	signal storeForwardData, stageDataAfterForward: InstructionState := DEFAULT_INSTRUCTION_STATE;
+	signal storeForwardSending: std_logic := '0'; 
+
 	signal ch0, ch1, ch2, ch3, ch4, ch5, ch6, ch7: std_logic := '0';
 begin
 		eventSignal <= execOrIntEventSignalIn;	
@@ -235,6 +238,8 @@ begin
 					stageEventsOut => open					
 				);
 
+				stageDataAfterForward <= setExecState(storeForwardData, storeForwardData.argValues.arg2,
+																		'0', "0000");
 				stageDataAfterCache <= setExecState(stageDataOutMem0.data(0), memLoadValue, '0', "0000");
 				stageDataAfterSysRegs <= setExecState(stageDataOutMem0.data(0), sysLoadVal, '0', "0000");
 
@@ -264,7 +269,8 @@ begin
 
 			STORE_QUEUE: entity work.MemoryUnit(Behavioral)
 			generic map(
-				QUEUE_SIZE => SQ_SIZE
+				QUEUE_SIZE => SQ_SIZE,
+				MODE => store
 			)
 			port map(
 				clk => clk,
@@ -281,8 +287,15 @@ begin
 				storeAddressDataIn => storeAddressDataSig,
 				storeValueDataIn => storeValueDataSig,
 				
+					compareAddressDataIn => --DEFAULT_INSTRUCTION_STATE,--
+													dataToLoadUnitSig,
+					compareAddressReady => sendingToLoadUnitSig or sendingToMfcSig, -- ??
+				
+					selectedDataOut => storeForwardData,
+					selectedSending => storeForwardSending,
+				
 					committing => committing,
-					groupCtrNext => groupCtrNext,
+					--groupCtrNext => groupCtrNext,
 						groupCtrInc => groupCtrInc,
 						
 					lateEventSignal => lateEventSignal,	
@@ -297,7 +310,8 @@ begin
 
 			MEM_LOAD_QUEUE: entity work.MemoryUnit(Behavioral)
 			generic map(
-				QUEUE_SIZE => LQ_SIZE
+				QUEUE_SIZE => LQ_SIZE,
+				MODE => load
 			)											
 			port map(
 				clk => clk,
@@ -314,8 +328,15 @@ begin
 				storeAddressDataIn => dataToLoadUnitSig, --?
 				storeValueDataIn => DEFAULT_INSTRUCTION_STATE,
 
+					compareAddressDataIn => --DEFAULT_INSTRUCTION_STATE,--
+													storeAddressDataSig,
+					compareAddressReady => storeAddressWrSig,
+
+					selectedDataOut => open,
+					selectedSending => open,
+					
 					committing => committing,
-					groupCtrNext => groupCtrNext,
+					--groupCtrNext => groupCtrNext,
 						groupCtrInc => groupCtrInc,
 
 					lateEventSignal => lateEventSignal,
@@ -328,6 +349,9 @@ begin
 					dataOutV => open
 			);
 
+			-- TODO: utilize info about store address hit in LoadQueue to squash the incorrect load.
+			
+	
 	
 				TMP_SYS_REG: process(clk)
 				begin
@@ -384,11 +408,14 @@ begin
 				execAcceptingC <= execAcceptingCSig;
 				execAcceptingE <= '1'; --???  -- execAcceptingESig;
 
-			loadResultSending <= sendingFromSysReg or sendingFromDLQ or sendingMem0;
+			loadResultSending <= sendingFromSysReg or sendingFromDLQ or sendingMem0
+																								or storeForwardSending;		
 					-- CAREFUL, TODO: ^ memLoadReady needed to ack that not a miss? But would block when a store!
+					
 			loadResultData <=
 					  stageDataAfterSysRegs when sendingFromSysReg = '1'
 				else dataFromDLQ when sendingFromDLQ = '1'
+				else stageDataAfterForward when storeForwardSending = '1'
 				else stageDataAfterCache;
 
 				-- Mem interface

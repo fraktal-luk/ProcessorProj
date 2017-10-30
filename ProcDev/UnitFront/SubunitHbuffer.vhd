@@ -103,28 +103,30 @@ architecture Implem of SubunitHbuffer is
 		
 		signal TMP_offset: SmallNumber := (others => '0');
 begin
-				ta <= hbufferDrive.nextAccepting;
-				tb <= hbufferDrive.prevSending;
-				qs1 <= TMP_change_Shifting(qs0, ta, tb, TMP_mask, TMP_killMask, execEventSignal,
-										TMP_maskNext);
-										
-				inputIndices <= --getQueueIndicesForInput_Shifting(qs0, TMP_mask, 2*PIPE_WIDTH,
-									--												hbufferDrive.nextAccepting);
-										getQueueIndicesForInput_ShiftingHbuff(qs0, TMP_mask, 2*PIPE_WIDTH,
-																					hbufferDrive.nextAccepting, TMP_offset);																					
-																					
-				TMP_ckEnForInput <= getEnableForInput_Shifting(qs0, TMP_mask,
-																				hbufferDrive.nextAccepting, hbufferDrive.prevSending);
 
-				movedIndices <= getQueueIndicesForMoved_Shifting(qs0, TMP_mask,
-																				hbufferDrive.nextAccepting, hbufferDrive.prevSending);
-				TMP_ckEnForMoved <= getEnableForMoved_Shifting(qs0, TMP_mask,
-																				hbufferDrive.nextAccepting, hbufferDrive.prevSending);
-				
 				TMP_killMask <= getKillMask(TMP_stageData, TMP_mask, execCausing, '0', execEventSignal);
-				
-				TMP_maskNext <= getQueueMaskNext_Shifting(qs1, TMP_mask);
+				--ta <= hbufferDrive.nextAccepting;
+				--tb <= hbufferDrive.prevSending;
+				--qs1 <= TMP_change_Shifting(qs0, ta, tb, TMP_mask, TMP_killMask, execEventSignal);
+				qs1 <= TMP_change_Shifting(
+									qs0, hbufferDrive.nextAccepting, hbufferDrive.prevSending,
+										TMP_mask, TMP_killMask, execEventSignal);
+										
+									--getQueueIndicesForInput_Shifting(qs0, TMP_mask, 2*PIPE_WIDTH,
+									--												hbufferDrive.nextAccepting);
+				inputIndices <= getQueueIndicesForInput_ShiftingHbuff(
+										qs0, HBUFFER_SIZE, hbufferDrive.nextAccepting, 2*PIPE_WIDTH, TMP_offset);																					
+				TMP_ckEnForInput <= getEnableForInput_Shifting(
+										qs0, HBUFFER_SIZE, hbufferDrive.nextAccepting, hbufferDrive.prevSending);
 
+
+				movedIndices <= getQueueIndicesForMoved_Shifting(
+										qs0, HBUFFER_SIZE,	hbufferDrive.nextAccepting, hbufferDrive.prevSending);
+				TMP_ckEnForMoved <= getEnableForMoved_Shifting(
+										qs0, HBUFFER_SIZE, hbufferDrive.nextAccepting, hbufferDrive.prevSending);
+
+
+				TMP_maskNext <= getQueueMaskNext_Shifting(qs1, HBUFFER_SIZE);
 
 				TMP_stageDataNext <= TMP_getNewContent_General(TMP_stageData, hbufferDataANew,
 																		 TMP_ckEnForMoved, movedIndices,

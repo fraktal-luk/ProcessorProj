@@ -98,22 +98,22 @@ architecture Behavioral of UnitFront is
 		signal sendingOutFetch1: std_logic := '0';	
 		signal acceptingOutFetch1: std_logic := '0';	
 
-		signal fetchBlock1: HwordArray(0 to FETCH_BLOCK_SIZE-1) := (others => (others => '0'));
+		signal fetchBlock1, fetchBlockBP: HwordArray(0 to FETCH_BLOCK_SIZE-1) := (others => (others => '0'));
 	
 		signal ivalidFinal: std_logic := '0';
 		signal fetchBlockFinal: HwordArray(0 to FETCH_BLOCK_SIZE-1) := (others => (others => '0'));
 		signal stageDataOutFetchFinal:  InstructionState := DEFAULT_DATA_PC;
 		signal sendingOutFetchFinal: std_logic := '0';
 		
-		signal acceptingForFetchFirst: std_logic := '0';
+		signal acceptingForFetchFirst, earlyBranchAccepting, earlyBranchSending: std_logic := '0';
 		
-		signal hbufferDataIn: InstructionState := DEFAULT_INSTRUCTION_STATE;
+		signal hbufferDataIn, stallCausing: InstructionState := DEFAULT_INSTRUCTION_STATE;
 	
-		signal killAll, frontKill: std_logic := '0';
+		signal killAll, frontKill, stallEventSig: std_logic := '0';
 	
-		signal earlyBranchDataIn: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
+		signal earlyBranchDataIn, earlyBranchDataOut: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
 	
-		signal sendingToEarlyBranch, stallAtFetchLast: std_logic := '0'; 
+		signal sendingToEarlyBranch, stallAtFetchLast, fetchStall: std_logic := '0'; 
 		signal pcSendingDelayed0, pcSendingDelayed1, pcSendingDelayedFinal: std_logic := '0';
 	
 	constant HAS_RESET_FRONT: std_logic := '0';
@@ -168,7 +168,9 @@ begin
 					pcSendingDelayed1 <= pcSendingDelayed0;
 					
 					ivalid1 <= ivalid;
-					fetchBlock1 <= fetchBlock;					
+					fetchBlock1 <= fetchBlock;
+
+					fetchBlockBP <= fetchBlockFinal;
 				end if;
 			--end if;
 		end if;	
@@ -190,7 +192,7 @@ begin
 			clk => clk, reset => resetSig, en => enSig,
 					
 			prevSending => sendingOutFetch,	
-			nextAccepting => '1' or acceptingOutHbuffer,
+			nextAccepting => earlyBranchAccepting,
 			stageDataIn => f1input,
 			
 			acceptingOut => acceptingOutFetch1,
@@ -211,31 +213,12 @@ begin
 	
 	acceptingForFetchFirst <= acceptingOutFetch1;
 	
-	hbufferDataIn <= checkIvalid(stageDataOutFetchFinal, ivalidFinal);
+	hbufferDataIn <= checkIvalid(earlyBranchDataOut.data(0), '1');
 	
-	-- Hword buffer		
-	SUBUNIT_HBUFFER: entity work.SubunitHbuffer(--Behavioral)
-																Implem)
-	port map(
-		clk => clk, reset => resetSig, en => enSig,
-		
-		prevSending => sendingOutFetchFinal and acceptingOutHbuffer,
-		nextAccepting => acceptingOut0,
-		stageDataIn => hbufferDataIn,
-		fetchBlock => fetchBlockFinal,
-		
-		acceptingOut => acceptingOutHbuffer,
-		sendingOut => sendingOutHbuffer,
-		stageDataOut => stageDataOutHbuffer,
-		
-		execEventSignal => killAll,--killVector(3),
-		execCausing => DEFAULT_INSTRUCTION_STATE		
-	);		
 	
-		
 		-- Branch prediction stub. This stage is in parallel with Hbuff
-			earlyBranchDataIn.data(0) <= getFrontEvent(hbufferDataIn,
-															pcSendingDelayedFinal, ivalidFinal, acceptingOutHbuffer,
+			earlyBranchDataIn.data(0) <= getFrontEvent(stageDataOutFetchFinal,
+															pcSendingDelayedFinal, ivalidFinal, '1',
 															fetchBlockFinal);
 			earlyBranchdataIn.fullMask(0) <= pcSendingDelayedFinal;
 			
@@ -250,22 +233,51 @@ begin
 					clk => clk, reset => resetSig, en => enSig,
 							
 					prevSending => sendingToEarlyBranch,	
-					nextAccepting => '1',
+					nextAccepting => '1',--acceptingOutHbuffer,
 					stageDataIn => earlyBranchDataIn,
 					
-					acceptingOut => open,
-					sendingOut => open,
-					stageDataOut => open,
+					acceptingOut => earlyBranchAccepting,
+					sendingOut => earlyBranchSending,
+					stageDataOut => earlyBranchDataOut,
 					
-					execEventSignal => killAll,--killVector(1),
+					execEventSignal => killAll, -- CAREFUL: not killing on stall, because is sent to void
 					lateEventSignal => killAll,
 					execCausing => DEFAULT_INSTRUCTION_STATE,
 					lockCommand => '0',
 
 					stageEventsOut => stage0Events
-			);
+			);	
+	
+			
+			stallEventSig <= fetchStall;
+			stallCausing <= setInstructionTarget(earlyBranchDataOut.data(0),
+															 earlyBranchDataOut.data(0).basicInfo.ip);
+	
+
+			frontKill <= stage0Events.eventOccured or fetchStall;
+	
+	
+					fetchStall <= earlyBranchSending and not acceptingOutHbuffer;
+	
+	-- Hword buffer		
+	SUBUNIT_HBUFFER: entity work.SubunitHbuffer(--Behavioral)
+																Implem)
+	port map(
+		clk => clk, reset => resetSig, en => enSig,
 		
-			frontKill <= stage0Events.eventOccured;
+		prevSending => earlyBranchSending and not fetchStall,
+		nextAccepting => acceptingOut0,
+		stageDataIn => hbufferDataIn,
+		fetchBlock => fetchBlockBP,
+		
+		acceptingOut => acceptingOutHbuffer,
+		sendingOut => sendingOutHbuffer,
+		stageDataOut => stageDataOutHbuffer,
+		
+		execEventSignal => killAll,--killVector(3),
+		execCausing => DEFAULT_INSTRUCTION_STATE		
+	);		
+	
 	
 	-- Decode stage				
 	STAGE_DECODE: block
@@ -318,7 +330,7 @@ begin
 	
 	frontAccepting <= acceptingOutFetch;
 	
-		frontEventSignal <= stage0Events.eventOccured;
-		frontCausing <= stage0Events.causing;
+		frontEventSignal <= stallEventSig or stage0Events.eventOccured;
+		frontCausing <= stallCausing when stallEventSig = '1' else stage0Events.causing;
 end Behavioral;
 
