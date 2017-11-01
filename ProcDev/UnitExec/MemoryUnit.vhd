@@ -125,114 +125,6 @@ architecture Behavioral of MemoryUnit is
 		
 		signal selectedData: InstructionState := DEFAULT_INSTRUCTION_STATE;
 		signal selectedSendingSig: std_logic := '0';
-		
-		
-		function compareAddress(content: InstructionStateArray; ins: InstructionState) return std_logic_vector is
-			variable res: std_logic_vector(0 to QUEUE_SIZE-1) := (others => '0');
-		begin
-			for i in 0 to res'length-1 loop
-				if ins.argValues.arg1 = content(i).argValues.arg1 then
-					res(i) := '1';
-				end if;
-			end loop;
-			
-			return res;
-		end function;
-		
-		-- To find what to forward from StoreQueue
-		function findNewestMatch(qs: TMP_queueState; cmpMask: std_logic_vector; ins: InstructionState)
-		return std_logic_vector is
-			variable res, older, before: std_logic_vector(0 to QUEUE_SIZE-1) := (others => '0');
-			variable indices, rawIndices: SmallNumberArray(0 to QUEUE_SIZE-1) := (others => (others => '0'));
-			variable matchBefore: std_logic := '0';
-		begin
-			-- From qs we must check which are older than ins
-			indices := getQueueIndicesFrom(QUEUE_SIZE, qs.pStart);
-			rawIndices := getQueueIndicesFrom(QUEUE_SIZE, (others => '0'));
-			older := compareIndicesSmaller(indices, ins.groupTag);
-			before := compareIndicesSmaller(rawIndices, ins.groupTag);
-			-- Use priority enc. to find last in the older ones. But they may be divided:
-			--		V  1 1 1 0 0 0 0 1 1 1 and cmp  V
-			--		   0 1 0 0 0 0 0 1 0 1
-			-- and then there are 2 runs of bits and those at the enc must be ignored (r older than first run)
-			
-			-- So, elems at the end are ignored when those conditions cooccur:
-			--		pStart > ins.groupTag and [match exists that match.groupTag < ins.groupTag]
-			matchBefore := isNonzero(cmpMask and before);
-			
-			if matchBefore = '1' then
-				-- Ignore those after
-				res := invertVec(getFirstOne(invertVec(cmpMask and before)));
-			else
-				-- Don't ignore any matches
-				res := invertVec(getFirstOne(invertVec(cmpMask)));				
-			end if;
-			
-			return res;
-		end function;
-		
-		-- To check what in the LoadQueue has an error
-		function findOldestMatch(qs: TMP_queueState; cmpMask: std_logic_vector; ins: InstructionState)
-		return std_logic_vector is
-			variable res, newer, areAfter: std_logic_vector(0 to QUEUE_SIZE-1) := (others => '0');
-			variable indices, rawIndices: SmallNumberArray(0 to QUEUE_SIZE-1) := (others => (others => '0'));
-			variable matchAfter: std_logic := '0';
-		begin
-			-- From qs we must check which are newer than ins
-			indices := getQueueIndicesFrom(QUEUE_SIZE, qs.pStart);
-			rawIndices := getQueueIndicesFrom(QUEUE_SIZE, (others => '0'));
-			newer := compareIndicesGreater(indices, ins.groupTag);
-			areAfter := compareIndicesGreater(rawIndices, ins.groupTag);
-			-- Use priority enc. to find first in the newer ones. But they may be divided:
-			--		V  1 1 1 0 0 0 0 1 1 1 and cmp  V
-			--		   0 1 0 0 0 0 0 1 0 1
-			-- and then there are 2 runs of bits and those at the enc must be ignored (r newer than first run)
-			
-			-- So, elems at the end are ignored when those conditions cooccur:
-			--		pStart > ins.groupTag and [match exists that match.groupTag < ins.groupTag]
-			matchAfter := isNonzero(cmpMask and areAfter);
-			
-			if matchAfter = '1' then
-				-- Ignore those before
-				res := getFirstOne(cmpMask and areAfter);
-			else
-				-- Don't ignore any matches
-				res := getFirstOne(cmpMask);
-			end if;
-			
-			return res;
-		end function;
-		
-		-- To check what in the LoadQueue has an error
-		function findMatchingGroupTag(arr: InstructionStateArray; ins: InstructionState)
-		return std_logic_vector is
-			variable res: std_logic_vector(0 to QUEUE_SIZE-1) := (others => '0');
-		begin
-			for i in 0 to arr'length-1 loop
-				if arr(i).groupTag = ins.groupTag then
-					res(i) := '1';
-				end if;
-			end loop;
-			
-			return res;
-		end function;		
-		
-		-- TODO: MOVE to general logic
-		function chooseIns(content: InstructionStateArray; which: std_logic_vector)
-		return InstructionState is
-			variable res: InstructionState := DEFAULT_INSTRUCTION_STATE;
-		begin
-			for i in 0 to which'length-1 loop
-				if which(i) = '1' then
-					res := content(i);
-							report integer'image(slv2u(content(i).argValues.arg1));
-					exit;
-				end if;
-			end loop;
-			
-			return res;
-		end function;
-		
 begin				
 	qs1 <= TMP_change(qs0, bufferDrive.nextAccepting, bufferDrive.prevSending,
 							TMP_mask, TMP_killMask, lateEventSignal or execEventSignal, TMP_maskNext);
@@ -276,10 +168,12 @@ begin
 
 		cmpMask <= compareAddress(TMP_content, compareAddressDataIn) and TMP_Mask;
 		-- TEMP selection of hit checking mechanism 
-		matchedSlot <= findNewestMatch(qs0, cmpMask, compareAddressDataIn) when MODE = store
-					else	findOldestMatch(qs0, cmpMask, compareAddressDataIn) when MODE = load
+		matchedSlot <= findNewestMatch(cmpMask, qs0.pStart, compareAddressDataIn)
+																										when MODE = store
+					else	findOldestMatch(cmpMask, qs0.pStart, compareAddressDataIn)
+																										when MODE = load
 					else  findMatchingGroupTag(TMP_content, compareAddressDataIn) and TMP_mask
-																								 when MODE = branch
+																										when MODE = branch
 					else	(others => '0');
 		selectedSendingSig <= isNonzero(matchedSlot) and compareAddressReady;
 		selectedData <= chooseIns(TMP_content, matchedSlot);

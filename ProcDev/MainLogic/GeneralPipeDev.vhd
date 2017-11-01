@@ -36,12 +36,20 @@ function selectFromQueue(content: InstructionSlotArray; index: integer) return I
 
 function removeFromQueue(content: InstructionSlotArray; index: integer) return InstructionSlotArray;
 
+function chooseIns(content: InstructionStateArray; which: std_logic_vector)
+return InstructionState;
+
 -- CAREFUL! This is not a general function, only a special type of compacting
 function compactData(data: InstructionStateArray; mask: std_logic_vector) return InstructionStateArray;
 function compactMask(data: InstructionStateArray; mask: std_logic_vector) return std_logic_vector;
 
 function findMatching(content: InstructionSlotArray; ins: InstructionState)
 return std_logic_vector;
+
+-- TODO: is redundant, should unify with findMatching?
+function findMatchingGroupTag(arr: InstructionStateArray; ins: InstructionState)
+return std_logic_vector;
+
 
 function stageSimpleNext(content, newContent: InstructionState; full, sending, receiving: std_logic)
 return InstructionState;
@@ -245,6 +253,21 @@ begin
 end function;
 
 
+function chooseIns(content: InstructionStateArray; which: std_logic_vector)
+return InstructionState is
+	variable res: InstructionState := DEFAULT_INSTRUCTION_STATE;
+begin
+	for i in 0 to which'length-1 loop
+		if which(i) = '1' then
+			res := content(i);
+			exit;
+		end if;
+	end loop;
+	
+	return res;
+end function;
+
+
 function findMatching(content: InstructionSlotArray; ins: InstructionState)
 return std_logic_vector is
 	variable res: std_logic_vector(content'range) := (others => '0');
@@ -255,6 +278,20 @@ begin
 			res(i) := '1';
 		end if;
 	end loop;							
+	return res;
+end function;
+
+
+function findMatchingGroupTag(arr: InstructionStateArray; ins: InstructionState)
+return std_logic_vector is
+	variable res: std_logic_vector(0 to arr'length-1) := (others => '0');
+begin
+	for i in 0 to arr'length-1 loop
+		if arr(i).groupTag = ins.groupTag then
+			res(i) := '1';
+		end if;
+	end loop;
+	
 	return res;
 end function;
 
