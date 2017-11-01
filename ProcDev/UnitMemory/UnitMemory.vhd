@@ -133,9 +133,8 @@ begin
 		activeCausing <= setInterrupt(execCausing, lateEventSignal);
 
 		inputDataC.data(0) <=			
-				 setExecState(dataIQC,
-								  addMwordFaster(dataIQC.argValues.arg0, dataIQC.argValues.arg1),
-								  '0', (others => '0'));
+				 setInsResult(dataIQC, addMwordFaster(dataIQC.argValues.arg0, dataIQC.argValues.arg1));--),
+								  --'0', (others => '0'));
 	
 			inputDataC.fullMask(0) <= sendingIQC;
 
@@ -238,10 +237,10 @@ begin
 					stageEventsOut => open					
 				);
 
-				stageDataAfterForward <= setExecState(stageDataOutMem0.data(0),
-																		 storeForwardData.argValues.arg2, '0', "0000");
-				stageDataAfterCache <= setExecState(stageDataOutMem0.data(0), memLoadValue, '0', "0000");
-				stageDataAfterSysRegs <= setExecState(stageDataOutMem0.data(0), sysLoadVal, '0', "0000");
+				stageDataAfterForward <= setInsResult(stageDataOutMem0.data(0),
+																		 storeForwardData.argValues.arg2);--, '0', "0000");
+				stageDataAfterCache <= setInsResult(stageDataOutMem0.data(0), memLoadValue);--, '0', "0000");
+				stageDataAfterSysRegs <= setInsResult(stageDataOutMem0.data(0), sysLoadVal);--, '0', "0000");
 
 					outputC.ins <= clearTempControlInfoSimple(outputData.data(0));
 					outputC.full <= loadUnitSendingSig;

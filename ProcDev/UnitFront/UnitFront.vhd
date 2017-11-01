@@ -288,8 +288,8 @@ begin
 		
 		CALC_TARGETS: for i in 0 to PIPE_WIDTH-1 generate
 		begin	
-			newDecodedWithTargets.data(i) <= -- TODO: remove usage of Exec package
-				work.ProcLogicExec.setResult(setInstructionTarget(newDecoded.data(i), targets(i)), links(i));
+			newDecodedWithTargets.data(i) <=
+				setInsResult(setInstructionTarget(newDecoded.data(i), targets(i)), links(i));
 
 			targets(i) <= addMwordFaster(newDecoded.data(i).basicInfo.ip, newDecoded.data(i).constantArgs.imm);		
 			links(i) <= addMwordBasic(newDecoded.data(i).basicInfo.ip, getAddressIncrement(newDecoded.data(i)));			

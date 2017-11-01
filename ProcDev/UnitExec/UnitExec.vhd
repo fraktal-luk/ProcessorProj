@@ -203,7 +203,7 @@ begin
 		signal storeTargetWrSig: std_logic := '0';
 		signal storeTargetDataSig: InstructionState := DEFAULT_INSTRUCTION_STATE;
 	begin	
-		storeTargetDataSig <= trgToResult(dataD0);
+		storeTargetDataSig <= setInsResult(dataD0, dataD0.target);
 		storeTargetWrSig <= execSendingD and
 										((dataD0.controlInfo.hasBranch and --dataD0.classInfo.branchReg)
 																					  not dataD0.constantArgs.immSel)

@@ -20,10 +20,8 @@ use work.Decoding2.all;
 
 use work.NewPipelineData.all;
 
+
 package TEMP_DEV is
-
-function setInstructionTarget(ins: InstructionState; target: Mword) return InstructionState;
-
 
 function extractReadyRegBits(bits: std_logic_vector; data: InstructionStateArray)
 return std_logic_vector;
@@ -31,6 +29,7 @@ return std_logic_vector;
 function extractReadyRegBitsV(bits: std_logic_vector; data: InstructionStateArray)
 return std_logic_vector;
 
+-- GENERAL?
 function clearTempControlInfoSimple(ins: InstructionState) return InstructionState;
 function clearTempControlInfoMulti(sd: StageDataMulti) return StageDataMulti;
 
@@ -39,10 +38,8 @@ function clearTempControlInfoMulti(sd: StageDataMulti) return StageDataMulti;
 function clearEmptyResultTags(insVec: InstructionStateArray; fullMask: std_logic_vector)
 return InstructionStateArray;
 
+-- Description: arg1 := target
 function trgForBQ(insVec: StageDataMulti) return StageDataMulti;
-function trgToResult(ins: InstructionState) return InstructionState;
-function setInsResult(ins: InstructionState; result: Mword) return InstructionState;
-
 
 function addMwordBasic(a, b: Mword) return Mword;
 function subMwordBasic(a, b: Mword) return Mword;
@@ -54,36 +51,15 @@ function addMwordFaster(a, b: Mword) return Mword;
 
 function addMwordFasterExt(a, b: Mword; carryIn: std_logic) return std_logic_vector;
 
-
+-- TODO: inspect usage and refactor?
 function setInterrupt(ins: InstructionState; int: std_logic) return InstructionState;
 
-function checkIvalid(ins: InstructionState; ivalid: std_logic) return InstructionState;
 
 end TEMP_DEV;
 
 
 
 package body TEMP_DEV is
-
-	function setInstructionTarget(ins: InstructionState; target: Mword) return InstructionState is
-		variable res: InstructionState := ins;
-	begin
-		res.target := target;
-		return res;
-	end function;
-
---		WHAT IS THIS?	
---		function shiftedIndex(startInd: integer; mask: std_logic_vector) return integer is
---			variable res: integer := mask'length-1;
---		begin
---			for i in startInd to mask'length-2 loop -- ignoring last mask bit, because it's neutral for content
---				if mask(i) = '1' then
---					res := res - 1;
---				end if;
---			end loop;
---			
---			return res;
---		end function;
 
 function extractReadyRegBits(bits: std_logic_vector; data: InstructionStateArray) return std_logic_vector is
 	variable res: std_logic_vector(0 to 3*data'length-1) := (others => '0'); -- 31) := (others=>'0');
@@ -186,24 +162,8 @@ begin
 	end loop;
 	
 	return res;
-end function;	
-	
-		
-		function trgToResult(ins: InstructionState) return InstructionState is
-			variable res: InstructionState := ins;
-		begin
-			-- CAREFUL! Here we use 'result' because it is the field copied to arg1 in mem queue!
-			-- TODO: regularize usage of such fields, maybe remove 'target' from InstructionState?
-			res.result := ins.target;
-			return res;
-		end function;
+end function;
 
-		function setInsResult(ins: InstructionState; result: Mword) return InstructionState is
-			variable res: InstructionState := ins;
-		begin
-			res.result := result;
-			return res;
-		end function;
 
 function addMwordBasic(a, b: Mword) return Mword is
 	variable res: Mword := (others => '0');
@@ -388,13 +348,6 @@ begin
 	return res;
 end function;
 
-
-function checkIvalid(ins: InstructionState; ivalid: std_logic) return InstructionState is
-	variable res: InstructionState := ins;
-begin
-	res.controlInfo.squashed := not ivalid; -- CAREFUL: here we'll use 'squashed', must be cleared before ROB 
-	return res;
-end function;
 
 end TEMP_DEV;
 

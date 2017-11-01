@@ -42,10 +42,6 @@ package ProcLogicExec is
 								result: Mword; carry: std_logic; exc: std_logic_vector(3 downto 0))
 	return InstructionState;
 
-	function setResult(ins: InstructionState;
-								result: Mword)
-	return InstructionState;
-
 	function executeAlu(ins: InstructionState) return InstructionState;
 
 end ProcLogicExec;
@@ -154,15 +150,6 @@ package body ProcLogicExec is
 		res.controlInfo.exceptionCode := (others => '0');
 		res.controlInfo.exceptionCode(3 downto 0) := exc;
 		return res;
-	end function;
-
-	function setResult(ins: InstructionState;
-								result: Mword)
-	return InstructionState is
-		variable res: InstructionState := ins;	
-	begin
-		res.result := result;
-		return res; 
 	end function;
 	
 	function executeAlu(ins: InstructionState) return InstructionState is

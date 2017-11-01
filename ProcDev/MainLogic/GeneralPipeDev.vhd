@@ -145,6 +145,9 @@ function getKillMask(content: InstructionStateArray; fullMask: std_logic_vector;
 							causing: InstructionState; execEventSig: std_logic; lateEventSig: std_logic)
 return std_logic_vector;
 
+function setInstructionTarget(ins: InstructionState; target: Mword) return InstructionState;
+function setInsResult(ins: InstructionState; result: Mword) return InstructionState;
+
 end GeneralPipeDev;
 
 
@@ -901,5 +904,19 @@ begin
 	return res;
 end function;
 
+
+function setInstructionTarget(ins: InstructionState; target: Mword) return InstructionState is
+	variable res: InstructionState := ins;
+begin
+	res.target := target;
+	return res;
+end function;
+
+function setInsResult(ins: InstructionState; result: Mword) return InstructionState is
+	variable res: InstructionState := ins;
+begin
+	res.result := result;
+	return res;
+end function;
 
 end GeneralPipeDev;

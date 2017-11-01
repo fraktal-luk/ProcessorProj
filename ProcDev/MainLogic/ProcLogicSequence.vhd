@@ -78,6 +78,8 @@ return InstructionState;
 
 function getAddressIncrement(ins: InstructionState) return Mword;
 
+function checkIvalid(ins: InstructionState; ivalid: std_logic) return InstructionState;
+
 end ProcLogicSequence;
 
 
@@ -343,6 +345,13 @@ begin
 	else
 		res(2) := '1'; -- 4
 	end if;
+	return res;
+end function;
+
+function checkIvalid(ins: InstructionState; ivalid: std_logic) return InstructionState is
+	variable res: InstructionState := ins;
+begin
+	res.controlInfo.squashed := not ivalid; -- CAREFUL: here we'll use 'squashed', must be cleared before ROB 
 	return res;
 end function;
 
