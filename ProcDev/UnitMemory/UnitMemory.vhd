@@ -238,8 +238,8 @@ begin
 					stageEventsOut => open					
 				);
 
-				stageDataAfterForward <= setExecState(storeForwardData, storeForwardData.argValues.arg2,
-																		'0', "0000");
+				stageDataAfterForward <= setExecState(stageDataOutMem0.data(0),
+																		 storeForwardData.argValues.arg2, '0', "0000");
 				stageDataAfterCache <= setExecState(stageDataOutMem0.data(0), memLoadValue, '0', "0000");
 				stageDataAfterSysRegs <= setExecState(stageDataOutMem0.data(0), sysLoadVal, '0', "0000");
 
