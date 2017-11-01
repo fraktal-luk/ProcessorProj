@@ -31,27 +31,11 @@ return std_logic_vector;
 function extractReadyRegBitsV(bits: std_logic_vector; data: InstructionStateArray)
 return std_logic_vector;
 
-
--- SEQUENCE??
-function getAddressIncrement(ins: InstructionState) return Mword;
-
-
 function clearTempControlInfoSimple(ins: InstructionState) return InstructionState;
 function clearTempControlInfoMulti(sd: StageDataMulti) return StageDataMulti;
 
--- SEQUENCE ------
-function setPhase(ins: InstructionState;
-							 phase0, phase1, phase2: std_logic)
-return InstructionState;
 
-function setException2(ins, causing: InstructionState;
-							  intSignal, resetSignal, isNew, phase0, phase1, phase2: std_logic)
-return InstructionState;
-
-function setLateTargetAndLink(ins: InstructionState; target: Mword; link: Mword; phase1: std_logic)
-return InstructionState;
--------------------
-
+-- UNUSED
 function clearEmptyResultTags(insVec: InstructionStateArray; fullMask: std_logic_vector)
 return InstructionStateArray;
 
@@ -124,19 +108,6 @@ begin
 end function;
 
 
-function getAddressIncrement(ins: InstructionState) return Mword is
-	variable res: Mword := (others => '0');
-begin
-	-- TODO: short instructions...
-	if false then
-		res(1) := '1'; -- 2
-	else
-		res(2) := '1'; -- 4
-	end if;
-	return res;
-end function;
-
-
 function clearTempControlInfoSimple(ins: InstructionState) return InstructionState is
 	variable res: InstructionState := ins;
 begin
@@ -156,67 +127,6 @@ begin
 	end loop;
 	return res;
 end function;
-
-	
-function setPhase(ins: InstructionState;
-							 phase0, phase1, phase2: std_logic)
-return InstructionState is
-	variable res: InstructionState := ins;
-begin	
-	res.controlInfo.phase0 := phase0;
-	res.controlInfo.phase1 := phase1;
-	res.controlInfo.phase2 := phase2;
-	return res;
-end function;	
-
-
-function setException2(ins, causing: InstructionState;
-							  intSignal, resetSignal, isNew, phase0, phase1, phase2: std_logic)
-return InstructionState is
-	variable res: InstructionState := ins;
-begin
-	res.controlInfo.newEvent := ((res.controlInfo.hasException 
-											or res.controlInfo.specialAction
-											)
-											and isNew) 
-									or intSignal or resetSignal;
-
-	res.controlInfo.hasInterrupt := res.controlInfo.hasInterrupt or intSignal;
-	-- ^ Interrupts delayed by 1 cycle if exception being committed!
-	
-	res.controlInfo.hasReset := resetSignal;
-		
-	if phase1 = '1' then
-			res.result := res.target;
-		--res.target := causing.target;
-	end if;
-	
-	if phase2 = '1' then
-		res.controlInfo.newEvent := '0';	
-
-			res.controlInfo.hasException := '0';
-			res.controlInfo.hasInterrupt := '0';
-			res.controlInfo.hasReset := '0';
-			--res.controlInfo.hasEvent := '0';	
-			res.controlInfo.specialAction := '0';			
-	end if;
-	
-	return res;
-end function;
-
-function setLateTargetAndLink(ins: InstructionState; target: Mword; link: Mword; phase1: std_logic)
-return InstructionState is
-	variable res: InstructionState := ins;
-begin
-
-	if phase1 = '1' then
-		res.result := link;
-		res.target := target;
-	end if;	
-	
-	return res;
-end function;
-
 
 
 function clearEmptyResultTags(insVec: InstructionStateArray; fullMask: std_logic_vector)

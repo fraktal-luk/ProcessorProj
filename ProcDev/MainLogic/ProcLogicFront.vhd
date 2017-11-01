@@ -45,57 +45,9 @@ return InstructionStateArray;
 
 function stageMultiEvents(sd: StageDataMulti; isNew: std_logic) return StageMultiEventInfo;
 
-
 function getFrontEvent(ins: InstructionState; receiving: std_logic; valid: std_logic;
 							  hbuffAccepting: std_logic; fetchBlock: HwordArray(0 to FETCH_BLOCK_SIZE-1))
-return InstructionState is
-	variable res: InstructionState := ins;
-	variable tempOffset, tempTarget: Mword := (others => '0');
-begin
-	if valid = '0' then
-		res.controlInfo.squashed := '1';
-	end if;
-
-	-- receiving, valid, accepting	-> good
-	-- receiving, valid, not accepting -> refetch
-	-- receiving, invalid, accepting -> error, will cause exception, but handled later, from decode on
-	-- receiving, invalid, not accepting -> refetch??
---return res;
-	if false and (receiving and not hbuffAccepting) = '1' then -- When need to refetch
-		res.target := res.basicInfo.ip;
-	
-
-	end if;
-	
-	-- Check if it's a branch
-	-- TODO: (should be done in predecode when loading to cache)
-	-- CAREFUL: Only without hword instructions now!
-		-- TMP
-	if (receiving and valid and hbuffAccepting) = '1' then
-		if 	fetchBlock(0)(15 downto 10) = opcode2slv(jl) 
-			or fetchBlock(0)(15 downto 10) = opcode2slv(jz) 
-			or fetchBlock(0)(15 downto 10) = opcode2slv(jnz)
-		then
-			report "brnch fetched!";
-			
-				--res.controlInfo.newEvent := '1';
-				--res.controlInfo.hasBranch := '1';			
-			
-			tempOffset := "00000000000" & fetchBlock(0)(4 downto 0) & fetchBlock(1);
-			tempTarget := addMwordFaster(res.basicInfo.ip, tempOffset);
-			res.target := tempTarget;
-		elsif fetchBlock(0)(15 downto 10) = opcode2slv(j)
-		then
-			report "long branch fetched";
-			tempOffset := "000000" & fetchBlock(0)(9 downto 0) & fetchBlock(1);
-			tempTarget := addMwordFaster(res.basicInfo.ip, tempOffset);
-			res.target := tempTarget;
-		end if;
-	end if;
-	
-	return res;
-end function;
-
+return InstructionState;
 
 end ProcLogicFront;
 
@@ -331,6 +283,56 @@ begin
 		tp := tp or eVec(i);			
 	end loop;
 	res.eventOccured := tp;
+	
+	return res;
+end function;
+
+function getFrontEvent(ins: InstructionState; receiving: std_logic; valid: std_logic;
+							  hbuffAccepting: std_logic; fetchBlock: HwordArray(0 to FETCH_BLOCK_SIZE-1))
+return InstructionState is
+	variable res: InstructionState := ins;
+	variable tempOffset, tempTarget: Mword := (others => '0');
+begin
+	if valid = '0' then
+		res.controlInfo.squashed := '1';
+	end if;
+
+	-- receiving, valid, accepting	-> good
+	-- receiving, valid, not accepting -> refetch
+	-- receiving, invalid, accepting -> error, will cause exception, but handled later, from decode on
+	-- receiving, invalid, not accepting -> refetch??
+--return res;
+	if false and (receiving and not hbuffAccepting) = '1' then -- When need to refetch
+		res.target := res.basicInfo.ip;
+	
+
+	end if;
+	
+	-- Check if it's a branch
+	-- TODO: (should be done in predecode when loading to cache)
+	-- CAREFUL: Only without hword instructions now!
+		-- TMP
+	if (receiving and valid and hbuffAccepting) = '1' then
+		if 	fetchBlock(0)(15 downto 10) = opcode2slv(jl) 
+			or fetchBlock(0)(15 downto 10) = opcode2slv(jz) 
+			or fetchBlock(0)(15 downto 10) = opcode2slv(jnz)
+		then
+			report "brnch fetched!";
+			
+				--res.controlInfo.newEvent := '1';
+				--res.controlInfo.hasBranch := '1';			
+			
+			tempOffset := "00000000000" & fetchBlock(0)(4 downto 0) & fetchBlock(1);
+			tempTarget := addMwordFaster(res.basicInfo.ip, tempOffset);
+			res.target := tempTarget;
+		elsif fetchBlock(0)(15 downto 10) = opcode2slv(j)
+		then
+			report "long branch fetched";
+			tempOffset := "000000" & fetchBlock(0)(9 downto 0) & fetchBlock(1);
+			tempTarget := addMwordFaster(res.basicInfo.ip, tempOffset);
+			res.target := tempTarget;
+		end if;
+	end if;
 	
 	return res;
 end function;

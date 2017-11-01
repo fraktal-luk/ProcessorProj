@@ -66,7 +66,6 @@ entity UnitSequencer is
 		intSignal: in std_logic;
 		execEventSignal: in std_logic;
 		execCausing: in InstructionState;		
-		--stage0EventInfo: in StageMultiEventInfo;	
 		
 			frontEventSignal: in std_logic;
 			frontCausing: in InstructionState;
@@ -95,7 +94,6 @@ entity UnitSequencer is
 		robDataLiving: in StageDataMulti;
 		sendingFromROB: in std_logic;
 		
-		--	sendingFromBQ: in std_logic;
 				dataFromBQV: in StageDataMulti;
 		
 				dataFromSB: in InstructionState;
@@ -122,8 +120,6 @@ entity UnitSequencer is
 			newPhysDestsIn: in PhysNameArray(0 to PIPE_WIDTH-1);
 			newPhysDestPointerIn: in SmallNumber;
 			newPhysSourcesIn: in PhysNameArray(0 to 3*PIPE_WIDTH-1);
-		
-		  --   readyRegFlagsNextV: in std_logic_vector(0 to 3*PIPE_WIDTH-1);
 		
 		start: in std_logic	
 	);
@@ -199,7 +195,7 @@ begin
 	begin	
 		generalEvents <= NEW_generalEvents(
 											stageDataOutPC,
-												TMP_phase0,--eiEvents.eventOccured, 
+												TMP_phase0, 
 											eiEvents.causing,
 											execEventSignal, execCausing,
 											frontEventSignal, frontCausing,
@@ -209,7 +205,7 @@ begin
 			lateEventOut <= TMP_phase0;
 		execOrIntEventSignal <= execEventSignal or TMP_phase0;
 		execOrIntCausing <= eiEvents.causing when TMP_phase0 = '1' else execCausing;
-									--execCausing;
+
 		execOrIntEventSignalOut <= execOrIntEventSignal;	-- $MODULE_OUT
 		execOrIntCausingOut <= execOrIntCausing; -- $MODULE_OUT
 	end block;
@@ -259,8 +255,7 @@ begin
 			sendingOut => sendingOutPC,
 			stageDataOut => tmpPcOut,
 			
-			execEventSignal => --generalEvents.affectedVec(0),
-										generalEvents.eventOccured,
+			execEventSignal => generalEvents.eventOccured,
 			lateEventSignal => TMP_phase0,
 			execCausing => DEFAULT_INSTRUCTION_STATE,
 			lockCommand => '0'		
@@ -388,8 +383,7 @@ begin
 							frontDataLastLiving, takeVec, reserveSelSig, newPhysSources, newPhysDests
 						),
 						newNumberTags, renameGroupCtrNext, newGprTags
-					)--,
-					--readyRegFlagsNextV
+					)
 				)	
 			);
 	

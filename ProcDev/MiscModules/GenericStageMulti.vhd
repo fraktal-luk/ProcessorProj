@@ -46,6 +46,8 @@ use work.BasicCheck.all;
 
 use work.TEMP_DEV.all;
 
+use work.ProcLogicSequence.all;
+
 
 entity GenericStageMulti is
 	port(
@@ -269,7 +271,7 @@ begin
 								stageDataNew,
 								flowResponse.living, flowResponse.sending, flowDrive.prevSending);			
 		stageDataLiving.fullMask <= stageData.fullMask;
-		stageDataLiving.data(0) <= work.TEMP_DEV.setException2(
+		stageDataLiving.data(0) <= setException2(
 								stageData.data(0),
 								execCausing,
 								execCausing.controlInfo.hasInterrupt, execCausing.controlInfo.hasReset, flowResponse.isNew,
@@ -318,7 +320,7 @@ begin
 		flowResponse => flowResponse
 	);
 		-- TODO: move to visible package! 
-		stageEvents.causing <= work.TEMP_DEV.setPhase(stageDataLiving.data(0),
+		stageEvents.causing <= setPhase(stageDataLiving.data(0),
 																	 evtPhase0, evtPhase1, evtPhase2);
 		stageEvents.eventOccured <= stageEvents.causing.controlInfo.newEvent;
 		

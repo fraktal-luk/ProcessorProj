@@ -74,6 +74,8 @@ function stageCQNext(content: StageDataCommitQueue; newContent: InstructionState
 return StageDataCommitQueue;
 
 -----------------------									
+
+function getPhysicalSources(ins: InstructionState) return PhysNameArray;
 	
 	-- TODO: use these to implement StageDataMulti corresponding functions?
 	function getArrayResults(ia: InstructionStateArray) return MwordArray;
@@ -819,6 +821,14 @@ begin
 	end loop;
 	
 	return res;		
+end function;
+
+
+function getPhysicalSources(ins: InstructionState) return PhysNameArray is
+	variable res: PhysNameArray(0 to 2) := (others => (others => '0'));
+begin
+	res := (0 => ins.physicalArgs.s0, 1 => ins.physicalArgs.s1, 2 => ins.physicalArgs.s2);			
+	return res;
 end function;
 
 

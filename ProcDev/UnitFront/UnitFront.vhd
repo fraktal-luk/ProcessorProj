@@ -38,12 +38,13 @@ use work.NewPipelineData.all;
 
 use work.GeneralPipeDev.all;
 
---use work.CommonRouting.all;
 use work.TEMP_DEV.all;
 
 use work.ProcComponents.all;
 
 use work.ProcLogicFront.all;
+
+use work.ProcLogicSequence.all;
 
 
 entity UnitFront is
@@ -56,11 +57,9 @@ entity UnitFront is
 		ivalid: in std_logic;		
 
 		-- Interface PC to front
-		pcDataLiving: in InstructionState; --InstructionState;
+		pcDataLiving: in InstructionState;
 		pcSending: in std_logic;
 		frontAccepting: out std_logic;
-
-		--stage0EventsOut: out StageMultiEventInfo;
 
 		-- Interface front to renaming
 		renameAccepting: in std_logic;		
@@ -72,9 +71,7 @@ entity UnitFront is
 		frontCausing: out InstructionState;
 		
 		execEventSignal: in std_logic;
-		lateEventSignal: in std_logic
-		
-		--killVector: in std_logic_vector(0 to N_EVENT_AREAS-1)
+		lateEventSignal: in std_logic		
 	);
 end UnitFront;
 
@@ -313,7 +310,7 @@ begin
 			sendingOut => sendingOut0,
 			stageDataOut => stageDataDecodeOut,
 
-			execEventSignal => killAll,--killVector(4),
+			execEventSignal => killAll,
 			lateEventSignal => killAll,
 			execCausing => DEFAULT_INSTRUCTION_STATE,
 			lockCommand => '0',

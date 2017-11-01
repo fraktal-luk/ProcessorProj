@@ -160,14 +160,6 @@ architecture Behavioral of OutOfOrderBox is
 								std_logic := '0';
 				signal issueAcceptingA, issueAcceptingB, issueAcceptingC, issueAcceptingD, issueAcceptingE:
 								std_logic := '0';
-			
-			-- TODO: move to package
-			function getPhysicalSources(ins: InstructionState) return PhysNameArray is
-				variable res: PhysNameArray(0 to 2) := (others => (others => '0'));
-			begin
-				res := (0 => ins.physicalArgs.s0, 1 => ins.physicalArgs.s1, 2 => ins.physicalArgs.s2);			
-				return res;
-			end function;
 		begin
 		
 	resetSig <= reset;
@@ -654,4 +646,3 @@ architecture Behavioral of OutOfOrderBox is
 	cqDataOut <= cqDataSig;
 
 end Behavioral;
-
