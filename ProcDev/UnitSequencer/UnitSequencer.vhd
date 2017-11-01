@@ -373,7 +373,6 @@ begin
 			nToTake <= countOnes(takeVec);
 
 		GEN_TAGS: for i in 0 to PIPE_WIDTH-1 generate	
-			-- CAREFUL, TODO: here GPR tags are selected
 			newNumberTags(i) <= i2slv(binFlowNum(renameCtr) + i + 1, SMALL_NUMBER_SIZE);										
 			newGprTags(i) <= 
 									i2slv((slv2u(newPhysDestPointer) + nToTake) mod FREE_LIST_SIZE, SMALL_NUMBER_SIZE)

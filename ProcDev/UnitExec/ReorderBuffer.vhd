@@ -204,7 +204,7 @@ begin
 
 	fromCommitted <= lateEventSignal;
 						
-	-- TODO: allow accepting also when queue full but sending, that is freeing a place.
+	-- TODO: allow accepting also when queue full but sending, that is freeing a place?
 	acceptingOut <= not getBitFromROBMaskPre(TMP_stageData, qs0.pStart);
 								
 	outputData <= TMP_frontCircular;

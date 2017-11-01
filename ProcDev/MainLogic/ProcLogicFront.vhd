@@ -113,9 +113,9 @@ begin
 					ci.secCluster := '1';
 				end if;
 				
-				-- TODO: branch with link should also contain main cluster because link goes there!
 				if ins.operation.unit = Jump then
 					ci.secCluster := '1';
+					-- For branch with link main cluster for destination write
 					if isNonzero(ins.virtualDestArgs.d0) = '0' then
 						ci.mainCluster := '0';
 					end if;

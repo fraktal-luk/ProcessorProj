@@ -58,37 +58,13 @@ function baptizeAll(insVec: StageDataMulti; numberTags: SmallNumberArray;
 return StageDataMulti;
 
 
--- TODO: use effective mask rather than full mask in this functions!
---function fetchLockCommitting(sd: StageDataMulti; effective: std_logic_vector) return std_logic;
 function getSysRegWriteAllow(sd: StageDataMulti; effective: std_logic_vector) return std_logic;
 -- CAREFUL: this seems not used and would choose the last value in group
 function getSysRegWriteSel(sd: StageDataMulti) return slv5;
 -- CAREFUL: this seems not used and would choose the last value in group
 function getSysRegWriteValue(sd: StageDataMulti) return Mword;
 
--- TODO: move to package body
--- FUNCTION BODY
-function TMP_handleSpecial(sd: StageDataMulti) return StageDataMulti is
-	variable res: StageDataMulti := sd;
-	variable found: boolean := false;
-begin
-	-- If found special instruction, kill next ones
-	for i in 0 to PIPE_WIDTH-1 loop
-		if found then
-			res.fullMask(i) := '0';
-		end if;
-
-		if 	res.data(i).controlInfo.specialAction = '1'
-			or res.data(i).controlInfo.hasException = '1' -- CAREFUL
-			--	TODO: include here also early branches? 
-		then
-			found := true;
-		end if;
-	end loop;
-	
-	return res;
-end function;
-
+function TMP_handleSpecial(sd: StageDataMulti) return StageDataMulti;
 
 function findWhichTakeReg(sd: StageDataMulti) return std_logic_vector;
 function findWhichPutReg(sd: StageDataMulti) return std_logic_vector;
@@ -210,10 +186,6 @@ begin
 		
 		res.data(i).argValues.readyBefore := not res.data(i).argValues.missing;
 
-			-- TODO: now handle 'completed' flags. If only main Exec cluster, 'completed2' = '1'.
-			--													If only secondary Exec cl, 'completed'  = '1'.
-			--													If both clusters,				both				'0'.
-				-- Set completed2 to false if it does need to be performed by the instruction
 			res.data(i).controlInfo.completed := not res.data(i).classInfo.mainCluster;				
 			res.data(i).controlInfo.completed2 := not res.data(i).classInfo.secCluster;
 				
@@ -282,18 +254,6 @@ begin
 	return res;
 end function;
 
-
---	function fetchLockCommitting(sd: StageDataMulti; effective: std_logic_vector) return std_logic is
---	begin
---		for i in sd.fullMask'range loop
---			if --sd.fullMask(i) = '1' 
---						effective(i) = '1'
---				and sd.data(i).classInfo.fetchLock = '1' then
---				return '1';
---			end if;
---		end loop;
---		return '0';
---	end function;
 	
 	function getSysRegWriteAllow(sd: StageDataMulti; effective: std_logic_vector) return std_logic is
 	begin
@@ -334,7 +294,26 @@ end function;
 		return res;
 	end function;
 
+function TMP_handleSpecial(sd: StageDataMulti) return StageDataMulti is
+	variable res: StageDataMulti := sd;
+	variable found: boolean := false;
+begin
+	-- If found special instruction, kill next ones
+	for i in 0 to PIPE_WIDTH-1 loop
+		if found then
+			res.fullMask(i) := '0';
+		end if;
 
+		if 	res.data(i).controlInfo.specialAction = '1'
+			or res.data(i).controlInfo.hasException = '1' -- CAREFUL
+			--	TODO: include here also early branches? 
+		then
+			found := true;
+		end if;
+	end loop;
+	
+	return res;
+end function;
 
 function findWhichTakeReg(sd: StageDataMulti) return std_logic_vector is
 	variable res: std_logic_vector(0 to PIPE_WIDTH-1) := (others => '0');

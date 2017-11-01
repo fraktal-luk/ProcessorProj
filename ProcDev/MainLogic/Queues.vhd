@@ -471,10 +471,6 @@ return InstructionStateArray is
 begin
 	for i in 0 to LEN-1 loop
 		tmpSN := indices(i) and MASK_NUM;
-		-- TODO: add updated slots to the mux
-		-- 		The update will apply only to selected fields of the slots, and for circular queue
-		--			those fields are never written from different sources.
-		--			So for circular queue there can be independent loops, without multiplexing those fields.
 		--		Also: write only needed entires: for D -> result, completed2; for A -> target, completed 
 
 		if (wrA and maskA(i)) = '1' then
