@@ -316,7 +316,7 @@ begin
 			or fetchBlock(0)(15 downto 10) = opcode2slv(jz) 
 			or fetchBlock(0)(15 downto 10) = opcode2slv(jnz)
 		then
-			report "brnch fetched!";
+			report "branch fetched!";
 			
 				--res.controlInfo.newEvent := '1';
 				--res.controlInfo.hasBranch := '1';			

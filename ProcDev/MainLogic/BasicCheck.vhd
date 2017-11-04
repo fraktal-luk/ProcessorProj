@@ -118,6 +118,7 @@ begin
 			end if;
 			write(fline,
 						  integer'image(slv2u(insArr(i).groupTag))
+				--& "/" & integer'image(slv2u(insArr(i).numberTag))
 				& "@" & integer'image(slv2u(insArr(i).basicInfo.ip)));
 		end if;
 		write(fline, ", ");
@@ -226,7 +227,7 @@ begin
 	
 	-- CHECK: does it make sense to examine this? Should other kinds of data be compared?
 	for i in 0 to nCommon-1 loop
-		assert commonPart1(i).numberTag = commonPart2(i).numberTag report "u"; -- TODO: is this the right tag field?
+		assert commonPart1(i).groupTag = commonPart2(i).groupTag report "u"; -- TODO: is this the right tag field?
 		assert commonPart1(i).basicInfo.ip = commonPart2(i).basicInfo.ip report "yio";
 	end loop;
 	
@@ -312,19 +313,19 @@ begin
 	nCommon := nLiving - nSending;	
 	for i in 0 to nLiving - 1 loop
 		-- In old array we have to skip the op that is being sent
-		if sending = '1' and bufferData(i).numberTag = insSending.numberTag 
+		if sending = '1' and bufferData(i).groupTag = insSending.groupTag 
 			then -- CAREFUL: is this the right tag field?
 			move := 1;
 					--report "rtttt";
 			insSendingMatch := bufferData(i);
 			-- Check the op that is sent?
-			assert insSendingMatch.numberTag = insSending.numberTag report "byj"; -- TODO: is this the right tag field?
+			assert insSendingMatch.groupTag = insSending.groupTag report "byj"; -- TODO: is this the right tag field?
 			assert insSendingMatch.basicInfo.ip = insSending.basicInfo.ip report "jjj";		
 		end if;
 		
 		-- If we have visited all living instructions in old array, we break, because 
 		--		it one less is copied to commonPart1, not all of them. Otherwise we could go out of array!
-		if i + move >= nLiving - 1 then
+		if i + move > nLiving - 1 then
 			exit;
 		end if;
 				
@@ -334,7 +335,7 @@ begin
 	
 	-- CHECK: does it make sense to examine this? Should other kinds of data be compared?
 	for i in 0 to nCommon-1 loop
-		assert commonPart1(i).numberTag = commonPart2(i).numberTag report "jutrrrr"; -- TODO: is this the right tag field?
+		assert commonPart1(i).groupTag = commonPart2(i).groupTag report "jutrrrr"; -- TODO: is this the right tag field?
 		assert commonPart1(i).basicInfo.ip = commonPart2(i).basicInfo.ip report "oiu";
 	end loop;
 	

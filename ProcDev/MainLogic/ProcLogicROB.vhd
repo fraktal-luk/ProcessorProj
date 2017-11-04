@@ -652,7 +652,7 @@ begin
 			if sdn.data(i).fullMask(j) = '0' then
 				exit;
 			end if;	
-			assert sd.data(i).data(j).numberTag = sd.data(i).data(j).numberTag report "koho";
+			assert sd.data(i).data(j).groupTag = sd.data(i).data(j).groupTag report "koho";
 								-- TODO: is this the right tag field?
 			assert sd.data(i).data(j).basicInfo.ip = sd.data(i).data(j).basicInfo.ip report "jor";
 		end loop;
