@@ -215,7 +215,7 @@ begin
 			-- Need to speculate...
 			-- ! src0 should be register other than r0
 			-- Check	if displacement is negative
-			--		TODO	
+			--			
 		end if;
 	end if;
 	
@@ -347,13 +347,13 @@ end procedure;
 
 function TEMP_defaultCanAccept(capacity, full: in PipeFlow) return PipeFlow is
 begin
-	-- TODO: what about aligning and otherwise normalizing the outputs?
+	--  what about aligning and otherwise normalizing the outputs?
 	return capacity;	
 end function;
 
 function TEMP_defaultWantSend(capacity, full: in PipeFlow) return PipeFlow is
 begin
-	return full;   -- TODO: what about aligning and otherwise normalizing the outputs?
+	return full;   --  what about aligning and otherwise normalizing the outputs?
 end function;
 
 

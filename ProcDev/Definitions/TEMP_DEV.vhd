@@ -40,6 +40,9 @@ return InstructionState;
 -- Description: arg1 := target
 function trgForBQ(insVec: StageDataMulti) return StageDataMulti;
 
+
+-- TODO: should be moved somewhere else, but depends on Mword definition.
+--			Because Mword is device specific, these functions must be redone as abstractions of addWord...
 function addMwordBasic(a, b: Mword) return Mword;
 function subMwordBasic(a, b: Mword) return Mword;
 

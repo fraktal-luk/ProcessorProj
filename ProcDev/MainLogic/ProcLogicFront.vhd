@@ -96,7 +96,6 @@ begin
 				ci.branchReg := '1';
 			end if;
 			
-			-- TODO: complete this!
 			if  ins.operation.unit = System then
 				--ci.system := '1';
 			end if;

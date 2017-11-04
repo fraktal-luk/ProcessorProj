@@ -93,7 +93,7 @@ architecture Behavioral of LoadQueue is
 								:= (others => DEFAULT_INSTRUCTION_SLOT);
 					
 					
-					-- TODO: use completed + completed2 for readyA + readyD ???
+					--  use completed + completed2 for readyA + readyD ???
 					signal readyA, readyD, readyAD, readyMask: std_logic_vector(0 to LQ_SIZE-1) := (others => '0');
 					
 					signal wrAddress, wrData, sameTag: std_logic := '0';
@@ -263,7 +263,7 @@ architecture Behavioral of LoadQueue is
 								
 								tempMask(0 to LQ_SIZE-1) := livingMask;
 
-									if nLiving >= LQ_SIZE or nLiving < 0 then -- CAREFUL, TODO: use modulo or sth?
+									if nLiving >= LQ_SIZE or nLiving < 0 then -- CAREFUL, use modulo or sth?
 										return outMask;
 									end if;
 								-- Append new data

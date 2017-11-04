@@ -339,8 +339,7 @@ end function;
 function getAddressIncrement(ins: InstructionState) return Mword is
 	variable res: Mword := (others => '0');
 begin
-	-- TODO: short instructions...
-	if false then
+	if ins.classInfo.short = '1' then
 		res(1) := '1'; -- 2
 	else
 		res(2) := '1'; -- 4
