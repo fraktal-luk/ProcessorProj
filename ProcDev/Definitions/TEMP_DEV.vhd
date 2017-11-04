@@ -29,14 +29,13 @@ return std_logic_vector;
 function extractReadyRegBitsV(bits: std_logic_vector; data: InstructionStateArray)
 return std_logic_vector;
 
--- GENERAL?
-function clearTempControlInfoSimple(ins: InstructionState) return InstructionState;
-function clearTempControlInfoMulti(sd: StageDataMulti) return StageDataMulti;
-
-
 -- UNUSED
 function clearEmptyResultTags(insVec: InstructionStateArray; fullMask: std_logic_vector)
 return InstructionStateArray;
+
+-- For partition into different clusters: int, FP, mem
+function isolateArgSubset(ins: InstructionState; destSel: std_logic; srcSel: std_logic_vector(0 to 2))
+return InstructionState;
 
 -- Description: arg1 := target
 function trgForBQ(insVec: StageDataMulti) return StageDataMulti;
@@ -79,28 +78,6 @@ begin
 	return res;
 end function;
 
-
-function clearTempControlInfoSimple(ins: InstructionState) return InstructionState is
-	variable res: InstructionState := ins;
-begin
-	res.controlInfo.newEvent := '0';
-	--res.controlInfo.newInterrupt := '0';
-	--res.controlInfo.newException := '0';
-	res.controlInfo.newBranch := '0';
-	--res.controlInfo.newReturn := '0';
-	return res;
-end function;
-
-function clearTempControlInfoMulti(sd: StageDataMulti) return StageDataMulti is
-	variable res: StageDataMulti := sd;
-begin
-	for i in res.fullMask'range loop
-		res.data(i) := clearTempControlInfoSimple(res.data(i));
-	end loop;
-	return res;
-end function;
-
-
 function clearEmptyResultTags(insVec: InstructionStateArray; fullMask: std_logic_vector)
 return InstructionStateArray is
 	variable res: InstructionStateArray(0 to insVec'length-1) := insVec;
@@ -112,7 +89,6 @@ begin
 	end loop;
 	return res;
 end function;
-
 
 
 function isolateArgSubset(ins: InstructionState; destSel: std_logic; srcSel: std_logic_vector(0 to 2))

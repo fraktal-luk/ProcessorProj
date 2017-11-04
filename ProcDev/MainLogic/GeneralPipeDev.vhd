@@ -77,6 +77,9 @@ return StageDataCommitQueue;
 
 function getPhysicalSources(ins: InstructionState) return PhysNameArray;
 	
+function clearTempControlInfoSimple(ins: InstructionState) return InstructionState;
+function clearTempControlInfoMulti(sd: StageDataMulti) return StageDataMulti;
+	
 	-- TODO: use these to implement StageDataMulti corresponding functions?
 	function getArrayResults(ia: InstructionStateArray) return MwordArray;
 	function getArrayPhysicalDests(ia: InstructionStateArray) return PhysNameArray;
@@ -831,6 +834,26 @@ function getPhysicalSources(ins: InstructionState) return PhysNameArray is
 	variable res: PhysNameArray(0 to 2) := (others => (others => '0'));
 begin
 	res := (0 => ins.physicalArgs.s0, 1 => ins.physicalArgs.s1, 2 => ins.physicalArgs.s2);			
+	return res;
+end function;
+
+function clearTempControlInfoSimple(ins: InstructionState) return InstructionState is
+	variable res: InstructionState := ins;
+begin
+	res.controlInfo.newEvent := '0';
+	--res.controlInfo.newInterrupt := '0';
+	--res.controlInfo.newException := '0';
+	res.controlInfo.newBranch := '0';
+	--res.controlInfo.newReturn := '0';
+	return res;
+end function;
+
+function clearTempControlInfoMulti(sd: StageDataMulti) return StageDataMulti is
+	variable res: StageDataMulti := sd;
+begin
+	for i in res.fullMask'range loop
+		res.data(i) := clearTempControlInfoSimple(res.data(i));
+	end loop;
 	return res;
 end function;
 
