@@ -109,7 +109,7 @@ begin
 	resetSig <= reset and HAS_RESET_IQ;
 	enSig <= en or not HAS_EN_IQ;
 		
-		eventCausing <= setInterrupt(execCausing, lateEventSignal);
+		eventCausing <= execCausing;
 		
 	-- The queue	
 	QUEUE_MAIN_LOGIC: entity work.SubunitIQBuffer(Implem)
@@ -120,8 +120,8 @@ begin
 	 	clk => clk, reset => resetSig, en => enSig,
 	 	prevSendingOK => prevSendingOK,
 	 	newData => newData,
-	 	nextAccepting => --dispatchAccepting,
-								issueAccepting,
+	 	nextAccepting => issueAccepting,
+		lateEventSignal => lateEventSignal,
 		execEventSignal => execEventSignal,
 		execCausing => eventCausing,
 		aiArray => aiArray,

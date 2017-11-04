@@ -85,7 +85,7 @@ architecture Behavioral of IntegerMultiplier is
 		signal eventCausing: InstructionState := DEFAULT_INSTRUCTION_STATE;
 	signal multResult: dword := (others => '0');
 begin
-		eventCausing <= setInterrupt(execCausing, lateEventSignal);
+		eventCausing <= execCausing;
 
 	inputData.data(0) <= dataIn;
 	inputData.fullMask(0) <= prevSending;
@@ -95,7 +95,7 @@ begin
 		clk => clk, reset => reset, en => en,
 		
 		prevSending => prevSending,
-		nextAccepting => acc1, --flowResponseAPost.accepting,
+		nextAccepting => acc1,
 		
 		stageDataIn => inputData, 
 		acceptingOut => acceptingOut,

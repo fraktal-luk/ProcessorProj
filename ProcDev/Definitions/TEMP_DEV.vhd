@@ -51,10 +51,6 @@ function addMwordFaster(a, b: Mword) return Mword;
 
 function addMwordFasterExt(a, b: Mword; carryIn: std_logic) return std_logic_vector;
 
--- TODO: inspect usage and refactor?
-function setInterrupt(ins: InstructionState; int: std_logic) return InstructionState;
-
-
 end TEMP_DEV;
 
 
@@ -339,15 +335,6 @@ begin
 	
 	return res;
 end function;
-
-
-function setInterrupt(ins: InstructionState; int: std_logic) return InstructionState is
-	variable res: InstructionState := ins;
-begin
-	res.controlInfo.hasInterrupt := int;
-	return res;
-end function;
-
 
 end TEMP_DEV;
 

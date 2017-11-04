@@ -130,7 +130,7 @@ architecture Behavioral of UnitMemory is
 	signal ch0, ch1, ch2, ch3, ch4, ch5, ch6, ch7: std_logic := '0';
 begin
 		eventSignal <= execOrIntEventSignalIn;	
-		activeCausing <= setInterrupt(execCausing, lateEventSignal);
+		activeCausing <= execCausing;
 
 		inputDataC.data(0) <=			
 				 setInsResult(dataIQC, addMwordFaster(dataIQC.argValues.arg0, dataIQC.argValues.arg1));--),

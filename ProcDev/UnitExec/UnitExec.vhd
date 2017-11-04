@@ -161,7 +161,7 @@ begin
 						dataOut => dataB2,
 						data1Prev => dataB1,
 					
-					lateEventSignal => lateEventSignal, -- CAREFUL: seems unneeded because activeCausing has the info
+					lateEventSignal => lateEventSignal,
 					execEventSignal => eventSignal,
 					execCausing => activeCausing,
 					lockCommand => '0'					
@@ -261,7 +261,7 @@ begin
 		execCausing <= eventsD.causing;
 
 		eventSignal <= execOrIntEventSignalIn;	
-		activeCausing <= setInterrupt(execCausing, lateEventSignal);
+		activeCausing <= execCausing;
 
 		execAcceptingA <= execAcceptingASig;
 		execAcceptingB <= execAcceptingBSig;

@@ -227,7 +227,6 @@ begin
 		before <= c(7);
 		flowDrive.kill <= killByTag(before, execEventSignal,
 										lateEventSignal);
-										--execCausing.controlInfo.hasInterrupt);
 	end block;	
 
 		stageEvents <= stageMultiEvents(stageData, flowResponse.isNew);

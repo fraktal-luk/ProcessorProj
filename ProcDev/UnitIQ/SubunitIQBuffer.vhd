@@ -60,18 +60,16 @@ entity SubunitIQBuffer is
 		reset: in std_logic;
 		en: in std_logic;
 		
-		--prevSending: in SmallNumber;
 		prevSendingOK: in std_logic;
 		newData: in StageDataMulti;
 		nextAccepting: in std_logic;
+		lateEventSignal: in std_logic;
 		execEventSignal: in std_logic;
-		--intSignal: in std_logic;
 		execCausing: in InstructionState;
 		aiArray: in ArgStatusInfoArray(0 to IQ_SIZE-1);
 		aiNew: in ArgStatusInfoArray(0 to PIPE_WIDTH-1);
 		readyRegFlags: in std_logic_vector(0 to 3*PIPE_WIDTH-1);
 		
-		--accepting: out SmallNumber;
 			acceptingVec: out std_logic_vector(0 to PIPE_WIDTH-1);
 		queueSending: out std_logic;
 		iqDataOut: out InstructionStateArray(0 to IQ_SIZE-1);
@@ -239,7 +237,7 @@ begin
 	);	
 	
 	killMask <=
-		getKillMask(queueData, fullMask, execCausing, execEventSignal, execCausing.controlInfo.hasInterrupt);
+		getKillMask(queueData, fullMask, execCausing, execEventSignal, lateEventSignal); 
 	
 	acceptingVec <= not fullMask(IQ_SIZE-PIPE_WIDTH to IQ_SIZE-1);
 		
