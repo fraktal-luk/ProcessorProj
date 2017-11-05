@@ -164,11 +164,14 @@ architecture Behavioral of OutOfOrderBox is
 			type SLVA is array (integer range <>) of std_logic_vector(0 to PIPE_WIDTH-1);
 			signal iqAcceptingVecArr: SLVA(0 to 4) := (others => (others => '0'));
 			
-			signal issueAcceptingArr, queueSendingArr: std_logic_vector(0 to 4) := (others => '0');
-			signal queueDataArr: InstructionStateArray(0 to 4)
+			signal issueAcceptingArr, queueSendingArr, sendingSchedArr, execAcceptingArr:
+						std_logic_vector(0 to 4) := (others => '0');
+			signal queueDataArr, schedDataArr: InstructionStateArray(0 to 4)
 											:= (others => DEFAULT_INSTRUCTION_STATE);
 			signal dataToQueuesArr: StageDataMultiArray(0 to 4)
-											:= (others => DEFAULT_STAGE_DATA_MULTI);			
+											:= (others => DEFAULT_STAGE_DATA_MULTI);
+
+			signal regValsArr: MwordArray(0 to 3*5-1) := (others => (others => '0'));
 		begin
 		
 	resetSig <= reset;
@@ -259,130 +262,130 @@ architecture Behavioral of OutOfOrderBox is
 		acceptingVecD <= iqAcceptingVecArr(3);
 		acceptingVecE <= iqAcceptingVecArr(4);
 		
-		
-			IQ_A: entity work.UnitIQ
-			generic map(
-				IQ_SIZE => IQ_A_SIZE
-			)
-			port map(
-				clk => clk, reset => resetSig, en => enSig,
-
-				acceptingVec => open,--acceptingVecA,
-
-				prevSendingOK => renamedSending,
-				newData => dataToA,
-
-				fni => fni,
-				
-				readyRegFlags => readyRegFlags,
-
-					issueAccepting => issueAcceptingA, --
-					queueSendingOut => open,--queueSendingA,
-					queueDataOut => open,--queueDataA,
-			
-				execCausing => execCausing,
-					lateEventSignal => lateEventSignal,
-				execEventSignal => execEventSignal			
-			);
-		
-			IQ_B: entity work.UnitIQ
-			generic map(
-				IQ_SIZE => IQ_B_SIZE
-			)
-			port map(
-				clk => clk, reset => resetSig, en => enSig,
-
-				acceptingVec => open,--acceptingVecB,		
-				
-				prevSendingOK => renamedSending,
-				newData => dataToB,		
-
-				fni => fni,	
-						
-				readyRegFlags => readyRegFlags,		
-
-					issueAccepting => issueAcceptingB,
-					queueSendingOut => open,--queueSendingB,
-					queueDataOut => open,--queueDataB,
-
-				execCausing => execCausing,
-					lateEventSignal => lateEventSignal,
-				execEventSignal => execEventSignal
-			);
-			
-			IQ_C: entity work.UnitIQ
-			generic map(
-				IQ_SIZE => IQ_C_SIZE
-			)
-			port map(
-				clk => clk, reset => resetSig, en => enSig,
-
-				acceptingVec => open,--acceptingVecC,		
-
-				prevSendingOK => renamedSending,
-				newData => dataToC,			
-
-				fni => fni,
-						
-				readyRegFlags => readyRegFlags,
-
-					issueAccepting => issueAcceptingC,
-					queueSendingOut => open,--queueSendingC,
-					queueDataOut => open,--queueDataC,
-	
-				execCausing => execCausing,
-					lateEventSignal => lateEventSignal,
-				execEventSignal => execEventSignal
-			);					
-			
-			IQ_D: entity work.UnitIQ
-			generic map(
-				IQ_SIZE => IQ_D_SIZE
-			)
-			port map(
-				clk => clk, reset => resetSig, en => enSig,
-
-				acceptingVec => open,--acceptingVecD,		
-
-				prevSendingOK => renamedSending,
-				newData => dataToD,
-
-				fni => fni,
-						
-				readyRegFlags => readyRegFlags,
-
-					issueAccepting => issueAcceptingD,
-					queueSendingOut => open,--queueSendingD,
-					queueDataOut => open,--queueDataD,
-
-				execCausing => execCausing,
-					lateEventSignal => lateEventSignal,
-				execEventSignal => execEventSignal
-			);	
-		
-			IQ_E: entity work.UnitIQ
-			generic map(
-				IQ_SIZE => IQ_E_SIZE
-			)
-			port map(
-				clk => clk, reset => resetSig, en => enSig,
-
-				acceptingVec => open,--acceptingVecE,		
-				prevSendingOK => renamedSending,
-				newData => dataToE,
-				
-				fni => fni,	
-						
-				readyRegFlags => readyRegFlags, -- bits generated for input group
-
-					issueAccepting => issueAcceptingE,
-					queueSendingOut => open,--queueSendingE,
-					queueDataOut => open,--queueDataE,
-
-				execCausing => execCausing,
-					lateEventSignal => lateEventSignal,
-				execEventSignal => execEventSignal
-			);	
+--		
+--			IQ_A: entity work.UnitIQ
+--			generic map(
+--				IQ_SIZE => IQ_A_SIZE
+--			)
+--			port map(
+--				clk => clk, reset => resetSig, en => enSig,
+--
+--				acceptingVec => open,--acceptingVecA,
+--
+--				prevSendingOK => renamedSending,
+--				newData => dataToA,
+--
+--				fni => fni,
+--				
+--				readyRegFlags => readyRegFlags,
+--
+--					issueAccepting => issueAcceptingA, --
+--					queueSendingOut => open,--queueSendingA,
+--					queueDataOut => open,--queueDataA,
+--			
+--				execCausing => execCausing,
+--					lateEventSignal => lateEventSignal,
+--				execEventSignal => execEventSignal			
+--			);
+--		
+--			IQ_B: entity work.UnitIQ
+--			generic map(
+--				IQ_SIZE => IQ_B_SIZE
+--			)
+--			port map(
+--				clk => clk, reset => resetSig, en => enSig,
+--
+--				acceptingVec => open,--acceptingVecB,		
+--				
+--				prevSendingOK => renamedSending,
+--				newData => dataToB,		
+--
+--				fni => fni,	
+--						
+--				readyRegFlags => readyRegFlags,		
+--
+--					issueAccepting => issueAcceptingB,
+--					queueSendingOut => open,--queueSendingB,
+--					queueDataOut => open,--queueDataB,
+--
+--				execCausing => execCausing,
+--					lateEventSignal => lateEventSignal,
+--				execEventSignal => execEventSignal
+--			);
+--			
+--			IQ_C: entity work.UnitIQ
+--			generic map(
+--				IQ_SIZE => IQ_C_SIZE
+--			)
+--			port map(
+--				clk => clk, reset => resetSig, en => enSig,
+--
+--				acceptingVec => open,--acceptingVecC,		
+--
+--				prevSendingOK => renamedSending,
+--				newData => dataToC,			
+--
+--				fni => fni,
+--						
+--				readyRegFlags => readyRegFlags,
+--
+--					issueAccepting => issueAcceptingC,
+--					queueSendingOut => open,--queueSendingC,
+--					queueDataOut => open,--queueDataC,
+--	
+--				execCausing => execCausing,
+--					lateEventSignal => lateEventSignal,
+--				execEventSignal => execEventSignal
+--			);					
+--			
+--			IQ_D: entity work.UnitIQ
+--			generic map(
+--				IQ_SIZE => IQ_D_SIZE
+--			)
+--			port map(
+--				clk => clk, reset => resetSig, en => enSig,
+--
+--				acceptingVec => open,--acceptingVecD,		
+--
+--				prevSendingOK => renamedSending,
+--				newData => dataToD,
+--
+--				fni => fni,
+--						
+--				readyRegFlags => readyRegFlags,
+--
+--					issueAccepting => issueAcceptingD,
+--					queueSendingOut => open,--queueSendingD,
+--					queueDataOut => open,--queueDataD,
+--
+--				execCausing => execCausing,
+--					lateEventSignal => lateEventSignal,
+--				execEventSignal => execEventSignal
+--			);	
+--		
+--			IQ_E: entity work.UnitIQ
+--			generic map(
+--				IQ_SIZE => IQ_E_SIZE
+--			)
+--			port map(
+--				clk => clk, reset => resetSig, en => enSig,
+--
+--				acceptingVec => open,--acceptingVecE,		
+--				prevSendingOK => renamedSending,
+--				newData => dataToE,
+--				
+--				fni => fni,	
+--						
+--				readyRegFlags => readyRegFlags, -- bits generated for input group
+--
+--					issueAccepting => issueAcceptingE,
+--					queueSendingOut => open,--queueSendingE,
+--					queueDataOut => open,--queueDataE,
+--
+--				execCausing => execCausing,
+--					lateEventSignal => lateEventSignal,
+--				execEventSignal => execEventSignal
+--			);	
 
 
 		EXEC_AREA: block
@@ -393,21 +396,49 @@ architecture Behavioral of OutOfOrderBox is
 				regsSelD <= getPhysicalSources(queueDataD);
 				regsSelE <= getPhysicalSources(queueDataE);
 
+
+				regValsArr <= regValsA & regValsB & regValsC & regValsD & regValsE;
+				execAcceptingArr <= (execAcceptingA, execAcceptingB, execAcceptingC,
+												execAcceptingD, execAcceptingE);
+
+			ISSUE_STAGES: for letter in 'A' to 'E' generate
+				constant i: integer := character'pos(letter) - character'pos('A');
+			begin
+				SCHED_STAGE: entity work.SubunitDispatch(Alternative)	
+				port map(
+					clk => clk, reset => resetSig, en => enSig,
+					prevSending => queueSendingArr(i),
+					nextAccepting => execAcceptingArr(i),--
+					execEventSignal => execEventSignal,
+					lateEventSignal => lateEventSignal,
+					execCausing => execCausing,
+					resultTags => fni.resultTags,
+					resultVals => fni.resultValues,
+					regValues => regValsArr(3*i to 3*i + 2),--
+					stageDataIn => queueDataArr(i),
+					acceptingOut => open,--issueAcceptingArr(i),
+					sendingOut => sendingSchedArr(i),--
+					stageDataOut => schedDataArr(i)--
+				);
+				
+			end generate;
+			
+
 			ISSUE_A: entity work.SubunitDispatch(Alternative)	
 			port map(
 				clk => clk, reset => resetSig, en => enSig,
 				prevSending => queueSendingA,
-				nextAccepting => execAcceptingA,
+				nextAccepting => execAcceptingA,--
 				execEventSignal => execEventSignal,
 				lateEventSignal => lateEventSignal,
 				execCausing => execCausing,
 				resultTags => fni.resultTags,
 				resultVals => fni.resultValues,
-				regValues => regValsA,
+				regValues => regValsA,--
 				stageDataIn => queueDataA,		
 				acceptingOut => issueAcceptingA,
-				sendingOut => sendingSchedA,
-				stageDataOut => dataOutIQA
+				sendingOut => sendingSchedA,--
+				stageDataOut => dataOutIQA--
 			);
 			
 			ISSUE_B: entity work.SubunitDispatch(Alternative)
