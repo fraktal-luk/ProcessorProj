@@ -160,6 +160,15 @@ architecture Behavioral of OutOfOrderBox is
 								std_logic := '0';
 				signal issueAcceptingA, issueAcceptingB, issueAcceptingC, issueAcceptingD, issueAcceptingE:
 								std_logic := '0';
+								
+			type SLVA is array (integer range <>) of std_logic_vector(0 to PIPE_WIDTH-1);
+			signal iqAcceptingVecArr: SLVA(0 to 4) := (others => (others => '0'));
+			
+			signal issueAcceptingArr, queueSendingArr: std_logic_vector(0 to 4) := (others => '0');
+			signal queueDataArr: InstructionStateArray(0 to 4)
+											:= (others => DEFAULT_INSTRUCTION_STATE);
+			signal dataToQueuesArr: StageDataMultiArray(0 to 4)
+											:= (others => DEFAULT_STAGE_DATA_MULTI);			
 		begin
 		
 	resetSig <= reset;
@@ -196,6 +205,60 @@ architecture Behavioral of OutOfOrderBox is
 				dataOutBQ => compactedToBQ
 			);
 
+
+		dataToQueuesArr <= (dataToA, dataToB, dataToC, dataToD, dataToE);
+		issueAcceptingArr <= (issueAcceptingA, issueAcceptingB, issueAcceptingC,
+											issueAcceptingD, issueAcceptingE); -- TMP!
+		
+		ISSUE_QUEUES: for letter in 'A' to 'E' generate
+			constant i: integer := character'pos(letter) - character'pos('A');
+			signal qq: std_logic := '0'; -- REMOVE
+		begin
+		
+			IQUEUE: entity work.UnitIQ
+			generic map(
+				IQ_SIZE => IQ_SIZES(i)
+			)
+			port map(
+				clk => clk, reset => resetSig, en => enSig,
+
+				acceptingVec => iqAcceptingVecArr(i),
+
+				prevSendingOK => renamedSending,
+				newData => dataToQueuesArr(i),
+
+				fni => fni,
+				
+				readyRegFlags => readyRegFlags,
+
+					issueAccepting => issueAcceptingArr(i), --
+					queueSendingOut => queueSendingArr(i),
+					queueDataOut => queueDataArr(i),
+			
+				execCausing => execCausing,
+					lateEventSignal => lateEventSignal,
+				execEventSignal => execEventSignal			
+			);
+		end generate;
+		
+		queueSendingA <= queueSendingArr(0);
+		queueSendingB <= queueSendingArr(1);
+		queueSendingC <= queueSendingArr(2);
+		queueSendingD <= queueSendingArr(3);
+		queueSendingE <= queueSendingArr(4);
+		
+		queueDataA <= queueDataArr(0);
+		queueDataB <= queueDataArr(1);
+		queueDataC <= queueDataArr(2);
+		queueDataD <= queueDataArr(3);
+		queueDataE <= queueDataArr(4);
+		
+		acceptingVecA <= iqAcceptingVecArr(0);
+		acceptingVecB <= iqAcceptingVecArr(1);
+		acceptingVecC <= iqAcceptingVecArr(2);
+		acceptingVecD <= iqAcceptingVecArr(3);
+		acceptingVecE <= iqAcceptingVecArr(4);
+		
 		
 			IQ_A: entity work.UnitIQ
 			generic map(
@@ -204,7 +267,7 @@ architecture Behavioral of OutOfOrderBox is
 			port map(
 				clk => clk, reset => resetSig, en => enSig,
 
-				acceptingVec => acceptingVecA,
+				acceptingVec => open,--acceptingVecA,
 
 				prevSendingOK => renamedSending,
 				newData => dataToA,
@@ -214,8 +277,8 @@ architecture Behavioral of OutOfOrderBox is
 				readyRegFlags => readyRegFlags,
 
 					issueAccepting => issueAcceptingA, --
-					queueSendingOut => queueSendingA,
-					queueDataOut => queueDataA,
+					queueSendingOut => open,--queueSendingA,
+					queueDataOut => open,--queueDataA,
 			
 				execCausing => execCausing,
 					lateEventSignal => lateEventSignal,
@@ -229,7 +292,7 @@ architecture Behavioral of OutOfOrderBox is
 			port map(
 				clk => clk, reset => resetSig, en => enSig,
 
-				acceptingVec => acceptingVecB,		
+				acceptingVec => open,--acceptingVecB,		
 				
 				prevSendingOK => renamedSending,
 				newData => dataToB,		
@@ -239,8 +302,8 @@ architecture Behavioral of OutOfOrderBox is
 				readyRegFlags => readyRegFlags,		
 
 					issueAccepting => issueAcceptingB,
-					queueSendingOut => queueSendingB,
-					queueDataOut => queueDataB,
+					queueSendingOut => open,--queueSendingB,
+					queueDataOut => open,--queueDataB,
 
 				execCausing => execCausing,
 					lateEventSignal => lateEventSignal,
@@ -254,7 +317,7 @@ architecture Behavioral of OutOfOrderBox is
 			port map(
 				clk => clk, reset => resetSig, en => enSig,
 
-				acceptingVec => acceptingVecC,		
+				acceptingVec => open,--acceptingVecC,		
 
 				prevSendingOK => renamedSending,
 				newData => dataToC,			
@@ -264,8 +327,8 @@ architecture Behavioral of OutOfOrderBox is
 				readyRegFlags => readyRegFlags,
 
 					issueAccepting => issueAcceptingC,
-					queueSendingOut => queueSendingC,
-					queueDataOut => queueDataC,
+					queueSendingOut => open,--queueSendingC,
+					queueDataOut => open,--queueDataC,
 	
 				execCausing => execCausing,
 					lateEventSignal => lateEventSignal,
@@ -279,7 +342,7 @@ architecture Behavioral of OutOfOrderBox is
 			port map(
 				clk => clk, reset => resetSig, en => enSig,
 
-				acceptingVec => acceptingVecD,		
+				acceptingVec => open,--acceptingVecD,		
 
 				prevSendingOK => renamedSending,
 				newData => dataToD,
@@ -289,8 +352,8 @@ architecture Behavioral of OutOfOrderBox is
 				readyRegFlags => readyRegFlags,
 
 					issueAccepting => issueAcceptingD,
-					queueSendingOut => queueSendingD,
-					queueDataOut => queueDataD,
+					queueSendingOut => open,--queueSendingD,
+					queueDataOut => open,--queueDataD,
 
 				execCausing => execCausing,
 					lateEventSignal => lateEventSignal,
@@ -304,7 +367,7 @@ architecture Behavioral of OutOfOrderBox is
 			port map(
 				clk => clk, reset => resetSig, en => enSig,
 
-				acceptingVec => acceptingVecE,		
+				acceptingVec => open,--acceptingVecE,		
 				prevSendingOK => renamedSending,
 				newData => dataToE,
 				
@@ -313,8 +376,8 @@ architecture Behavioral of OutOfOrderBox is
 				readyRegFlags => readyRegFlags, -- bits generated for input group
 
 					issueAccepting => issueAcceptingE,
-					queueSendingOut => queueSendingE,
-					queueDataOut => queueDataE,
+					queueSendingOut => open,--queueSendingE,
+					queueDataOut => open,--queueDataE,
 
 				execCausing => execCausing,
 					lateEventSignal => lateEventSignal,

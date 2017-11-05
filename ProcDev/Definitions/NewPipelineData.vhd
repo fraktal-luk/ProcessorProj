@@ -55,6 +55,8 @@ package NewPipelineData is
 	constant IQ_D_SIZE: natural := PIPE_WIDTH * 2;
 	constant IQ_E_SIZE: natural := PIPE_WIDTH * 2;	
 	
+	constant IQ_SIZES: IntArray(0 to 4) := (IQ_A_SIZE, IQ_B_SIZE, IQ_C_SIZE, IQ_D_SIZE,IQ_E_SIZE);
+	
 	constant SQ_SIZE: natural := 4;
 	constant LQ_SIZE: natural := 4;
 	constant LMQ_SIZE: natural := 4; -- !!!

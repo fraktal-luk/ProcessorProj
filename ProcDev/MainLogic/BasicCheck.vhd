@@ -90,6 +90,8 @@ begin
 	for i in res'range loop
 		if res(i) = ':' then
 			res(i) := '#';
+		elsif res(i) = '\' then
+			res(i) := '_';
 		end if;
 	end loop;
 	
