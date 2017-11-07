@@ -228,25 +228,28 @@ begin
 			);
 		end generate;
 		
+		-- Not used, for viewing
 		queueSendingA <= queueSendingArr(0);
 		queueSendingB <= queueSendingArr(1);
 		queueSendingC <= queueSendingArr(2);
 		queueSendingD <= queueSendingArr(3);
 		queueSendingE <= queueSendingArr(4);
 		
+		-- Used once
 		queueDataA <= queueDataArr(0);
 		queueDataB <= queueDataArr(1);
 		queueDataC <= queueDataArr(2);
 		queueDataD <= queueDataArr(3);
 		queueDataE <= queueDataArr(4);
 		
+		-- Used
 		acceptingVecA <= iqAcceptingVecArr(0);
 		acceptingVecB <= iqAcceptingVecArr(1);
 		acceptingVecC <= iqAcceptingVecArr(2);
 		acceptingVecD <= iqAcceptingVecArr(3);
 		acceptingVecE <= iqAcceptingVecArr(4);
 
-		EXEC_AREA: block			
+		EXEC_AREA: block
 			constant USE_IMM_VEC: std_logic_vector(0 to 4) := "10110";
 		begin
 				regsSelA <= getPhysicalSources(queueDataA);
@@ -285,18 +288,21 @@ begin
 				
 			end generate;
 			
+			-- Unused, only for viewing purpose
 			issueAcceptingA <= issueAcceptingArr(0);
 			issueAcceptingB <= issueAcceptingArr(1);
 			issueAcceptingC <= issueAcceptingArr(2);
 			issueAcceptingD <= issueAcceptingArr(3);
 			issueAcceptingE <= issueAcceptingArr(4);
 			
+			-- This IS used
 			dataOutIQA <= schedDataArr(0);
 			dataOutIQB <= schedDataArr(1);
 			dataOutIQC <= schedDataArr(2);
 			dataOutIQD <= schedDataArr(3);
 			dataOutIQE <= schedDataArr(4);
 			
+			-- This is used probably once
 			sendingSchedA <= sendingSchedArr(0);
 			sendingSchedB <= sendingSchedArr(1);
 			sendingSchedC <= sendingSchedArr(2);
@@ -328,8 +334,7 @@ begin
 				whichAcceptedCQ => whichAcceptedCQ,
 				
 				acceptingNewBQ => acceptingNewBQ,
-				--sendingOutBQ => sendingFromBQ,
-					dataOutBQV => dataOutBQV,
+				dataOutBQV => dataOutBQV,
 				prevSendingToBQ => renamedSending,
 				dataNewToBQ => compactedToBQ,
 					
@@ -341,7 +346,7 @@ begin
 				execEvent => execEventSignal,
 				execCausingOut => execCausing,
 						
-					lateEventSignal => lateEventSignal,
+				lateEventSignal => lateEventSignal,
 				execOrIntEventSignalIn => execEventSignal
 			);	
 
@@ -375,24 +380,22 @@ begin
 					
 					memLoadAddress => memLoadAddress,
 					memLoadAllow => memLoadAllow,
-
 					memLoadReady => memLoadReady,
 					memLoadValue => memLoadValue,
 
-						sysLoadAllow => open,
-						sysLoadVal => sysRegReadValue,
+					sysLoadAllow => open,
+					sysLoadVal => sysRegReadValue,
 
 					committing => robSending,
 					groupCtrNext => commitGroupCtrNextSig,				
 					groupCtrInc => commitGroupCtrIncSig,
-
-
-							sbAcceptingIn => sbAccepting,
-							dataOutSQ => dataOutSQ,
+						
+						sbAcceptingIn => sbAccepting,
+						dataOutSQ => dataOutSQ,
 											
-						lateEventSignal => lateEventSignal,	
+					lateEventSignal => lateEventSignal,	
 					execOrIntEventSignalIn => execEventSignal,
-						execCausing => execCausing
+					execCausing => execCausing
 				);
 
 						sysRegReadSel <= memLoadAddress(4 downto 0);

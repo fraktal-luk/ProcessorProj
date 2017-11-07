@@ -44,6 +44,9 @@ package ProcLogicExec is
 
 	function executeAlu(ins: InstructionState) return InstructionState;
 
+	function isIndirectBranchOrReturn(ins: InstructionState) return std_logic;
+	
+	function isLoad(ins: InstructionState) return std_logic;	
 end ProcLogicExec;
 
 
@@ -279,5 +282,19 @@ package body ProcLogicExec is
 		
 		return res;
 	end function;
-	
+
+		function isIndirectBranchOrReturn(ins: InstructionState) return std_logic is
+		begin
+			return 	  (ins.controlInfo.hasBranch and not ins.constantArgs.immSel)
+					 or   ins.controlInfo.hasReturn;
+		end function;
+		
+	function isLoad(ins: InstructionState) return std_logic is
+	begin
+		if ins.operation.func = load then
+			return '1';
+		else
+			return '0';
+		end if;
+	end function;
 end ProcLogicExec;

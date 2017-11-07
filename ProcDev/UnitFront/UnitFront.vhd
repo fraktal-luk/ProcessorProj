@@ -157,22 +157,18 @@ begin
 	FETCH_DELAY: process (clk)
 	begin
 		if rising_edge(clk) then
-			--if resetSig = '1' then
-			
-			--elsif enSig = '1' then
-				if sendingOutFetch = '1' then
-					pcSendingDelayed0 <= pcSending;
-					pcSendingDelayed1 <= pcSendingDelayed0;
-					
-					ivalid1 <= ivalid;
-					fetchBlock1 <= fetchBlock;
+			if sendingOutFetch = '1' then
+				pcSendingDelayed0 <= pcSending;
+				pcSendingDelayed1 <= pcSendingDelayed0;
+				
+				ivalid1 <= ivalid;
+				fetchBlock1 <= fetchBlock;
 
-					fetchBlockBP <= fetchBlockFinal;
-				end if;
-			--end if;
+				fetchBlockBP <= fetchBlockFinal;
+			end if;
 		end if;	
 	end process;				
-	
+
 	pcSendingDelayedFinal <= pcSendingDelayed1 when FETCH_DELAYED else pcSendingDelayed0;
 	ivalidFinal <= ivalid1 when FETCH_DELAYED else ivalid;
 	fetchBlockFinal <= fetchBlock1 when FETCH_DELAYED else fetchBlock;
@@ -212,18 +208,13 @@ begin
 	
 	hbufferDataIn <= checkIvalid(earlyBranchDataOut.data(0), '1');
 	
-	
 		-- Branch prediction stub. This stage is in parallel with Hbuff
 			earlyBranchDataIn.data(0) <= getFrontEvent(stageDataOutFetchFinal,
 															pcSendingDelayedFinal, ivalidFinal, '1',
 															fetchBlockFinal);
 			earlyBranchdataIn.fullMask(0) <= pcSendingDelayedFinal;
 			
-			sendingToEarlyBranch <= sendingOutFetchFinal; --pcSendingDelayedFinal; -- ??
-										--	sendingOutFetchFinal -- Good, no stall
-										--	stallAtFetchLast 	-- Wrong, fetched line must be refetched
-										--	pcSendingDelayedFinal and not ivalidFinal -- invalid fetch
-			--stallAtFetchLast <= ivalidFinal and not acceptingOutHbuffer;	
+			sendingToEarlyBranch <= sendingOutFetchFinal;
 											
 			SUBUNIT_EARLY_BRANCH: entity work.GenericStageMulti(Behavioral)
 			port map(
@@ -245,20 +236,14 @@ begin
 					stageEventsOut => stage0Events
 			);	
 	
-			
 			stallEventSig <= fetchStall;
 			stallCausing <= setInstructionTarget(earlyBranchDataOut.data(0),
 															 earlyBranchDataOut.data(0).basicInfo.ip);
-	
-
 			frontKill <= stage0Events.eventOccured or fetchStall;
-	
-	
-					fetchStall <= earlyBranchSending and not acceptingOutHbuffer;
+			fetchStall <= earlyBranchSending and not acceptingOutHbuffer;
 	
 	-- Hword buffer		
-	SUBUNIT_HBUFFER: entity work.SubunitHbuffer(--Behavioral)
-																Implem)
+	SUBUNIT_HBUFFER: entity work.SubunitHbuffer(Implem)
 	port map(
 		clk => clk, reset => resetSig, en => enSig,
 		
@@ -293,9 +278,8 @@ begin
 
 			targets(i) <= addMwordFaster(newDecoded.data(i).basicInfo.ip, newDecoded.data(i).constantArgs.imm);		
 			links(i) <= addMwordBasic(newDecoded.data(i).basicInfo.ip, getAddressIncrement(newDecoded.data(i)));			
-		end generate;
-		
-		
+		end generate;	
+
 		stageDataDecodeNew <= newDecodedWithTargets when EARLY_TARGET_ENABLE
 								else newDecoded;	
 		SUBUNIT_DECODE: entity work.GenericStageMulti(Behavioral)

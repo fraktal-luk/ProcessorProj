@@ -96,7 +96,6 @@ end UnitMemory;
 architecture Behavioral of UnitMemory is
 	signal inputDataLoadUnit: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
 	signal eventSignal: std_logic := '0';	
-	signal activeCausing: InstructionState := DEFAULT_INSTRUCTION_STATE;
 	
 	signal loadUnitSendingSig: std_logic := '0';
 	
@@ -104,12 +103,12 @@ architecture Behavioral of UnitMemory is
 	signal dataOutSQV: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
 
 	signal dlqAccepting: std_logic := '1';	
-	signal sendingToDLQ, sendingFromDLQ, loadResultSending, isLoad: std_logic := '0';
+	signal sendingToDLQ, sendingFromDLQ, loadResultSending: std_logic := '0';
 	signal dataToDLQ: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
 	
 	signal stageDataAfterCache, stageDataAfterSysRegs, loadResultData, dataFromDLQ:
 					InstructionState := DEFAULT_INSTRUCTION_STATE;
-	signal sendingMem0, sendingMem1: std_logic := '0';
+	signal sendingMem0: std_logic := '0';
 	
 	signal execAcceptingCSig, execAcceptingESig: std_logic := '0';	
 	signal inputDataC: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
@@ -122,31 +121,20 @@ architecture Behavioral of UnitMemory is
 	signal sendingToLoadUnitSig, sendingAddressToSQSig, sendingToMfcSig,
 				 storeAddressWrSig, storeValueWrSig: std_logic := '0';
 	signal dataToLoadUnitSig, storeAddressDataSig, storeValueDataSig:
-																		InstructionState := DEFAULT_INSTRUCTION_STATE;					
-
+																		InstructionState := DEFAULT_INSTRUCTION_STATE;
 	signal storeForwardData, stageDataAfterForward: InstructionState := DEFAULT_INSTRUCTION_STATE;
 	signal storeForwardSending, storeForwardSendingDelay: std_logic := '0'; 
-
-	signal ch0, ch1, ch2, ch3, ch4, ch5, ch6, ch7: std_logic := '0';
 begin
 		eventSignal <= execOrIntEventSignalIn;	
-		activeCausing <= execCausing;
 
 		inputDataC.data(0) <=			
-				 setInsResult(dataIQC, addMwordFaster(dataIQC.argValues.arg0, dataIQC.argValues.arg1));--),
-								  --'0', (others => '0'));
+				 setInsResult(dataIQC, addMwordFaster(dataIQC.argValues.arg0, dataIQC.argValues.arg1));
 	
 			inputDataC.fullMask(0) <= sendingIQC;
 
 			SUBPIPE_C: block
-				signal inputData, outputData: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
-				
 				signal stageDataOutAGU: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
 				signal sendingAGU: std_logic := '0';
-					
-				signal stageDataOutMem0, stageDataOutMem1: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
-				signal acceptingMem0, acceptingMem1,
-						 sendingMem0, sendingMem1: std_logic := '0';
 			begin
 				STAGE_AGU: entity work.GenericStageMulti(SingleTagged)
 				port map(
@@ -162,7 +150,7 @@ begin
 					
 					execEventSignal => eventSignal,
 					lateEventSignal => lateEventSignal,
-					execCausing => activeCausing,
+					execCausing => execCausing,
 					lockCommand => '0',
 					
 					stageEventsOut => open
@@ -172,28 +160,19 @@ begin
 				sendingAddressingSig <= sendingAGU;	
 			end block;
 				
-			-- Store data unit.
-			SUBPIPE_E: block
-				signal inputData, outputData: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
-			begin
-				inputData.data(0) <= dataIQE;
-				inputData.fullMask(0) <= sendingIQE;
-			end block;
+		--	block empty
+		SUBPIPE_E: block
+		begin
+		end block;
 
-			inputDataLoadUnit.data(0) <= dataToLoadUnitSig;
-			inputDataLoadUnit.fullMask(0) <= sendingAddressingSig;
-			
-					outputE.ins <= dataIQE;
-					outputE.full <= sendingIQE;
-						
-			SUBPIPE_LOAD_UNIT: block
-				signal inputData, outputData: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
-			
-				signal dataM: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;				
+		inputDataLoadUnit.data(0) <= dataToLoadUnitSig;
+		inputDataLoadUnit.fullMask(0) <= sendingAddressingSig;
+		outputE <= (sendingIQE, dataIQE);
 
-				signal stageDataOutMem0, stageDataOutMem1: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
-				signal acceptingMem0, acceptingMem1: std_logic := '0';
-			begin
+		SUBPIPE_LOAD_UNIT: block
+			signal dataM, outputData, stageDataOutMem0: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;			
+			signal acceptingMem1: std_logic := '0';
+		begin
 				STAGE_MEM0: entity work.GenericStageMulti(SingleTagged)
 				port map(
 					clk => clk, reset => reset, en => en,
@@ -208,7 +187,7 @@ begin
 					
 					execEventSignal => eventSignal,
 					lateEventSignal => lateEventSignal,					
-					execCausing => activeCausing,
+					execCausing => execCausing,
 					lockCommand => '0',
 					
 					stageEventsOut => open					
@@ -231,31 +210,27 @@ begin
 					
 					execEventSignal => eventSignal,
 					lateEventSignal => lateEventSignal,
-					execCausing => activeCausing,
+					execCausing => execCausing,
 					lockCommand => '0',
 					
 					stageEventsOut => open					
 				);
 
-				stageDataAfterForward <= setInsResult(stageDataOutMem0.data(0),
-																		 storeForwardData.argValues.arg2);--, '0', "0000");
-				stageDataAfterCache <= setInsResult(stageDataOutMem0.data(0), memLoadValue);--, '0', "0000");
-				stageDataAfterSysRegs <= setInsResult(stageDataOutMem0.data(0), sysLoadVal);--, '0', "0000");
+			stageDataAfterForward <= setInsResult(stageDataOutMem0.data(0),storeForwardData.argValues.arg2);
+			stageDataAfterCache <= setInsResult(stageDataOutMem0.data(0), memLoadValue);
+			stageDataAfterSysRegs <= setInsResult(stageDataOutMem0.data(0), sysLoadVal);
 
-					outputC.ins <= clearTempControlInfoSimple(outputData.data(0));
-					outputC.full <= loadUnitSendingSig;
-					
-					outputOpPreC <= stageDataOutMem0.data(0);
-			end block;		
+			outputC <= (loadUnitSendingSig, clearTempControlInfoSimple(outputData.data(0)));
+
+			outputOpPreC <= stageDataOutMem0.data(0);
+		end block;		
 		
 		sendingToLoadUnitSig <= sendingAddressingSig when addressingData.operation.func = load else '0';
-			sendingToMfcSig <= sendingAddressingSig when addressingData.operation = (System, sysMFC) else '0';
-		
-		
+		sendingToMfcSig <= sendingAddressingSig when addressingData.operation = (System, sysMFC) else '0';
+			
 		sendingAddressToSQSig <= sendingAddressingSig when addressingData.operation.func = store 
 																			or addressingData.operation = (System, sysMTC)
-																			else '0';
-				
+																			else '0';				
 		dataToLoadUnitSig <= addressingData;
 								
 		-- SQ inputs
@@ -301,7 +276,7 @@ begin
 				
 				nextAccepting => '1',
 				
-				sendingSQOut => sendingOutSQ, -- OUTPUT
+				sendingSQOut => sendingOutSQ,
 					dataOutV => dataOutSQV
 			);
 
@@ -343,25 +318,18 @@ begin
 				sendingSQOut => open,
 					dataOutV => open
 			);
-
 			-- TODO: utilize info about store address hit in LoadQueue to squash the incorrect load.
 			
-	
-	
-				TMP_REG: process(clk)
-				begin
-					if rising_edge(clk) then
-						sendingFromSysReg <= sendingToMfcSig;
-						
-						storeForwardSendingDelay <= storeForwardSending;						
-					end if;
-				end process;
+			TMP_REG: process(clk)
+			begin
+				if rising_edge(clk) then
+					sendingFromSysReg <= sendingToMfcSig;		
+					storeForwardSendingDelay <= storeForwardSending;						
+				end if;
+			end process;
 
-
-			-- Sending to Delayed Load Queue: when load miss or load and sending from sys reg			
-			isLoad <= '1' when stageDataAfterCache.operation.func = load else '0';
-			
-			sendingToDLQ <= sendingMem0 and isLoad
+			-- Sending to Delayed Load Queue: when load miss or load and sending from sys reg
+			sendingToDLQ <= sendingMem0 and isLoad(stageDataAfterCache)
 								and (not memLoadReady or (memLoadReady and sendingFromSysReg));
 			dataToDLQ.data(0) <= stageDataAfterCache;
 			dataToDLQ.fullMask(0) <= sendingToDLQ;
@@ -400,12 +368,10 @@ begin
 				dataOutSQ => dataFromDLQ
 			);
 
+			execAcceptingC <= execAcceptingCSig;
+			execAcceptingE <= '1'; --???  -- execAcceptingESig;
 
-				execAcceptingC <= execAcceptingCSig;
-				execAcceptingE <= '1'; --???  -- execAcceptingESig;
-
-			loadResultSending <= sendingFromSysReg or sendingFromDLQ or sendingMem0
-																								or storeForwardSending;		
+			loadResultSending <= sendingFromSysReg or sendingFromDLQ or sendingMem0 or storeForwardSending;		
 					-- CAREFUL, TODO: ^ memLoadReady needed to ack that not a miss? But would block when a store!
 					
 			loadResultData <=
@@ -416,12 +382,8 @@ begin
 
 				-- Mem interface
 				memLoadAddress <= dataToLoadUnitSig.result; -- in LoadUnit
-		
 				memLoadAllow <= sendingToLoadUnitSig;
-									
 				sysLoadAllow <= sendingToMfcSig;	 
 				 
-			dataOutSQ <= dataOutSQV;	 
-
+			dataOutSQ <= dataOutSQV;
 end Behavioral;
-

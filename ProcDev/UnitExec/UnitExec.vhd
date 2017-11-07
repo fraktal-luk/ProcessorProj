@@ -66,7 +66,6 @@ entity UnitExec is
 		execAcceptingD: out std_logic;
 			
 			acceptingNewBQ: out std_logic;
-			--sendingOutBQ: out std_logic;
 				dataOutBQV: out StageDataMulti;
 			prevSendingToBQ: in std_logic;
 			dataNewToBQ: in StageDataMulti;
@@ -96,23 +95,19 @@ architecture Implem of UnitExec is
 	signal resetSig, enSig: std_logic := '0';
 	signal execEventSignal, eventSignal: std_logic := '0';
 	signal execCausing: InstructionState := defaultInstructionState;
-	signal activeCausing: InstructionState := defaultInstructionState;
 
-	signal dataA0, dataB0, dataB1, dataB2, dataC0, dataC1, dataC2, dataD0: InstructionState
-					:= DEFAULT_INSTRUCTION_STATE;
-
-	signal execSendingA, execSendingB, execSendingC, execSendingD, execSendingE,
-			execSendingEffectiveD: std_logic := '0';
-	signal execAcceptingASig, execAcceptingBSig, execAcceptingCSig, execAcceptingDSig, execAcceptingESig:
-											std_logic := '0';
+	signal dataA0, dataB0, dataB1, dataB2, dataC0, dataD0: InstructionState := DEFAULT_INSTRUCTION_STATE;
+	signal execSendingA, execSendingB, execSendingD: std_logic := '0';
+	signal execAcceptingASig, execAcceptingBSig, execAcceptingDSig: std_logic := '0';
 	signal eventsD: StageMultiEventInfo;
-		signal inputDataA, outputDataA: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
-		signal inputDataD, outputDataD: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
+	signal inputDataA, outputDataA: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
+	signal inputDataD, outputDataD: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
 
 	signal branchQueueSelectedOut: InstructionState := DEFAULT_INSTRUCTION_STATE;
 	signal branchQueueSelectedSending: std_logic := '0';
 
-			signal ch0, ch1: std_logic := '0';
+		signal storeTargetWrSig: std_logic := '0';
+		signal storeTargetDataSig: InstructionState := DEFAULT_INSTRUCTION_STATE;
 
 	constant HAS_RESET_EXEC: std_logic := '1';
 	constant HAS_EN_EXEC: std_logic := '1';	
@@ -120,14 +115,12 @@ begin
 		resetSig <= reset and HAS_RESET_EXEC;
 		enSig <= en or not HAS_EN_EXEC; 
 
-
 					inputDataA.data(0) <= executeAlu(dataIQA);					
 					inputDataA.fullMask(0) <= sendingIQA;
 					
 					dataA0 <= outputDataA.data(0);
 					
-					SUBPIPE_A: entity work.GenericStageMulti(--BasicAlu)
-																			SingleTagged)
+					SUBPIPE_A: entity work.GenericStageMulti(SingleTagged)
 					port map(
 						clk => clk, reset => resetSig, en => enSig,
 						
@@ -141,7 +134,7 @@ begin
 						
 						execEventSignal => eventSignal,
 						lateEventSignal => lateEventSignal,
-						execCausing => activeCausing,
+						execCausing => execCausing,
 						lockCommand => '0',
 						
 						stageEventsOut => open
@@ -163,7 +156,7 @@ begin
 					
 					lateEventSignal => lateEventSignal,
 					execEventSignal => eventSignal,
-					execCausing => activeCausing,
+					execCausing => execCausing,
 					lockCommand => '0'					
 				);
 				
@@ -192,22 +185,14 @@ begin
 						
 						execEventSignal => eventSignal,
 						lateEventSignal => lateEventSignal,
-						execCausing => activeCausing,
+						execCausing => execCausing,
 						lockCommand => '0',
 						
 						stageEventsOut => eventsD						
 					);	
 
------------------------------------
-	BQ_BLOCK: block
-		signal storeTargetWrSig: std_logic := '0';
-		signal storeTargetDataSig: InstructionState := DEFAULT_INSTRUCTION_STATE;
-	begin	
 		storeTargetDataSig <= setInsResult(dataD0, dataD0.target);
-		storeTargetWrSig <= execSendingD and
-										((dataD0.controlInfo.hasBranch and --dataD0.classInfo.branchReg)
-																					  not dataD0.constantArgs.immSel)
-									or   dataD0.controlInfo.hasReturn);
+		storeTargetWrSig <= execSendingD and isIndirectBranchOrReturn(dataD0);
 
 			BRANCH_QUEUE: entity work.MemoryUnit(Behavioral)
 			generic map(
@@ -237,7 +222,6 @@ begin
 					selectedSending => branchQueueSelectedSending,
 					
 					committing => committing,
-					--groupCtrNext => groupCtrNext,
 						groupCtrInc => groupCtrInc,
 						
 				lateEventSignal => lateEventSignal,
@@ -246,37 +230,28 @@ begin
 				
 				nextAccepting => '1',
 				
-				sendingSQOut => open,--sendingOutBQ, -- OUTPUT
+				sendingSQOut => open,
 					dataOutV => dataOutBQV
 			);
 
-	end block;
--------------------------------------
-
 		-- Data from sysreg reads goes to load pipe
 		-- CAREFUL: Don't send the same thing from both subpipes:
-		execSendingEffectiveD <= execSendingD;
 
 		execEventSignal <= eventsD.eventOccured;
 		execCausing <= eventsD.causing;
 
 		eventSignal <= execOrIntEventSignalIn;	
-		activeCausing <= execCausing;
 
 		execAcceptingA <= execAcceptingASig;
 		execAcceptingB <= execAcceptingBSig;
 		execAcceptingD <= execAcceptingDSig;
 
-		outputA.ins <= clearTempControlInfoSimple(dataA0);	
-		outputA.full <= execSendingA; 
-		outputB.ins <= clearTempControlInfoSimple(dataB2);	
-		outputB.full <= execSendingB;
-		outputD.ins <= clearTempControlInfoSimple(dataD0);	
-		outputD.full <= execSendingEffectiveD;
+		outputA <= (execSendingA, clearTempControlInfoSimple(dataA0));
+		outputB <= (execSendingB, clearTempControlInfoSimple(dataB2));
+		outputD <= (execSendingD, clearTempControlInfoSimple(dataD0));
 		
 		outputOpPreB <= dataB1;
 				
 	execEvent <= execEventSignal;
 	execCausingOut <= execCausing;
 end Implem;
-

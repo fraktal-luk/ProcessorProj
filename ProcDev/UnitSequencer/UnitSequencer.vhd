@@ -164,7 +164,7 @@ architecture Behavioral of UnitSequencer is
 	signal renameCtr, renameCtrNext, commitCtr, commitCtrNext: SmallNumber := (others => '1');
 	signal renameGroupCtr, renameGroupCtrNext, commitGroupCtr, commitGroupCtrNext: SmallNumber :=
 																						INITIAL_GROUP_TAG;
-		signal commitGroupCtrInc: SmallNumber := (others => '0');
+	signal commitGroupCtrInc: SmallNumber := (others => '0');
 	
 	signal effectiveMask: std_logic_vector(0 to PIPE_WIDTH-1) := (others => '0');
 	
@@ -172,15 +172,12 @@ architecture Behavioral of UnitSequencer is
 	signal renameLockCommand, renameLockRelease, renameLockState, renameLockEnd: std_logic := '0';	
 				
 	signal dataToLastEffective, dataFromLastEffective: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;	
-		signal insToLastEffective: InstructionState := DEFAULT_INSTRUCTION_STATE;	
+	signal insToLastEffective: InstructionState := DEFAULT_INSTRUCTION_STATE;	
 
 	signal eiEvents: StageMultiEventInfo;
 							
-				signal TMP_targetIns: InstructionState := DEFAULT_INSTRUCTION_STATE;
-			
-				signal TMP_phase0, TMP_phase2: std_logic := '0';
-			
-			signal ch0, ch1: std_logic := '0';
+	signal TMP_targetIns: InstructionState := DEFAULT_INSTRUCTION_STATE;		
+	signal TMP_phase0, TMP_phase2: std_logic := '0';
 				
 	constant HAS_RESET_SEQ: std_logic := '0';
 	constant HAS_EN_SEQ: std_logic := '0';			
@@ -339,11 +336,9 @@ begin
 		
 		currentStateSig <= currentState;
 		
-		
 		TMP_targetIns <= getLatePCData('1', eiEvents.causing,
 													linkRegExc, linkRegInt,
 													savedStateExc, savedStateInt); -- Here, becaue needs sys regs
-		
 	end block;
 
 
