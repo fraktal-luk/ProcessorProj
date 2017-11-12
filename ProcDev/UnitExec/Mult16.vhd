@@ -22,12 +22,12 @@
 --    devices, or systems.  Use in such applications are expressly            --
 --    prohibited.                                                             --
 --                                                                            --
---    (c) Copyright 1995-2015 Xilinx, Inc.                                    --
+--    (c) Copyright 1995-2017 Xilinx, Inc.                                    --
 --    All rights reserved.                                                    --
 --------------------------------------------------------------------------------
 --------------------------------------------------------------------------------
--- You must compile the wrapper file Mac16wide.vhd when simulating
--- the core, Mac16wide. When compiling the wrapper file, be sure to
+-- You must compile the wrapper file Mult16.vhd when simulating
+-- the core, Mult16. When compiling the wrapper file, be sure to
 -- reference the XilinxCoreLib VHDL simulation library. For detailed
 -- instructions, please refer to the "CORE Generator Help".
 
@@ -40,45 +40,31 @@ USE ieee.std_logic_1164.ALL;
 -- synthesis translate_off
 LIBRARY XilinxCoreLib;
 -- synthesis translate_on
-ENTITY Mac16wide IS
+ENTITY Mult16 IS
   PORT (
     clk : IN STD_LOGIC;
-    a : IN STD_LOGIC_VECTOR(17 DOWNTO 0);
-    b : IN STD_LOGIC_VECTOR(17 DOWNTO 0);
-    c : IN STD_LOGIC_VECTOR(47 DOWNTO 0);
-    p : OUT STD_LOGIC_VECTOR(47 DOWNTO 0);
-    cec : IN STD_LOGIC;
-    cem : IN STD_LOGIC;
-    cep : IN STD_LOGIC;
-    sclrc : IN STD_LOGIC;
-    sclrm : IN STD_LOGIC;
-    sclrp : IN STD_LOGIC
+    a : IN STD_LOGIC_VECTOR(15 DOWNTO 0);
+    b : IN STD_LOGIC_VECTOR(15 DOWNTO 0);
+    p : OUT STD_LOGIC_VECTOR(31 DOWNTO 0)
   );
-END Mac16wide;
+END Mult16;
 
-ARCHITECTURE Mac16wide_a OF Mac16wide IS
+ARCHITECTURE Mult16_a OF Mult16 IS
 -- synthesis translate_off
-COMPONENT wrapped_Mac16wide
+COMPONENT wrapped_Mult16
   PORT (
     clk : IN STD_LOGIC;
-    a : IN STD_LOGIC_VECTOR(17 DOWNTO 0);
-    b : IN STD_LOGIC_VECTOR(17 DOWNTO 0);
-    c : IN STD_LOGIC_VECTOR(47 DOWNTO 0);
-    p : OUT STD_LOGIC_VECTOR(47 DOWNTO 0);
-    cec : IN STD_LOGIC;
-    cem : IN STD_LOGIC;
-    cep : IN STD_LOGIC;
-    sclrc : IN STD_LOGIC;
-    sclrm : IN STD_LOGIC;
-    sclrp : IN STD_LOGIC
+    a : IN STD_LOGIC_VECTOR(15 DOWNTO 0);
+    b : IN STD_LOGIC_VECTOR(15 DOWNTO 0);
+    p : OUT STD_LOGIC_VECTOR(31 DOWNTO 0)
   );
 END COMPONENT;
 
 -- Configuration specification
-  FOR ALL : wrapped_Mac16wide USE ENTITY XilinxCoreLib.xbip_dsp48_macro_v2_1(behavioral)
+  FOR ALL : wrapped_Mult16 USE ENTITY XilinxCoreLib.xbip_dsp48_macro_v2_1(behavioral)
     GENERIC MAP (
-      c_a_width => 18,
-      c_b_width => 18,
+      c_a_width => 16,
+      c_b_width => 16,
       c_c_width => 48,
       c_concat_width => 48,
       c_constant_1 => 1,
@@ -89,41 +75,41 @@ END COMPONENT;
       c_has_b => 1,
       c_has_bcin => 0,
       c_has_bcout => 0,
-      c_has_c => 1,
+      c_has_c => 0,
       c_has_carrycascin => 0,
       c_has_carrycascout => 0,
       c_has_carryin => 0,
       c_has_carryout => 0,
-      c_has_ce => 1,
+      c_has_ce => 0,
       c_has_cea => 0,
       c_has_ceb => 0,
-      c_has_cec => 16,
+      c_has_cec => 0,
       c_has_ceconcat => 0,
       c_has_ced => 0,
-      c_has_cem => 1,
-      c_has_cep => 1,
+      c_has_cem => 0,
+      c_has_cep => 0,
       c_has_cesel => 0,
       c_has_concat => 0,
       c_has_d => 0,
-      c_has_indep_ce => 1,
-      c_has_indep_sclr => 1,
+      c_has_indep_ce => 0,
+      c_has_indep_sclr => 0,
       c_has_pcin => 0,
       c_has_pcout => 0,
-      c_has_sclr => 1,
+      c_has_sclr => 0,
       c_has_sclra => 0,
       c_has_sclrb => 0,
-      c_has_sclrc => 1,
+      c_has_sclrc => 0,
       c_has_sclrconcat => 0,
       c_has_sclrd => 0,
-      c_has_sclrm => 1,
-      c_has_sclrp => 1,
+      c_has_sclrm => 0,
+      c_has_sclrp => 0,
       c_has_sclrsel => 0,
-      c_latency => 112,
+      c_latency => 80,
       c_model_type => 0,
-      c_opmodes => "0000001100010000000",
+      c_opmodes => "0000000000010000000",
       c_p_lsb => 0,
-      c_p_msb => 47,
-      c_reg_config => "00000000000000000000000011000100",
+      c_p_msb => 31,
+      c_reg_config => "00000000000000000000000001000000",
       c_sel_width => 0,
       c_test_core => 0,
       c_verbosity => 0,
@@ -132,20 +118,13 @@ END COMPONENT;
 -- synthesis translate_on
 BEGIN
 -- synthesis translate_off
-U0 : wrapped_Mac16wide
+U0 : wrapped_Mult16
   PORT MAP (
     clk => clk,
     a => a,
     b => b,
-    c => c,
-    p => p,
-    cec => cec,
-    cem => cem,
-    cep => cep,
-    sclrc => sclrc,
-    sclrm => sclrm,
-    sclrp => sclrp
+    p => p
   );
 -- synthesis translate_on
 
-END Mac16wide_a;
+END Mult16_a;

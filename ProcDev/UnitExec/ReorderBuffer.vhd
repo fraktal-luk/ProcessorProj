@@ -38,11 +38,11 @@ use work.NewPipelineData.all;
 
 use work.GeneralPipeDev.all;
 
---use work.CommonRouting.all;
 use work.TEMP_DEV.all;
 
 use work.ProcLogicROB.all;
 
+use work.Queues.all;
 
 
 entity ReorderBuffer is
@@ -51,7 +51,7 @@ entity ReorderBuffer is
 		reset: in std_logic;
 		en: in std_logic;
 		
-		intSignal: in std_logic;
+		lateEventSignal: in std_logic;
 		execEventSignal: in std_logic;
 		execCausing: in InstructionState; -- Redundant cause we have inputs from all Exec ends? 
 		
@@ -67,6 +67,7 @@ entity ReorderBuffer is
 		prevSending: in std_logic;
 		acceptingOut: out std_logic;
 		
+			nextAccepting: in std_logic;
 		sendingOut: out std_logic; 
 		
 		outputData: out StageDataMulti
@@ -76,7 +77,13 @@ end ReorderBuffer;
 
 
 architecture Implem of ReorderBuffer is
-	signal stageData, stageDataLiving, stageDataNext, stageDataUpdated: 
+
+		signal fullMask, TMP_mask, TMP_ckEnForInput, TMP_sendingMask, TMP_killMask, TMP_livingMask, TMP_maskNext:
+				std_logic_vector(0 to ROB_SIZE-1) := (others => '0');
+
+		signal TMP_front, TMP_frontCircular: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
+	signal stageData, stageDataLiving, stageDataNext, stageDataUpdated,
+					TMP_stageData, TMP_stageDataUpdated, TMP_stageDataNext: 
 							StageDataROB := (fullMask => (others => '0'),
 												  data => (others => DEFAULT_STAGE_DATA_MULTI));
 	signal flowDrive: FlowDriveBuffer	:= (killAll => '0', lockAccept => '0', lockSend => '0',
@@ -84,10 +91,23 @@ architecture Implem of ReorderBuffer is
 	signal flowResponse: FlowResponseBuffer := (others => (others=> '0'));
 
 	signal resetSig, enSig: std_logic := '0';	
-	
 	signal isSending: std_logic := '0';
+	signal fromCommitted: std_logic := '0';
+		
+	signal numKilled: SmallNumber := (others => '0');
+
+
+		signal qs0, qs1: TMP_queueState := TMP_defaultQueueState;
+		signal ta, tb: SmallNumber := (others => '0');
+		
+		signal inputIndices: SmallNumberArray(0 to ROB_SIZE-1) := (others => (others => '0'));
+
+	signal inputIndices_T: SmallNumberArray(0 to ROB_SIZE-1) := (others => (others => '0'));
+	signal ckEnForInput_T, sendingMask_T: std_logic_vector(0 to ROB_SIZE-1) := (others => '0');
 	
-		signal fromCommitted: std_logic := '0';
+	signal robView, robLivingView, robNextView, robLivingViewU, robNextViewU:
+							StageDataROB := (fullMask => (others => '0'),
+																					 data => (others => DEFAULT_STAGE_DATA_MULTI));
 	
 	constant ROB_HAS_RESET: std_logic := '0';
 	constant ROB_HAS_EN: std_logic := '0';
@@ -95,32 +115,60 @@ begin
 	resetSig <= reset and ROB_HAS_RESET;
 	enSig <= en or not ROB_HAS_EN;
 	
-	-- This is before shifting!
-	stageDataLiving <= killInROB(stageData, commitGroupCtr, execCausing.groupTag,
+	
+				--ta <= flowDrive.nextAccepting;
+				--tb <= flowDrive.prevSending;
+				qs1 <= TMP_change(qs0,-- ta, tb,
+									flowDrive.nextAccepting,
+									flowDrive.prevSending,
+										TMP_mask, TMP_killMask, lateEventSignal or execEventSignal,
+										TMP_maskNext);
+										
+				inputIndices <= getQueueIndicesForInput(qs0, ROB_SIZE, 1);
+					-- indices for moved part in shifting queue would be nSend (bufferResponse.sending) everywhere
+				TMP_ckEnForInput <= getQueueEnableForInput(qs0, ROB_SIZE, flowDrive.prevSending);
+					-- in shifting queue this would be shfited by nSend
+					-- Also slots for moved part would have enable, found from (i < nRemaining), only if nSend /= 0
+				TMP_sendingMask <= getQueueSendingMask(qs0, ROB_SIZE, flowDrive.nextAccepting);
+				TMP_killMask <= getKillMaskROB(qs0, TMP_mask, --execCausing,
+																				execEnds2(3),
+																				execEventSignal, lateEventSignal);
+
+					TMP_livingMask <= TMP_mask and not TMP_killMask;
+
+				TMP_maskNext <= (TMP_mask and not TMP_killMask and not TMP_sendingMask) or TMP_ckEnForInput;
+
+				TMP_stageDataUpdated <= setCompleted_Circular(TMP_stageData, commitGroupCtr,
+												execEnds, execReady, execEnds2, execReady2,
 												execEventSignal, fromCommitted);
 	
-		-- TODO: add execEnds2, execReady2
-	stageDataUpdated <= setCompleted(stageDataLiving, commitGroupCtr,
-												execEnds, execReady,
-												execEnds2, execReady2);
+				TMP_stageDataNext <= stageROBNext_Circular(TMP_stageDataUpdated, TMP_mask, inputData,
+															 binFlowNum(flowResponse.living),
+															 '0',
+															 prevSending, qs0.pEnd);
 	
-	-- CAREFUL! fullMask before kills is used along with fullMask after killing!
-	stageDataNext <= stageROBNext(stageDataUpdated, stageData.fullMask, inputData, 
-											binFlowNum(flowResponse.living),
-											isSending,
-											prevSending);
-											
+			TMP_frontCircular <= getSlotFromROB(TMP_stageData, qs0.pStart);
+	
+	robView <= normalizeROB(TMP_stageData, qs0.pStart);
+	
+		robLivingViewU.data <= TMP_stageData.data;
+		robLivingViewU.fullMask <= TMP_livingMask;
+	robLivingView <= normalizeROB(robLivingViewU, qs0.pStart);
+	
+		robNextViewU.fullMask <= TMP_maskNext;
+		robNextViewU.data <= TMP_stageDataNext.data;
+	robNextView <= normalizeROB(robNextViewU, qs1.pStart);
+								
 	ROB_SYNCHRONOUS: process (clk)
 	begin
-		if rising_edge(clk) then
-			if resetSig = '1' then
-			
-			elsif enSig = '1' then
-				stageData <= stageDataNext;
-				
-				logROB(stageData, stageDataLiving, flowResponse);
-				checkROB(stageData, stageDataNext, flowDrive, flowResponse);
-			end if;
+		if rising_edge(clk) then	
+			qs0 <= qs1;
+			TMP_mask <= TMP_maskNext;	
+			TMP_stageData.data <= TMP_stageDataNext.data;
+			TMP_stageData.fullMask <= TMP_maskNext;	-- CAREFUL: this is redundant
+
+			logROB(robView, robLivingView, flowResponse);
+			checkROB(robView, robNextView, flowDrive, flowResponse);
 		end if;		
 	end process;
 	
@@ -142,28 +190,25 @@ begin
 	flowDrive.nextAccepting <= num2flow(1) when isSending = '1'
 								else  (others => '0');
 	
-	flowDrive.kill <=
-				i2slv((
-					slv2s(flowResponse.full)
-					+	integer(slv2u(tagHigh(commitGroupCtr)))
-					- 	integer(slv2u(tagHigh(execCausing.groupTag)))
-						) mod 2**(SMALL_NUMBER_SIZE - LOG2_PIPE_WIDTH), --(256/PIPE_WIDTH
-					SMALL_NUMBER_SIZE)
-				when execEventSignal = '1'
-		else (others => '0');
+		numKilled <= getNumKilled(flowResponse.full,
+												execEnds2(3).groupTag,
+												commitGroupCtr, execEventSignal);
+	
+	flowDrive.kill <= numKilled;							
+		flowDrive.killAll <= fromCommitted;
 		
-	isSending <= --stageDataLiving.fullMask(0) and groupCompleted(stageDataLiving.data(0));
-					 stageData.fullMask(0) and 
-						groupCompleted(stageData.data(0)) and --not intSignal;
-											 not fromCommitted;
-											 
-	fromCommitted <= (execEventSignal and 	
-							(execCausing.controlInfo.newInterrupt or execCausing.controlInfo.newException));
+	isSending <= getBitFromROBMask(TMP_stageData, qs0.pStart)
+				and groupCompleted(TMP_frontCircular)
+				and not fromCommitted
+							and nextAccepting;
+
+	fromCommitted <= lateEventSignal;
 						
-	-- TODO: allow accepting also when queue full but sending, that is freeing a place.
-	acceptingOut <= --'1' when binFlowNum(flowResponse.full) < ROB_SIZE else '0';
-							not stageData.fullMask(ROB_SIZE-1);
-	outputData <= stageData.data(0);
+	-- TODO: allow accepting also when queue full but sending, that is freeing a place?
+	acceptingOut <= not getBitFromROBMaskPre(TMP_stageData, qs0.pStart);
+								
+	outputData <= TMP_frontCircular;
+
 	sendingOut <= isSending;
 end Implem;
 

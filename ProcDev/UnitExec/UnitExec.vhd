@@ -38,7 +38,6 @@ use work.NewPipelineData.all;
 
 use work.GeneralPipeDev.all;
 
---use work.CommonRouting.all;
 use work.TEMP_DEV.all;
 
 use work.ProcLogicExec.all;
@@ -67,10 +66,11 @@ entity UnitExec is
 		execAcceptingD: out std_logic;
 			
 			acceptingNewBQ: out std_logic;
-			sendingOutBQ: out std_logic;
-			dataOutBQ: out InstructionState;
+				dataOutBQV: out StageDataMulti;
 			prevSendingToBQ: in std_logic;
 			dataNewToBQ: in StageDataMulti;
+			
+			lateEventSignal: in std_logic; 
 			
 			committing: in std_logic;
 			
@@ -82,20 +82,11 @@ entity UnitExec is
 		outputD: out InstructionSlot;
 			
 		outputOpPreB: out InstructionState;
-			
-		sysRegSelect: out slv5;
-		sysRegIn: in Mword;
-		sysRegWriteSelOut: out slv5;
-		sysRegWriteValueOut: out Mword;
-				
-		sysRegDataOut: out InstructionState;
-		sysRegSending: out std_logic;
 
 		execEvent: out std_logic;
 		execCausingOut: out InstructionState;
 		
-		execOrIntEventSignalIn: in std_logic;
-		execOrIntCausingIn: in InstructionState
+		execOrIntEventSignalIn: in std_logic
 	);
 end UnitExec;
 
@@ -103,31 +94,20 @@ end UnitExec;
 architecture Implem of UnitExec is
 	signal resetSig, enSig: std_logic := '0';
 	signal execEventSignal, eventSignal: std_logic := '0';
-	signal execCausing, intCausing: InstructionState := defaultInstructionState;
-	signal activeCausing: InstructionState := defaultInstructionState;
-	
-	signal sysRegValue: Mword := (others => '0');
-	signal sysRegReadSel, sysRegWriteSel: slv5 := (others => '0');
-	
-	signal sysRegWriteValueStore: Mword := (others => '0');
-	signal sysRegWriteSelStore: slv5 := (others => '0');
-	
-	signal execEndsSig, execEnds2Sig: InstructionStateArray(0 to 3) := (others => defaultInstructionState);
+	signal execCausing: InstructionState := defaultInstructionState;
 
-	signal execSending2Sig: std_logic_vector(0 to 3) := (others => '0');
-		
-	signal dataA0, dataB0, dataB1, dataB2, dataC0, dataC1, dataC2, dataD0: InstructionState
-					:= DEFAULT_INSTRUCTION_STATE;
-
-	signal execSendingA, execSendingB, execSendingC, execSendingD, execSendingE,
-			execSendingEffectiveD: std_logic := '0';
-	signal execAcceptingASig, execAcceptingBSig, execAcceptingCSig, execAcceptingDSig, execAcceptingESig:
-											std_logic := '0';
+	signal dataA0, dataB0, dataB1, dataB2, dataC0, dataD0: InstructionState := DEFAULT_INSTRUCTION_STATE;
+	signal execSendingA, execSendingB, execSendingD: std_logic := '0';
+	signal execAcceptingASig, execAcceptingBSig, execAcceptingDSig: std_logic := '0';
 	signal eventsD: StageMultiEventInfo;
-		signal inputDataA, outputDataA: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
-		signal inputDataD, outputDataD: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
+	signal inputDataA, outputDataA: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
+	signal inputDataD, outputDataD: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
 
-			signal ch0, ch1: std_logic := '0';
+	signal branchQueueSelectedOut: InstructionState := DEFAULT_INSTRUCTION_STATE;
+	signal branchQueueSelectedSending: std_logic := '0';
+
+		signal storeTargetWrSig: std_logic := '0';
+		signal storeTargetDataSig: InstructionState := DEFAULT_INSTRUCTION_STATE;
 
 	constant HAS_RESET_EXEC: std_logic := '1';
 	constant HAS_EN_EXEC: std_logic := '1';	
@@ -135,13 +115,12 @@ begin
 		resetSig <= reset and HAS_RESET_EXEC;
 		enSig <= en or not HAS_EN_EXEC; 
 
-
-					inputDataA.data(0) <= dataIQA;
+					inputDataA.data(0) <= executeAlu(dataIQA);					
 					inputDataA.fullMask(0) <= sendingIQA;
 					
 					dataA0 <= outputDataA.data(0);
 					
-					SUBPIPE_A: entity work.SimpleAlu(Behavioral)
+					SUBPIPE_A: entity work.GenericStageMulti(SingleTagged)
 					port map(
 						clk => clk, reset => resetSig, en => enSig,
 						
@@ -154,7 +133,8 @@ begin
 						stageDataOut => outputDataA,
 						
 						execEventSignal => eventSignal,
-						execCausing => activeCausing,
+						lateEventSignal => lateEventSignal,
+						execCausing => execCausing,
 						lockCommand => '0',
 						
 						stageEventsOut => open
@@ -174,22 +154,24 @@ begin
 						dataOut => dataB2,
 						data1Prev => dataB1,
 					
+					lateEventSignal => lateEventSignal,
 					execEventSignal => eventSignal,
-					execCausing => activeCausing,
+					execCausing => execCausing,
 					lockCommand => '0'					
 				);
 				
 ------------------------------------------------
--- Branch/System
-					sysRegSelect <= sysRegReadSel;
-					sysRegValue <= sysRegIn;
-
-					inputDataD.data(0) <= dataIQD;
+-- Branch
+					inputDataD.data(0) <= basicBranch(setInstructionTarget(dataIQD,
+																 dataIQD.constantArgs.imm),
+																 (others => '0'),
+																 dataIQD.result);					
+					
 					inputDataD.fullMask(0) <= sendingIQD;
 					
 					dataD0 <= outputDataD.data(0);
 					
-					SUBPIPE_D: entity work.BranchUnit(Behavioral)
+					SUBPIPE_D: entity work.GenericStageMulti(SingleTagged)
 					port map(
 						clk => clk, reset => resetSig, en => enSig,
 						
@@ -202,45 +184,21 @@ begin
 						stageDataOut => outputDataD,
 						
 						execEventSignal => eventSignal,
-						execCausing => activeCausing,
+						lateEventSignal => lateEventSignal,
+						execCausing => execCausing,
 						lockCommand => '0',
 						
-						stageEventsOut => eventsD,
-						
-						sysRegSel => sysRegreadSel,
-						sysRegValue => sysRegValue,
-						
-						sysRegWriteSel => sysRegWriteSelStore,
-						sysRegWriteValue => sysRegWriteValueStore
+						stageEventsOut => eventsD						
 					);	
 
------------------------------------
-	BQ_BLOCK: block
-		signal --acceptingNewBQ, 
-					--prevSendingToBQ, 
-					storeTargetWrSig--, sendingOutBQ
-					: std_logic := '0';
-		--signal dataNewToBQ: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
-		signal storeTargetDataSig--, dataOutBQ
-						: InstructionState := DEFAULT_INSTRUCTION_STATE;
-		--signal committing: std_logic := '0';
-		--signal groupCtrNext, groupCtrInc: SmallNumber := (others => '0');
-		
-		function trgToResult(ins: InstructionState) return InstructionState is
-			variable res: InstructionState := ins;
-		begin
-			-- CAREFUL! Here we use 'result' because it is the field copied to arg1 in mem queue!
-			-- TODO: regularize usage of such fields, maybe remove 'target' from InstructionState?
-			res.result := ins.target;
-			return res;
-		end function;
-	begin
-		storeTargetDataSig <= trgToResult(dataD0);
-		storeTargetWrSig <= execSendingD;
-	
+		storeTargetDataSig <= setInsResult(dataD0, dataD0.target);
+		storeTargetWrSig <= execSendingD and isIndirectBranchOrReturn(dataD0);
+
 			BRANCH_QUEUE: entity work.MemoryUnit(Behavioral)
 			generic map(
-				QUEUE_SIZE => SQ_SIZE
+				QUEUE_SIZE => BQ_SIZE,
+				KEEP_INPUT_CONTENT => true,
+				MODE => branch
 			)
 			port map(
 				clk => clk,
@@ -252,57 +210,48 @@ begin
 					dataIn => dataNewToBQ,
 				
 				storeAddressWr => storeTargetWrSig,
-				storeValueWr => '0',-- storeValueWrSig,
+				storeValueWr => storeTargetWrSig,
 
 				storeAddressDataIn => storeTargetDataSig,
-				storeValueDataIn => DEFAULT_INSTRUCTION_STATE,-- storeValueDataSig,
+				storeValueDataIn => DEFAULT_INSTRUCTION_STATE,
 				
+				compareAddressDataIn => dataIQD,
+				compareAddressReady => sendingIQD,
+
+					selectedDataOut => branchQueueSelectedOut,
+					selectedSending => branchQueueSelectedSending,
+					
 					committing => committing,
-					groupCtrNext => groupCtrNext,
 						groupCtrInc => groupCtrInc,
 						
+				lateEventSignal => lateEventSignal,
 				execEventSignal => eventSignal,
-				execCausing => activeCausing,
+				execCausing => execCausing,
 				
 				nextAccepting => '1',
 				
-				--acceptingOutSQ => execAcceptingESig,
-				sendingSQOut => sendingOutBQ, -- OUTPUT
-				dataOutSQ => dataOutBQ -- OUTPUT
+				sendingSQOut => open,
+					dataOutV => dataOutBQV
 			);
-	end block;
--------------------------------------
 
 		-- Data from sysreg reads goes to load pipe
-		sysRegDataOut <= dataD0;
-		sysRegSending <= execSendingD when dataD0.operation = (System, sysMfc) else '0';
 		-- CAREFUL: Don't send the same thing from both subpipes:
-		execSendingEffectiveD <= execSendingD when dataD0.operation /= (System, sysMfc) else '0';
 
 		execEventSignal <= eventsD.eventOccured;
 		execCausing <= eventsD.causing;
 
 		eventSignal <= execOrIntEventSignalIn;	
-		activeCausing <= execOrIntCausingIn;	
 
 		execAcceptingA <= execAcceptingASig;
 		execAcceptingB <= execAcceptingBSig;
 		execAcceptingD <= execAcceptingDSig;
 
-		outputA.ins <= clearTempControlInfoSimple(dataA0);	
-		outputA.full <= execSendingA; 
-		outputB.ins <= clearTempControlInfoSimple(dataB2);	
-		outputB.full <= execSendingB;
-		outputD.ins <= clearTempControlInfoSimple(dataD0);	
-		outputD.full <= execSendingEffectiveD;
+		outputA <= (execSendingA, clearTempControlInfoSimple(dataA0));
+		outputB <= (execSendingB, clearTempControlInfoSimple(dataB2));
+		outputD <= (execSendingD, clearTempControlInfoSimple(dataD0));
 		
 		outputOpPreB <= dataB1;
 				
 	execEvent <= execEventSignal;
 	execCausingOut <= execCausing;
-
-		sysRegWriteSelOut <= sysRegWriteSelStore;
-		sysRegWriteValueOut <= sysRegWriteValueStore;
-
 end Implem;
-

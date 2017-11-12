@@ -24,15 +24,6 @@ use work.TEMP_DEV.all;
 
 package GeneralPipeDev is
 
-		-- group:  revTag = causing.groupTag and i2slv(-PIPE_WIDTH, SMALL_NUMBER_SIZE), mask = all ones
-		-- sequential: revTag = causing.numberTag, mask = new group's fullMask		
-		function nextCtr(ctr: SmallNumber; rewind: std_logic; revTag: SmallNumber;
-									 allow: std_logic; mask: std_logic_vector) 
-		return SmallNumber;
-		
-		constant ALL_FULL: std_logic_vector(0 to PIPE_WIDTH-1) := (others => '1');
-
-
 function makeSlotArray(insVec: InstructionStateArray; mask: std_logic_vector) return InstructionSlotArray;
 
 function extractFullMask(queueContent: InstructionSlotArray) return std_logic_vector;
@@ -45,6 +36,9 @@ function selectFromQueue(content: InstructionSlotArray; index: integer) return I
 
 function removeFromQueue(content: InstructionSlotArray; index: integer) return InstructionSlotArray;
 
+function chooseIns(content: InstructionStateArray; which: std_logic_vector)
+return InstructionState;
+
 -- CAREFUL! This is not a general function, only a special type of compacting
 function compactData(data: InstructionStateArray; mask: std_logic_vector) return InstructionStateArray;
 function compactMask(data: InstructionStateArray; mask: std_logic_vector) return std_logic_vector;
@@ -52,11 +46,10 @@ function compactMask(data: InstructionStateArray; mask: std_logic_vector) return
 function findMatching(content: InstructionSlotArray; ins: InstructionState)
 return std_logic_vector;
 
-function queueMaskNext(livingMask: std_logic_vector;
-					  newMask: std_logic_vector;
-					  nLivingIn: integer;
-					  sending: integer;
-					  receiving: std_logic) return std_logic_vector;
+-- TODO: is redundant, should unify with findMatching?
+function findMatchingGroupTag(arr: InstructionStateArray; ins: InstructionState)
+return std_logic_vector;
+
 
 function stageSimpleNext(content, newContent: InstructionState; full, sending, receiving: std_logic)
 return InstructionState;
@@ -81,7 +74,17 @@ function stageCQNext(content: StageDataCommitQueue; newContent: InstructionState
 return StageDataCommitQueue;
 
 -----------------------									
-				
+
+function getPhysicalSources(ins: InstructionState) return PhysNameArray;
+	
+function clearTempControlInfoSimple(ins: InstructionState) return InstructionState;
+function clearTempControlInfoMulti(sd: StageDataMulti) return StageDataMulti;
+	
+	-- TODO: use these to implement StageDataMulti corresponding functions?
+	function getArrayResults(ia: InstructionStateArray) return MwordArray;
+	function getArrayPhysicalDests(ia: InstructionStateArray) return PhysNameArray;
+	function getArrayDestMask(ia: InstructionStateArray; fm: std_logic_vector) return std_logic_vector;
+	
 function getInstructionResults(insVec: StageDataMulti) return MwordArray;
 function getVirtualArgs(insVec: StageDataMulti) return RegNameArray;
 function getPhysicalArgs(insVec: StageDataMulti) return PhysNameArray;
@@ -97,23 +100,18 @@ function getPhysicalDestMask(insVec: StageDataMulti) return std_logic_vector;
 
 function getExceptionMask(insVec: StageDataMulti) return std_logic_vector;
 
-function getLastFull(newContent: StageDataMulti) return InstructionState;
 function getEffectiveMask(newContent: StageDataMulti) return std_logic_vector;
 function getLastEffective(newContent: StageDataMulti) return InstructionState;
-function groupHasException(newContent: StageDataMulti) return std_logic;
-
 
 function getSendingFromCQ(livingMask: std_logic_vector) return std_logic_vector;
 
-
 function killByTag(before, ei, int: std_logic) return std_logic;
-
 	
 -- FORWARDING NETWORK ------------
-function getWrittenTags(lastCommitted: StageDataMulti) return PhysNameArray;
+function getWrittenTags(lastCommitted: StageDataMulti) return PhysNameArray; -- DEPREC
 
 function getResultTags(execEnds: InstructionStateArray;
-			stageDataCQ: StageDataCommitQueue;
+			stageDataCQ: InstructionStateArray;
 			dispatchDataA, dispatchDataB, dispatchDataC, dispatchDataD: InstructionState;
 			lastCommitted: StageDataMulti) 
 return PhysNameArray;
@@ -123,38 +121,41 @@ function getNextResultTags(execPreEnds: InstructionStateArray;
 return PhysNameArray;
 	
 function getResultValues(execEnds: InstructionStateArray; 
-										stageDataCQ: StageDataCommitQueue;
+										stageDataCQ: InstructionStateArray;
 										lastCommitted: StageDataMulti)
 return MwordArray;	
+---------------------
 
+-- OTHER EXEC -----------
 function getExecEnds(oA, oB, oC, oD, oE: InstructionSlot) return InstructionStateArray;
 function getExecEnds2(oA, oB, oC, oD, oE: InstructionSlot) return InstructionStateArray;
 function getExecSending(oA, oB, oC, oD, oE: InstructionSlot) return std_logic_vector;
 function getExecSending2(oA, oB, oC, oD, oE: InstructionSlot) return std_logic_vector;
 function getExecPreEnds(opB, opC: InstructionState) return InstructionStateArray;
+-----------------------
 
-	
+
+function simpleQueueNext(content: InstructionStateArray; newContent: InstructionStateArray;
+		livingMask: std_logic_vector;
+		newMask: std_logic_vector;
+		nFull: integer;
+		sending: std_logic
+)
+return InstructionSlotArray;
+
+
+function getKillMask(content: InstructionStateArray; fullMask: std_logic_vector;
+							causing: InstructionState; execEventSig: std_logic; lateEventSig: std_logic)
+return std_logic_vector;
+
+function setInstructionTarget(ins: InstructionState; target: Mword) return InstructionState;
+function setInsResult(ins: InstructionState; result: Mword) return InstructionState;
+
 end GeneralPipeDev;
 
 
 
 package body GeneralPipeDev is
-
-
-		-- group:  revTag = causing.groupTag and i2slv(-PIPE_WIDTH, SMALL_NUMBER_SIZE), mask = all ones
-		-- sequential: revTag = causing.numberTag, mask = new group's fullMask		
-		function nextCtr(ctr: SmallNumber; rewind: std_logic; revTag: SmallNumber;
-									 allow: std_logic; mask: std_logic_vector) 
-		return SmallNumber is			
-		begin
-			if rewind = '1' then
-				return revTag;
-			elsif allow = '1' then
-				return i2slv(slv2u(ctr) + countOnes(mask), SMALL_NUMBER_SIZE);
-			else
-				return ctr;
-			end if;
-		end function;
 
 function makeSlotArray(insVec: InstructionStateArray; mask: std_logic_vector) return InstructionSlotArray is
 	variable res: InstructionSlotArray(0 to insVec'length-1) := (others => DEFAULT_INSTRUCTION_SLOT);
@@ -260,6 +261,21 @@ begin
 end function;
 
 
+function chooseIns(content: InstructionStateArray; which: std_logic_vector)
+return InstructionState is
+	variable res: InstructionState := DEFAULT_INSTRUCTION_STATE;
+begin
+	for i in 0 to which'length-1 loop
+		if which(i) = '1' then
+			res := content(i);
+			exit;
+		end if;
+	end loop;
+	
+	return res;
+end function;
+
+
 function findMatching(content: InstructionSlotArray; ins: InstructionState)
 return std_logic_vector is
 	variable res: std_logic_vector(content'range) := (others => '0');
@@ -274,32 +290,17 @@ begin
 end function;
 
 
-function queueMaskNext(livingMask: std_logic_vector;
-					  newMask: std_logic_vector;
-					  nLivingIn: integer;
-					  sending: integer;
-					  receiving: std_logic) return std_logic_vector is
-	variable nLiving: integer := nLivingIn;
-	constant LEN: integer := livingMask'length;
-	variable tempMask: std_logic_vector(0 to LEN + PIPE_WIDTH-1) := (others => '0');
-	variable outMask: std_logic_vector(0 to LEN-1) := (others => '0');
+function findMatchingGroupTag(arr: InstructionStateArray; ins: InstructionState)
+return std_logic_vector is
+	variable res: std_logic_vector(0 to arr'length-1) := (others => '0');
 begin
-	if nLiving < 0  or nLiving > LEN then
-		nLiving := 0;
-	end if;
-								
-	tempMask(0 to LEN-1) := livingMask;
-
-	-- Append new data
-	if receiving = '1' then
-		tempMask(nLiving to nLiving + PIPE_WIDTH-1) := newMask;
-	end if;
-
-	-- Shift by n of sending
-	-- CAREFUL: tempMask must have enough zeros at the end to clear outdated 'ones'!
-	outMask(0 to LEN-1) := tempMask(sending to sending + LEN-1); 
-
-	return outMask;
+	for i in 0 to arr'length-1 loop
+		if arr(i).groupTag = ins.groupTag then
+			res(i) := '1';
+		end if;
+	end loop;
+	
+	return res;
 end function;
 
 
@@ -399,12 +400,38 @@ begin
 end function;
 
 
+	function getArrayResults(ia: InstructionStateArray) return MwordArray is
+		variable res: MwordArray(0 to ia'length-1) := (others => (others => '0'));
+	begin
+		for i in 0 to res'length-1 loop
+			res(i) := ia(i).result; 
+		end loop;
+		return res;
+	end function;
+	
+	function getArrayPhysicalDests(ia: InstructionStateArray) return PhysNameArray is
+		variable res: PhysNameArray(0 to ia'length-1) := (others => (others => '0'));
+	begin
+		for i in 0 to res'length-1 loop
+			res(i) := ia(i).physicalDestArgs.d0; 
+		end loop;
+		return res;
+	end function;
+	
+	function getArrayDestMask(ia: InstructionStateArray; fm: std_logic_vector) return std_logic_vector is
+		variable res: std_logic_vector(0 to ia'length-1) := (others => '0');
+	begin
+		for i in 0 to res'length-1 loop
+			res(i) := fm(i) and ia(i).physicalDestArgs.sel(0); 
+		end loop;
+		return res;
+	end function;
+
+
 function getInstructionResults(insVec: StageDataMulti) return MwordArray is
 	variable res: MwordArray(0 to PIPE_WIDTH-1) := (others => (others => '0'));
 begin
 	for i in insVec.fullMask'range loop
-		res(i) := insVec.data(i).result;
-		res(i) := insVec.data(i).result;
 		res(i) := insVec.data(i).result;
 	end loop;
 	return res;
@@ -465,10 +492,13 @@ end function;
 
 function findOverriddenDests(insVec: StageDataMulti) return std_logic_vector is
 	variable res: std_logic_vector(insVec.fullMask'range) := (others=>'0');
+	variable em: std_logic_vector(insVec.fullMask'range) := (others => '0');
 begin
+	em := getExceptionMask(insVec);
 	for i in insVec.fullMask'range loop
 		for j in insVec.fullMask'range loop
-			if j > i and insVec.data(i).virtualDestArgs.d0 = insVec.data(j).virtualDestArgs.d0 then
+			if 		j > i and insVec.fullMask(j) = '1' and em(j) = '0' -- CAREFUL: if exception, doesn't write
+				and insVec.data(i).virtualDestArgs.d0 = insVec.data(j).virtualDestArgs.d0 then
 				res(i) := '1';
 			end if;
 		end loop;
@@ -481,8 +511,7 @@ function getPhysicalDestMask(insVec: StageDataMulti) return std_logic_vector is
 	variable res: std_logic_vector(insVec.fullMask'range) := (others=>'0');
 begin
 	for i in insVec.fullMask'range loop
-		res(i) := insVec.fullMask(i) 
-				and insVec.data(i).physicalDestArgs.sel(0);
+		res(i) := insVec.data(i).physicalDestArgs.sel(0);
 	end loop;			
 	return res;
 end function;
@@ -491,8 +520,7 @@ function getExceptionMask(insVec: StageDataMulti) return std_logic_vector is
 	variable res: std_logic_vector(insVec.fullMask'range) := (others=>'0');
 begin
 	for i in insVec.fullMask'range loop
-		res(i) := insVec.fullMask(i) 
-				and insVec.data(i).controlInfo.newException;
+		res(i) := insVec.data(i).controlInfo.hasException;
 	end loop;			
 	return res;
 end function;
@@ -501,17 +529,15 @@ end function;
 function getWrittenTags(lastCommitted: StageDataMulti) return PhysNameArray is
 	variable writtenTags: PhysNameArray(0 to PIPE_WIDTH-1) := (others=>(others=>'0'));	
 begin	
-	-- Slots in writeback stage
-	for i in 0 to PIPE_WIDTH-1 loop
+	for i in 0 to PIPE_WIDTH-1 loop -- Slots in writeback stage
 		writtenTags(i) := lastCommitted.data(i).physicalDestArgs.d0;
-	end loop;
-	
+	end loop;	
 	return writtenTags;
 end function;
 
 
 function getResultTags(execEnds: InstructionStateArray; 
-						stageDataCQ: StageDataCommitQueue;
+						stageDataCQ: InstructionStateArray;
 						dispatchDataA, dispatchDataB, dispatchDataC, dispatchDataD: InstructionState;
 						lastCommitted: StageDataMulti) 
 return PhysNameArray is
@@ -522,21 +548,12 @@ begin
 	resultTags(0) := execEnds(0).physicalDestArgs.d0;
 	resultTags(1) := execEnds(1).physicalDestArgs.d0;
 	resultTags(2) := execEnds(2).physicalDestArgs.d0;
-	--resultTags(3) := execEnds(3).physicalDestArgs.d0;			
 	
 	-- CQ slots
 	for i in 0 to CQ_SIZE-1 loop 
-		resultTags(4-1 + i) := stageDataCQ.data(i).physicalDestArgs.d0;  	
+		resultTags(4-1 + i) := stageDataCQ(i).physicalDestArgs.d0;  	
 	end loop;
-
 	return resultTags;
-
-	---- Slots in writeback stage
-	--for i in 0 to PIPE_WIDTH-1 loop
-	--	resultTags(4 + CQ_SIZE + i) := lastCommitted.data(i).physicalDestArgs.d0;
-	--end loop;			
-	--
-	--return resultTags;
 end function;		
 
 function getNextResultTags(execPreEnds: InstructionStateArray;
@@ -544,18 +561,15 @@ function getNextResultTags(execPreEnds: InstructionStateArray;
 return PhysNameArray is
 	variable nextResultTags: PhysNameArray(0 to N_NEXT_RES_TAGS-1) := (others=>(others=>'0'));
 begin
-	nextResultTags(0) := dispatchDataA.physicalDestArgs.d0;
-	
+	nextResultTags(0) := dispatchDataA.physicalDestArgs.d0;	
 	nextResultTags(1) := execPreEnds(1).physicalDestArgs.d0;
 	--nextResultTags(2) := execPreEnds(2).physicalDestArgs.d0;
-	
-	--nextResultTags(3) := dispatchDataD.physicalDestArgs.d0;	
 	return nextResultTags;
 end function;
 
 
 function getResultValues(execEnds: InstructionStateArray; 
-						stageDataCQ: StageDataCommitQueue;
+						stageDataCQ: InstructionStateArray;
 						lastCommitted: StageDataMulti)
 return MwordArray is
 	variable resultVals: MwordArray(0 to N_RES_TAGS-1) := (others=>(others=>'0'));		
@@ -563,20 +577,11 @@ begin
 	resultVals(0) := execEnds(0).result;
 	resultVals(1) := execEnds(1).result;
 	resultVals(2) := execEnds(2).result;
-	--resultVals(3) := execEnds(3).result;			
 			
-	-- CQ slots
-	for i in 0 to CQ_SIZE-1 loop 
-		resultVals(4-1 + i) := stageDataCQ.data(i).result;  	
+	for i in 0 to CQ_SIZE-1 loop 	-- CQ slots
+		resultVals(4-1 + i) := stageDataCQ(i).result;  	
 	end loop;
-	
 	return resultVals;
-	
-	--for i in 0 to PIPE_WIDTH-1 loop
-	--	resultVals(4 + CQ_SIZE + i) := lastCommitted.data(i).result;
-	--end loop;
-	--	
-	--return resultVals;
 end function;	
 
 			
@@ -627,21 +632,6 @@ begin
 	return res;
 end function;
 
-			
-	function getLastFull(newContent: StageDataMulti) return InstructionState is
-		variable res: InstructionState := defaultInstructionState;
-	begin
-		-- Seeking from right side cause we need the last one 
-		for i in newContent.fullMask'reverse_range loop
-			if newContent.fullMask(i) = '1' then
-				res := newContent.data(i);				
-				exit;
-			end if;
-		end loop;
-		return res;
-	end function;			
-
-
 	function getLastEffective(newContent: StageDataMulti) return InstructionState is
 		variable res: InstructionState := newContent.data(0);
 	begin
@@ -655,7 +645,9 @@ end function;
 			end if;
 			
 			-- If this one has an event, following ones don't count
-			if newContent.data(i).controlInfo.hasException = '1' then
+			if 	newContent.data(i).controlInfo.hasException = '1'
+				or newContent.data(i).controlInfo.specialAction = '1'	-- CAREFUL! This also breaks flow!
+			then 
 				res.controlInfo.newEvent := '1'; -- Announce that event is to happen now!
 				exit;
 			end if;
@@ -669,15 +661,16 @@ end function;
 	begin
 		-- Seeking from right side cause we need the last one 
 		for i in newContent.fullMask'range loop
-			-- Count only full instructions
-			if newContent.fullMask(i) = '1' then
+			if newContent.fullMask(i) = '1' then -- Count only full instructions
 				res(i) := '1';
 			else
 				exit;
 			end if;
 			
+			-- CAREFUL, TODO: what if there's a branch (or branch correction) and valid path after it??
 			-- If this one has an event, following ones don't count
-			if 	newContent.data(i).controlInfo.hasEvent = '1' --??
+			if 	newContent.data(i).controlInfo.hasException = '1'
+				or newContent.data(i).controlInfo.specialAction = '1'
 			then
 				exit;
 			end if;
@@ -685,29 +678,10 @@ end function;
 		end loop;
 		return res;
 	end function;
-
-		function groupHasException(newContent: StageDataMulti) return std_logic is
-		begin			
-			for i in newContent.fullMask'range loop
-				-- Count only full instructions
-				if newContent.fullMask(i) = '1' then
-					if newContent.data(i).controlInfo.hasException = '1' then
-						return '1';
-					end if;
-				else 	
-					exit;
-				end if;
-				
-			end loop;			
-			return '0';
-		end function;
 	
 	function killByTag(before, ei, int: std_logic) return std_logic is
 	begin
-		-- Version with unified exec/interrupt event
-		return before and ei;
-		-- Version with separate interrupt 
-		--return (before and ei) or int;
+		return (before and ei) or int;
 	end function;
 
 
@@ -806,42 +780,30 @@ return StageDataCommitQueue is
 	variable newCompactedData: InstructionStateArray(0 to 3);
 	variable newCompactedMask: std_logic_vector(0 to 3);
 begin
-	newCompactedData := newContent; --compactData(newContent, ready);
-	newCompactedMask := ready; --compactMask(newContent, ready);
+	newCompactedData := newContent;
+	newCompactedMask := ready;
 	-- CAREFUL: even when not clearing empty slots, result tags probably should be cleared!
 	--				It's to prevent reading of fake results from empty slots
 	if not CLEAR_EMPTY_SLOTS_CQ then
-		dataTemp := contentExtended; -- content.data & newCompactedData;
+		dataTemp := contentExtended;
 	end if;	
 
---			for i in 0 to content.data'length-1 loop -- to livingContent'length - nOut - 1 loop
---				if i < nFull - nOut then
---					dataTemp(i) := content.data(i + nOut);		
---					fullMaskTemp(i) := '1'; -- content.fullMask(i + nOut);
---				elsif i < nFull - nOut + 4 then
---					dataTemp(i) := newCompactedData(k);
---					fullMaskTemp(i) := newCompactedMask(k);
---					k := k + 1;
---				else
---					--fullMaskTemp(i) := '0';
---				end if;
---			end loop;	
-		
 		for i in 0 to contentExtended'length - 1 - outWidth loop
 			contentExtended(i) := contentExtended(i + outWidth);
 		end loop;
 		
-		for i in 0 to content.data'length-1 loop -- to livingContent'length - nOut - 1 loop
+		for i in 0 to content.data'length-1 loop
 			if i < nFull - nOut then
+								--outWidth then
 				dataTemp(i) := contentExtended(i);		
-				fullMaskTemp(i) := '1'; -- content.fullMask(i + nOut);
+				fullMaskTemp(i) := '1';
 			elsif i < nFull - nOut + 4 then
+									--outWidth + 4 then
 				dataTemp(i) := newCompactedData(k);
 				fullMaskTemp(i) := newCompactedMask(k);
 				k := k + 1;
 			else
 				dataTemp(i) := contentExtended(i);
-				--fullMaskTemp(i) := '0';
 			end if;
 		end loop;		
 		
@@ -867,5 +829,117 @@ begin
 	return res;		
 end function;
 
+
+function getPhysicalSources(ins: InstructionState) return PhysNameArray is
+	variable res: PhysNameArray(0 to 2) := (others => (others => '0'));
+begin
+	res := (0 => ins.physicalArgs.s0, 1 => ins.physicalArgs.s1, 2 => ins.physicalArgs.s2);			
+	return res;
+end function;
+
+function clearTempControlInfoSimple(ins: InstructionState) return InstructionState is
+	variable res: InstructionState := ins;
+begin
+	res.controlInfo.newEvent := '0';
+	--res.controlInfo.newInterrupt := '0';
+	--res.controlInfo.newException := '0';
+	res.controlInfo.newBranch := '0';
+	--res.controlInfo.newReturn := '0';
+	return res;
+end function;
+
+function clearTempControlInfoMulti(sd: StageDataMulti) return StageDataMulti is
+	variable res: StageDataMulti := sd;
+begin
+	for i in res.fullMask'range loop
+		res.data(i) := clearTempControlInfoSimple(res.data(i));
+	end loop;
+	return res;
+end function;
+
+
+function simpleQueueNext(content: InstructionStateArray; newContent: InstructionStateArray;
+		livingMask: std_logic_vector;
+		newMask: std_logic_vector;
+		nFull: integer;
+		sending: std_logic
+)
+return InstructionSlotArray is
+	constant LEN: integer := content'length;
+	constant INPUT_LEN: integer := newContent'length;
+	variable res: InstructionSlotArray(0 to LEN-1) := (others => DEFAULT_INSTRUCTION_SLOT);
+	variable contentExtended: InstructionStateArray(0 to LEN + INPUT_LEN - 1) := 
+																				content & newContent;
+	variable dataTemp: InstructionStateArray(0 to LEN + INPUT_LEN - 1) := (others => defaultInstructionState);
+	variable fullMaskTemp: std_logic_vector(0 to LEN + INPUT_LEN - 1) := (others => '0');
+		
+	variable j: integer;
+	variable k: integer := 0;
+	variable newFullMask: std_logic_vector(0 to LEN-1) := (others => '0');
+		constant CLEAR_EMPTY_SLOTS: boolean := false;
+	variable nFullNew: integer := nFull;
+begin
+	-- CAREFUL: even when not clearing empty slots, result tags probably should be cleared!
+	--				It's to prevent reading of fake results from empty slots
+
+	dataTemp(0 to LEN-1) := content;
+	if not CLEAR_EMPTY_SLOTS then
+		dataTemp := contentExtended;
+	end if;	
+
+	if sending = '1' then
+		dataTemp(0 to LEN + INPUT_LEN - 2) := dataTemp(1 to LEN + INPUT_LEN - 1);
+		nFullNew := nFull-1;
+	end if;
+		
+		for i in 0 to LEN + INPUT_LEN - 1 loop
+			if i < nFullNew then
+								--outWidth then
+				--dataTemp(i) := contentExtended(i);		
+				fullMaskTemp(i) := '1';
+			elsif i < nFullNew + INPUT_LEN then
+									--outWidth + 4 then
+				dataTemp(i) := newContent(k);
+				fullMaskTemp(i) := newMask(k);
+				k := k + 1;
+			else
+				--dataTemp(i) := contentExtended(i);
+			end if;
+		end loop;		
+		
+		
+	res := makeSlotArray(dataTemp(0 to LEN-1), fullMaskTemp(0 to LEN-1));
+	
+	return res;		
+end function;
+
+
+function getKillMask(content: InstructionStateArray; fullMask: std_logic_vector;
+							causing: InstructionState; execEventSig: std_logic; lateEventSig: std_logic)
+return std_logic_vector is
+	variable res: std_logic_vector(0 to fullMask'length-1);
+	variable diff: SmallNumber := (others => '0');
+begin
+	for i in 0 to fullMask'length-1 loop
+		diff := subSN(causing.groupTag, content(i).groupTag); -- High bit of diff carries the info "tag is before"
+		res(i) := killByTag(diff(SMALL_NUMBER_SIZE-1), execEventSig, lateEventSig) and fullMask(i);
+	end loop;
+	return res;
+end function;
+
+
+function setInstructionTarget(ins: InstructionState; target: Mword) return InstructionState is
+	variable res: InstructionState := ins;
+begin
+	res.target := target;
+	return res;
+end function;
+
+function setInsResult(ins: InstructionState; result: Mword) return InstructionState is
+	variable res: InstructionState := ins;
+begin
+	res.result := result;
+	return res;
+end function;
 
 end GeneralPipeDev;

@@ -45,6 +45,8 @@ use work.ProcLogicFront.all;
 
 use work.ProcLogicExec.all;
 
+use work.TEMP_DEV.all;
+
 
 entity IntegerMultiplier is
 	port(
@@ -63,6 +65,7 @@ entity IntegerMultiplier is
 			dataOut: out InstructionState;	
 			data1Prev: out InstructionState; -- stage before last
 		
+			lateEventSignal: in std_logic;
 		execEventSignal: in std_logic;
 		execCausing: in InstructionState;
 		lockCommand: in std_logic
@@ -78,8 +81,12 @@ architecture Behavioral of IntegerMultiplier is
 	signal data0, data1: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
 	signal sending0, sending1, acc1, acc2: std_logic := '0';
 	
-	signal dataM: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;				
+	signal dataM: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
+		signal eventCausing: InstructionState := DEFAULT_INSTRUCTION_STATE;
+	signal multResult: dword := (others => '0');
 begin
+		eventCausing <= execCausing;
+
 	inputData.data(0) <= dataIn;
 	inputData.fullMask(0) <= prevSending;
 	
@@ -88,7 +95,7 @@ begin
 		clk => clk, reset => reset, en => en,
 		
 		prevSending => prevSending,
-		nextAccepting => acc1, --flowResponseAPost.accepting,
+		nextAccepting => acc1,
 		
 		stageDataIn => inputData, 
 		acceptingOut => acceptingOut,
@@ -96,7 +103,8 @@ begin
 		stageDataOut => data0,
 		
 		execEventSignal => execEventSignal,
-		execCausing => execCausing,
+		lateEventSignal => lateEventSignal,
+		execCausing => eventCausing,
 		lockCommand => '0',
 		
 		stageEventsOut => open					
@@ -115,7 +123,8 @@ begin
 		stageDataOut => data1,
 		
 		execEventSignal => execEventSignal,
-		execCausing => execCausing,
+		lateEventSignal => lateEventSignal,
+		execCausing => eventCausing,
 		lockCommand => '0',
 		
 		stageEventsOut => open					
@@ -137,13 +146,26 @@ begin
 		stageDataOut => outputData,
 		
 		execEventSignal => execEventSignal,
-		execCausing => execCausing,
+		lateEventSignal => lateEventSignal,
+		execCausing => eventCausing,
 		lockCommand => '0',
 		
 		stageEventsOut => open					
 	);		
 	
 	data1Prev <= data1.data(0);				
-	dataOut <= outputData.data(0);
+	dataOut <= setInsResult(outputData.data(0), multResult(31 downto 0));
+	
+	
+	MP: entity work.NewMultiplierPipe(Behavioral)
+	port map(
+		clk => clk, reset => reset, en => en,
+		inA => dataIn.argValues.arg0,
+		inB => dataIn.argValues.arg1,
+		inC => (others => '0'),
+		result => multResult
+	);
+	
+	
 end Behavioral;
 

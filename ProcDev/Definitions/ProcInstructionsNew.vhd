@@ -102,8 +102,12 @@ type ProcOpcont is ( -- ALU functions
 							
 							-- ext2: 
 							-- system jumps
-							--rete,
-							--reti,
+							retE,
+							retI,
+							halt,
+							sync,
+							replay,
+							error,
 							
 							mfc,
 							mtc,
@@ -126,35 +130,8 @@ type InterruptType is (none, unknown,
 							int0, int1, int2
 							);
 
---subtype ExceptionTable is WordArray;
---subtype InterrruptTable is WordArray;
-
--- TODO: remove those tables and define only 'bases': start address for table, aligned to have 0 as last byte 
-constant EXC_TABLE: WordArray(0 to 8) := (
-	X"000000c0",
-	X"000000c4",
-	X"000000c8",
-	X"000000cc",
-	X"000000d0",
-	X"000000d4",
-	X"000000d8",
-	X"000000dc",
-	X"000000e0"
-);
 
 constant EXC_BASE: Mword := X"00000100"; -- TODO: enable 64b
-
-constant INT_TABLE: WordArray(0 to 6) := (
-	X"000001c0",
-	X"000001c4",
-	X"000001c8",
-	X"000001cc",
-	X"000001d0",
-	X"000001d4",
-	X"000001d8"
---	X"00000210"
-);
-
 constant INT_BASE: Mword := X"00000200"; -- TODO: enable 64b
 
 

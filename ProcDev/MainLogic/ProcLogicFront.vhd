@@ -21,16 +21,11 @@ use work.Decoding2.all;
 use work.TEMP_DEV.all;
 use work.GeneralPipeDev.all;
 
---use std.textio.all;
-
 
 package ProcLogicFront is
 
 
 function getInstructionClassInfo(ins: InstructionState) return InstructionClassInfo;
-
--- Writes target to the 'target' field
-function setBranchTarget(ins: InstructionState) return InstructionState;
 
 function instructionFromWord(w: word) return InstructionState;
 
@@ -38,65 +33,21 @@ function decodeInstruction(inputState: InstructionState) return InstructionState
 
 function decodeMulti(sd: StageDataMulti) return StageDataMulti;
 
--- DEPREC?? How many hwords will be fetched - depends on PC alignment
-function pc2size(pc: Mword; alignBits: natural; capacity: PipeFlow) return PipeFlow;
-
-function bufferAHNext(content: InstructionStateArray;
-									livingMask: std_logic_vector;
-								newContent: InstructionStateArray; 
-								fetchData: InstructionState;
-									fetchBasicInfo: InstructionBasicInfo;								
-								nFull, nOut, nIn: integer) 
-return InstructionStateArray;
-
-function TEMP_hbufferFullMaskNext(content: InstructionStateArray;
-											livingMask: std_logic_vector;
-											newContent: InstructionStateArray;
-											prevSending: std_logic;											
-											fetchData: InstructionState;
-												fetchBasicInfo: InstructionBasicInfo;											
-											nFull, nOut, nIn: integer)  
-return std_logic_vector;
-
-
-function TEMP_hbufferStageDataNext(content: InstructionStateArray;
-											livingMask: std_logic_vector;
-											newContent: InstructionStateArray;
-											prevSending: std_logic;
-											fetchData: InstructionState;
-												fetchBasicInfo: InstructionBasicInfo;											
-											nFull, nOut, nIn: integer)  
-return StageDataHbuffer;
-
-
 function newFromHbuffer(content: InstructionStateArray; fullMask: std_logic_vector)
 return HbuffOutData;
 
-function newPCData(content: InstructionState;
-						  commitEvent: std_logic; commitCausing: InstructionState;
-						  execEvent: std_logic; execCausing: InstructionState;	
-						  decodeEvent: std_logic; decodeCausing: InstructionState;
-						  pcNext, causingNext: Mword)
-						--					excTarget: InstructionBasicInfo
-return InstructionState;
+function getFetchOffset(ip: Mword) return SmallNumber;
 
-	function NEW_generalEvents(pcData: InstructionState;
-										commitEvent: std_logic; commitCausing: InstructionState;
-										execEvent: std_logic; execCausing: InstructionState;	
-										decodeEvent: std_logic; decodeCausing: InstructionState;
-										pcNext, causingNext: Mword)
-										--	excTarget: InstructionBasicInfo)
-	return GeneralEventInfo;
-
-function getAnnotatedHwords(--fetchData: InstructionState;
-									 fetchBasicInfo: InstructionBasicInfo; 
+function getAnnotatedHwords(fetchIns: InstructionState;
 									 fetchBlock: HwordArray)
 return InstructionStateArray;
 
-function getGeneralEvents(eventArr: InstructionSlotArray)
-return GeneralEventInfo;
 
 function stageMultiEvents(sd: StageDataMulti; isNew: std_logic) return StageMultiEventInfo;
+
+function getFrontEvent(ins: InstructionState; receiving: std_logic; valid: std_logic;
+							  hbuffAccepting: std_logic; fetchBlock: HwordArray(0 to FETCH_BLOCK_SIZE-1))
+return InstructionState;
 
 end ProcLogicFront;
 
@@ -107,23 +58,6 @@ package body ProcLogicFront is
 function getInstructionClassInfo(ins: InstructionState) return InstructionClassInfo is
 	variable ci: InstructionClassInfo := defaultClassInfo;
 begin
-	-- TODO: determine:
-	--			illegal/undefined (incl. privilege level) 
-	-- 		? what kind?
-		-- Proposition: if condition is 'none', set "branch confirmed" 
-		--				// or use "speculated"? Fact of being sure don't change anyth when constant jump?
-		
-		-- If branch upon r0, result also sure
-		
-		-- If branch conditionally, not on r0, need to speculate
-			
-	--			other special conditions: fetchLock? halt? etc...
-
-
-			if ins.operation.func = sysUndef then
-				ci.undef := '1';
-			end if;
-
 				-- Which clusters?
 				-- TEMP!
 				ci.mainCluster := '1';
@@ -131,9 +65,9 @@ begin
 					ci.secCluster := '1';
 				end if;
 				
-				-- TODO: branch with link should also contain main cluster because link goes there!
 				if ins.operation.unit = Jump then
 					ci.secCluster := '1';
+					-- For branch with link main cluster for destination write
 					if isNonzero(ins.virtualDestArgs.d0) = '0' then
 						ci.mainCluster := '0';
 					end if;
@@ -142,13 +76,16 @@ begin
 					ci.secCluster := '1';
 				end if;
 
+			if ins.operation.func = sysUndef then
+				--ci.undef := '1';
+				ci.mainCluster := '0';
+				ci.secCluster := '0';
+			end if;
+
 			ci.branchAlways := '0';
 			ci.branchCond := '0';
 
-			if 	 	(ins.operation.func = jump and ins.constantArgs.c1 = COND_NONE)
-				--or		ins.operation.func = sysRetE
-				--or 	ins.operation.func = sysRetI
-			then
+			if 	 	(ins.operation.func = jump and ins.constantArgs.c1 = COND_NONE) then
 				ci.branchAlways := '1';
 			elsif (ins.operation.func = jump and ins.constantArgs.c1 /= COND_NONE) then 
 				ci.branchCond := '1';	
@@ -159,35 +96,20 @@ begin
 				ci.branchReg := '1';
 			end if;
 			
-			-- TODO: complete this!
 			if  ins.operation.unit = System then
-				ci.system := '1';
+				--ci.system := '1';
 			end if;
 			
 			if  (ins.operation.func = sysMTC) then
-				--res.writeSysSel := '1';
-				ci.fetchLock := '1';
-			else
-				ci.fetchLock := '0';
+				ci.mtc := '1';
 			end if;
 
 			if (ins.operation.func = sysMFC) then
-				--res.readSysSel := '1';
+				ci.mfc := '1';
 			end if;
-
-
 				
 	return ci;
 end function;
-
--- TODO, CAREFUL: inspect other possible paths, like "jump to next" for some instructions?
-function setBranchTarget(ins: InstructionState) return InstructionState is
-	variable res: InstructionState := ins;
-begin
-	-- NOTE: jump relative to this instruction, not next one
-	res.target := i2slv(slv2s(ins.constantArgs.imm) + slv2s(ins.basicInfo.ip), MWORD_SIZE);		
-	return res;
-end function;	
 
 
 function instructionFromWord(w: word) return InstructionState is
@@ -210,39 +132,43 @@ begin
 					res.virtualDestArgs);
 	
 	res.classInfo := getInstructionClassInfo(res);	
-				
-	-- TODO: other control flow considerations: detect exceptions etc.! 
-	--...
-				-- TEMP: code for predicting every regular jump (even "branch never"!) as taken
---				if res.operation.func = jump then
+
+--				-- TEMP: code for predicting every regular jump (even "branch never"!) as taken
+--				if ((res.classInfo.branchAlways or res.classInfo.branchCond)
+--					and not res.classInfo.branchReg)	= '1' and BRANCH_AT_DECODE then
 --					res.controlInfo.newEvent := '1';
---					res.controlInfo.hasEvent := '1';
+--					--res.controlInfo.hasEvent := '1';
 --					res.controlInfo.newBranch := '1';
 --					res.controlInfo.hasBranch := '1';					
 --				end if;
+
+
+				if res.operation.unit = System and
+						(	res.operation.func = sysRetI or res.operation.func = sysRetE
+						or res.operation.func = sysSync or res.operation.func = sysReplay
+						or res.operation.func = sysError
+						or res.operation.func = sysHalt) then 		
+					res.controlInfo.specialAction := '1';
+					
+						-- CAREFUL: Those ops don't get issued, they are handled at retirement
+						res.classInfo.mainCluster := '0';
+						res.classInfo.secCluster := '0';
+				end if;	
 	
-		if res.classInfo.undef = '1' then
-			--res.controlInfo.newEvent := '1';
-			--res.controlInfo.hasEvent := '1';			
-					--res.controlInfo.exception := '1';
-			--res.controlInfo.newException := '1';
-			--res.controlInfo.hasException := '1';
+		if --res.classInfo.undef = '1' then
+				res.operation.func = sysUndef 
+		then
+			res.controlInfo.hasException := '1';
 			res.controlInfo.exceptionCode := i2slv(ExceptionType'pos(undefinedInstruction), SMALL_NUMBER_SIZE);
 		end if;
 		
-		-- CAREFUL! Indicate that fetch lock must be applied
-		if res.classInfo.fetchLock = '1' then
-			res.controlInfo.newEvent := '1';
-			res.controlInfo.hasEvent := '1';				
-			res.controlInfo.newFetchLock := '1';
-			res.controlInfo.hasFetchLock := '1';
+		if res.controlInfo.squashed = '1' then	-- CAREFUL: ivalid was '0'
+			report "Trying to decode invalid locaiton" severity error;
 		end if;
 		
+			res.controlInfo.squashed := '0';
 		
-		res.target := (others => '0');
-		-- TEMP!
-		--res := setBranchTarget(res); 
-		
+		res.target := (others => '0');		
 	return res;
 end function;
 
@@ -256,230 +182,6 @@ begin
 	return res;
 end function;
 
-function pc2size(pc: Mword; alignBits: natural; capacity: PipeFlow) return PipeFlow is
-	variable res: PipeFlow := (others=>'0');
-	variable ending, cap: natural;
-begin
-	ending := slv2u(pc(alignBits-1 downto 0));
-	-- "ending" is eq to num of bytes over aligned PC
-	cap := binFlowNum(capacity);
-	res := num2flow(cap - slv2u(pc(alignBits-1 downto 1)));
-	return res;
-end function;
-
-
-function bufferAHNext(content: InstructionStateArray;
-									livingMask: std_logic_vector;
-								newContent: InstructionStateArray; 
-								fetchData: InstructionState;
-									fetchBasicInfo: InstructionBasicInfo;								
-								nFull, nOut, nIn: integer) 
-return InstructionStateArray is
-	variable res: InstructionStateArray(0 to content'length-1) 
-			:= (others => DEFAULT_ANNOTATED_HWORD);
-	variable newShift: integer := 0; -- CAREFUL! This determines where actual data starts in newContent
-		constant CLEAR_EMPTY_SLOTS_HBUFF: boolean := false;	
-	variable tempX: InstructionStateArray(0 to content'length + newContent'length - 1) 
-			:= (others => DEFAULT_ANNOTATED_HWORD);
-	variable tempMaskX: std_logic_vector(0 to content'length + newContent'length - 1) := (others => '0');		
-			
-	variable tempY: InstructionStateArray(0 to 2*content'length + newContent'length - 1) 
-			:= (others => DEFAULT_ANNOTATED_HWORD);
-begin	
-	-- CAREFUL! Hbuffer size MUST be a multiple of newContent size!
-
-	newShift := slv2u(fetchBasicInfo.ip(ALIGN_BITS-1 downto 1)); -- pc(ALIGN_BITS-1 downto 1));					
-		--	newShift := 0;
-		-- For position 'i':
-		-- Y: if taking newContent[y], it must be: nFull + y - newShift = i, so
-		--		y = i + newShift - nFull 
-		-- 	So let's get y := (i + newShift - nFull)
-		-- X: if taking form content[x], it must be: i + nOut = x, so
-		--		x := i + nOut
-		--
-		-- However, for Y: when i is end of queue, it can only take yMax,
-		--					when end-1, it can take {yMax-1, yMax}, etc.
-		-- and for X: x must be smaller than QUEUE_SIZE
-		--
-		-- Selection X vs Y: when nFull-nOut+nIn > i, select X, else select Y
-		--	
-	tempX := content & newContent;
-			tempMaskX(0 to content'length-1) := livingMask;
-	for k in 0 to --content'length + newContent'length - 1 loop
-						tempY'length-1 loop
-		tempY(k) := newContent(k mod newContent'length); -- & newContent & newContent & newContent;	
-	end loop;
-			
-	--tempX(0 to content'length-1 - nOut) := tempX(nOut to content'length-1);
-	--	tempMaskX(0 to content'length-1 - nOut) := tempMaskX(nOut to content'length-1);
-		tempX(0 to content'length-1) := tempX(nOut to content'length-1 + nOut);
-			tempMaskX(0 to content'length-1) := tempMaskX(nOut to content'length-1 + nOut);	
-
-	--tempY(0 to content'length-1 - newShift) := 
-	--	tempY(		(content'length - nFull + nOut) + newShift 
-	--				to (content'length - nFull + nOut) + content'length-1 );
-		tempY(0 to content'length-1) := 
-			tempY(		(content'length - nFull + nOut) + newShift 
-								to (content'length - nFull + nOut) + content'length-1 + newShift);
-
-	for p in 0 to content'length-1 loop
-		if --nFull - nOut > p then
-			tempMaskX(p) = '1' then
-			res(p) := tempX(p);
-		else		
-			res(p) := tempY(p);
-		end if;		
-	end loop;
-
-	if CLEAR_EMPTY_SLOTS_HBUFF then
-		res(nFull - nOut + nIn to res'length-1) := (others => DEFAULT_ANNOTATED_HWORD);
-	end if;
-		
-	return res;
-end function;
-
-
-function TEMP_hbufferFullMaskNext(content: InstructionStateArray;
-											livingMask: std_logic_vector;
-											newContent: InstructionStateArray;
-											prevSending: std_logic;
-											fetchData: InstructionState;
-												fetchBasicInfo: InstructionBasicInfo;											
-											nFull, nOut, nIn: integer)  
-return std_logic_vector is
-	variable res: std_logic_vector(0 to content'length-1) 
-			:= (others => '0');
-	variable newShift: integer := 0; -- CAREFUL! This determines where actual data starts in newContent
-		constant CLEAR_EMPTY_SLOTS_HBUFF: boolean := false;	
-	variable tempX: InstructionStateArray(0 to content'length + newContent'length - 1) 
-			:= (others => DEFAULT_ANNOTATED_HWORD);
-	variable tempMaskX: std_logic_vector(0 to content'length + newContent'length - 1) := (others => '0');		
-			
-	variable tempMaskY: std_logic_vector(0 to 2*content'length + newContent'length - 1) 
-			:= (others => '0');
-begin	
-	-- CAREFUL! Hbuffer size MUST be a multiple of newContent size!
-
-	newShift := slv2u(fetchBasicInfo.ip(ALIGN_BITS-1 downto 1)); -- pc(ALIGN_BITS-1 downto 1));					
-		-- For position 'i':
-		-- Y: if taking newContent[y], it must be: nFull + y - newShift = i, so
-		--		y = i + newShift - nFull 
-		-- 	So let's get y := (i + newShift - nFull)
-		-- X: if taking form content[x], it must be: i + nOut = x, so
-		--		x := i + nOut
-		--
-		-- However, for Y: when i is end of queue, it can only take yMax,
-		--					when end-1, it can take {yMax-1, yMax}, etc.
-		-- and for X: x must be smaller than QUEUE_SIZE
-		--
-		-- Selection X vs Y: when nFull-nOut+nIn > i, select X, else select Y
-		--	
-	tempX := content & newContent;
-	tempMaskX(0 to content'length-1) := livingMask;
-	for k in 0 to newContent'length - 1 loop
-		--if nIn /= 0 then
-			tempMaskY(k) := prevSending; --newContentMask(k); -- & newContent & newContent & newContent;
-			tempMaskY(content'length + k) := prevSending; --newContentMask(k); -- & newContent & newContent & newContent;
-		--end if;
-	end loop;
-	
-	tempMaskX(0 to tempMaskX'length-1 - nOut) := tempMaskX(nOut to tempMaskX'length-1);
-		
---	tempMaskY(0 to content'length-1 - newShift) := 
---		tempMaskY(		(content'length - nFull + nOut) + newShift 
---					to (content'length - nFull + nOut) + content'length-1 );
-					
-	tempMaskY(0 to content'length-1) := 
-		tempMaskY(		(content'length - nFull + nOut) + newShift 
-					to (content'length - nFull + nOut) + content'length-1 + newShift);					
-					
-	for p in 0 to content'length-1 loop	
-		if --nFull - nOut > p then
-			tempMaskX(p) = '1' then
-											
-			res(p) := '1';
-		else		
-			res(p) := tempMaskY(p);
-		end if;	
-	end loop;
-
-	return res;
-end function;
-
-
-function TEMP_hbufferStageDataNext(content: InstructionStateArray;
-											livingMask: std_logic_vector;
-											newContent: InstructionStateArray;
-											prevSending: std_logic;
-											fetchData: InstructionState;
-												fetchBasicInfo: InstructionBasicInfo;											
-											nFull, nOut, nIn: integer)  
-return StageDataHbuffer is
-	variable res: StageDataHbuffer := DEFAULT_STAGE_DATA_HBUFFER;
-	variable newShift: integer := 0; -- CAREFUL! This determines where actual data starts in newContent
-		constant CLEAR_EMPTY_SLOTS_HBUFF: boolean := false;	
-	variable tempX: InstructionStateArray(0 to content'length + newContent'length - 1) 
-			:= (others => DEFAULT_ANNOTATED_HWORD);
-	variable tempMaskX: std_logic_vector(0 to content'length + newContent'length - 1) := (others => '0');		
-			
-	variable tempY: InstructionStateArray(0 to 2*content'length + newContent'length - 1) 
-			:= (others => DEFAULT_ANNOTATED_HWORD);					
-	variable tempMaskY: std_logic_vector(0 to 2*content'length + newContent'length - 1) 
-			:= (others => '0');
-begin	
-	-- CAREFUL! Hbuffer size MUST be a multiple of newContent size!
-
-	newShift := slv2u(fetchBasicInfo.ip(ALIGN_BITS-1 downto 1)); -- pc(ALIGN_BITS-1 downto 1));					
-		-- For position 'i':
-		-- Y: if taking newContent[y], it must be: nFull + y - newShift = i, so
-		--		y = i + newShift - nFull 
-		-- 	So let's get y := (i + newShift - nFull)
-		-- X: if taking form content[x], it must be: i + nOut = x, so
-		--		x := i + nOut
-		--
-		-- However, for Y: when i is end of queue, it can only take yMax,
-		--					when end-1, it can take {yMax-1, yMax}, etc.
-		-- and for X: x must be smaller than QUEUE_SIZE
-		--
-		-- Selection X vs Y: when nFull-nOut+nIn > i, select X, else select Y
-		--	
-	tempX := content & newContent;
-	tempMaskX(0 to content'length-1) := livingMask;		
-	for k in 0 to tempY'length-1 loop
-		tempY(k) := newContent(k mod newContent'length); -- & newContent & newContent & newContent;	
-	end loop;			
-			
-	for k in 0 to newContent'length - 1 loop
-		--if nIn /= 0 then
-			tempMaskY(k) := prevSending; --newContentMask(k); -- & newContent & newContent & newContent;
-			tempMaskY(content'length + k) := prevSending; --newContentMask(k); -- & newContent & newContent & newContent;
-		--end if;
-	end loop;
-
-	tempX(0 to content'length-1 - nOut) := tempX(nOut to content'length-1);
-	tempMaskX(0 to tempMaskX'length-1 - nOut) := tempMaskX(nOut to tempMaskX'length-1);
-		
-
-	tempY(0 to content'length-1) := 
-		tempY(		(content'length - nFull + nOut) + newShift 
-					to (content'length - nFull + nOut) + content'length-1 + newShift);
-
-	tempMaskY(0 to content'length-1) := 
-		tempMaskY(		(content'length - nFull + nOut) + newShift 
-					to (content'length - nFull + nOut) + content'length-1 + newShift);					
-			
-	for p in 0 to content'length-1 loop	
-		if tempMaskX(p) = '1' then
-			res.data(p) := tempX(p);
-			res.fullMask(p) := '1';
-		else
-			res.data(p) := tempY(p);
-			res.fullMask(p) := tempMaskY(p);
-		end if;	
-	end loop;
-	
-	return res;
-end function;
 
 
 function newFromHbuffer(content: InstructionStateArray; fullMask: std_logic_vector)
@@ -490,28 +192,24 @@ return HbuffOutData is
 	variable nOut: integer;
 begin
 	for i in 0 to PIPE_WIDTH-1 loop
-		--res.data(i).bits := content(i).bits(15 downto 0) & X"0000"; --content(i+1).bits;
 		res.data(i).bits := content(i).bits(15 downto 0) & content(i+1).bits(15 downto 0);		
 		res.data(i).basicInfo := content(i).basicInfo;
+			res.data(i).controlInfo.squashed := content(i).controlInfo.squashed;
 	end loop;
 
 	for i in 0 to PIPE_WIDTH-1 loop
 		nOut := PIPE_WIDTH;
-		if (fullMask(j) and --content(j).shortIns) = '1' then
-									content(j).classInfo.short) = '1' then
+		if (fullMask(j) and content(j).classInfo.short) = '1' then
 			res.fullMask(i) := '1';
-			--res.data(i).bits(31 downto 16) := content(j).bits(15 downto 0); -- & content(j+1).bits; --X"0000";
 			res.data(i).bits := content(j).bits(15 downto 0) & content(j+1).bits(15 downto 0);			
 			res.data(i).basicInfo := content(j).basicInfo;
-				--res.data(i).basicInfo.intLevel(7 downto 2) := "000000";
-				--res.data(i).basicInfo.systemLevel(7 downto 2) := "000000";				
+				res.data(i).controlInfo.squashed := content(j).controlInfo.squashed;			
 			j := j + 1;
 		elsif (fullMask(j) and fullMask(j+1)) = '1' then
 			res.fullMask(i) := '1';
 			res.data(i).bits := content(j).bits(15 downto 0) & content(j+1).bits(15 downto 0);
-			res.data(i).basicInfo := content(j).basicInfo;	
-				--res.data(i).basicInfo.intLevel(7 downto 2) := "000000";
-				--res.data(i).basicInfo.systemLevel(7 downto 2) := "000000";				
+			res.data(i).basicInfo := content(j).basicInfo;
+				res.data(i).controlInfo.squashed := content(j).controlInfo.squashed;			
 			j := j + 2;
 		else
 			nOut := i;
@@ -525,96 +223,21 @@ begin
 	return ret;
 end function;
 
-
-function newPCData(content: InstructionState;
-						  commitEvent: std_logic; commitCausing: InstructionState;
-						  execEvent: std_logic; execCausing: InstructionState;	
-						  decodeEvent: std_logic; decodeCausing: InstructionState;
-						  pcNext, causingNext: Mword)
-							--	excTarget: InstructionBasicInfo)
-return InstructionState is
-	variable res: InstructionState := content;
-	variable newPC: Mword := (others=>'0');
-begin
-	if commitEvent = '1' then -- when from exec or front	
-		if commitCausing.controlInfo.newReset = '1' then -- TEMP!
-			res.basicInfo.ip := (others => '0');
-			res.basicInfo.intLevel := "00000000";				
-		elsif commitCausing.controlInfo.newInterrupt = '1' then
-			res.basicInfo.ip := INT_BASE; -- TEMP!
-			res.basicInfo.intLevel := "00000001";		
-		else -- if commitCausing.controlInfo.newException = '1' then
-			-- TODO, FIX: exceptionCode sliced - shift left by ALIGN_BITS? or leave just base address
-			res.basicInfo.ip := EXC_BASE(MWORD_SIZE-1 downto commitCausing.controlInfo.exceptionCode'length)
-									& commitCausing.controlInfo.exceptionCode(
-													commitCausing.controlInfo.exceptionCode'length-1 downto ALIGN_BITS)
-									& EXC_BASE(ALIGN_BITS-1 downto 0);	
-									--		INT_BASE;
-			res.basicInfo.systemLevel := "00000001";
-		end if;	
-	elsif execEvent = '1' then		
-		if execCausing.controlInfo.newBranch = '1' then
-			res.basicInfo.ip := execCausing.target;
-		else -- if execCausing.controlInfo.newReturn = '1'
-			res.basicInfo.ip := execCausing.result;
-														--target;
-		end if;	
-	elsif decodeEvent = '1' then		
-		if decodeCausing.controlInfo.newFetchLock = '1' then	
-			res.basicInfo.ip := causingNext;
-		end if;
-	else	-- Increment by the width of fetch group
-		res.basicInfo.ip := pcNext;
-	end if;	
-
-	return res;
-end function;
+		function getFetchOffset(ip: Mword) return SmallNumber is
+			variable res: SmallNumber := (others => '0');
+		begin
+			res(ALIGN_BITS-2 downto 0) := ip(ALIGN_BITS-1 downto 1);
+			return res;
+		end function;
 
 
-	function NEW_generalEvents(pcData: InstructionState;
-										commitEvent: std_logic; commitCausing: InstructionState;
-										execEvent: std_logic; execCausing: InstructionState;	
-										decodeEvent: std_logic; decodeCausing: InstructionState;
-										pcNext, causingNext: Mword)
-											--excTarget: InstructionBasicInfo
-	return GeneralEventInfo is
-		variable res: GeneralEventInfo;
-	begin
-		res.affectedVec := (others => '0');
-		res.eventOccured := '1';
-		res.causing := decodeCausing;
-	
-		if commitEvent = '1' then 
-			res.causing := commitCausing;
-			res.affectedVec(0 to 4) := (others => '1');
-		elsif execEvent = '1' then
-			res.causing := execCausing;
-			res.affectedVec(0 to 4) := (others => '1');
-		elsif decodeEvent = '1' then
-			res.causing := decodeCausing;
-			res.affectedVec(0 to 3) := (others => '1');
-		else
-			res.eventOccured := '0';
-		end if;
-		
-		res.newStagePC := newPCData( pcData,
-												commitEvent, commitCausing,
-												execEvent, execCausing,
-												decodeEvent, decodeCausing,
-												pcNext, causingNext);
-												--	excTarget);
-		
-		return res;
-	end function;
-
-
-function getAnnotatedHwords(--fetchData: InstructionState;
-									 fetchBasicInfo: InstructionBasicInfo; 
+function getAnnotatedHwords(fetchIns: InstructionState; 
 									 fetchBlock: HwordArray)
 return InstructionStateArray is
 	variable res: InstructionStateArray(0 to 2*PIPE_WIDTH-1) := (others => DEFAULT_ANNOTATED_HWORD);
-	variable hwordBasicInfo: InstructionBasicInfo := fetchBasicInfo; --fetchData.basicInfo;
 	variable	tempWord: word := (others => '0');
+	constant fetchBasicInfo: InstructionBasicInfo := fetchIns.basicInfo;
+	variable hwordBasicInfo: InstructionBasicInfo := fetchBasicInfo;	
 begin
 	for i in 0 to 2*PIPE_WIDTH-1 loop
 		hwordBasicInfo.ip := fetchBasicInfo.ip(MWORD_SIZE-1 downto ALIGN_BITS) & i2slv(2*i, ALIGN_BITS);
@@ -624,27 +247,9 @@ begin
 
 		res(i).bits := tempWord;
 		res(i).basicInfo := hwordBasicInfo;
-		res(i).classInfo.short := '0'; -- TEMP!	
+		res(i).classInfo.short := '0'; -- TEMP!
+			res(i).controlInfo.squashed := fetchIns.controlInfo.squashed; -- CAREFUL: guarding from wrong reading 
 	end loop;
-	return res;
-end function;
-
-
-function getGeneralEvents(eventArr: InstructionSlotArray)
-return GeneralEventInfo is	
-	variable res: GeneralEventInfo;
-begin
-	res.eventOccured := eventArr(0).full;
-	--res.fromExec := eventArr(6).data.controlInfo.newEvent;
-	--res.fromInt := eventArr(0).ins.controlInfo.newInterrupt;
-	res.causing := eventArr(0).ins;
-			
-		-- CAREFUL! Must have matching indices to work correctly!	
-		res.affectedVec := (others => '0');
-		for i in res.affectedVec'range loop
-			res.affectedVec(i) := eventArr(i).full;
-		end loop;
-		
 	return res;
 end function;
 
@@ -680,5 +285,55 @@ begin
 	
 	return res;
 end function;
- 
+
+function getFrontEvent(ins: InstructionState; receiving: std_logic; valid: std_logic;
+							  hbuffAccepting: std_logic; fetchBlock: HwordArray(0 to FETCH_BLOCK_SIZE-1))
+return InstructionState is
+	variable res: InstructionState := ins;
+	variable tempOffset, tempTarget: Mword := (others => '0');
+begin
+	if valid = '0' then
+		res.controlInfo.squashed := '1';
+	end if;
+
+	-- receiving, valid, accepting	-> good
+	-- receiving, valid, not accepting -> refetch
+	-- receiving, invalid, accepting -> error, will cause exception, but handled later, from decode on
+	-- receiving, invalid, not accepting -> refetch??
+--return res;
+	if false and (receiving and not hbuffAccepting) = '1' then -- When need to refetch
+		res.target := res.basicInfo.ip;
+	
+
+	end if;
+	
+	-- Check if it's a branch
+	-- TODO: (should be done in predecode when loading to cache)
+	-- CAREFUL: Only without hword instructions now!
+		-- TMP
+	if (receiving and valid and hbuffAccepting) = '1' then
+		if 	fetchBlock(0)(15 downto 10) = opcode2slv(jl) 
+			or fetchBlock(0)(15 downto 10) = opcode2slv(jz) 
+			or fetchBlock(0)(15 downto 10) = opcode2slv(jnz)
+		then
+			report "branch fetched!";
+			
+				--res.controlInfo.newEvent := '1';
+				--res.controlInfo.hasBranch := '1';			
+			
+			tempOffset := "00000000000" & fetchBlock(0)(4 downto 0) & fetchBlock(1);
+			tempTarget := addMwordFaster(res.basicInfo.ip, tempOffset);
+			res.target := tempTarget;
+		elsif fetchBlock(0)(15 downto 10) = opcode2slv(j)
+		then
+			report "long branch fetched";
+			tempOffset := "000000" & fetchBlock(0)(9 downto 0) & fetchBlock(1);
+			tempTarget := addMwordFaster(res.basicInfo.ip, tempOffset);
+			res.target := tempTarget;
+		end if;
+	end if;
+	
+	return res;
+end function;
+
 end ProcLogicFront;

@@ -80,7 +80,7 @@ architecture Behavioral of SimplePipeLogic is
 		signal sendingSig: std_logic := '0';	
 
 		signal afterSending: std_logic := '0';
-		signal afterReceiving: std_logic := '0';
+		signal afterReceiving: std_logic := '0';		
 begin
 		livingSig <= fullSig and not flowDrive.kill; -- CHECK: killing mechanism correct?
 
@@ -117,5 +117,13 @@ begin
 		flowResponse.full <= fullSig;	
 		flowResponse.living <= livingSig;	
 		flowResponse.isNew <= isNewSig;
+		
+		-- @clk ContentState = f(ContentState, FlowDrive);
+		--	FlowResponse <= g(ContentState, FlowDrive)
+	
+		-- ContentState {
+		-- isFull
+		-- isNew
+		--}
 	
 end Behavioral;

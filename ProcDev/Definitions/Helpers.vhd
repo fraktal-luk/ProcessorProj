@@ -15,6 +15,7 @@ use work.ProcBasicDefs.all;
 
 package Helpers is
 
+
 	function addWordE(a, b: word) return std_logic_vector;
 	function addWord(a, b: word) return word;
 	function addDword(a, b: dword) return dword;
@@ -295,5 +296,6 @@ begin
 	end loop;
 	return res;
 end function;
- 
+
+
 end Helpers;

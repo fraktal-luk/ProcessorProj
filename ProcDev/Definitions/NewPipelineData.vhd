@@ -12,36 +12,50 @@ use IEEE.STD_LOGIC_1164.all;
 
 use work.ProcBasicDefs.all;
 use work.ProcInstructionsNew.all;
---use work.Renaming1.all;
 
 package NewPipelineData is
 
 	constant BASIC_CHECKS: boolean := true;
 	constant LOG_PIPELINE: boolean := false;
+	constant LOG_FREE_LIST: boolean := false;
 
 	-- Configuration defs 
 	constant MW: natural := 4; -- Max pipe width  
 
-	constant LOG2_PIPE_WIDTH: natural := 0 ; -- + 2; -- Must match the width!
+	constant LOG2_PIPE_WIDTH: natural := 0 + 0; -- + 2; -- Must match the width!
 	constant PIPE_WIDTH: positive := 2**LOG2_PIPE_WIDTH; -- + 1 + 2; 
 	constant ALIGN_BITS: natural := LOG2_PIPE_WIDTH + 2;
 
 	constant FETCH_BLOCK_SIZE: natural := PIPE_WIDTH * 2;
+	constant FETCH_DELAYED: boolean := false; -- Additional fetch stage for slower caches
+	
 	constant HBUFFER_SIZE: natural := PIPE_WIDTH * 4;
 	
-	constant PROPAGATE_MODE: boolean := true;
+	constant PROPAGATE_MODE: boolean := false;--true; -- Int/exc level marked in instruction throughout pipeline
 	
-	-- TODO: eliminate, change to chained implementation
-	constant N_EVENT_AREAS: natural := 8;-- How many distinct stages or groups of stages have own event signals
-	-- PC, Fetch0, Fetch1, Hbuffer, Decode, Rename, OOO, Committed
-	--	 0			1		  2 		  3		 4			5 	  6			 7	
+	constant EARLY_TARGET_ENABLE: boolean := true; -- Calc branch targets in front pipe
 	
+	constant CQ_SINGLE_OUTPUT: boolean := (LOG2_PIPE_WIDTH = 0);
+	constant CQ_THREE_OUTPUTS: boolean := not CQ_SINGLE_OUTPUT;
+	
+	function getIntegerWriteWidth(so: boolean) return integer is
+	begin
+		if so then
+			return 1;
+		else
+			return 3;
+		end if;	
+	end function;
+	
+	constant INTEGER_WRITE_WIDTH: integer := getIntegerWriteWidth(CQ_SINGLE_OUTPUT);
 	
 	constant IQ_A_SIZE: natural := PIPE_WIDTH * 2;
 	constant IQ_B_SIZE: natural := PIPE_WIDTH * 2;
 	constant IQ_C_SIZE: natural := PIPE_WIDTH * 2;
 	constant IQ_D_SIZE: natural := PIPE_WIDTH * 2;
 	constant IQ_E_SIZE: natural := PIPE_WIDTH * 2;	
+	
+	constant IQ_SIZES: IntArray(0 to 4) := (IQ_A_SIZE, IQ_B_SIZE, IQ_C_SIZE, IQ_D_SIZE,IQ_E_SIZE);
 	
 	constant SQ_SIZE: natural := 4;
 	constant LQ_SIZE: natural := 4;
@@ -50,37 +64,47 @@ package NewPipelineData is
 	
 	constant CQ_SIZE: natural := PIPE_WIDTH * 3;
 	
-		constant ROB_SIZE: natural := 8; -- ??
+	constant SB_SIZE: natural := 4;
 	
-		-- If true, physical registers are allocated even for empty slots in instruction group
-		--		and later freed from them.
-		constant ALLOC_REGS_ALWAYS: boolean := false;
+	constant ROB_SIZE: natural := 8; -- ??
+	
+		type MemQueueMode is (none, store, load, branch);
+	
+		constant INITIAL_GROUP_TAG: SmallNumber := (others => '0');
+															-- i2slv(-PIPE_WIDTH, SMALL_NUMBER_SIZE)
 		
 		-- Allows to raise 'lockSend' for instruction before Exec when source which was 'readyNext'
 		--	doesn't show in 'ready'	when expected	
-		constant BLOCK_ISSUE_WHEN_MISSING: std_logic := '0';
+		constant BLOCK_ISSUE_WHEN_MISSING: std_logic := '0'; -- 
 		
-	constant N_RES_TAGS: natural := 4-1 + CQ_SIZE; -- + PIPE_WIDTH; -- + 3*PIPE_WIDTH; 
+	constant N_RES_TAGS: natural := 4-1 + CQ_SIZE;
 						-- Above: num subpipe results + CQ slots + max commited slots + pre-IQ red ports
 	constant N_NEXT_RES_TAGS: natural := 2; 
-	
-	constant zerosPW: std_logic_vector(0 to PIPE_WIDTH-1) := (others=>'0');	
 	------
 
 	-- TODO: move config info to general config file included in higher level definition files
-	constant N_PHYSICAL_REGS: natural := 64;
+	constant N_PHYSICAL_REGS: natural := 64;  -- CAREFUL: not more than 2**PHYS_NAME_SIZE!
 	constant N_PHYS: natural := N_PHYSICAL_REGS;
 	
-	constant FREE_LIST_SIZE: natural := 64; -- ??
+	constant FREE_LIST_SIZE: natural := N_PHYS; -- CAREFUL: must be enough for N_PHYS-32
+	constant FREE_LIST_COARSE_REWIND: std_logic := '0';
 	
-	subtype PhysName is slv6;
+	constant PHYS_NAME_SIZE: integer := 6; -- CAREFUL: 2**PHYS_NAME_SIZE must be not less than n_PHYS!
+	subtype PhysName is std_logic_vector(PHYS_NAME_SIZE-1 downto 0);
 	type PhysNameArray is array(natural range <>) of PhysName;
 
+	constant TAG_SIZE: integer := 8;
+	subtype InsTag is std_logic_vector(TAG_SIZE-1 downto 0);
 
-subtype SmallNumber is byte;
-type SmallNumberArray is array(integer range <>) of SmallNumber;
-constant SMALL_NUMBER_SIZE: natural := SmallNumber'length;
-
+	function getTagHigh(tag: std_logic_vector) return std_logic_vector;
+	function getTagLow(tag: std_logic_vector) return std_logic_vector;
+	function getTagHighSN(tag: SmallNumber) return SmallNumber;
+	function getTagLowSN(tag: SmallNumber) return SmallNumber;	
+	function clearTagLow(tag: std_logic_vector) return std_logic_vector;	
+	function clearTagHigh(tag: std_logic_vector) return std_logic_vector;	
+	function alignAddress(adr: std_logic_vector) return std_logic_vector;
+	function clearLowBits(vec: std_logic_vector; n: integer) return std_logic_vector;
+	function getLowBits(vec: std_logic_vector; n: integer) return std_logic_vector;
 
 constant PROCESSOR_ID: Mword := X"001100aa";
 
@@ -97,15 +121,14 @@ type ExecFunc is (unknown,
 										
 										jump,
 										
+										sysRetI, sysRetE,
+										sysHalt,
+										sysSync, sysReplay,
 										sysMTC, sysMFC, -- move to/from control
+										sysError,
+										
 										sysUndef
 							);	
-
---	-- CAREFUL: is this needed and correct?
---	type ExecStages is (	ExecA0, 
---								ExecB0, ExecB1, ExecB2,
---								ExecC0, ExecC1, ExecC2,
---								ExecD0);
 							
 type BinomialOp is record
 	unit: ExecUnit;
@@ -121,24 +144,20 @@ type InstructionBasicInfo is record
 end record;
 
 type InstructionControlInfo is record
+		squashed: std_logic;
 	completed: std_logic;
 		completed2: std_logic;
 	-- Momentary data:
 	newEvent: std_logic; -- True if any new event appears
-		newReset: std_logic;
-	newInterrupt: std_logic;
-	newException: std_logic;
 	newBranch: std_logic;
-	newReturn: std_logic; -- going to normal next, as in cancelling a branch
-	newFetchLock: std_logic;
 	-- Persistent data:
-	hasEvent: std_logic; -- Persistent
 		hasReset: std_logic;
 	hasInterrupt: std_logic;
 	hasException: std_logic;
 	hasBranch: std_logic;
 	hasReturn: std_logic;
-	hasFetchLock: std_logic;
+		specialAction: std_logic;
+		phase0, phase1, phase2: std_logic;
 	exceptionCode: SmallNumber; -- Set when exception occurs, remains cause exception can be only 1 per op
 end record;
 
@@ -150,14 +169,8 @@ type InstructionClassInfo is record
 	branchCond: std_logic;
 	branchReg: std_logic;
 		branchLink: std_logic;
-	system: std_logic; -- ??
-	--memory: std_logic; -- ??
-	fetchLock: std_logic;
-	--renameLock: std_logic; -- prob. cannot be here; maybe should in controlInfo
-	--		short: std_logic;
-	undef: std_logic;
-	illegal: std_logic;
-	privilege: SmallNumber;
+		mtc: std_logic;
+		mfc: std_logic;
 end record;
 
 type InstructionConstantArgs is record
@@ -230,10 +243,6 @@ end record;
 
 type InstructionStateArray is array(integer range <>) of InstructionState;
 	
-	constant INITIAL_GROUP_TAG: SmallNumber := (others => '0');
-															-- i2slv(-PIPE_WIDTH, SMALL_NUMBER_SIZE)
-	constant USE_GPR_TAG: boolean := false;
-	
 	
 -- Number of words proper for fetch group size
 subtype InsGroup is WordArray(0 to PIPE_WIDTH-1);
@@ -257,6 +266,95 @@ type FlowResponseSimple is record
 	full: std_logic;
 	living: std_logic;	
 end record;
+
+		type ContentStateSimple is record
+			isFull: std_logic;
+			isNew: std_logic;
+		end record;
+
+constant DEFAULT_FD_SIMPLE: FlowDriveSimple := FlowDriveSimple'(others => '0');
+constant DEFAULT_FR_SIMPLE: FlowResponseSimple := FlowResponseSimple'(others => '0');
+constant DEFAULT_CS_SIMPLE: ContentStateSimple := ContentStateSimple'(others => '0');
+
+		-- CAREFUL: below functions for Simple slot have some duplicate code
+		function nextContentState(cs: ContentStateSimple; drive: FlowDriveSimple; reset, en: std_logic)
+		return ContentStateSimple is
+			variable res: ContentStateSimple := cs;
+			variable isNewSig: std_logic := '0';
+			variable fullSig: std_logic := '0';
+			variable livingSig: std_logic := '0';		
+			
+			variable canAccept: std_logic := '0';
+			variable wantSend: std_logic := '0';
+			variable acceptingSig: std_logic := '0';
+			variable sendingSig: std_logic := '0';	
+
+			variable afterSending: std_logic := '0';
+			variable afterReceiving: std_logic := '0';			
+		begin
+			if reset = '1' then
+				res.isFull := '0';
+				res.isNew := '0';
+			elsif en = '0' then -- If no enable, don't change
+				return res;
+			end if;
+			
+			livingSig := cs.isFull and not drive.kill; -- CHECK: killing mechanism correct?
+
+			canAccept := not drive.lockAccept;
+			wantSend := livingSig and not drive.lockSend;
+			
+			-- Determine what will be sent
+			sendingSig := drive.nextAccepting and wantSend;
+			afterSending := livingSig and not sendingSig;
+
+			-- Determine what will be received
+			acceptingSig := canAccept and not afterSending;	
+			afterReceiving := afterSending or drive.prevSending;
+			
+			res.isFull := afterReceiving;
+			res.isNew := drive.prevSending;
+			
+			return res;
+		end function;
+		
+		
+		function getResponse(cs: ContentStateSimple; drive: FlowDriveSimple) return FlowResponseSimple is
+			variable res: FlowResponseSimple;
+			variable isNewSig: std_logic := '0';
+			variable fullSig: std_logic := '0';
+			variable livingSig: std_logic := '0';		
+			
+			variable canAccept: std_logic := '0';
+			variable wantSend: std_logic := '0';
+			variable acceptingSig: std_logic := '0';
+			variable sendingSig: std_logic := '0';	
+
+			variable afterSending: std_logic := '0';
+			variable afterReceiving: std_logic := '0';			
+		begin
+
+			livingSig := cs.isFull and not drive.kill; -- CHECK: killing mechanism correct?
+
+			canAccept := not drive.lockAccept;
+			wantSend := livingSig and not drive.lockSend;
+			
+			-- Determine what will be sent
+			sendingSig := drive.nextAccepting and wantSend;
+			afterSending := livingSig and not sendingSig;
+
+			-- Determine what will be received
+			acceptingSig := canAccept and not afterSending;	
+			afterReceiving := afterSending or drive.prevSending;
+
+			res.sending := sendingSig;
+			res.accepting := acceptingSig;
+			res.full := cs.isFull;	
+			res.living := livingSig;	
+			res.isNew := cs.isNew;
+					
+			return res;
+		end function;
 
 
 -- Input structure
@@ -357,6 +455,7 @@ constant INITIAL_DATA_PC: InstructionState := initialPCData;
 
 constant DEFAULT_ANNOTATED_HWORD: InstructionState := defaultInstructionState;
 	
+	-- CAREFUL! Only needed for 1 function (a possible optimization idea, may be implemented with I.Slot.Arr.)
 	type StageDataHbuffer is record
 		fullMask: std_logic_vector(0 to HBUFFER_SIZE-1);
 		data: InstructionStateArray(0 to HBUFFER_SIZE-1);
@@ -374,15 +473,9 @@ end record;
 
 type GeneralEventInfo is record
 	eventOccured: std_logic;
+		killPC: std_logic;
 	causing: InstructionState;
-	affectedVec --, causingVec
-		: std_logic_vector(0 to 4);	
-	--fromExec, fromInt: std_logic;	
-	
-	-- New style:
-	-- lateEvent, execEvent, [events from respective front stages]: std_logic  ??
-	-- lateCausing, execCausing, [causing instuctions from front stages]: InstructionState
-	newStagePC: InstructionState;	
+	affectedVec: std_logic_vector(0 to 4);		
 end record;
 
  
@@ -396,17 +489,6 @@ constant DEFAULT_STAGE_MULTI_EVENT_INFO: StageMultiEventInfo
 													:= (eventOccured => '0',
 														  causing => defaultInstructionState,
 														  partialKillMask => (others => '0'));
-
-	-- UNUSED?
-	type InstructionResult is record
-		full: std_logic;
-		tag: SmallNumber;
-		value: Mword;
-	end record;
-
-	constant DEFAULT_INSTRUCTION_RESULT: InstructionResult := ('0', (others => '0'), (others => '0'));
-	
-	type InstructionResultArray is array(integer range <>) of InstructionResult;
 					
 			type ArgStatusInfo is record
 				stored: std_logic_vector(0 to 2); -- those that were already present in prev cycle	
@@ -422,11 +504,94 @@ constant DEFAULT_STAGE_MULTI_EVENT_INFO: StageMultiEventInfo
 
 	function defaultLastCommitted return InstructionState;
 
+	type ForwardingInfo is record
+		writtenTags: PhysNameArray(0 to PIPE_WIDTH-1);
+		resultTags: PhysNameArray(0 to N_RES_TAGS-1);
+		nextResultTags: PhysNameArray(0 to N_NEXT_RES_TAGS-1);
+		resultValues: MwordArray(0 to N_RES_TAGS-1);
+	end record;
+	
+	constant DEFAULT_FORWARDING_INFO: ForwardingInfo := (
+		writtenTags => (others => (others => '0')),
+		resultTags => (others => (others => '0')),
+		nextResultTags => (others => (others => '0')),
+		resultValues => (others => (others => '0'))
+	);
+
 end NewPipelineData;
 
 
 
 package body NewPipelineData is
+
+	function getTagHigh(tag: std_logic_vector) return std_logic_vector is
+		variable res: std_logic_vector(tag'high-LOG2_PIPE_WIDTH downto 0) := (others => '0');
+	begin
+		res := tag(tag'high downto LOG2_PIPE_WIDTH);
+		return res;
+	end function;
+
+	function getTagLow(tag: std_logic_vector) return std_logic_vector is
+		variable res: std_logic_vector(LOG2_PIPE_WIDTH-1 downto 0) := (others => '0');
+	begin
+		res := tag(LOG2_PIPE_WIDTH-1 downto 0);
+		return res;
+	end function;
+
+		function getTagHighSN(tag: SmallNumber) return SmallNumber is
+			variable res: SmallNumber := (others => '0');
+		begin
+			res(SMALL_NUMBER_SIZE-1-LOG2_PIPE_WIDTH downto 0) := tag(SMALL_NUMBER_SIZE-1 downto LOG2_PIPE_WIDTH);
+			return res;
+		end function;
+
+		function getTagLowSN(tag: SmallNumber) return SmallNumber is
+			variable res: SmallNumber := (others => '0');
+		begin
+			res(LOG2_PIPE_WIDTH-1 downto 0) := tag(LOG2_PIPE_WIDTH-1 downto 0);
+			return res;
+		end function;
+
+
+	function clearTagLow(tag: std_logic_vector) return std_logic_vector is
+		variable res: std_logic_vector(tag'high downto 0) := (others => '0');
+	begin
+		res := tag;
+		res(LOG2_PIPE_WIDTH-1 downto 0) := (others => '0');
+		return res;
+	end function;	
+
+	function clearTagHigh(tag: std_logic_vector) return std_logic_vector is
+		variable res: std_logic_vector(tag'high downto 0) := (others => '0');
+	begin
+		res := tag;
+		res(tag'high downto LOG2_PIPE_WIDTH) := (others => '0');
+		return res;
+	end function;
+
+	function alignAddress(adr: std_logic_vector) return std_logic_vector is
+		variable res: std_logic_vector(adr'high downto 0) := (others => '0');
+	begin
+		res := adr;
+		res(ALIGN_BITS-1 downto 0) := (others => '0');
+		return res;
+	end function;
+
+	function clearLowBits(vec: std_logic_vector; n: integer) return std_logic_vector is
+		variable res: std_logic_vector(vec'high downto 0) := (others => '0');
+	begin
+		res := vec;
+		res(n-1 downto 0) := (others => '0');
+		return res;
+	end function;
+	
+	function getLowBits(vec: std_logic_vector; n: integer) return std_logic_vector is
+		variable res: std_logic_vector(n-1 downto 0) := (others => '0');
+	begin
+		res(n-1 downto 0) := vec(n-1 downto 0);
+		return res;
+	end function;
+
 
 function binFlowNum(flow: PipeFlow) return natural is
 	variable vec: std_logic_vector(PipeFlow'length-1 downto 0) := flow;
@@ -454,23 +619,20 @@ end function;
 function defaultControlInfo return InstructionControlInfo is
 begin
 	return InstructionControlInfo'(
+													squashed => '0',
 												completed => '0',
 													completed2 => '0',
 												newEvent => '0',
-													newReset => '0',
-												hasEvent => '0',
-												newInterrupt => '0',
 												hasInterrupt => '0',
 													hasReset => '0',
-												newException => '0',
 												hasException => '0',
 												newBranch => '0',
 												hasBranch => '0',
-												newReturn => '0',
 												hasReturn => '0',												
-												newFetchLock => '0',
-												hasFetchLock => '0',
-												
+													specialAction => '0',
+													phase0 => '0',
+													phase1 => '0',
+													phase2 => '0',
 												exceptionCode => (others=>'0')
 												);
 end function;
@@ -484,16 +646,9 @@ begin
 											branchCond => '0',
 											branchReg => '0',
 												branchLink => '0',
-											system => '0',
-											--memory: std_logic; -- ??
-												-- ?? load => '0',
-												-- ?? store => '0',
-											fetchLock => '0',
-											--renameLock => '0',
-											
-											undef => '0', --?
-											illegal => '0',
-											privilege => (others=>'1'));	
+												mtc => '0',
+												mfc => '0'
+											);	
 end function;
 
 function defaultConstantArgs return InstructionConstantArgs is
@@ -514,12 +669,12 @@ end function;
 
 function defaultPhysicalArgs return InstructionPhysicalArgs is
 begin
-	return InstructionPhysicalArgs'("000", "000000", "000000", "000000");
+	return InstructionPhysicalArgs'("000", (others => '0'), (others => '0'), (others => '0'));
 end function;
 
 function defaultPhysicalDestArgs return InstructionPhysicalDestArgs is
 begin
-	return InstructionPhysicalDestArgs'("0", "000000");
+	return InstructionPhysicalDestArgs'("0", (others => '0'));
 end function;
 
 function defaultArgValues return InstructionArgValues is
@@ -591,9 +746,7 @@ end function;
 		res.physicalDestArgs := defaultPhysicalDestArgs;
 		res.numberTag := (others => '1');
 		res.gprTag := (others => '0');
-		res.groupTag := --(others => '1');
-							 --(others => '0');
-								INITIAL_GROUP_TAG;
+		res.groupTag := INITIAL_GROUP_TAG;
 		res.argValues := defaultArgValues;
 		res.result := (others => '0');
 		res.target := (others => '0');

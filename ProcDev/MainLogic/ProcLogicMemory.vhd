@@ -21,32 +21,27 @@ use work.Decoding2.all;
 use work.TEMP_DEV.all;
 use work.GeneralPipeDev.all;
 
+use work.Queues.all;
+
 
 package ProcLogicMemory is
 
-	function findReadySQ(content: InstructionStateArray; livingMask: std_logic_vector;
-								nextAccepting: std_logic)
-	return StageDataMulti;
+function compareAddress(content: InstructionStateArray; ins: InstructionState) return std_logic_vector;
+
+-- TODO: This function and findOldestMatch introduce dependency on Queues. May be good to remove it
+function findNewestMatch(cmpMask: std_logic_vector; pStart: SmallNumber; ins: InstructionState)
+return std_logic_vector;
+		
+function findOldestMatch(cmpMask: std_logic_vector; pStart: SmallNumber; ins: InstructionState)
+return std_logic_vector;		
+
 
 	function findFirstFilled(content: InstructionStateArray; livingMask: std_logic_vector;
 									 nextAccepting: std_logic)
 	return std_logic_vector;
 
 function findCommittingSQ(content: InstructionStateArray; livingMask: std_logic_vector;
-								  committingTag: SmallNumber; send: std_logic) return StageDataMulti;							
-
-function storeQueueNext(content: InstructionStateArray;
-									  livingMask: std_logic_vector;
-									  newContent: InstructionStateArray;
-									  newMask: std_logic_vector;
-									  nLiving: integer;
-									  sending: integer;
-									  receiving: std_logic;
-									  dataA, dataD: InstructionState;
-									  wrA, wrD: std_logic;
-									  mA, mD: std_logic_vector;
-									  clearCompleted: boolean									  
-									  ) return InstructionStateArray;
+								  committingTag: SmallNumber; send: std_logic) return StageDataMulti;
 
 				function lmQueueNext(content: InstructionStateArray;
 									  livingMask: std_logic_vector;
@@ -73,26 +68,87 @@ end ProcLogicMemory;
 
 package body ProcLogicMemory is
 
-			function findReadySQ(content: InstructionStateArray; livingMask: std_logic_vector;
-										  nextAccepting: std_logic)
-			return StageDataMulti is
-				variable res: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
-			begin
-				res.data := content(0 to PIPE_WIDTH-1);
-				if nextAccepting = '0' then
-					return res;
-				end if;
-				
-				for i in 0 to PIPE_WIDTH-1 loop
-					if (livingMask(i) and content(i).controlInfo.completed
-										  and	content(i).controlInfo.completed2) = '0' then
-						exit;
-					end if;
-					res.fullMask(i) := '1';
-				end loop;
-				
-				return res;
-			end function;
+		
+function compareAddress(content: InstructionStateArray; ins: InstructionState) return std_logic_vector is
+	variable res: std_logic_vector(0 to content'length-1) := (others => '0');
+begin
+	for i in 0 to res'length-1 loop
+		if ins.argValues.arg1 = content(i).argValues.arg1 then
+			res(i) := '1';
+		end if;
+	end loop;
+	
+	return res;
+end function;
+
+		-- To find what to forward from StoreQueue
+		function findNewestMatch(cmpMask: std_logic_vector; pStart: SmallNumber;
+										 ins: InstructionState)
+		return std_logic_vector is
+			constant LEN: integer := cmpMask'length;		
+			variable res, older, before: std_logic_vector(0 to LEN-1) := (others => '0');
+			variable indices, rawIndices: SmallNumberArray(0 to LEN-1) := (others => (others => '0'));
+			variable matchBefore: std_logic := '0';
+		begin
+			-- From qs we must check which are older than ins
+			indices := getQueueIndicesFrom(LEN, pStart);
+			rawIndices := getQueueIndicesFrom(LEN, (others => '0'));
+			older := compareIndicesSmaller(indices, ins.groupTag);
+			before := compareIndicesSmaller(rawIndices, ins.groupTag);
+			-- Use priority enc. to find last in the older ones. But they may be divided:
+			--		V  1 1 1 0 0 0 0 1 1 1 and cmp  V
+			--		   0 1 0 0 0 0 0 1 0 1
+			-- and then there are 2 runs of bits and those at the enc must be ignored (r older than first run)
+			
+			-- So, elems at the end are ignored when those conditions cooccur:
+			--		pStart > ins.groupTag and [match exists that match.groupTag < ins.groupTag]
+			matchBefore := isNonzero(cmpMask and before);
+			
+			if matchBefore = '1' then
+				-- Ignore those after
+				res := invertVec(getFirstOne(invertVec(cmpMask and before)));
+			else
+				-- Don't ignore any matches
+				res := invertVec(getFirstOne(invertVec(cmpMask)));				
+			end if;
+			
+			return res;
+		end function;
+		
+		-- To check what in the LoadQueue has an error
+		function findOldestMatch(cmpMask: std_logic_vector; pStart: SmallNumber;
+										 ins: InstructionState)
+		return std_logic_vector is
+			constant LEN: integer := cmpMask'length;
+			variable res, newer, areAfter: std_logic_vector(0 to LEN-1) := (others => '0');
+			variable indices, rawIndices: SmallNumberArray(0 to LEN-1) := (others => (others => '0'));
+			variable matchAfter: std_logic := '0';
+		begin
+			-- From qs we must check which are newer than ins
+			indices := getQueueIndicesFrom(LEN, pStart);
+			rawIndices := getQueueIndicesFrom(LEN, (others => '0'));
+			newer := compareIndicesGreater(indices, ins.groupTag);
+			areAfter := compareIndicesGreater(rawIndices, ins.groupTag);
+			-- Use priority enc. to find first in the newer ones. But they may be divided:
+			--		V  1 1 1 0 0 0 0 1 1 1 and cmp  V
+			--		   0 1 0 0 0 0 0 1 0 1
+			-- and then there are 2 runs of bits and those at the enc must be ignored (r newer than first run)
+			
+			-- So, elems at the end are ignored when those conditions cooccur:
+			--		pStart > ins.groupTag and [match exists that match.groupTag < ins.groupTag]
+			matchAfter := isNonzero(cmpMask and areAfter);
+			
+			if matchAfter = '1' then
+				-- Ignore those before
+				res := getFirstOne(cmpMask and areAfter);
+			else
+				-- Don't ignore any matches
+				res := getFirstOne(cmpMask);
+			end if;
+			
+			return res;
+		end function;
+
 			
 			-- Set '1' where first occupied slot with completed transfer lies.
 			function findFirstFilled(content: InstructionStateArray; livingMask: std_logic_vector;
@@ -131,108 +187,7 @@ package body ProcLogicMemory is
 
 							return res;
 						end function;
-							
-				function storeQueueNext(content: InstructionStateArray;
-									  livingMask: std_logic_vector;
-									  newContent: InstructionStateArray;
-									  newMask: std_logic_vector;
-									  nLiving: integer;
-									  sending: integer;
-									  receiving: std_logic;
-									  dataA, dataD: InstructionState;
-									  wrA, wrD: std_logic;
-									  mA, mD: std_logic_vector;
-									  clearCompleted: boolean
-									  ) return InstructionStateArray is
-					constant LEN: integer := content'length;
-					variable tempContent, tempNewContent: InstructionStateArray(0 to LEN + PIPE_WIDTH-1)
-									:= (others => DEFAULT_INSTRUCTION_STATE);
-					variable tempMask: std_logic_vector(0 to LEN + PIPE_WIDTH-1) := (others => '0');
-					variable res: InstructionStateArray(0 to LEN-1)
-											:= (others => DEFAULT_INSTRUCTION_STATE);--content;
-					variable outMask: std_logic_vector(0 to LEN-1) := (others => '0');
-					variable c1, c2: std_logic := '0';
-					variable sv: Mword := (others => '0');
-						variable sh: integer := sending;
-				begin							
-					tempContent(0 to LEN-1) := content;
-					for i in 0 to LEN-1 loop
-						tempNewContent(i) := newContent((nLiving-sh + i) mod PIPE_WIDTH);
-					end loop;
-					--	tempNewContent(SQ_SIZE to SQ_SIZE + PIPE_WIDTH-1) := newContent;
-					
-					tempMask(0 to LEN-1) := livingMask;
 
-					-- Shift by n of sending
-					tempContent(0 to LEN - 1) := tempContent(sh to sh + LEN-1);
-					-- CAREFUL: tempMask must have enough zeros at the end to clear outdated 'ones'!
-					outMask(0 to LEN-1) := tempMask(sh to sh + LEN-1); 
-					
-					for i in 0 to LEN-1 loop
-						res(i).basicInfo := DEFAULT_BASIC_INFO;
-							c1 := res(i).controlInfo.completed;
-							c2 := res(i).controlInfo.completed2;
-							res(i).controlInfo := DEFAULT_CONTROL_INFO;
-							res(i).controlInfo.completed := c1;
-							res(i).controlInfo.completed2 := c2;
-						res(i).bits := (others => '0');
-						res(i).classInfo := DEFAULT_CLASS_INFO;
-						res(i).constantArgs := DEFAULT_CONSTANT_ARGS;
-						res(i).virtualArgs := DEFAULT_VIRTUAL_ARGS;
-						res(i).virtualDestArgs := DEFAULT_VIRTUAL_DEST_ARGS;
-						res(i).physicalArgs := DEFAULT_PHYSICAL_ARGS;
-						res(i).physicalDestArgs := DEFAULT_PHYSICAL_DEST_ARGS;
-						
-						res(i).numberTag := (others => '0');
-						res(i).gprTag := (others => '0');
-						
-							sv := res(i).argValues.arg2;
-							res(i).argValues := DEFAULT_ARG_VALUES;
-							res(i).argValues.arg2 := sv;
-						res(i).target := (others => '0');
-						
-						if outMask(i) = '1' then									
-							res(i).groupTag := tempContent(i).groupTag;
-							res(i).operation := tempContent(i).operation; --(Memory, store);														
-						else
-							res(i).groupTag := tempNewContent(i).groupTag;
-							res(i).operation := tempNewContent(i).operation; --(Memory, store);							
-						end if;
-															
-						if (wrA and mA(i)) = '1' then
-							res(i).argValues.arg1 := dataA.result;
-							res(i).controlInfo.completed := '1';
-						elsif outMask(i) = '1' then
-							res(i).argValues.arg1 := tempContent(i).argValues.arg1;
-							res(i).controlInfo.completed := tempContent(i).controlInfo.completed;									
-						else
-							res(i).argValues.arg1 := tempNewContent(i).argValues.arg1;
-							if clearCompleted then
-								res(i).controlInfo.completed := '0';
-							else
-								res(i).controlInfo.completed := tempNewContent(i).controlInfo.completed;
-							end if;	
-						end if;
-
-						if (wrD and mD(i)) = '1' then									
-							res(i).argValues.arg2 := dataD.argValues.arg2;
-							res(i).controlInfo.completed2 := '1';
-						elsif outMask(i) = '1' then
-							res(i).argValues.arg2 := tempContent(i).argValues.arg2;
-							res(i).controlInfo.completed2 := tempContent(i).controlInfo.completed2;
-						else	
-							res(i).argValues.arg2 := tempNewContent(i).argValues.arg2;
-							if clearCompleted then
-								res(i).controlInfo.completed2 := '0';
-							else
-								res(i).controlInfo.completed2 := tempNewContent(i).controlInfo.completed2;
-							end if;
-						end if;
-
-					end loop;
-					
-					return res;
-				end function;
 
 
 				function lmQueueNext(content: InstructionStateArray;
@@ -267,12 +222,10 @@ package body ProcLogicMemory is
 					for i in 0 to LEN-1 loop
 						tempNewContent(i) := newContent((nLiving-sh + i) mod PIPE_WIDTH);
 					end loop;
-					--	tempNewContent(SQ_SIZE to SQ_SIZE + PIPE_WIDTH-1) := newContent;
 					
 					tempMask(0 to LEN-1) := livingMask;
 
 					-- Shift by n of sending
-					--tempContent(0 to LEN - 1) := tempContent(sh to sh + LEN-1);
 					for i in 0 to LEN-1 loop
 						if sendingVec(i) = '1' then
 							shifted := true;

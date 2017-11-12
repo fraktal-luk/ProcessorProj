@@ -39,6 +39,7 @@ use work.GeneralPipeDev.all;
 --use work.FrontPipeDev.all;
 use work.ProcLogicRenaming.all;
 use work.TEMP_DEV.all;
+use work.ProcLogicRouting.all;
 
 
 entity SubunitIssueRouting is
@@ -76,7 +77,7 @@ end SubunitIssueRouting;
 
 architecture Behavioral of SubunitIssueRouting is	
 	signal srcVecA, srcVecB, srcVecC, srcVecD, srcVecE: std_logic_vector(0 to PIPE_WIDTH-1) := (others => '0');
-	signal storeVec: std_logic_vector(0 to PIPE_WIDTH-1) := (others => '0');
+	signal storeVec, loadVec: std_logic_vector(0 to PIPE_WIDTH-1) := (others => '0');
 	signal issueRouteVec: IntArray(0 to PIPE_WIDTH-1) := (others => 0);
 
 	signal iqAcceptingA: std_logic := '0';						
@@ -90,7 +91,8 @@ architecture Behavioral of SubunitIssueRouting is
 begin	
 	renamedSending <= renamedSendingIn;
 
-		storeVec <= findStores(renamedDataLiving);
+		storeVec <= findStores(renamedDataLiving) and renamedDataLiving.fullMask;
+		loadVec <= findLoads(renamedDataLiving) and renamedDataLiving.fullMask;
 
 		-- Routing to queues
 		ROUTE_VEC_GEN: for i in 0 to PIPE_WIDTH-1 generate
@@ -100,12 +102,14 @@ begin
 	-- New concept for IQ routing.  {renamedData, srcVec*} -> (StageDataMulti){A,B,C,D}
 	-- Based on "push left" of each destination type, generating "New" StageDataMulti data for each one
 	-- dataToA <= [func](stageData1Living, srcVecA); -- s.d.1.l includes fullMask!		
-		srcVecA <= (findByNumber(issueRouteVec, 0) or whichBranchLink(renamedDataLiving));
-								--and renamedDataLiving.fullMask;
-		srcVecB <= findByNumber(issueRouteVec, 1);-- and renamedDataLiving.fullMask;
-		srcVecC <= findByNumber(issueRouteVec, 2);-- and renamedDataLiving.fullMask;
-		srcVecD <= findByNumber(issueRouteVec, 3);-- and renamedDataLiving.fullMask;
-		srcVecE <= storeVec;-- and renamedDataLiving.fullMask;
+		srcVecA <= (findByNumber(issueRouteVec, 0) or whichBranchLink(renamedDataLiving))
+																							and renamedDataLiving.fullMask;
+		srcVecB <= findByNumber(issueRouteVec, 1) and renamedDataLiving.fullMask;
+		srcVecC <= (findByNumber(issueRouteVec, 2)
+								or storeVec or loadVec) and renamedDataLiving.fullMask;
+		srcVecD <= (findByNumber(issueRouteVec, 3)
+								and not storeVec and not loadVec) and renamedDataLiving.fullMask;
+		srcVecE <= storeVec and renamedDataLiving.fullMask;
 
 		dataToA <= routeToIQ2(prepareForAlu(renamedDataLiving, whichBranchLink(renamedDataLiving)), srcVecA);
 		dataToB <= routeToIQ2(renamedDataLiving, srcVecB);
@@ -116,8 +120,8 @@ begin
 	
 		dataOutSQ <= dataToSQ;
 		dataToSQ <= routeToIQ(renamedDataLiving, storeVec);
-		dataOutLQ <= routeToIQ(renamedDataLiving, findLoads(renamedDataLiving));	
-			dataOutBQ <= routeToIQ(renamedDataLiving, srcVecD); -- TEMP! Contains system instructions!
+		dataOutLQ <= routeToIQ(renamedDataLiving, loadVec);	
+			dataOutBQ <= trgForBQ(routeToIQ(renamedDataLiving, srcVecD)); -- TEMP! Contains system instructions!
 	
 		invA <= invertVec(acceptingVecA);
 		invB <= invertVec(acceptingVecB);

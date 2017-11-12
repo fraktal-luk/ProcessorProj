@@ -59,6 +59,25 @@ procedure checkIQ(bufferData: InstructionStateArray; fullMask: std_logic_vector;
 						insSending: InstructionState; sending: std_logic;
 						bufferDrive: FlowDriveBuffer; bufferResponse: FlowResponseBuffer);
 
+
+
+procedure checkFreeList(indTake, indPutA, nTaken, nPut: in integer);
+
+-- pragma synthesis off
+procedure logFreeListImpl(indTake, indPut, nTaken, nPut: in integer;
+							 content: in PhysNameArray; freeListTakeSel: in std_logic_vector;
+							 putTags: in PhysNameArray; freeListPutSel: in std_logic_vector;
+							 takeAllow: in std_logic; putAllow: in std_logic;
+							 freeListRewind: in std_logic; freeListWriteTag: in SmallNumber;
+							 filename: in string; desc: in string);
+-- pragma synthesis on
+
+procedure logFreeList(indTake, indPut, nTaken, nPut: in integer;
+							 signal content: in PhysNameArray; freeListTakeSel: in std_logic_vector;
+							 putTags: in PhysNameArray; freeListPutSel: in std_logic_vector;
+							 takeAllow: in std_logic; putAllow: in std_logic;
+							 freeListRewind: in std_logic; freeListWriteTag: in SmallNumber);
+
 end BasicCheck;
 
 
@@ -71,6 +90,8 @@ begin
 	for i in res'range loop
 		if res(i) = ':' then
 			res(i) := '#';
+		elsif res(i) = '\' then
+			res(i) := '_';
 		end if;
 	end loop;
 	
@@ -99,6 +120,7 @@ begin
 			end if;
 			write(fline,
 						  integer'image(slv2u(insArr(i).groupTag))
+				--& "/" & integer'image(slv2u(insArr(i).numberTag))
 				& "@" & integer'image(slv2u(insArr(i).basicInfo.ip)));
 		end if;
 		write(fline, ", ");
@@ -207,7 +229,7 @@ begin
 	
 	-- CHECK: does it make sense to examine this? Should other kinds of data be compared?
 	for i in 0 to nCommon-1 loop
-		assert commonPart1(i).numberTag = commonPart2(i).numberTag report "u"; -- TODO: is this the right tag field?
+		assert commonPart1(i).groupTag = commonPart2(i).groupTag report "u"; -- TODO: is this the right tag field?
 		assert commonPart1(i).basicInfo.ip = commonPart2(i).basicInfo.ip report "yio";
 	end loop;
 	
@@ -273,11 +295,11 @@ begin
 	
 	nFullNext := nLiving + nReceiving - nSending;
 	-- full, fullMask - agree?
-	assert countOnes(fullMask) = nFull;
-		assert countOnes(fullMask(0 to nFull-1)) = nFull; -- checking continuity		
+	assert countOnes(fullMask) = nFull report "eeee";
+		assert countOnes(fullMask(0 to nFull-1)) = nFull report "hjuu"; -- checking continuity		
 	-- next full, fullMaskNext - agree?
-	assert countOnes(fullMaskNext) = nFullNext;
-		assert countOnes(fullMaskNext(0 to nFullNext-1)) = nFullNext; -- checking continuity	
+	assert countOnes(fullMaskNext) = nFullNext report "h";
+		assert countOnes(fullMaskNext(0 to nFullNext-1)) = nFullNext report "m,"; -- checking continuity	
 	-- number of killed agrees?
 		--??
 	-- number of new agrees?
@@ -293,19 +315,19 @@ begin
 	nCommon := nLiving - nSending;	
 	for i in 0 to nLiving - 1 loop
 		-- In old array we have to skip the op that is being sent
-		if sending = '1' and bufferData(i).numberTag = insSending.numberTag 
+		if sending = '1' and bufferData(i).groupTag = insSending.groupTag 
 			then -- CAREFUL: is this the right tag field?
 			move := 1;
 					--report "rtttt";
 			insSendingMatch := bufferData(i);
 			-- Check the op that is sent?
-			assert insSendingMatch.numberTag = insSending.numberTag; -- TODO: is this the right tag field?
-			assert insSendingMatch.basicInfo.ip = insSending.basicInfo.ip;		
+			assert insSendingMatch.groupTag = insSending.groupTag report "byj"; -- TODO: is this the right tag field?
+			assert insSendingMatch.basicInfo.ip = insSending.basicInfo.ip report "jjj";		
 		end if;
 		
 		-- If we have visited all living instructions in old array, we break, because 
 		--		it one less is copied to commonPart1, not all of them. Otherwise we could go out of array!
-		if i + move >= nLiving - 1 then
+		if i + move > nLiving - 1 then
 			exit;
 		end if;
 				
@@ -315,11 +337,107 @@ begin
 	
 	-- CHECK: does it make sense to examine this? Should other kinds of data be compared?
 	for i in 0 to nCommon-1 loop
-		assert commonPart1(i).numberTag = commonPart2(i).numberTag; -- TODO: is this the right tag field?
-		assert commonPart1(i).basicInfo.ip = commonPart2(i).basicInfo.ip;
+		assert commonPart1(i).groupTag = commonPart2(i).groupTag report "jutrrrr"; -- TODO: is this the right tag field?
+		assert commonPart1(i).basicInfo.ip = commonPart2(i).basicInfo.ip report "oiu";
 	end loop;
 	
 	-- pragma synthesis on	
+end procedure;
+
+
+procedure checkFreeList(indTake, indPutA, nTaken, nPut: in integer) is
+	variable indPut: integer := indPutA;
+	variable diff: integer := 0;
+begin
+	-- pragma synthesis off
+	if indTake > indPut then
+		indPut := indPut + FREE_LIST_SIZE;
+	end if;
+	diff := indPut - indTake;
+	-- NOTE: Below alert doesn't mean that wrong operation happened, but if 'take' of sufficient width
+	-- happens before 'put', it will read wrong data. It could be prevented when we lock Rename in such cases.
+	assert diff >= PIPE_WIDTH report "Too few free registers on list" severity error;
+	
+	-- Now what will be the new state:
+	diff := diff + nPut - nTaken;
+	-- NOTE: like the previous alert, this is a careful reaction, not that something bad already has taken place. 
+	assert diff >= PIPE_WIDTH report "Free list becoming drained!" severity error;
+	
+	-- TODO: check if no 0 values are read or written (if implementation prevents physical reg 0 from alloction)
+	
+	-- pragma synthesis on
+end procedure;
+
+
+-- pragma synthesis off
+procedure logFreeListImpl(indTake, indPut, nTaken, nPut: in integer;
+							 content: in PhysNameArray; freeListTakeSel: in std_logic_vector;
+							 putTags: in PhysNameArray; freeListPutSel: in std_logic_vector;
+							 takeAllow: in std_logic; putAllow: in std_logic;
+							 freeListRewind: in std_logic; freeListWriteTag: in SmallNumber;
+							 filename: in string; desc: in string) is
+	use std.textio.all;
+
+	file outFile: text open append_mode is filename;
+	variable fline: line;
+begin	
+	write(fline, time'image(now) & ", " & desc);
+	writeline(outFile, fline);
+	
+	if freeListRewind = '1' then
+		write(fline, "Rewinding to: " & integer'image(slv2u(freeListWriteTag)));
+		writeline(outFile, fline);
+	end if;
+	
+	-- What's being taken from list:
+	if takeAllow = '1' then
+		write(fline, "Taking  at " & integer'image(indTake) & ":    ");
+		for i in 0 to freeListTakeSel'length-1 loop
+			if freeListTakeSel(i) = '1' then
+				write(fline, integer'image(slv2u(content((indTake + i) mod FREE_LIST_SIZE))) & ","); 
+			else
+				write(fline, "_" & ",");
+			end if;	
+		end loop;
+		writeline(outFile, fline);
+	end if;
+
+	-- What's being put to list:
+	if putAllow = '1' then
+		write(fline, "Putting at " & integer'image(indPut) & ":    " & "          ");
+		for i in 0 to freeListPutSel'length-1 loop
+			if freeListPutSel(i) = '1' then
+				write(fline, integer'image(slv2u(putTags(i))) & ","); 
+			else
+				write(fline, "_" & ",");
+			end if;	
+		end loop;
+		writeline(outFile, fline);
+	end if;	
+		
+end procedure;
+-- pragma synthesis on
+
+
+procedure logFreeList(indTake, indPut, nTaken, nPut: in integer;
+							 signal content: in PhysNameArray; freeListTakeSel: in std_logic_vector;
+							 putTags: in PhysNameArray; freeListPutSel: in std_logic_vector;
+							 takeAllow: in std_logic; putAllow: in std_logic;
+							 freeListRewind: in std_logic; freeListWriteTag: in SmallNumber) is
+begin
+	-- pragma synthesis off
+	if not LOG_FREE_LIST then
+		return;
+	end if;
+					  logFreeListImpl(indTake, indPut, nTaken, nPut,
+											content, freeListTakeSel,
+											putTags, freeListPutSel,
+											takeAllow, putAllow,
+											freeListRewind, freeListWriteTag,
+											makeLogPath(content'path_name),
+											"");	
+	
+	--	pragma synthesis on
 end procedure;
 
 

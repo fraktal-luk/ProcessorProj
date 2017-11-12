@@ -50,11 +50,15 @@ use work.ProcLogicMemory.all;
 
 use work.BasicCheck.all;
 
+use work.Queues.all;
+
 
 entity MemoryUnit is
 	generic(
 		QUEUE_SIZE: integer := 4;
-		CLEAR_COMPLETED: boolean := true
+		CLEAR_COMPLETED: boolean := true;
+		KEEP_INPUT_CONTENT: boolean := false;
+		MODE: MemQueueMode := none
 	);
 	port(
 		clk: in std_logic;
@@ -71,16 +75,22 @@ entity MemoryUnit is
 		storeAddressDataIn: in InstructionState;
 		storeValueDataIn: in InstructionState;
 
+			compareAddressDataIn: in InstructionState;
+			compareAddressReady: in std_logic;
+
+			selectedDataOut: out InstructionState;
+			selectedSending: out std_logic;
+
 		committing: in std_logic;
-		groupCtrNext: in SmallNumber;
 		groupCtrInc: in SmallNumber;
 
+		lateEventSignal: in std_logic;
 		execEventSignal: in std_logic;
 		execCausing: in InstructionState;
 		
 		nextAccepting: in std_logic;		
 		sendingSQOut: out std_logic;
-		dataOutSQ: out InstructionState
+			dataOutV: out StageDataMulti
 	);
 end MemoryUnit;
 
@@ -92,103 +102,119 @@ architecture Behavioral of MemoryUnit is
 
 	signal content, contentNext, contentUpdated:
 					InstructionSlotArray(0 to QUEUE_SIZE-1) := (others => DEFAULT_INSTRUCTION_SLOT);
-	signal contentData, contentDataNext: InstructionStateArray(0 to QUEUE_SIZE-1)
+	signal contentData, contentDataNext,  TMP_content, TMP_contentNext: InstructionStateArray(0 to QUEUE_SIZE-1)
 																			:= (others => DEFAULT_INSTRUCTION_STATE);
 	signal fullMask, livingMask, killMask, contentMaskNext, matchingA, matchingD,
-								matchingShA, matchingShD: std_logic_vector(0 to QUEUE_SIZE-1) := (others => '0'); 
-	signal sqOutData: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
+				TMP_mask, TMP_ckEnForInput, TMP_sendingMask, TMP_killMask, TMP_livingMask,
+				TMP_maskNext,	TMP_maskA, TMP_maskD
+								: std_logic_vector(0 to QUEUE_SIZE-1) := (others => '0'); 
+	signal sqOutData, TMP_frontW, TMP_preFrontW, TMP_sendingData: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
 
 	signal bufferDrive: FlowDriveBuffer := (killAll => '0', lockAccept => '0', lockSend => '0',
 																others=>(others=>'0'));
 	signal bufferResponse: FlowResponseBuffer := (others=>(others=>'0'));
-begin				
-		fullMask <= extractFullMask(content);
-		livingMask <= fullMask and not killMask;
-							
-		matchingA <= findMatching(content, storeAddressDataIn); --dataA);
-		matchingD <= findMatching(content, storeValueDataIn); -- dataD);
-							
-		matchingShA <= queueMaskNext(matchingA, zeroMask,
-																 binFlowNum(bufferResponse.full),
-																 countOnes(sqOutData.fullMask),
-																 prevSending);																
-
-		matchingShD <= queueMaskNext(matchingD, zeroMask,
-																 binFlowNum(bufferResponse.full),
-																 countOnes(sqOutData.fullMask),
-																 prevSending);
-			
-		contentDataNext <= storeQueueNext(extractData(content), fullMask,
-																 dataIn.data, dataIn.fullMask,
-																 binFlowNum(bufferResponse.full),
-																 countOnes(sqOutData.fullMask),
-																 prevSending,
-																 storeAddressDataIn, --dataA
-																 storeValueDataIn,--dataD,
-																 storeAddressWr, storeValueWr,
-																 matchingShA, matchingShD,
-																 CLEAR_COMPLETED);
-
-		contentMaskNext <= queueMaskNext(livingMask, dataIn.fullMask,
-																 binFlowNum(bufferResponse.living),
-																 countOnes(sqOutData.fullMask),
-																 prevSending);
-		contentUpdated <= makeSlotArray(contentDataNext, contentMaskNext);		
-		contentNext <= contentUpdated;
+	
+		signal qs0, qs1: TMP_queueState := TMP_defaultQueueState;
+		signal contentView, contentNextView:
+					InstructionStateArray(0 to QUEUE_SIZE-1) := (others => DEFAULT_INSTRUCTION_STATE);
+		signal maskView, liveMaskView, maskNextView: std_logic_vector(0 to QUEUE_SIZE-1) := (others => '0');
 		
-			sqOutData <= findCommittingSQ(extractData(content), livingMask, groupCtrInc, committing);
-					
-			sendingSQ <= isNonzero(sqOutData.fullMask);
-			dataOutSQ <= sqOutData.data(0); -- CAREFUL, TEMP!
+		signal inputIndices: SmallNumberArray(0 to QUEUE_SIZE-1) := (others => (others => '0'));
+
+		signal cmpMask, matchedSlot: std_logic_vector(0 to QUEUE_SIZE-1) := (others => '0');
+		
+		signal selectedData: InstructionState := DEFAULT_INSTRUCTION_STATE;
+		signal selectedSendingSig: std_logic := '0';
+begin				
+	qs1 <= TMP_change(qs0, bufferDrive.nextAccepting, bufferDrive.prevSending,
+							TMP_mask, TMP_killMask, lateEventSignal or execEventSignal, TMP_maskNext);
 			
-			contentData <= extractData(content);
+	inputIndices <= getQueueIndicesForInput(qs0, QUEUE_SIZE, PIPE_WIDTH);
+	TMP_ckEnForInput <= getQueueEnableForInput(qs0, QUEUE_SIZE, bufferDrive.prevSending);
+	-- in shifting queue this would be shfited by nSend
+	TMP_sendingMask <= getQueueSendingMask(qs0, QUEUE_SIZE, bufferDrive.nextAccepting);
+	TMP_killMask <= getKillMask(TMP_content, TMP_mask, execCausing, execEventSignal, lateEventSignal);
+	TMP_livingMask <= TMP_mask and not TMP_killMask;			
+				
+	TMP_maskNext <= (TMP_livingMask and not TMP_sendingMask) or TMP_ckEnForInput;
+	-- in shifting queue generated from (i < nFullNext)
+	TMP_contentNext <=
+				TMP_getNewContentUpdate(TMP_content, dataIn.data, TMP_ckEnForInput, inputIndices,
+												TMP_maskA, TMP_maskD,
+												storeAddressWr, storeValueWr, storeAddressDataIn, storeValueDataIn,
+												CLEAR_COMPLETED, KEEP_INPUT_CONTENT);
+
+	TMP_maskA <= findMatching(makeSlotArray(TMP_content, TMP_mask), storeAddressDataIn);
+	TMP_maskD <= findMatching(makeSlotArray(TMP_content, TMP_mask), storeValueDataIn);
+
+	-- View
+	contentView <= normalizeInsArray(qs0, TMP_content);
+	maskView <= normalizeMask(qs0, TMP_mask);
+	liveMaskView <= normalizeMask(qs0, TMP_livingMask);
+	contentNextView <= normalizeInsArray(qs1, TMP_contentNext);
+	maskNextView <= normalizeMask(qs1, TMP_maskNext);
+	------
+
+	TMP_frontW <= getQueueFrontWindow(qs0, TMP_content, TMP_mask);
+	TMP_preFrontW <= getQueuePreFrontWindow(qs0, TMP_content, TMP_mask);
+	TMP_sendingData <= findCommittingSQ(TMP_frontW.data, TMP_frontW.fullMask, groupCtrInc, committing);
+		
+	sqOutData <= TMP_sendingData;
 			
-			process (clk)
-			begin
-				if rising_edge(clk) then			
-					content <= contentNext;
-					
-					logBuffer(contentData, fullMask, livingMask, bufferResponse);	
-					-- NOTE: below has no info about flow constraints. It just checks data against
-					--			flow numbers, while the validity of those numbers is checked by slot logic
-					checkBuffer(extractData(content), fullMask, extractData(contentNext),
-																				extractFullMask(contentNext),
-										bufferDrive, bufferResponse);
-				end if;
-			end process;
-					
-			SLOT_BUFF: entity work.BufferPipeLogic(Behavioral)
-			generic map(
-				CAPACITY => QUEUE_SIZE, -- PIPE_WIDTH*2*2
-				MAX_OUTPUT => PIPE_WIDTH,
-				MAX_INPUT => PIPE_WIDTH
-			)		
-			port map(
-				clk => clk, reset => reset, en => en,
-				flowDrive => bufferDrive,
-				flowResponse => bufferResponse
-			);						
+	sendingSQ <= isNonzero(sqOutData.fullMask);
+	dataOutV <= sqOutData;
+	contentData <= extractData(content);
+
+
+		cmpMask <= compareAddress(TMP_content, compareAddressDataIn) and TMP_Mask;
+		-- TEMP selection of hit checking mechanism 
+		matchedSlot <= findNewestMatch(cmpMask, qs0.pStart, compareAddressDataIn)
+																										when MODE = store
+					else	findOldestMatch(cmpMask, qs0.pStart, compareAddressDataIn)
+																										when MODE = load
+					else  findMatchingGroupTag(TMP_content, compareAddressDataIn) and TMP_mask
+																										when MODE = branch
+					else	(others => '0');
+		selectedSendingSig <= isNonzero(matchedSlot) and compareAddressReady;
+		selectedData <= chooseIns(TMP_content, matchedSlot);
+	
+	
+	process (clk)
+	begin
+		if rising_edge(clk) then	
+			qs0 <= qs1;
+			TMP_mask <= TMP_maskNext;	
+			TMP_content <= TMP_contentNext;
+			
+			logBuffer(contentView, maskView, liveMaskView, bufferResponse);					
+			
+			-- NOTE: below has no info about flow constraints. It just checks data against
+			--			flow numbers, while the validity of those numbers is checked by slot logic	
+			checkBuffer(contentView, maskView, contentNextView, maskNextView, bufferDrive, bufferResponse);
+		end if;
+	end process;
+			
+	SLOT_BUFF: entity work.BufferPipeLogic(BehavioralDirect)
+	generic map(
+		CAPACITY => QUEUE_SIZE, -- PIPE_WIDTH*2*2
+		MAX_OUTPUT => PIPE_WIDTH,
+		MAX_INPUT => PIPE_WIDTH
+	)
+	port map(
+		clk => clk, reset => reset, en => en,
+		flowDrive => bufferDrive,
+		flowResponse => bufferResponse
+	);						
 
 	bufferDrive.prevSending <=num2flow(countOnes(dataIn.fullMask)) when prevSending = '1' else (others => '0');
-	bufferDrive.kill <= num2flow(countOnes(killMask));
+	bufferDrive.kill <= num2flow(countOnes(TMP_killMask));
 	bufferDrive.nextAccepting <= num2flow(countOnes(sqOutData.fullMask));
 					
-					KILLERS: for i in 0 to QUEUE_SIZE-1 generate
-						signal before: std_logic;
-						signal a, b: std_logic_vector(7 downto 0);
-					begin
-						a <= execCausing.groupTag;
-						b <= content(i).ins.groupTag;
-						IQ_KILLER: entity work.CompareBefore8 port map(
-							inA =>  a,
-							inB =>  b,
-							outC => before
-						);		
-						killMask(i) <= killByTag(before, execEventSignal, '0') -- before and execEventSignal
-												and fullMask(i);									
-					end generate;
-					
-	acceptingOut <= not fullMask(QUEUE_SIZE-PIPE_WIDTH); -- when last slot free					
+	acceptingOut <= not TMP_preFrontW.fullMask(0);
+	
 	sendingSQOut <= sendingSQ;
+	
+	selectedDataOut <= selectedData;
+	selectedSending <= selectedSendingSig;
 end Behavioral;
 

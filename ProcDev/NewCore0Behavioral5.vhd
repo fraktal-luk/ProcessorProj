@@ -8,140 +8,79 @@ architecture Behavioral5 of NewCore0 is
 	signal pcDataSig: InstructionState := DEFAULT_INSTRUCTION_STATE;
 	signal pcSendingSig: std_logic := '0';
 
+	signal acceptingOutFront: std_logic := '0';
+	--signal stage0Events: StageMultiEventInfo;
+	
 	signal frontDataLastLiving: StageDataMulti;
 	signal frontLastSending, renameAccepting: std_logic := '0';
 
-	signal acceptingOutFront: std_logic := '0';
-	signal stage0Events: StageMultiEventInfo;
-		
-	-- for Front
-	signal killVec: std_logic_vector(0 to N_EVENT_AREAS-1) := (others => '0');	
+		signal frontEventSignal: std_logic := '0';
+		signal frontCausing: InstructionState := DEFAULT_INSTRUCTION_STATE;
 
-	signal renamedDataLiving, stageDataCommittedOut: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;				
-	signal renamedSending, iqAccepts: std_logic := '0';			
-		
-	-- CAREFUL, TODO: make this robust for changes in renaming details!
-	signal readyRegs, readyRegsSig, readyRegsPrev: std_logic_vector(0 to N_PHYSICAL_REGS-1)
-		:= (0 to 31 => '1', others=>'0'); -- p0-p31 are initially mapped to logical regs and ready
-		
-	signal dataToA, dataToB, dataToC, dataToD, dataToE: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;						
+---------------------------------
+	signal renamedDataLiving: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;	-- INPUT			
+	signal renamedSending, -- INPUT
+				iqAccepts: std_logic := '0'; -- OUTPUT
 
-	signal acceptingVecA, acceptingVecB, acceptingVecC, acceptingVecD, acceptingVecE:
-				std_logic_vector(0 to PIPE_WIDTH-1) := (others => '0');
-	
-	signal compactedToSQ, compactedToLQ, compactedToBQ: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
-		signal cc0, cc1: std_logic := '0';
-
-	signal dataOutIQA, dataOutIQB, dataOutIQC, dataOutIQD, dataOutIQE: InstructionState
-																	:= defaultInstructionState;	
-	signal sendingSchedA, sendingSchedB, sendingSchedC, sendingSchedD, sendingSchedE: std_logic := '0';
-	
-	-- Physical register interface
-	signal regsSelA, regsSelB, regsSelC, regsSelD, regsSelE, regsSelCE: PhysNameArray(0 to 2)
-					:= (others => (others => '0'));
-	signal regValsA, regValsB, regValsC, regValsD, regValsE, regValsCE: MwordArray(0 to 2)
-							:= (others => (others => '0'));
-	signal regsAllowA, regsAllowB, regsAllowC, regsAllowD, regsAllowE, regsAllowCE,
-			execAcceptingA, execAcceptingB, execAcceptingC, execAcceptingD, execAcceptingE: std_logic := '0'; 
-	
-	-- forw network
-	signal resultTags: PhysNameArray(0 to N_RES_TAGS-1) := (others=>(others=>'0'));
-	signal nextResultTags: PhysNameArray(0 to N_NEXT_RES_TAGS-1) := (others=>(others=>'0'));
-	signal resultVals: MwordArray(0 to N_RES_TAGS-1) := (others=>(others=>'0'));	
-	-- writtenTags indicate registers written to GPR file in last cycle, so they can be read from there
-	--		rather than from forw. network, but readyRegFlags are not available in the 1st cycle after WB.
-	signal writtenTags: PhysNameArray(0 to PIPE_WIDTH-1) := (others => (others => '0'));
-
-	signal execEnds, execEnds2: InstructionStateArray(0 to 3) := (others => DEFAULT_INSTRUCTION_STATE);
-	signal execPreEnds: InstructionStateArray(0 to 3) := (others => DEFAULT_INSTRUCTION_STATE);
-	signal execSending, execSending2: std_logic_vector(0 to 3) := (others => '0');
-
-	------------ TEMP!
-	signal execEnds_C, execEnds2_C: InstructionStateArray(0 to 3) := (others => DEFAULT_INSTRUCTION_STATE);
-	signal execPreEnds_C: InstructionStateArray(0 to 3) := (others => DEFAULT_INSTRUCTION_STATE);
-	signal execSending_C, execSending2_C: std_logic_vector(0 to 3) := (others => '0');
-	------------
-	
-	signal loadData, loadDataPre: InstructionState := DEFAULT_INSTRUCTION_STATE;	
-	signal loadUnitSending: std_logic := '0';
-	signal loadUnitNextAccepting: std_logic := '0';
-	
-	-- Mem interface
-	signal memLoadAddress, memStoreAddress, memLoadValue, memStoreValue: Mword := (others => '0');
-	signal memStoreAllow, memLoadAllow, memLoadReady: std_logic := '0';
-		
 	-- Sys reg interface	
-	signal sysRegReadSel, sysRegWriteSel: slv5 := (others => '0');
-	signal sysRegReadValue, sysRegWriteValue: Mword := (others => '0');
-	
+	signal sysRegReadSel: slv5 := (others => '0'); -- OUTPUT  -- Doesn't need to be a port of OOO part
+	signal sysRegReadValue: Mword := (others => '0'); -- INPUT
+
+	-- Mem interface
+	signal memLoadAddress, memLoadValue: Mword := (others => '0');  -- OUTPUT, INPUT
+	signal memLoadAllow, memLoadReady: std_logic := '0';  -- OUTPUT, INPUT
+
 	-- evt
-	signal execEventSignal, intSig, execOrIntEventSignal: std_logic := '0';						
-	-- This will take the value of operation that causes jump or exception
-	signal execCausing, intCausing, execOrIntCausing: InstructionState := defaultInstructionState;																			
+	signal execEventSignal, lateEventSignal: std_logic := '0';	-- OUTPUT/SIG, INPUT 	
+	signal execCausing: InstructionState := defaultInstructionState; -- OUTPUT/SIG
 
 	-- Hidden to some degree, but may be useful for sth
-	signal renameCtrSig, renameCtrNextSig, commitCtrSig, commitCtrNextSig: SmallNumber := (others=>'0');
-	signal commitGroupCtrSig, commitGroupCtrNextSig: SmallNumber := (others => '0');
-	signal commitGroupCtrIncSig: SmallNumber := (others => '0');
+	signal commitGroupCtrSig, commitGroupCtrNextSig: SmallNumber := (others => '0'); -- INPUT
+	signal commitGroupCtrIncSig: SmallNumber := (others => '0');	-- INPUT
 												
 	-- ROB interface	
-	signal robSending, robAccepting: std_logic := '0';
-	signal dataOutROB: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;					
+	signal robSending: std_logic := '0';		-- OUTPUT
+	signal dataOutROB: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;		-- OUTPUT
 
-		signal committingSig: std_logic := '0';
+		signal sbAccepting: std_logic := '0';	-- INPUT
+		signal commitAccepting: std_logic := '0'; -- INPUT
 
-		signal acceptingNewSQ, acceptingNewLQ, acceptingNewBQ: std_logic := '0';
-		signal sendingQueueE: std_logic := '0';
+		signal dataOutBQV: StageDataMulti := DEFAULT_STAGE_DATA_MULTI; -- OUTPUT
+		signal dataOutSQ: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;	-- OUTPUT
+-------------------------------------------------------
 
-			signal sendingFromBQ: std_logic := '0';
-			signal dataOutBQ: InstructionState := DEFAULT_INSTRUCTION_STATE;
+	signal execOrIntCausing: InstructionState := defaultInstructionState;
+	signal execOrIntEventSignal: std_logic := '0';
 
-	-- back end interfaces
-	signal whichAcceptedCQ: std_logic_vector(0 to 3) := (others=>'0');	
-	signal anySendingFromCQ: std_logic := '0';
-	
-	signal dataCQOut: StageDataCommitQueue
-										:= (fullMask=>(others=>'0'), data=>(others=>defaultInstructionState));	
-	signal cqDataLivingOut: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
-
-	signal cqPhysDestMask: std_logic_vector(0 to PIPE_WIDTH-1) := (others => '0');
-	signal cqPhysicalDests: PhysNameArray(0 to PIPE_WIDTH-1) := (others => (others => '0'));
-	signal cqInstructionResults: MwordArray(0 to PIPE_WIDTH-1) := (others => (others => '0'));
-
-	signal rfWriteVec: std_logic_vector(0 to 3) := (others => '0');
-	signal rfSelectWrite: PhysNameArray(0 to 3) := (others => (others => '0'));
-	signal rfWriteValues: MwordArray(0 to 3) := (others => (others => '0'));
-	
-	signal stageDataAfterCQ: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;	
-				
 		signal newPhysDests: PhysNameArray(0 to PIPE_WIDTH-1) := (others => (others => '0'));
 		signal newPhysDestPointer: SmallNumber := (others => '0');
 		signal newPhysSources: PhysNameArray(0 to 3*PIPE_WIDTH-1) := (others => (others => '0'));
+
+
+		signal committingSig: std_logic := '0';	-- !! Just a copy of robSending
 			
 		signal committedSending, renameLockEnd: std_logic := '0';
 		signal committedDataOut: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
 
-	signal readyRegFlags, readyRegFlagsV: std_logic_vector(0 to 3*PIPE_WIDTH-1) := (others => '0');
+			signal sbEmpty, sbSending: std_logic := '0';
+			signal dataFromSB: InstructionState := DEFAULT_INSTRUCTION_STATE;
+			signal sbAcceptingV: std_logic_vector(0 to 3) := (others => '0');				
+			signal sbMaskOut: std_logic_vector(0 to 0) := (others => '0');
+			signal sbDataOut: InstructionStateArray(0 to 0) := (others => DEFAULT_INSTRUCTION_STATE);	
+			signal sbFullMask: std_logic_vector(0 to SB_SIZE-1) := (others => '0');
+
+		signal sysStoreAllow: std_logic := '0';
+		signal sysStoreAddress: slv5 := (others => '0'); 
+		signal sysStoreValue: Mword := (others => '0');
+		
+		signal memStoreAddress, memStoreValue: Mword := (others => '0');
+		signal memStoreAllow: std_logic := '0';
 			
-		signal readyRegFlags_2: std_logic_vector(0 to 3*PIPE_WIDTH-1) := (others => '0');
-		signal readyRegFlagsNext, readyRegFlagsNextV: std_logic_vector(0 to 3*PIPE_WIDTH-1) := (others => '0');					
-						
-		signal sysRegData: InstructionState := DEFAULT_INSTRUCTION_STATE;
-		signal sysRegSending: std_logic := '0';
-						
-	signal outputA, outputB, outputC, outputD, outputE: InstructionSlot := DEFAULT_INSTRUCTION_SLOT;
-	signal outputOpPreB, outputOpPreC: InstructionState := DEFAULT_INSTRUCTION_STATE;
-						
-	-- CAREFUL: this is used to turn off dependence on iqAccepts
-	constant	OMIT_IQ_ACCEPTS: std_logic := '0';			
-				
 	constant HAS_RESET: std_logic := '0';
 	constant HAS_EN: std_logic := '0';
 begin
 	resetSig <= reset and HAS_RESET;
 	enSig <= en or not HAS_EN;
-	
-	intSig <= '0'; -- CAREFUL!
 	
 	SEQUENCING_PART: entity work.UnitSequencer(Behavioral)
 	port map (
@@ -150,8 +89,9 @@ begin
 		-- sys reg interface
 		sysRegReadSel => sysRegReadSel,
 		sysRegReadValue => sysRegReadValue,	
-		sysRegWriteSel => sysRegWriteSel,
-		sysRegWriteValue => sysRegWriteValue,
+			 sysStoreAllow => sysStoreAllow,
+			 sysStoreAddress => sysStoreAddress,
+			 sysStoreValue => sysStoreValue,
 
 		-- Icache interface
 		iadr => iadr,
@@ -167,11 +107,15 @@ begin
 		start => int1,		
 		execEventSignal => execEventSignal,
 		execCausing => execCausing,
-		stage0EventInfo => stage0Events, -- from front
+		
+		frontEventSignal => frontEventSignal,
+		frontCausing => frontCausing,
+		
+		--stage0EventInfo => stage0Events, -- from front
 		-- Events out
 		execOrIntEventSignalOut => execOrIntEventSignal,
 		execOrIntCausingOut => execOrIntCausing,
-		killVecOut => killVec,
+		lateEventOut => lateEventSignal,
 		-- Data from front pipe interface		
 		renameAccepting => renameAccepting, -- to frontend
 		frontLastSending => frontLastSending,
@@ -183,34 +127,31 @@ begin
 		newPhysSourcesIn => newPhysSources,
 
 		-- Interface with IQ
-		-- CAREFUL: iqAccepts is needed here, but must be faster (based on 'full' instead of 'living')
-		iqAccepts => --robAccepting and (iqAccepts or OMIT_IQ_ACCEPTS) and acceptingNewSQ and acceptingNewLQ,
-							iqAccepts,
+		iqAccepts => iqAccepts,
 		renamedDataLiving => renamedDataLiving, -- !!!
 		renamedSending => renamedSending,
-
-		-- Signal about ready regs (version with virtual ready bits!)
-		readyRegFlagsNextV => readyRegFlagsNextV,
 		
 		-- Interface from ROB
+		commitAccepting => commitAccepting,
 		sendingFromROB => robSending,	
 		robDataLiving => dataOutROB,
 		committing => committingSig,
 
-				---
-				sendingFromBQ => sendingFromBQ,
-				dataFromBQ => dataOutBQ,
+		---
+		dataFromBQV => dataOutBQV,
+
+		sbSending => sbSending,
+		dataFromSB => dataFromSB,
+		sbEmpty => sbEmpty,
 
 		-- Interface from committed stage
 		committedSending => committedSending,
 		committedDataOut => committedDataOut,
 		renameLockEndOut => renameLockEnd,
-		
-		
+				
 		commitGroupCtrOut => commitGroupCtrSig,
-		commitGroupCtrNextOut => commitGroupCtrNextSig,
-		
-			commitGroupCtrIncOut => commitGroupCtrIncSig
+		commitGroupCtrNextOut => commitGroupCtrNextSig,	
+		commitGroupCtrIncOut => commitGroupCtrIncSig
 	);
 		
 	FRONT_PART: entity work.UnitFront(Behavioral)
@@ -228,541 +169,202 @@ begin
 		dataLastLiving => frontDataLastLiving,
 		lastSending => frontLastSending,
 		
-		stage0EventsOut => stage0Events,
-		killVector => killVec		
-	);
-	
-	ISSUE_ROUTING: entity work.SubunitIssueRouting(Behavioral)
-	port map(
-		renamedDataLiving => renamedDataLiving,
-
-			acceptingVecA => acceptingVecA,
-			acceptingVecB => acceptingVecB,
-			acceptingVecC => acceptingVecC,
-			acceptingVecD => acceptingVecD,
-			acceptingVecE => acceptingVecE,
-
-			acceptingROB => robAccepting,-- and (iqAccepts or OMIT_IQ_ACCEPTS)
-			acceptingSQ => acceptingNewSQ,
-			acceptingLQ => acceptingNewLQ,
-			acceptingBQ => acceptingNewBQ,
+		--stage0EventsOut => stage0Events,
+			frontEventSignal => frontEventSignal,
+			frontCausing => frontCausing,
 		
-		renamedSendingIn => renamedSending,
-		
-		renamedSendingOut => open, -- DEPREC??
-		iqAccepts => iqAccepts,		
-		
-		dataOutA => dataToA,
-		dataOutB => dataToB,
-		dataOutC => dataToC,
-		dataOutD => dataToD,
-		dataOutE => dataToE,
-		
-		dataOutSQ => compactedToSQ,
-		dataOutLQ => compactedToLQ,
-		dataOutBQ => compactedToBQ
+		execEventSignal => execEventSignal,
+		lateEventSignal => lateEventSignal		
 	);
 
-	IQ_A: entity work.UnitIQ
-	generic map(
-		IQ_SIZE => IQ_A_SIZE
-	)
-	port map(
-		clk => clk, reset => resetSig, en => enSig,
 
-		acceptingVec => acceptingVecA,
+	--------------------------------
+	--- Out of order domain
+	OUTER_OOO_AREA: block
+			signal cqMaskOut: std_logic_vector(0 to INTEGER_WRITE_WIDTH-1) := (others => '0');
+			signal cqDataOut: InstructionStateArray(0 to INTEGER_WRITE_WIDTH-1)
+					:= (others => DEFAULT_INSTRUCTION_STATE);
+			signal readyRegFlags: std_logic_vector(0 to 3*PIPE_WIDTH-1) := (others => '0');		
+			signal readyRegFlagsNext: std_logic_vector(0 to 3*PIPE_WIDTH-1) := (others => '0');					
+	begin
 
-		prevSendingOK => renamedSending,
-		newData => dataToA,
-		
-		writtenTags => writtenTags,		
-		resultTags => resultTags,
-		nextResultTags => nextResultTags,
-		resultVals => resultVals,
-		
-		readyRegFlags => readyRegFlags,
-		regsForDispatch => regsSelA,
-		regReadAllow => regsAllowA,	
-		regValues => regValsA,
-			
-		nextAccepting => execAcceptingA,			
-		dataOutIQ => dataOutIQA,
-		sendingOut => sendingSchedA,
-			
-		execCausing => execOrIntCausing,
-		execEventSignal => execOrIntEventSignal			
-	);
-	
-	IQ_B: entity work.UnitIQ
-	generic map(
-		IQ_SIZE => IQ_B_SIZE
-	)
-	port map(
-		clk => clk, reset => resetSig, en => enSig,
-
-		acceptingVec => acceptingVecB,		
-		
-		prevSendingOK => renamedSending,
-		newData => dataToB,		
-		
-		writtenTags => writtenTags,		
-		resultTags => resultTags,
-		nextResultTags => nextResultTags,
-		resultVals => resultVals,
-				
-		readyRegFlags => readyRegFlags,		
-		regsForDispatch => regsSelB,
-		regReadAllow => regsAllowB,
-		regValues => regValsB,
-		
-		nextAccepting => execAcceptingB,	
-		dataOutIQ => dataOutIQB,
-		sendingOut => sendingSchedB,		
-		
-		execCausing => execOrIntCausing,
-		execEventSignal => execOrIntEventSignal
-	);
-	
-		
-	IQ_C: entity work.UnitIQ
-	generic map(
-		IQ_SIZE => IQ_C_SIZE
-	)
-	port map(
-		clk => clk, reset => resetSig, en => enSig,
-
-		acceptingVec => acceptingVecC,		
-
-		prevSendingOK => renamedSending,
-		newData => dataToC,			
-
-		writtenTags => writtenTags,		
-		resultTags => resultTags,
-		nextResultTags => nextResultTags,
-		resultVals => resultVals,
-				
-		readyRegFlags => readyRegFlags,
-		regsForDispatch => regsSelC,
-		regReadAllow => regsAllowC,	
-		regValues => regValsC,
-			
-		nextAccepting => execAcceptingC,
-		dataOutIQ => dataOutIQC,
-		sendingOut => sendingSchedC,		
-		
-		execCausing => execOrIntCausing,
-		execEventSignal => execOrIntEventSignal
-	);					
-	
-	IQ_D: entity work.UnitIQ
-	generic map(
-		IQ_SIZE => IQ_D_SIZE
-	)
-	port map(
-		clk => clk, reset => resetSig, en => enSig,
-
-		acceptingVec => acceptingVecD,		
-
-		prevSendingOK => renamedSending,
-		newData => dataToD,		
-		
-		writtenTags => writtenTags,
-		resultTags => resultTags,
-		nextResultTags => nextResultTags,
-		resultVals => resultVals,
-				
-		readyRegFlags => readyRegFlags,
-		regsForDispatch => regsSelD,
-		regReadAllow => regsAllowD,
-		regValues => regValsD,
-			
-		nextAccepting => execAcceptingD,
-		dataOutIQ => dataOutIQD,
-		sendingOut => sendingSchedD,		
-		
-		execCausing => execOrIntCausing,
-		execEventSignal => execOrIntEventSignal
-	);	
-
-
-	IQ_E: entity work.UnitIQ
-	generic map(
-		IQ_SIZE => IQ_E_SIZE
-	)
-	port map(
-		clk => clk, reset => resetSig, en => enSig,
-
-		acceptingVec => acceptingVecE,		
-		prevSendingOK => renamedSending,
-		newData => dataToE,
-
-		nextAccepting => execAcceptingE,
-		dataOutIQ => dataOutIQE,
-		sendingOut => sendingSchedE,
-		
-		----------------------------
-		writtenTags => writtenTags, -- tag for registers just written
-		
-		resultTags => resultTags,
-		nextResultTags => nextResultTags,
-		resultVals => resultVals,
-				
-		readyRegFlags => readyRegFlags, -- bits generated for input group
-		
-		-- Interface for reading registers
-		regsForDispatch => regsSelE,
-		regReadAllow => regsAllowE,
-		regValues => regValsE,		
-		
-		execCausing => execOrIntCausing,
-		execEventSignal => execOrIntEventSignal
-	);	
-															
-	EXEC_BLOCK: entity work.UnitExec(Implem)
-	port map(
-		clk => clk, reset => resetSig, en => enSig,
-
-		execAcceptingA => execAcceptingA,
-		execAcceptingB => execAcceptingB,				
-		execAcceptingD => execAcceptingD,
-
-		sendingIQA => sendingSchedA,
-		sendingIQB => sendingSchedB,
-		sendingIQD => sendingSchedD,
-
-		dataIQA => dataOutIQA,
-		dataIQB => dataOutIQB,
-		dataIQD => dataOutIQD,
-		
-			outputA => outputA,
-			outputB => outputB,
-			outputD => outputD,
-			
-			outputOpPreB => outputOpPreB,
-		
-		--dataQueueE => dataOutIQE,
-
-		--sendingQueueE => sendingQueueE,
-
-		--loadUnitNextAcceptingOut => loadUnitNextAccepting,
-			
-		--loadUnitSending => loadUnitSending,
-		--loadData => loadData,
-		--loadDataPre => loadDataPre,
-			
-		sysRegSelect => sysRegReadSel,
-		sysRegIn => sysRegReadValue,
-		sysRegWriteSelOut => sysRegWriteSel,
-		sysRegWriteValueOut => sysRegWriteValue,
-
-		sysRegDataOut => sysRegData,
-		sysRegSending => sysRegSending,
-		
-		whichAcceptedCQ => whichAcceptedCQ,
-		
-		--execSending => execSending_C,
-		--execSending2 => execSending2_C,
-
-		--execPreEnds => execPreEnds_C,
-		--execEnds => execEnds_C,
-		--execEnds2 => execEnds2_C,
-
-			acceptingNewBQ => acceptingNewBQ,--: out std_logic;
-			sendingOutBQ => sendingFromBQ,--: out std_logic;
-			dataOutBQ => dataOutBQ,--: out InstructionState;
-			prevSendingToBQ => renamedSending,--: in std_logic;
-			dataNewToBQ => compactedToBQ,--: in StageDataMulti;
-			
-			committing => committingSig,--: in std_logic;
-			
-			groupCtrNext => commitGroupCtrNextSig,--: in SmallNumber;
-			groupCtrInc => commitGroupCtrIncSig,--: in SmallNumber;
-		
-		execEvent => execEventSignal,
-		execCausingOut => execCausing,
-				
-		execOrIntEventSignalIn => execOrIntEventSignal,
-		execOrIntCausingIn => execOrIntCausing
-	);	
-
-		NEW_MEM_UNIT: entity work.UnitMemory(Behavioral)
+		OOO_BOX: entity work.OutOfOrderBox(Behavioral)
 		port map(
-			clk => clk, reset => reset, en => en,
+				  clk => clk, reset => resetSig, en => enSig,
+				  
+				  renamedDataLiving => renamedDataLiving,--: in StageDataMulti;	-- INPUT			
+				  renamedSending => renamedSending,--: in std_logic;
+				  
+				  iqAccepts => iqAccepts,
 
-			execAcceptingC => execAcceptingC, --open,
-			execAcceptingE => execAcceptingE, --open, -- Store data
-			
-			sendingIQC => sendingSchedC,
-			sendingIQE => sendingSchedE, -- Store data
+		-- Sys reg interface	
+				  sysRegReadSel => sysRegReadSel,
+				  sysRegReadValue => sysRegReadValue,--: in Mword; -- INPUT
 
-			dataIQC => dataOutIQC,
-			dataIQE => dataOutIQE,	-- Store data			
-			-------------
+		-- Mem interface
+				  memLoadAddressOut => memLoadAddress,
+				  memLoadValue => memLoadValue,--: in Mword;
+				  memLoadAllow => memLoadAllow,
+				  memLoadReady => memLoadReady,--: in std_logic;
+		-- evt
+				 execEventSignalOut => execEventSignal,
+				 lateEventSignal => lateEventSignal,--: in std_logic;
+				 execCausingOut => execCausing,
+											
+		-- Hidden to some degree, but may be useful for sth
+				commitGroupCtrSig => commitGroupCtrSig,--: in SmallNumber;
+				commitGroupCtrNextSig => commitGroupCtrNextSig,--: in SmallNumber; -- INPUT
+				commitGroupCtrIncSig => commitGroupCtrIncSig,--: in SmallNumber;	-- INPUT
+													
+		-- ROB interface	
+				robSendingOut => robSending,
+				dataOutROB => dataOutROB,
 
-			acceptingNewSQ => acceptingNewSQ,
-			acceptingNewLQ => acceptingNewLQ,
-			prevSendingToSQ => renamedSending,
-			prevSendingToLQ => renamedSending,
-			dataNewToSQ => compactedToSQ,
-			dataNewToLQ => compactedToLQ,
+				sbAccepting => sbAccepting,--: in std_logic;	-- INPUT
+				commitAccepting => commitAccepting,--: in std_logic; -- INPUT
 
-				outputC => outputC,
-				outputE => outputE,
+				dataOutBQV => dataOutBQV,
+				dataOutSQ => dataOutSQ,
+				readyRegFlags => readyRegFlags,
 				
-				outputOpPreC => outputOpPreC,
-
-		whichAcceptedCQ => whichAcceptedCQ,
-
-			--loadUnitNextAccepting => loadUnitNextAccepting,
-			--loadUnitSending => loadUnitSending,
-			--loadDataPreOut => loadDataPre,
-			--loadDataOut => loadData,
-				
-			memLoadReady => memLoadReady,--'0',
-			memLoadValue => memLoadValue,
-			
-			memLoadAddress => memLoadAddress,--open,
-			memStoreAddress => memStoreAddress,--open,
-			memLoadAllow => memLoadAllow,--open,
-			memStoreAllow => memStoreAllow,--open,
-			memStoreValue => memStoreValue, --open,
-
-			--sendingQueueE => sendingQueueE,
-
-			sysRegDataIn => sysRegData,
-			sysRegSendingIn => sysRegSending,
-
-			committing => committingSig,
-			groupCtrNext => commitGroupCtrNextSig,
-				groupCtrInc => commitGroupCtrIncSig,
-
-			execOrIntEventSignalIn => execOrIntEventSignal,
-			execOrIntCausingIn => execOrIntCausing
+				cqMaskOut => cqMaskOut,
+				cqDataOut => cqDataOut
 		);
 
-			execSending <= getExecSending(outputA, outputB, outputC, outputD, outputE);
-			execSending2 <= getExecSending2(outputA, outputB, outputC, outputD, outputE);
-			execEnds <= getExecEnds(outputA, outputB, outputC, outputD, outputE);
-			execEnds2 <= getExecEnds2(outputA, outputB, outputC, outputD, outputE);
-			execPreEnds <= getExecPreEnds(outputOpPreB, outputOpPreC);
 
-		cc0 <= '1' when execPreEnds_C = execPreEnds else '0';
-		cc1 <= '1' when execEnds2_C = execEnds2 else '0';
+				INT_READY_TABLE: entity work.ReadyRegisterTable(Behavioral)
+				generic map(
+					WRITE_WIDTH => INTEGER_WRITE_WIDTH
+				)
+				port map(
+					clk => clk, reset => resetSig, en => enSig, 
+					
+					sendingToReserve => frontLastSending,
+					stageDataToReserve => frontDataLastLiving,
+						
+					newPhysDests => newPhysDests,	-- FOR MAPPING
+					stageDataReserved => renamedDataLiving, --stageDataOutRename,
+					
+						writingMask => cqMaskOut,
+						writingData => cqDataOut,
+					readyRegFlagsNext => readyRegFlagsNext -- FOR IQs
+				);
 
+				READY_REGS_SYNCHRONOUS: process(clk) 	
+				begin
+					if rising_edge(clk) then
+						readyRegFlags <= readyRegFlagsNext;
+					end if;
+				end process;
 
-	COMMIT_QUEUE: entity work.TestCQPart0(Implem)
-	port map(
-		clk => clk, reset => resetSig, en => enSig,
+			
+		INT_REG_MAPPING: block
+			signal physStable, physStableDelayed: PhysNameArray(0 to PIPE_WIDTH-1) := (others=>(others=>'0'));
+		begin
+					INT_MAPPER: entity work.RegisterMappingUnit(Behavioral)
+					port map(
+						clk => clk,
+						reset => resetSig,
+						en => enSig,
+						
+						rewind => renameLockEnd,	-- FROM SEQ
+						causingInstruction => DEFAULT_INSTRUCTION_STATE,
+						
+						sendingToReserve => frontLastSending,
+						stageDataToReserve => frontDataLastLiving,
+						newPhysDests => newPhysDests,	-- MAPPING (from FREE LIST)
+
+						sendingToCommit => robSending,
+						stageDataToCommit => dataOutROB,
+						physCommitDests_TMP => (others => (others => '0')), -- CAREFUL: useless input?
+						
+						prevNewPhysDests => open,
+						newPhysSources => newPhysSources,	-- TO SEQ
+						
+						prevStablePhysDests => physStable,  -- FOR MAPPING (to FREE LIST)
+						stablePhysSources => open							
+					);
+
+				LAST_COMMITTED_SYNCHRONOUS: process(clk) 	
+				begin
+					if rising_edge(clk) then
+						-- CAREFUL! When writing the same virtual reg multiple times, to get a vector to put on FreeList,
+						-- 			we either A) bypass phys dests to next instructions instead of reading stable map, 
+						--				or B) don't bypass but select to put the phys dests for all but the last writing op,
+						--				and that last one returns the stable map entry.
+						--				Option A means that below we substitute relevant phys names, and B means that
+						--				we don't, and handle overridden dests by seleciton bits in RegisterFreeList.
+						physStableDelayed <= work.ProcLogicRenaming.getStableDestsParallel(dataOutROB, physStable);					
+					end if;
+				end process;
 		
-		execEventSignal => execOrIntEventSignal,
-		execCausing => execOrIntCausing,
-		
-		inputInstructions => execEnds,
-		whichAcceptedCQ => whichAcceptedCQ,
-		cqWhichSend => (0 => execSending(0), 1 => execSending(1), 2 => execSending(2), others => '0'),
-		anySending => anySendingFromCQ,
-		cqOut => cqDataLivingOut,
-		dataCQOut => dataCQOut -- CAREFUL: must remain, because used by forwarding network!
-	);
-		
-	INT_REG_MAPPING: block
-		signal physStable, physStableDelayed: PhysNameArray(0 to PIPE_WIDTH-1) := (others=>(others=>'0'));
-	begin
-				INT_MAPPER: entity work.RegisterMappingUnit(Behavioral)
+				INT_FREE_LIST: entity work.RegisterFreeList(Behavioral)
 				port map(
 					clk => clk,
 					reset => resetSig,
 					en => enSig,
 					
-					rewind => renameLockEnd,	-- FROM SEQ
-					causingInstruction => DEFAULT_INSTRUCTION_STATE,
+					rewind => execOrIntEventSignal,
+					causingInstruction => execOrIntCausing,
 					
-					sendingToReserve => frontLastSending,
+					sendingToReserve => frontLastSending, 
+					takeAllow => frontLastSending,	-- FROM SEQ
+						auxTakeAllow => renameLockEnd,
 					stageDataToReserve => frontDataLastLiving,
-					newPhysDests => newPhysDests,	-- MAPPING (from FREE LIST)
+					
+					newPhysDests => newPhysDests,			-- TO SEQ
+					newPhysDestPointer => newPhysDestPointer, -- TO SEQ
 
-					sendingToCommit => robSending,
-					stageDataToCommit => dataOutROB,
-					physCommitDests_TMP => (others => (others => '0')), -- CAREFUL: useless input?
+					sendingToRelease => committedSending,  -- FROM SEQ
+					stageDataToRelease => committedDataOut,  -- FROM SEQ
 					
-					prevNewPhysDests => open,
-					newPhysSources => newPhysSources,	-- TO SEQ
-					
-					prevStablePhysDests => physStable,  -- FOR MAPPING (to FREE LIST)
-					stablePhysSources => open,
-					
-						sendingToWrite => anySendingFromCQ,
-						stageDataToWrite => cqDataLivingOut,
+					physStableDelayed => physStableDelayed -- FOR MAPPING (from MAP)
+				);		
 
-							stageDataToWritePre => cqDataLivingOut, -- TEMP!
+			end block;
+	
+	end block; -- OUTER_OOO
+
+
+					sbAccepting <= sbAcceptingV(0);
+
+					STORE_BUFFER: entity work.TestCQPart0(WriteBuffer)
+					generic map(
+						INPUT_WIDTH => PIPE_WIDTH,
+						QUEUE_SIZE => SB_SIZE,
+						OUTPUT_SIZE => 1
+					)
+					port map(
+						clk => clk, reset => reset, en => en,
 						
-						readyRegFlagsNext => readyRegFlagsNextV
-				);
+						whichAcceptedCQ => sbAcceptingV,
+						maskIn => dataOutSQ.fullMask,
+						dataIn => dataOutSQ.data,
+						
+						bufferMaskOut => sbFullMask,
+						bufferDataOut => open,
+						
+						anySending => sbSending,
+						cqMaskOut => sbMaskOut,
+						cqDataOut => sbDataOut,
+						
+						execEventSignal => '0',
+						execCausing => DEFAULT_INSTRUCTION_STATE
+					);
 
-			LAST_COMMITTED_SYNCHRONOUS: process(clk) 	
-			begin
-				if rising_edge(clk) then
-					--if resetSig = '1' then
-					--elsif enSig = '1' then
-						physStableDelayed <= work.ProcLogicRenaming.getStableDestsParallel(dataOutROB, physStable);					
-					--end if;
-				end if;
-			end process;
-	
-			INT_FREE_LIST: entity work.RegisterFreeList(Behavioral)
-			port map(
-				clk => clk,
-				reset => resetSig,
-				en => enSig,
-				
-				rewind => execOrIntEventSignal,
-				causingInstruction => execOrIntCausing,
-				
-				sendingToReserve => frontLastSending, 
-				takeAllow => frontLastSending or renameLockEnd,	-- FROM SEQ
-				stageDataToReserve => frontDataLastLiving,
-				
-				newPhysDests => newPhysDests,			-- TO SEQ
-				newPhysDestPointer => newPhysDestPointer, -- TO SEQ
+				sbEmpty <= not sbFullMask(0);
+				dataFromSB <= sbDataOut(0);
 
-				sendingToRelease => committedSending,  -- FROM SEQ
-				stageDataToRelease => committedDataOut,  -- FROM SEQ
+				memStoreAddress <= sbDataOut(0).argValues.arg1;
+				memStoreValue <= sbDataOut(0).argValues.arg2;
+				memStoreAllow <= sbSending when sbDataOut(0).operation = (Memory, store) else '0';
 				
-				physStableDelayed => physStableDelayed -- FOR MAPPING (from MAP)
-			);		
+				sysStoreAllow <= sbSending when sbDataOut(0).operation = (System, sysMTC) 
+							 else '0'; 
+				sysStoreAddress <= sbDataOut(0).argValues.arg1(4 downto 0);
+				sysStoreValue <= sbDataOut(0).argValues.arg2;				
 
-			INT_READY_TABLE: entity work.ReadyRegisterTable(Behavioral)
-			port map(
-				clk => clk, reset => resetSig, en => enSig, 
-				
-				sendingToReserve => frontLastSending,
-				stageDataToReserve => frontDataLastLiving,
-					
-				newPhysDests => newPhysDests,	-- FOR MAPPING
-				stageDataReserved => renamedDataLiving, --stageDataOutRename,
-				
-				sendingToWrite => anySendingFromCQ,
-				stageDataToWrite => cqDataLivingOut,
-				
-				readyRegFlagsNext => readyRegFlagsNext -- FOR IQs
-			);
 
-			READY_REGS_SYNCHRONOUS: process(clk) 	
-			begin
-				if rising_edge(clk) then
-						readyRegFlags_2 <= readyRegFlagsNext;
-						--	readyRegFlagsV <= readyRegFlagsNextV;
-				end if;
-			end process;
-
-			readyRegFlags <= readyRegFlags_2;
-			
---				INT_READY_TABLE_V: entity work.ReadyRegTableV(Behavioral)
---				port map(
---					clk => clk, reset => resetSig, en => enSig, 
---					sendingToReserve => frontLastSending,
---					stageDataToReserve => frontDataLastLiving,
---					--newPhysDests => newPhysDests,	-- FOR MAPPING
---					--stageDataReserved => renamedDataLiving, --stageDataOutRename,
---					sendingToWrite => anySendingFromCQ,
---					stageDataToWrite => cqDataLivingOut,
---					readyRegFlagsNext => readyRegFlagsNextV -- FOR IQs
---				);			
-		end block;
-	
-		-- CAREFUL! This stage is needed to keep result tags 1 for cycle when writing to reg file,
-		--				so that "black hole" of inivisible readiness doesn't occur
-		AFTER_CQ: entity work.GenericStageMulti(Behavioral) port map(
-			clk => clk, reset => resetSig, en => enSig,
-			
-			prevSending => anySendingFromCQ,
-			nextAccepting => '1',
-			execEventSignal => '0',
-			execCausing => execCausing,
-			stageDataIn => cqDataLivingOut,
-			acceptingOut => open,
-			sendingOut => open,
-			stageDataOut => stageDataAfterCQ,
-			
-			lockCommand => '0'			
-		);
-			
-		cqPhysDestMask <= getPhysicalDestMask(cqDataLivingOut);
-		cqPhysicalDests <= getPhysicalDests(cqDataLivingOut);
-		cqInstructionResults <= getInstructionResults(cqDataLivingOut);
-				
-			regsSelCE(0 to 1) <= regsSelC(0 to 1);
-			regsSelCE(2) <= regsSelE(2);
-			regsAllowCE <= regsAllowC or regsAllowE;
-			regValsC <= regValsCE;
-			regValsE <= regValsCE;
-		
-		TEMP_REG_FILE_INPUTS: for i in 0 to PIPE_WIDTH-1 generate
-			rfWriteVec(i) <= cqPhysDestMask(i);
-			rfSelectWrite(i) <= cqPhysicalDests(i);
-			rfWriteValues(i) <= cqInstructionResults(i);
-		end generate;		
-		
-		GPR_FILE_DISPATCH: entity work.RegisterFile0 (Behavioral)
-																	--(Implem)
-		generic map(WIDTH => 4, WRITE_WIDTH => PIPE_WIDTH)
-		port map(
-			clk => clk, reset => resetSig, en => enSig,
-
-				readAllowT0 => regsAllowA,
-				readAllowT1 => regsAllowB,
-				readAllowT2 => regsAllowCE,
-				readAllowT3 => regsAllowD,
-				
-			writeAllow => anySendingFromCQ,
-			writeVec => rfWriteVec,
-			selectWrite => rfSelectWrite, -- NOTE: unneeded writing isn't harmful anyway
-			writeValues => rfWriteValues,
-			
-			selectRead(0 to 2) => regsSelA,
-			selectRead(3 to 5) => regsSelB,
-			selectRead(6 to 8) => regsSelCE,
-			selectRead(9 to 11) => regsSelD,
-			
-			readValues(0 to 2) => regValsA,
-			readValues(3 to 5) => regValsB,
-			readValues(6 to 8) => regValsCE,						
-			readValues(9 to 11) => regValsD			
-		);
-	
-	
-	REORDER_BUFFER: entity work.ReorderBuffer --(Behavioral) 
-															(Implem)
-	port map(
-		clk => clk, reset => resetSig, en => enSig,
-		
-		intSignal => '0',
-		execEventSignal => execOrIntEventSignal,
-		execCausing => execOrIntCausing,
-		
-		commitGroupCtr => commitGroupCtrSig,
-		commitGroupCtrNext => commitGroupCtrNextSig,
-			
-		execEnds => execEnds,
-		execReady => execSending,
-		
-		execEnds2 => execEnds2,
-		execReady2 => execSending2,
-		
-		inputData => renamedDataLiving,
-		prevSending => renamedSending,
-		acceptingOut => robAccepting,
-		
-		sendingOut => robSending, 
-		outputData => dataOutROB		
-	);
-	
-	writtenTags <= getWrittenTags(stageDataAfterCQ);
-	resultTags <= getResultTags(
-				execEnds, dataCQOut, dataOutIQA, dataOutIQB, dataOutIQC, dataOutIQD,	stageDataAfterCQ);
-	nextResultTags <= getNextResultTags(execPreEnds, dataOutIQA, dataOutIQB, dataOutIQC, dataOutIQD);
-	resultVals <= getResultValues(execEnds, dataCQOut, stageDataAfterCQ);
-	
 	dadr <= memLoadAddress;
 	doutadr <= memStoreAddress;
 	dread <= memLoadAllow;

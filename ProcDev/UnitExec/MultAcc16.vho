@@ -22,7 +22,7 @@
 --    devices, or systems.  Use in such applications are expressly            --
 --    prohibited.                                                             --
 --                                                                            --
---    (c) Copyright 1995-2015 Xilinx, Inc.                                    --
+--    (c) Copyright 1995-2017 Xilinx, Inc.                                    --
 --    All rights reserved.                                                    --
 --------------------------------------------------------------------------------
 
@@ -103,19 +103,13 @@
 -- The following code must appear in the VHDL architecture header:
 
 ------------- Begin Cut here for COMPONENT Declaration ------ COMP_TAG
-COMPONENT Mac16wide
+COMPONENT MultAcc16
   PORT (
     clk : IN STD_LOGIC;
-    a : IN STD_LOGIC_VECTOR(17 DOWNTO 0);
-    b : IN STD_LOGIC_VECTOR(17 DOWNTO 0);
+    a : IN STD_LOGIC_VECTOR(15 DOWNTO 0);
+    b : IN STD_LOGIC_VECTOR(15 DOWNTO 0);
     c : IN STD_LOGIC_VECTOR(47 DOWNTO 0);
-    p : OUT STD_LOGIC_VECTOR(47 DOWNTO 0);
-    cec : IN STD_LOGIC;
-    cem : IN STD_LOGIC;
-    cep : IN STD_LOGIC;
-    sclrc : IN STD_LOGIC;
-    sclrm : IN STD_LOGIC;
-    sclrp : IN STD_LOGIC
+    p : OUT STD_LOGIC_VECTOR(47 DOWNTO 0)
   );
 END COMPONENT;
 -- COMP_TAG_END ------ End COMPONENT Declaration ------------
@@ -124,24 +118,18 @@ END COMPONENT;
 -- body. Substitute your own instance name and net names.
 
 ------------- Begin Cut here for INSTANTIATION Template ----- INST_TAG
-your_instance_name : Mac16wide
+your_instance_name : MultAcc16
   PORT MAP (
     clk => clk,
     a => a,
     b => b,
     c => c,
-    p => p,
-    cec => cec,
-    cem => cem,
-    cep => cep,
-    sclrc => sclrc,
-    sclrm => sclrm,
-    sclrp => sclrp
+    p => p
   );
 -- INST_TAG_END ------ End INSTANTIATION Template ------------
 
--- You must compile the wrapper file Mac16wide.vhd when simulating
--- the core, Mac16wide. When compiling the wrapper file, be sure to
+-- You must compile the wrapper file MultAcc16.vhd when simulating
+-- the core, MultAcc16. When compiling the wrapper file, be sure to
 -- reference the XilinxCoreLib VHDL simulation library. For detailed
 -- instructions, please refer to the "CORE Generator Help".
 
