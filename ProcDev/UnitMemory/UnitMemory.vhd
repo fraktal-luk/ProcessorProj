@@ -41,7 +41,7 @@ use work.GeneralPipeDev.all;
 use work.TEMP_DEV.all;
 
 use work.ProcLogicExec.all;
-
+use work.ProcLogicMemory.all;
 
 entity UnitMemory is
 	port(
@@ -216,21 +216,22 @@ begin
 					stageEventsOut => open					
 				);
 
-			stageDataAfterForward <= setInsResult(stageDataOutMem0.data(0),storeForwardData.argValues.arg2);
-			stageDataAfterCache <= setInsResult(stageDataOutMem0.data(0), memLoadValue);
-			stageDataAfterSysRegs <= setInsResult(stageDataOutMem0.data(0), sysLoadVal);
+			stageDataAfterForward <= setInsResult(stageDataOutMem0.data(0), storeForwardData.argValues.arg2);
+			stageDataAfterCache <= setInsResult(setDataCompleted(stageDataOutMem0.data(0), memLoadReady),
+															memLoadValue);
+			stageDataAfterSysRegs <= setInsResult(setDataCompleted(stageDataOutMem0.data(0), sendingFromSysReg),
+															  sysLoadVal);
 
 			outputC <= (loadUnitSendingSig, clearTempControlInfoSimple(outputData.data(0)));
 
 			outputOpPreC <= stageDataOutMem0.data(0);
 		end block;		
 		
-		sendingToLoadUnitSig <= sendingAddressingSig when addressingData.operation.func = load else '0';
-		sendingToMfcSig <= sendingAddressingSig when addressingData.operation = (System, sysMFC) else '0';
+		sendingToLoadUnitSig <= sendingAddressingSig and isLoad(addressingData);	
+		sendingToMfcSig <= sendingAddressingSig and isSysRegRead(addressingData);
 			
-		sendingAddressToSQSig <= sendingAddressingSig when addressingData.operation.func = store 
-																			or addressingData.operation = (System, sysMTC)
-																			else '0';				
+		sendingAddressToSQSig <= sendingAddressingSig
+														and (isStore(addressingData) or isSysRegWrite(addressingData));
 		dataToLoadUnitSig <= addressingData;
 								
 		-- SQ inputs
@@ -329,8 +330,10 @@ begin
 			end process;
 
 			-- Sending to Delayed Load Queue: when load miss or load and sending from sys reg
-			sendingToDLQ <= sendingMem0 and isLoad(stageDataAfterCache)
-								and (not memLoadReady or (memLoadReady and sendingFromSysReg));
+			sendingToDLQ <= 		sendingMem0 -- TODO: synonymous with "load/mfc sending" but may change
+								 and (isLoad(loadResultData) or isSysRegRead(loadResultData)) -- not store!
+								 and not getDataCompleted(loadResultData); -- When missed
+								 
 			dataToDLQ.data(0) <= stageDataAfterCache;
 			dataToDLQ.fullMask(0) <= sendingToDLQ;
 
@@ -361,7 +364,7 @@ begin
 				execEventSignal => eventSignal,
 				execCausing => execCausing,
 				
-				nextAccepting => not sendingFromSysReg,
+				nextAccepting => not sendingFromSysReg, -- TODO: when should it be allowed to send? Priorities
 				
 				acceptingOutSQ => open, -- TODO
 				sendingSQOut => sendingFromDLQ,
@@ -374,7 +377,7 @@ begin
 			loadResultSending <= sendingFromSysReg or sendingFromDLQ or sendingMem0 or storeForwardSending;		
 					-- CAREFUL, TODO: ^ memLoadReady needed to ack that not a miss? But would block when a store!
 					
-			loadResultData <=
+			loadResultData <= -- TODO: as with DLQ sending, what prios?
 					  stageDataAfterSysRegs when sendingFromSysReg = '1'
 				else dataFromDLQ when sendingFromDLQ = '1'
 				else stageDataAfterForward when storeForwardSendingDelay = '1'

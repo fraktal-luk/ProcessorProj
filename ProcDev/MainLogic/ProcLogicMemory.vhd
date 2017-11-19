@@ -26,8 +26,8 @@ use work.Queues.all;
 
 package ProcLogicMemory is
 
-function compareAddress(content: InstructionStateArray; ins: InstructionState) return std_logic_vector;
-
+function compareAddress(content: InstructionStateArray; fullMask: std_logic_vector;
+								ins: InstructionState) return std_logic_vector;
 -- TODO: This function and findOldestMatch introduce dependency on Queues. May be good to remove it
 function findNewestMatch(cmpMask: std_logic_vector; pStart: SmallNumber; ins: InstructionState)
 return std_logic_vector;
@@ -42,6 +42,12 @@ return std_logic_vector;
 
 function findCommittingSQ(content: InstructionStateArray; livingMask: std_logic_vector;
 								  committingTag: SmallNumber; send: std_logic) return StageDataMulti;
+
+function getAddressCompleted(ins: InstructionState) return std_logic;
+function getDataCompleted(ins: InstructionState) return std_logic;
+function setAddressCompleted(ins: InstructionState; state: std_logic) return InstructionState;
+function setDataCompleted(ins: InstructionState; state: std_logic) return InstructionState;
+
 
 				function lmQueueNext(content: InstructionStateArray;
 									  livingMask: std_logic_vector;
@@ -69,11 +75,14 @@ end ProcLogicMemory;
 package body ProcLogicMemory is
 
 		
-function compareAddress(content: InstructionStateArray; ins: InstructionState) return std_logic_vector is
+function compareAddress(content: InstructionStateArray; fullMask: std_logic_vector;
+								ins: InstructionState) return std_logic_vector is
 	variable res: std_logic_vector(0 to content'length-1) := (others => '0');
 begin
 	for i in 0 to res'length-1 loop
-		if ins.argValues.arg1 = content(i).argValues.arg1 then
+		if 	 fullMask(i) = '1'
+			and content(i).controlInfo.completed = '1' -- Addressmust be already known!
+			and ins.argValues.arg1 = content(i).argValues.arg1 then
 			res(i) := '1';
 		end if;
 	end loop;
@@ -188,6 +197,29 @@ end function;
 							return res;
 						end function;
 
+function getAddressCompleted(ins: InstructionState) return std_logic is
+begin
+	return ins.controlInfo.completed;
+end function;
+
+function getDataCompleted(ins: InstructionState) return std_logic is
+begin
+	return ins.controlInfo.completed2;
+end function;
+
+function setAddressCompleted(ins: InstructionState; state: std_logic) return InstructionState is
+	variable res: InstructionState := ins;
+begin
+	res.controlInfo.completed := state;
+	return res;
+end function;
+
+function setDataCompleted(ins: InstructionState; state: std_logic) return InstructionState is
+	variable res: InstructionState := ins;
+begin
+	res.controlInfo.completed2 := state;
+	return res;
+end function;
 
 
 				function lmQueueNext(content: InstructionStateArray;

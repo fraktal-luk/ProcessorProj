@@ -166,7 +166,7 @@ begin
 	contentData <= extractData(content);
 
 
-		cmpMask <= compareAddress(TMP_content, compareAddressDataIn) and TMP_Mask;
+		cmpMask <= compareAddress(TMP_content, TMP_mask, compareAddressDataIn);
 		-- TEMP selection of hit checking mechanism 
 		matchedSlot <= findNewestMatch(cmpMask, qs0.pStart, compareAddressDataIn)
 																										when MODE = store
