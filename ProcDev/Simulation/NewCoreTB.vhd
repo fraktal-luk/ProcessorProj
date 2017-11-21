@@ -113,6 +113,8 @@ ARCHITECTURE behavior OF NewCoreTB4 IS
    -- Clock period definitions
    constant clk_period : time := 10 ns;
  
+	alias testProgram is testProg1;
+ 
 	for uut: NewCore0 use entity work.NewCore0(Behavioral5);
 BEGIN
  
@@ -210,10 +212,7 @@ BEGIN
 						--				So we can't get new instruction bits when Fetch stalls, cause they'd destroy
 						--				stalled content in fetch buffer!
 						for i in 0 to PIPE_WIDTH-1 loop
-							iin(i) <= --mainProgram --programMem
-										 --prog0 -- CAREFUL! if using prog0, PM_SIZE may be wrong
-										 --prog1
-										 testProg1
+							iin(i) <= testProgMem
 										(slv2u(iadr(10 downto 2)) + i); -- CAREFUL! 2 low bits unused (32b memory) 									
 						end loop;
 					end if;

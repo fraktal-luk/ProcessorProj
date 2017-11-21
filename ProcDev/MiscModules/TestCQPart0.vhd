@@ -114,10 +114,11 @@ begin
 				logBuffer(stageDataCQ.data, stageDataCQ.fullMask, livingMaskCQ,
 								flowResponseCQ);
 
-				if CQ_SINGLE_OUTPUT then				
-					checkBuffer(stageDataCQ.data, stageDataCQ.fullMask,
-									stageDataCQNext.data, stageDataCQNext.fullMask,
-									flowDriveCQ, flowResponseCQ);	
+				if CQ_SINGLE_OUTPUT then
+					-- CAREFUL! Can't be used here because queue not continuous
+					--checkBuffer(stageDataCQ.data, stageDataCQ.fullMask,
+					--				stageDataCQNext.data, stageDataCQNext.fullMask,
+					--				flowDriveCQ, flowResponseCQ);	
 					assert isNonzero(compareMaskCQ) = '0' report "Overwriting in CQ!";
 				end if;
 		end if;
@@ -129,34 +130,41 @@ begin
 	maskNew(0 to INPUT_WIDTH-1) <= maskIn;
 	
 	SINGLE_OUTPUT_REGS: if CQ_SINGLE_OUTPUT generate
-		stageDataCQNext <= stageCQNext(stageDataCQ,
-													compactData(stageDataCQNew, maskNew),
+		stageDataCQNext <= stageCQNext_New(stageDataCQ,
+													--compactData(stageDataCQNew, maskNew),
+														stageDataCQNew,
 												livingMaskCQ,
-													compactMask(stageDataCQNew, maskNew),
+													--compactMask(stageDataCQNew, maskNew),
+														maskNew,
 												PIPE_WIDTH,
 												binFlowNum(flowResponseCQ.living),
 												binFlowNum(flowResponseCQ.sending),
 												binFlowNum(flowDriveCQ.prevSending));
 
-		stageDataCQNextCheckOld <= stageCQNext(stageDataCQ,
-													compactData(stageDataCQNew, maskNew),
+		stageDataCQNextCheckOld <= stageCQNext_New(stageDataCQ,
+													--compactData(stageDataCQNew, maskNew),
+														stageDataCQNew,
 												livingMaskCQ,
-													compactMask(stageDataCQNew, zeroInputMask),
+													--compactMask(stageDataCQNew, zeroInputMask),
+														zeroInputMask,
 												PIPE_WIDTH,
 												binFlowNum(flowResponseCQ.living),
 												binFlowNum(flowResponseCQ.sending),
 												binFlowNum(flowDriveCQ.prevSending));
 
-		stageDataCQNextCheckNew <= stageCQNext(stageDataCQ,
-													compactData(stageDataCQNew, maskNew),
+		stageDataCQNextCheckNew <= stageCQNext_New(stageDataCQ,
+													--compactData(stageDataCQNew, maskNew),
+														stageDataCQNew,
 												zeroMaskCQ,
-													compactMask(stageDataCQNew, maskNew),
+													--compactMask(stageDataCQNew, maskNew),
+														maskNew,
 												PIPE_WIDTH,
 												binFlowNum(flowResponseCQ.living),
 												binFlowNum(flowResponseCQ.sending),
 												binFlowNum(flowDriveCQ.prevSending));
 
-		compareMaskCQ <= stageDataCQNextCheckOld.fullMask and stageDataCQNextCheckNew.fullMask;
+		compareMaskCQ <= stageDataCQNextCheckOld.fullMask and maskNew(0 to 2);
+																				--stageDataCQNextCheckNew.fullMask;
 		
 												
 		flowDriveCQ.prevSending <=	num2flow(countOnes(maskIn));
@@ -168,7 +176,8 @@ begin
 		stageDataCQNext.data(0 to 2) <= dataIn(0 to 2);
 	end generate;
 
-	whichAcceptedCQSig <= (others => '1');
+	whichAcceptedCQSig <= --(others => '1');
+								 not stageDataCQLiving.fullMask(1 to 2) & "11";
 													
 	SLOT_CQ: entity work.BufferPipeLogic(BehavioralDirect)
 	generic map(

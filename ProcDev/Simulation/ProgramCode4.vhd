@@ -347,6 +347,47 @@ package ProgramCode4 is
 			others => insERROR -- undefined
 		);
 	
+	
+	constant testProgMem: WordMem := (
+		0 => insNOP,
+		1 => insSET(r1, 325),
+		2 => insSET(r2, 0),
+		3 => insSTORE(r1, r2, 12), -- This should go immediately
+		4 => insLOAD(r5, r0, 10), -- Addres hit, forwarding
+
+		5 => insNOP,
+		6 => insNOP,
+		7 => insNOP,
+		8 => insNOP,
+		9 => insNOP,
+		10 => insNOP,
+		11 => insNOP,
+		12 => insNOP,
+		13 => insNOP,
+		14 => insNOP,
+		
+		15 => insSET(r2, 221),
+		16 => ins655655(ext0, r2, r5, mulS, r5, 0), -- long operation, delaying store address
+		17 => insSTORE(r2, r0, 16),
+		18 => insLOAD(r10, r0, 16), -- data not ready
+		
+		19 => insNOP,
+		20 => insNOP,
+		21 => insNOP,
+		22 => insNOP,
+		23 => insNOP,
+		24 => insNOP,
+		25 => insNOP,
+		26 => insNOP,
+		27 => insNOP,
+		28 => insNOP,
+		
+		29 => ins65J(jz, r0, -4*(29-0)),
+		
+		
+		others => insERROR
+	);
+	
 end ProgramCode4;
 
 
