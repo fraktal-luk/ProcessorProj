@@ -176,9 +176,9 @@ begin
 		stageDataCQNext.data(0 to 2) <= dataIn(0 to 2);
 	end generate;
 
-	whichAcceptedCQSig <= --(others => '1');
-								 not stageDataCQLiving.fullMask(1 to 2) & "11";
-													
+	whichAcceptedCQSig <=  (others => '1') when CQ_THREE_OUTPUTS	-- Don't block Exec if 3 write ports
+							else (not stageDataCQLiving.fullMask(1 to 2)) & "11"; -- Enable blocking if 1 wr port
+
 	SLOT_CQ: entity work.BufferPipeLogic(BehavioralDirect)
 	generic map(
 		CAPACITY => CQ_SIZE,

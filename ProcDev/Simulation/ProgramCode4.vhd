@@ -353,9 +353,11 @@ package ProgramCode4 is
 		1 => insSET(r1, 325),
 		2 => insSET(r2, 0),
 		3 => insSTORE(r1, r2, 12), -- This should go immediately
-		4 => insLOAD(r5, r0, 10), -- Addres hit, forwarding
+		4 => insLOAD(r5, r0, 12), -- Addres hit, forwarding
 
-		5 => insNOP,
+		5 =>
+				insLOAD(r7, r0, 20), -- Addres hit, forwarding
+
 		6 => insNOP,
 		7 => insNOP,
 		8 => insNOP,

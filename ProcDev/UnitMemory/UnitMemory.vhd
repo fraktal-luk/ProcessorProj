@@ -374,7 +374,10 @@ begin
 			execAcceptingC <= execAcceptingCSig;
 			execAcceptingE <= '1'; --???  -- execAcceptingESig;
 
-			loadResultSending <= sendingFromSysReg or sendingFromDLQ or sendingMem0 or storeForwardSending;		
+			loadResultSending <= (sendingFromSysReg or sendingFromDLQ or memLoadReady
+																							or storeForwardSendingDelay)
+										or (sendingMem0 and isStore(loadResultData)); 
+											-- CAREFUL: this is for stores, loadResultSig sh. be renamed
 					-- CAREFUL, TODO: ^ memLoadReady needed to ack that not a miss? But would block when a store!
 					
 			loadResultData <= -- TODO: as with DLQ sending, what prios?
