@@ -60,9 +60,9 @@ entity LoadMissQueue is -- TODO: this is copy-paste from MemoryUnit - should be 
 		reset: in std_logic;
 		en: in std_logic;
 
-			acceptingOut: out std_logic;
-			prevSending: in std_logic;
-			dataIn: in StageDataMulti;
+		acceptingOut: out std_logic;
+		prevSending: in std_logic;
+		dataIn: in StageDataMulti;
 
 		storeAddressWr: in std_logic;
 		storeValueWr: in std_logic;
@@ -70,18 +70,22 @@ entity LoadMissQueue is -- TODO: this is copy-paste from MemoryUnit - should be 
 		storeAddressDataIn: in InstructionState;
 		storeValueDataIn: in InstructionState;
 
-			committing: in std_logic;
-			groupCtrNext: in SmallNumber;
+			compareAddressDataIn: in InstructionState;
+			compareAddressReady: in std_logic;
 
-		lateEventSignal :in std_logic;
+			selectedDataOut: out InstructionState;
+			selectedSending: out std_logic;
+
+		committing: in std_logic;
+		groupCtrInc: in SmallNumber; -- CAREFUL: differs from MemoryUnit
+
+		lateEventSignal: in std_logic;
 		execEventSignal: in std_logic;
 		execCausing: in InstructionState;
 		
-		nextAccepting: in std_logic;
-		
-		acceptingOutSQ: out std_logic;
+		nextAccepting: in std_logic;	
 		sendingSQOut: out std_logic;
-		dataOutSQ: out InstructionState
+			dataOutV: out StageDataMulti
 	);
 end LoadMissQueue;
 
@@ -171,8 +175,7 @@ begin
 			firstReadyVec <= findFirstFilled(extractData(content), livingMask, nextAccepting);
 		
 		-- TODO: use firstReadyVec to select!
-		sqOutData	<= --findCommittingSQ(extractData(content), livingMask, groupCtrNext);
-							selectReady(extractData(content), firstReadyVec); -- like this!
+		sqOutData	<= selectReady(extractData(content), firstReadyVec); -- like this!
 				
 			wrAddress <= storeAddressWr;
 			wrData <= storeValueWr;
@@ -180,11 +183,9 @@ begin
 			dataA <= storeAddressDataIn;
 			dataD <= storeValueDataIn;
 					
-			acceptingOutSQ <= '1'; -- TEMP!						
-			sendingSQ <= isNonzero(sqOutData.fullMask);
-			dataOutSQ <= sqOutData.data(0); -- CAREFUL, TEMP!
-							
-			--fullMask <= extractFullMask(content); -- DUPLICATE!
+			sendingSQ <= isNonzero(sqOutData.fullMask);				
+				dataOutV.fullMask <= sqOutData.fullMask;
+				dataOutV.data <= sqOutData.data;
 
 			contentData <= extractData(content);
 								
@@ -193,7 +194,7 @@ begin
 				if rising_edge(clk) then			
 					content <= contentNext;
 					
-					logBuffer(contentData, fullMask, livingMask, bufferResponse);	
+					--logBuffer(contentData, fullMask, livingMask, bufferResponse);	
 					-- NOTE: below has no info about flow constraints. It just checks data against
 					--			flow numbers, while the validity of those numbers is checked by slot logic
 					checkBuffer(extractData(content), fullMask, extractData(contentNext),
@@ -219,10 +220,7 @@ begin
 							num2flow(countOnes(dataIn.fullMask)) when prevSending = '1' else (others => '0');
 			bufferDrive.kill <= num2flow(countOnes(killMask));
 			bufferDrive.nextAccepting <= num2flow(countOnes(sqOutData.fullMask));
-			acceptingOut <= --'1' when binFlowNum(bufferResponse.living) >= PIPE_WIDTH else '0';
-								 --not isNonzero(livingMask(QUEUE_SIZE-PIPE_WIDTH to QUEUE_SIZE-1));		
-								 --not livingMask(QUEUE_SIZE-PIPE_WIDTH);
-								 not fullMask(QUEUE_SIZE-PIPE_WIDTH);
+			acceptingOut <= not fullMask(QUEUE_SIZE-PIPE_WIDTH);
 					
 					KILLERS: for i in 0 to QUEUE_SIZE-1 generate
 						signal before: std_logic;

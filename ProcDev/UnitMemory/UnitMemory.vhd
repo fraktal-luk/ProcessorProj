@@ -108,6 +108,8 @@ architecture Behavioral of UnitMemory is
 	
 	signal stageDataAfterCache, stageDataAfterSysRegs, loadResultData, dataFromDLQ:
 					InstructionState := DEFAULT_INSTRUCTION_STATE;
+		signal stageDataMultiDLQ: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
+					
 	signal sendingMem0: std_logic := '0';
 	
 	signal execAcceptingCSig, execAcceptingESig: std_logic := '0';	
@@ -357,8 +359,14 @@ begin
 				storeAddressDataIn => DEFAULT_INSTRUCTION_STATE,
 				storeValueDataIn => DEFAULT_INSTRUCTION_STATE,
 
+					compareAddressDataIn => DEFAULT_INSTRUCTION_STATE,
+					compareAddressReady => '0',
+
+					selectedDataOut => open,
+					selectedSending => open,
+			
 					committing => committing,
-					groupCtrNext => groupCtrNext,
+					groupCtrInc => (others => '0'),
 					
 					lateEventSignal => lateEventSignal,
 				execEventSignal => eventSignal,
@@ -366,11 +374,11 @@ begin
 				
 				nextAccepting => not sendingFromSysReg, -- TODO: when should it be allowed to send? Priorities
 				
-				acceptingOutSQ => open, -- TODO
 				sendingSQOut => sendingFromDLQ,
-				dataOutSQ => dataFromDLQ
+					dataOutV => stageDataMultiDLQ
 			);
-
+				dataFromDLQ <= stageDataMultiDLQ.data(0);
+			
 			execAcceptingC <= execAcceptingCSig;
 			execAcceptingE <= '1'; --???  -- execAcceptingESig;
 
