@@ -97,20 +97,20 @@ architecture Behavioral of UnitMemory is
 	signal inputDataLoadUnit: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
 	signal eventSignal: std_logic := '0';	
 	
-	signal loadUnitSendingSig: std_logic := '0';
+	signal addressUnitSendingSig: std_logic := '0';
 	
 	signal sendingOutSQ: std_logic  := '0';
 	signal dataOutSQV: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
 
 	signal dlqAccepting: std_logic := '1';	
-	signal sendingToDLQ, sendingFromDLQ, loadResultSending: std_logic := '0';
+	signal sendingToDLQ, sendingFromDLQ, readResultSending: std_logic := '0';
 	signal dataToDLQ: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
 	
-	signal stageDataAfterCache, stageDataAfterSysRegs, loadResultData, dataFromDLQ:
+	signal stageDataAfterCache, stageDataAfterSysRegs, readResultData, dataFromDLQ:
 					InstructionState := DEFAULT_INSTRUCTION_STATE;
 		signal stageDataMultiDLQ: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
 					
-	signal sendingMem0, sendingAfterRead: std_logic := '0';
+	signal sendingMem0, sendingMem1, sendingAfterRead: std_logic := '0';
 		signal dataAfterRead: InstructionState := DEFAULT_INSTRUCTION_STATE;
 	
 	signal execAcceptingCSig, execAcceptingESig: std_logic := '0';	
@@ -184,7 +184,7 @@ begin
 		inputDataLoadUnit.fullMask(0) <= effectiveAddressSending;		
 
 		SUBPIPE_LOAD_UNIT: block
-			signal dataM, outputData, stageDataOutMem0: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;			
+			signal dataM, dataN, outputData, stageDataOutMem0: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;			
 			signal acceptingMem1: std_logic := '0';
 		begin
 				STAGE_MEM0: entity work.GenericStageMulti(SingleTagged)
@@ -209,27 +209,21 @@ begin
 
 					sendingAfterRead <= sendingMem0; -- TEMP!
 					dataAfterRead <= stageDataOutMem0.data(0);
-
-			stageDataAfterForward <= setInsResult(dataAfterRead, storeForwardData.argValues.arg2);
-			stageDataAfterCache <= setInsResult(setDataCompleted(dataAfterRead, memLoadReady),
-															memLoadValue);
-			stageDataAfterSysRegs <= setInsResult(setDataCompleted(dataAfterRead, sendingFromSysReg),
-															  sysLoadVal);
 			
-				dataM.data(0) <= loadResultData;
-				dataM.fullMask(0) <= loadResultSending;
+				dataM.data(0) <= readResultData;
+				dataM.fullMask(0) <= readResultSending;
 				
 				STAGE_MEM1: entity work.GenericStageMulti(SingleTagged)
 				port map(
 					clk => clk, reset => reset, en => en,
 					
-					prevSending => loadResultSending,
+					prevSending => readResultSending,
 					nextAccepting => whichAcceptedCQ(2),
 					
 					stageDataIn => dataM, 
 					acceptingOut => acceptingMem1,
-					sendingOut => loadUnitSendingSig,
-					stageDataOut => outputData,
+					sendingOut => sendingMem1,
+					stageDataOut => dataN,
 					
 					execEventSignal => eventSignal,
 					lateEventSignal => lateEventSignal,
@@ -239,7 +233,10 @@ begin
 					stageEventsOut => open					
 				);
 
-			outputC <= (loadUnitSendingSig, clearTempControlInfoSimple(outputData.data(0)));
+					addressUnitSendingSig <= sendingMem1;
+					outputData <= dataN;
+
+			outputC <= (addressUnitSendingSig, clearTempControlInfoSimple(outputData.data(0)));
 
 			outputOpPreC <= stageDataOutMem0.data(0);
 		end block;
@@ -253,18 +250,24 @@ begin
 		sendingAddressToSQSig <= sendingAddressingForStore or sendingAddressingForMtc;	
 
 
-			loadResultSending <= (sendingFromSysReg or sendingFromDLQ or memLoadReady
+
+			stageDataAfterForward <= setInsResult(dataAfterRead, storeForwardData.argValues.arg2);
+			stageDataAfterCache <= setInsResult(setDataCompleted(dataAfterRead, memLoadReady),
+															memLoadValue);
+			stageDataAfterSysRegs <= setInsResult(setDataCompleted(dataAfterRead, sendingFromSysReg),
+															  sysLoadVal);
+
+		readResultSending <= (sendingFromSysReg or sendingFromDLQ or memLoadReady
 																							or storeForwardSendingDelay)
-										or (sendingAfterRead and isStore(loadResultData)); 
+										or (sendingAfterRead and isStore(readResultData)); 
 											-- CAREFUL: this is for stores, loadResultSig sh. be renamed
 					-- CAREFUL, TODO: ^ memLoadReady needed to ack that not a miss? But would block when a store!
 					
-			loadResultData <= -- TODO: as with DLQ sending, what prios?
+		readResultData <= -- TODO: as with DLQ sending, what prios?
 					  stageDataAfterSysRegs when sendingFromSysReg = '1'
 				else dataFromDLQ when sendingFromDLQ = '1'
 				else stageDataAfterForward when storeForwardSendingDelay = '1'
 				else stageDataAfterCache;
-
 
 	
 		-- SQ inputs
@@ -357,8 +360,8 @@ begin
 
 			-- Sending to Delayed Load Queue: when load miss or load and sending from sys reg
 			sendingToDLQ <= 		sendingAfterRead -- TODO: synonymous with "load/mfc sending" but may change
-								 and (isLoad(loadResultData) or isSysRegRead(loadResultData)) -- not store!
-								 and not getDataCompleted(loadResultData); -- When missed
+								 and (isLoad(readResultData) or isSysRegRead(readResultData)) -- not store!
+								 and not getDataCompleted(readResultData); -- When missed
 								 
 			dataToDLQ.data(0) <= stageDataAfterCache;
 			dataToDLQ.fullMask(0) <= sendingToDLQ;
