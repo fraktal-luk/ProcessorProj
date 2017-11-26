@@ -110,8 +110,8 @@ architecture Behavioral of UnitMemory is
 					InstructionState := DEFAULT_INSTRUCTION_STATE;
 		signal stageDataMultiDLQ: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
 					
-	signal sendingMem0, sendingMem1, sendingAfterRead: std_logic := '0';
-		signal dataAfterRead: InstructionState := DEFAULT_INSTRUCTION_STATE;
+	signal sendingMem0, sendingMem1, sendingAfterTranslation, sendingAfterRead: std_logic := '0';
+		signal dataAfterTranslation, dataAfterRead: InstructionState := DEFAULT_INSTRUCTION_STATE;
 	
 	signal execAcceptingCSig, execAcceptingESig: std_logic := '0';	
 	signal inputDataC: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
@@ -207,6 +207,9 @@ begin
 					stageEventsOut => open					
 				);
 
+					sendingAfterTranslation <= sendingMem0;
+					dataAfterTranslation <= stageDataOutMem0.data(0);
+				
 					sendingAfterRead <= sendingMem0; -- TEMP!
 					dataAfterRead <= stageDataOutMem0.data(0);
 			
