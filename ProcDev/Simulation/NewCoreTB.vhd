@@ -212,7 +212,7 @@ BEGIN
 						--				So we can't get new instruction bits when Fetch stalls, cause they'd destroy
 						--				stalled content in fetch buffer!
 						for i in 0 to PIPE_WIDTH-1 loop
-							iin(i) <= testProg1--Mem
+							iin(i) <= testProgMem
 										(slv2u(iadr(10 downto 2)) + i); -- CAREFUL! 2 low bits unused (32b memory) 									
 						end loop;
 					end if;

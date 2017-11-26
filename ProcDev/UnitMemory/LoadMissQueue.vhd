@@ -49,48 +49,47 @@ use work.ProcLogicMemory.all;
 
 use work.BasicCheck.all;
 
- 
-entity LoadMissQueue is -- TODO: this is copy-paste from MemoryUnit - should be done by parameters or so!
-	generic(
-		QUEUE_SIZE: integer := 4;
-		CLEAR_COMPLETED: boolean := true
-	);
-	port(
-		clk: in std_logic;
-		reset: in std_logic;
-		en: in std_logic;
+--entity LoadMissQueue is -- TODO: this is copy-paste from MemoryUnit - should be done by parameters or so!
+--	generic(
+--		QUEUE_SIZE: integer := 4;
+--		CLEAR_COMPLETED: boolean := true
+--	);
+--	port(
+--		clk: in std_logic;
+--		reset: in std_logic;
+--		en: in std_logic;
+--
+--		acceptingOut: out std_logic;
+--		prevSending: in std_logic;
+--		dataIn: in StageDataMulti;
+--
+--		storeAddressWr: in std_logic;
+--		storeValueWr: in std_logic;
+--
+--		storeAddressDataIn: in InstructionState;
+--		storeValueDataIn: in InstructionState;
+--
+--			compareAddressDataIn: in InstructionState;
+--			compareAddressReady: in std_logic;
+--
+--			selectedDataOut: out InstructionState;
+--			selectedSending: out std_logic;
+--
+--		committing: in std_logic;
+--		groupCtrInc: in SmallNumber; -- CAREFUL: differs from MemoryUnit
+--
+--		lateEventSignal: in std_logic;
+--		execEventSignal: in std_logic;
+--		execCausing: in InstructionState;
+--		
+--		nextAccepting: in std_logic;	
+--		sendingSQOut: out std_logic;
+--			dataOutV: out StageDataMulti
+--	);
+--end LoadMissQueue;
 
-		acceptingOut: out std_logic;
-		prevSending: in std_logic;
-		dataIn: in StageDataMulti;
 
-		storeAddressWr: in std_logic;
-		storeValueWr: in std_logic;
-
-		storeAddressDataIn: in InstructionState;
-		storeValueDataIn: in InstructionState;
-
-			compareAddressDataIn: in InstructionState;
-			compareAddressReady: in std_logic;
-
-			selectedDataOut: out InstructionState;
-			selectedSending: out std_logic;
-
-		committing: in std_logic;
-		groupCtrInc: in SmallNumber; -- CAREFUL: differs from MemoryUnit
-
-		lateEventSignal: in std_logic;
-		execEventSignal: in std_logic;
-		execCausing: in InstructionState;
-		
-		nextAccepting: in std_logic;	
-		sendingSQOut: out std_logic;
-			dataOutV: out StageDataMulti
-	);
-end LoadMissQueue;
-
-
-architecture Behavioral of LoadMissQueue is
+architecture LoadMissQueue of MEmoryUnit is--LoadMissQueue is
 	constant zeroMask: std_logic_vector(0 to PIPE_WIDTH-1) := (others => '0');
 
 	signal wrAddress, wrData, sendingSQ: std_logic := '0';
@@ -106,31 +105,11 @@ architecture Behavioral of LoadMissQueue is
 																			:= (others => DEFAULT_INSTRUCTION_STATE);
 	signal contentMaskNext, matchingA, matchingD,
 				matchingShA, matchingShD, firstReadyVec, sendingVec
-				: std_logic_vector(0 to QUEUE_SIZE-1) := (others => '0'); 
-	signal sqOutData, sqOutData_2: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
-
+				: std_logic_vector(0 to QUEUE_SIZE-1) := (others => '0');
 
 	signal bufferDrive: FlowDriveBuffer := (killAll => '0', lockAccept => '0', lockSend => '0',
 																others=>(others=>'0'));
-	signal bufferResponse: FlowResponseBuffer := (others=>(others=>'0'));
-	
-	
-	
-	function selectReady(content: InstructionStateArray; firstReadyVec: std_logic_vector)
-	return StageDataMulti is
-		variable res: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
-	begin
-		for i in 0 to firstReadyVec'length-1 loop
-			res.data(0) := content(i);		
-			if firstReadyVec(i) = '1' then
-				res.fullMask(0) := '1';
-				exit;
-			end if;
-		end loop;
-		
-		return res;
-	end function;
-	
+	signal bufferResponse: FlowResponseBuffer := (others=>(others=>'0'));	
 begin				
 		fullMask <= extractFullMask(content);
 		livingMask <= fullMask and not killMask;
@@ -173,9 +152,6 @@ begin
 		contentNext <= contentUpdated;
 		
 			firstReadyVec <= findFirstFilled(extractData(content), livingMask, nextAccepting);
-		
-		-- TODO: use firstReadyVec to select!
-		sqOutData	<= selectReady(extractData(content), firstReadyVec); -- like this!
 				
 			wrAddress <= storeAddressWr;
 			wrData <= storeValueWr;
@@ -183,9 +159,9 @@ begin
 			dataA <= storeAddressDataIn;
 			dataD <= storeValueDataIn;
 					
-			sendingSQ <= isNonzero(sqOutData.fullMask);				
-				dataOutV.fullMask <= sqOutData.fullMask;
-				dataOutV.data <= sqOutData.data;
+			sendingSQ <= isNonzero(firstReadyVec);
+				dataOutV.fullMask(0) <= sendingSq;
+				dataOutV.data(0) <= chooseIns(extractData(content), firstReadyVec);
 
 			contentData <= extractData(content);
 								
@@ -204,7 +180,6 @@ begin
 			end process;
 					
 			SLOT_BUFF: entity work.BufferPipeLogic(BehavioralDirect)
-																	--BehavioralDirect)
 			generic map(
 				CAPACITY => QUEUE_SIZE, -- PIPE_WIDTH*2*2
 				MAX_OUTPUT => PIPE_WIDTH,
@@ -219,28 +194,13 @@ begin
 			bufferDrive.prevSending <= 
 							num2flow(countOnes(dataIn.fullMask)) when prevSending = '1' else (others => '0');
 			bufferDrive.kill <= num2flow(countOnes(killMask));
-			bufferDrive.nextAccepting <= num2flow(countOnes(sqOutData.fullMask));
+			bufferDrive.nextAccepting <= num2flow(1) when sendingSq = '1' else num2flow(0);
 			acceptingOut <= not fullMask(QUEUE_SIZE-PIPE_WIDTH);
-					
-					KILLERS: for i in 0 to QUEUE_SIZE-1 generate
-						signal before: std_logic;
-						signal a, b: std_logic_vector(7 downto 0);
-						signal c: SmallNumber := (others => '0');						
-					begin
-						a <= execCausing.groupTag;
-						b <= content(i).ins.groupTag;
---						IQ_KILLER: entity work.CompareBefore8 port map(
---							inA =>  a,
---							inB =>  b,
---							outC => --before
---										open
---						);		
-						
-						c <= subSN(a, b);
-						before <= c(7);
-						killMask(i) <= killByTag(before, execEventSignal, lateEventSignal) -- before and execEventSignal
-												and fullMask(i);									
-					end generate;
+				
+
+			killMask <=	getKillMask(extractData(content), fullMask,
+											execCausing, execEventSignal, lateEventSignal);
+		
 	sendingSQOut <= sendingSQ;
-end Behavioral;
+end LoadMissQueue;
 

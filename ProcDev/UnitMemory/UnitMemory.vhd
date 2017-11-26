@@ -339,7 +339,8 @@ begin
 			dataToDLQ.data(0) <= stageDataAfterCache;
 			dataToDLQ.fullMask(0) <= sendingToDLQ;
 
-			DELAYED_LOAD_QUEUE: entity work.LoadMissQueue(Behavioral)
+			DELAYED_LOAD_QUEUE: entity work.--LoadMissQueue(Behavioral)
+														MemoryUnit(LoadMissQueue)
 			generic map(
 				QUEUE_SIZE => LMQ_SIZE,
 				CLEAR_COMPLETED => false
@@ -372,7 +373,8 @@ begin
 				execEventSignal => eventSignal,
 				execCausing => execCausing,
 				
-				nextAccepting => not sendingFromSysReg, -- TODO: when should it be allowed to send? Priorities
+				nextAccepting => '1',--not sendingFromSysReg, -- TODO: when should it be allowed to send?
+																			 --		 Priorities!
 				
 				sendingSQOut => sendingFromDLQ,
 					dataOutV => stageDataMultiDLQ
