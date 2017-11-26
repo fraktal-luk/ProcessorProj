@@ -89,7 +89,7 @@ use work.BasicCheck.all;
 --end LoadMissQueue;
 
 
-architecture LoadMissQueue of MEmoryUnit is--LoadMissQueue is
+architecture LoadMissQueue of MemoryUnit is--LoadMissQueue is
 	constant zeroMask: std_logic_vector(0 to PIPE_WIDTH-1) := (others => '0');
 
 	signal wrAddress, wrData, sendingSQ: std_logic := '0';

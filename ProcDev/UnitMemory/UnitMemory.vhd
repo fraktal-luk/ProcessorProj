@@ -167,9 +167,13 @@ begin
 		begin
 		end block;
 
+		outputE <= (sendingIQE, dataIQE);
+
+
+		-- CAREFUL: Here we could inject form DLQ when needed
 		inputDataLoadUnit.data(0) <= dataToLoadUnitSig;
 		inputDataLoadUnit.fullMask(0) <= sendingAddressingSig;
-		outputE <= (sendingIQE, dataIQE);
+		
 
 		SUBPIPE_LOAD_UNIT: block
 			signal dataM, outputData, stageDataOutMem0: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;			

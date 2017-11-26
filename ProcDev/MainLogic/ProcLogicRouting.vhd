@@ -247,6 +247,9 @@ begin
 		res.data(i).virtualArgs.sel(2) := '0';
 		res.data(i).physicalArgs.sel(2) := '0';
 		res.data(i).argValues.missing(2) := '0';
+		
+			res.data(i).controlInfo.completed := '0';
+			res.data(i).controlInfo.completed2 := '0';
 	end loop;
 	return res;
 end function;
@@ -307,6 +310,9 @@ begin
 		res.data(i).constantArgs.immSel := '0';
 		res.data(i).virtualDestArgs.sel(0) := '0';
 		res.data(i).physicalDestArgs.sel(0) := '0';
+		
+			res.data(i).controlInfo.completed := '0';
+			res.data(i).controlInfo.completed2 := '0';
 	end loop;
 	return res;
 end function;
