@@ -175,9 +175,12 @@ begin
 
 		outputE <= (sendingIQE, dataIQE);
 
-			addressingData <= effectiveAddressData;
-			sendingAddressingSig <= effectiveAddressSending;
-				sendingAddressing <= effectiveAddressSending;
+			addressingData <= --effectiveAddressData;
+									dataAfterTranslation;
+			sendingAddressingSig <= --effectiveAddressSending;
+											sendingAfterTranslation;
+				sendingAddressing <= --effectiveAddressSending;
+											sendingAfterTranslation;
 
 		-- CAREFUL: Here we could inject form DLQ when needed
 		inputDataLoadUnit.data(0) <= effectiveAddressData;
@@ -210,17 +213,19 @@ begin
 					sendingAfterTranslation <= sendingMem0;
 					dataAfterTranslation <= stageDataOutMem0.data(0);
 				
-					sendingAfterRead <= sendingMem0; -- TEMP!
-					dataAfterRead <= stageDataOutMem0.data(0);
+					sendingAfterRead <= sendingMem1; -- TEMP!
+					dataAfterRead <= dataN.data(0);
 			
-				dataM.data(0) <= readResultData;
-				dataM.fullMask(0) <= readResultSending;
+				--dataM.data(0) <= readResultData;
+				--dataM.fullMask(0) <= readResultSending;
+				dataM <= stageDataOutMem0;
 				
 				STAGE_MEM1: entity work.GenericStageMulti(SingleTagged)
 				port map(
 					clk => clk, reset => reset, en => en,
 					
-					prevSending => readResultSending,
+					prevSending => --readResultSending,
+										sendingMem0,
 					nextAccepting => whichAcceptedCQ(2),
 					
 					stageDataIn => dataM, 
@@ -237,7 +242,11 @@ begin
 				);
 
 					addressUnitSendingSig <= sendingMem1;
-					outputData <= dataN;
+					
+					
+					--outputData <= dataN;
+					outputData.data(0) <= readResultData;
+					outputData.fullMask(0) <= readResultSending;
 
 			outputC <= (addressUnitSendingSig, clearTempControlInfoSimple(outputData.data(0)));
 
