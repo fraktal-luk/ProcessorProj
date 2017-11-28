@@ -241,9 +241,9 @@ begin
 					stageEventsOut => open					
 				);
 
-					addressUnitSendingSig <= sendingMem1;
-					
-					
+					-- CAREFUL: when miss (incl. forwarding miss), no 'completed' signal:
+					addressUnitSendingSig <= sendingAfterRead and not sendingToDLQ;
+										
 					--outputData <= dataN;
 					outputData.data(0) <= readResultData;
 					outputData.fullMask(0) <= readResultSending;
@@ -264,7 +264,7 @@ begin
 
 
 			stageDataAfterForward <= setInsResult(setDataCompleted(dataAfterRead, 
-																						getDataCompleted(storeforwardData)),
+																						getDataCompleted(storeForwardData)),
 															storeForwardData.argValues.arg2);
 			stageDataAfterCache <= setInsResult(setDataCompleted(dataAfterRead, memLoadReady),
 															memLoadValue);
