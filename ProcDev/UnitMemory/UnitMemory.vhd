@@ -263,7 +263,9 @@ begin
 
 
 
-			stageDataAfterForward <= setInsResult(dataAfterRead, storeForwardData.argValues.arg2);
+			stageDataAfterForward <= setInsResult(setDataCompleted(dataAfterRead, 
+																						getDataCompleted(storeforwardData)),
+															storeForwardData.argValues.arg2);
 			stageDataAfterCache <= setInsResult(setDataCompleted(dataAfterRead, memLoadReady),
 															memLoadValue);
 			stageDataAfterSysRegs <= setInsResult(setDataCompleted(dataAfterRead, sendingFromSysReg),
