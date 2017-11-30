@@ -124,6 +124,9 @@ architecture Behavioral of UnitMemory is
 		signal effectiveAddressData: InstructionState := DEFAULT_INSTRUCTION_STATE;
 		signal effectiveAddressSending: std_logic := '0';
 	
+	signal lqSelectedData: InstructionState := DEFAULT_INSTRUCTION_STATE;
+	signal lqSelectedSending: std_logic := '0';
+	
 	signal sendingAddressToSQSig,
 				 storeAddressWrSig, storeValueWrSig,
 				 sendingAddressing,
@@ -282,7 +285,8 @@ begin
 				else dataFromDLQ when sendingFromDLQ = '1'
 				else stageDataAfterForward when storeForwardSendingDelay = '1'
 				else stageDataAfterCache;
-
+				-- TODO: add here selection form LQ to send err signal to ROB when turns out to be
+				--			completed with false data (older store hit in LQ)?
 	
 		-- SQ inputs
 		storeAddressWrSig <= sendingAddressToSQSig;
@@ -354,8 +358,8 @@ begin
 					compareAddressDataIn => storeAddressDataSig,
 					compareAddressReady => storeAddressWrSig,
 
-					selectedDataOut => open,
-					selectedSending => open,
+					selectedDataOut => lqSelectedData,
+					selectedSending => lqSelectedSending,
 					
 					committing => committing,
 					groupCtrInc => groupCtrInc,
@@ -377,7 +381,10 @@ begin
 								 and (isLoad(readResultData) or isSysRegRead(readResultData)) -- not store!
 								 and not getDataCompleted(readResultData); -- When missed
 								 
-			dataToDLQ.data(0) <= stageDataAfterCache;
+			dataToDLQ.data(0) <= stageDataAfterCache; -- TODO: when older store hit after younger load,
+																	--	 		give here the store address op?
+																	--			Selection from LQ would go forward instead,
+																	--			to write err signal to ROB
 			dataToDLQ.fullMask(0) <= sendingToDLQ;
 
 			DELAYED_LOAD_QUEUE: entity work.--LoadMissQueue(Behavioral)
