@@ -124,8 +124,9 @@ architecture Behavioral of UnitMemory is
 		signal effectiveAddressData: InstructionState := DEFAULT_INSTRUCTION_STATE;
 		signal effectiveAddressSending: std_logic := '0';
 	
-	signal lqSelectedData: InstructionState := DEFAULT_INSTRUCTION_STATE;
-	signal lqSelectedSending: std_logic := '0';
+	signal lqSelectedData, lqSelectedDataWithErr,
+					 lqSelectedDataWithErrDelay : InstructionState := DEFAULT_INSTRUCTION_STATE;
+	signal lqSelectedSending, lqSelectedSendingDelay: std_logic := '0';
 	
 	signal sendingAddressToSQSig,
 				 storeAddressWrSig, storeValueWrSig,
@@ -133,8 +134,17 @@ architecture Behavioral of UnitMemory is
 				 sendingAddressingForLoad, sendingAddressingForMfc,
 				 sendingAddressingForStore, sendingAddressingForMtc: std_logic := '0';
 	signal storeAddressDataSig, storeValueDataSig: InstructionState := DEFAULT_INSTRUCTION_STATE;
-	signal storeForwardData, stageDataAfterForward: InstructionState := DEFAULT_INSTRUCTION_STATE;
-	signal storeForwardSending, storeForwardSendingDelay: std_logic := '0'; 
+	signal storeForwardData, storeForwardDataDelay,
+				stageDataAfterForward: InstructionState := DEFAULT_INSTRUCTION_STATE;
+	signal storeForwardSending, storeForwardSendingDelay: std_logic := '0';
+	
+	function TMP_setLoadException(ins: InstructionState) return InstructionState is
+		variable res: InstructionState := ins;
+	begin
+		res.controlInfo.hasException := '1';
+		return res;
+	end function;
+	
 begin
 		eventSignal <= execOrIntEventSignalIn;	
 
@@ -267,8 +277,8 @@ begin
 
 
 			stageDataAfterForward <= setInsResult(setDataCompleted(dataAfterRead, 
-																						getDataCompleted(storeForwardData)),
-															storeForwardData.argValues.arg2);
+																			getDataCompleted(storeForwardDataDelay)),
+															storeForwardDataDelay.argValues.arg2);
 			stageDataAfterCache <= setInsResult(setDataCompleted(dataAfterRead, memLoadReady),
 															memLoadValue);
 			stageDataAfterSysRegs <= setInsResult(setDataCompleted(dataAfterRead, sendingFromSysReg),
@@ -281,12 +291,13 @@ begin
 					-- CAREFUL, TODO: ^ memLoadReady needed to ack that not a miss? But would block when a store!
 					
 		readResultData <= -- TODO: as with DLQ sending, what prios?
-					  stageDataAfterSysRegs when sendingFromSysReg = '1'
+					  lqSelectedDataWithErrDelay when lqSelectedSendingDelay = '1'
+				else stageDataAfterSysRegs when sendingFromSysReg = '1'
 				else dataFromDLQ when sendingFromDLQ = '1'
 				else stageDataAfterForward when storeForwardSendingDelay = '1'
 				else stageDataAfterCache;
-				-- TODO: add here selection form LQ to send err signal to ROB when turns out to be
-				--			completed with false data (older store hit in LQ)?
+	
+			lqSelectedDataWithErr <= TMP_setLoadException(lqSelectedData);
 	
 		-- SQ inputs
 		storeAddressWrSig <= sendingAddressToSQSig;
@@ -373,17 +384,16 @@ begin
 				sendingSQOut => open,
 					dataOutV => open
 			);
-			-- TODO: utilize info about store address hit in LoadQueue to squash the incorrect load.
-
 
 			-- Sending to Delayed Load Queue: when load miss or load and sending from sys reg
-			sendingToDLQ <= 		sendingAfterRead -- TODO: synonymous with "load/mfc sending" but may change
+			sendingToDLQ <= (		sendingAfterRead -- TODO: synonymous with "load/mfc sending" but may change
 								 and (isLoad(readResultData) or isSysRegRead(readResultData)) -- not store!
-								 and not getDataCompleted(readResultData); -- When missed
+								 and not getDataCompleted(readResultData))  -- When missed							 
+							or  lqSelectedSending; -- When store hits younger load and must get off the way
 								 
-			dataToDLQ.data(0) <= stageDataAfterCache; -- TODO: when older store hit after younger load,
-																	--	 		give here the store address op?
-																	--			Selection from LQ would go forward instead,
+			dataToDLQ.data(0) <= stageDataAfterCache; -- CAREFUL: when older store hit after younger load,
+																	--	 		giving here the store address op.
+																	--			Selection from LQ will go forward instead,
 																	--			to write err signal to ROB
 			dataToDLQ.fullMask(0) <= sendingToDLQ;
 
@@ -436,7 +446,12 @@ begin
 			begin
 				if rising_edge(clk) then
 					sendingFromSysReg <= sendingAddressingForMfc;
-					storeForwardSendingDelay <= storeForwardSending;						
+					
+					storeForwardDataDelay <= storeForwardData;
+					storeForwardSendingDelay <= storeForwardSending;
+
+					lqSelectedSendingDelay <= lqSelectedSending;
+					lqSelectedDataWithErrDelay <= lqSelectedDataWithErr;
 				end if;
 			end process;
 
