@@ -29,10 +29,12 @@ package ProcLogicMemory is
 function compareAddress(content: InstructionStateArray; fullMask: std_logic_vector;
 								ins: InstructionState) return std_logic_vector;
 -- TODO: This function and findOldestMatch introduce dependency on Queues. May be good to remove it
-function findNewestMatch(cmpMask: std_logic_vector; pStart: SmallNumber; ins: InstructionState)
+function findNewestMatch(content: InstructionStateArray;
+								 cmpMask: std_logic_vector; pStart: SmallNumber; ins: InstructionState)
 return std_logic_vector;
 		
-function findOldestMatch(cmpMask: std_logic_vector; pStart: SmallNumber; ins: InstructionState)
+function findOldestMatch(content: InstructionStateArray;
+								 cmpMask: std_logic_vector; pStart: SmallNumber; ins: InstructionState)
 return std_logic_vector;		
 
 
@@ -67,6 +69,32 @@ function lmMaskNext(livingMask: std_logic_vector;
 					  nLivingIn: integer;
 					  sendingVec: std_logic_vector;
 					  receiving: std_logic) return std_logic_vector;
+
+	function TMP_cmpTagsBefore(content: InstructionStateArray; tag: SmallNumber)
+	return std_logic_vector is
+		variable res: std_logic_vector(0 to content'length-1) := (others => '0');
+		variable diff: SmallNumber := (others => '0');
+	begin
+		for i in 0 to res'length-1 loop
+			diff := subSN(content(i).groupTag, tag); -- If grTag < tag then diff(high) = '1'
+			res(i) := diff(SMALL_NUMBER_SIZE-1);
+		end loop;
+		
+		return res;
+	end function;
+
+	function TMP_cmpTagsAfter(content: InstructionStateArray; tag: SmallNumber)
+	return std_logic_vector is
+		variable res: std_logic_vector(0 to content'length-1) := (others => '0');
+		variable diff: SmallNumber := (others => '0');
+	begin
+		for i in 0 to res'length-1 loop
+			diff := subSN(tag, content(i).groupTag); -- If grTag > tag then diff(high) = '1'
+			res(i) := diff(SMALL_NUMBER_SIZE-1);
+		end loop;
+		
+		return res;
+	end function;
 					  
 end ProcLogicMemory;
 
@@ -91,53 +119,61 @@ begin
 end function;
 
 		-- To find what to forward from StoreQueue
-		function findNewestMatch(cmpMask: std_logic_vector; pStart: SmallNumber;
+		function findNewestMatch(content: InstructionStateArray;
+										 cmpMask: std_logic_vector; pStart: SmallNumber;
 										 ins: InstructionState)
 		return std_logic_vector is
 			constant LEN: integer := cmpMask'length;		
 			variable res, older, before: std_logic_vector(0 to LEN-1) := (others => '0');
 			variable indices, rawIndices: SmallNumberArray(0 to LEN-1) := (others => (others => '0'));
 			variable matchBefore: std_logic := '0';
+			
+			variable tmpVec: std_logic_vector(0 to LEN-1) := (others => '0');
 		begin
 			-- From qs we must check which are older than ins
 			indices := getQueueIndicesFrom(LEN, pStart);
 			rawIndices := getQueueIndicesFrom(LEN, (others => '0'));
-			older := compareIndicesSmaller(indices, ins.groupTag);
-			before := compareIndicesSmaller(rawIndices, ins.groupTag);
+			older := TMP_cmpTagsBefore(content, ins.groupTag);
+			before := compareIndicesSmaller(rawIndices, pStart);
 			-- Use priority enc. to find last in the older ones. But they may be divided:
 			--		V  1 1 1 0 0 0 0 1 1 1 and cmp  V
 			--		   0 1 0 0 0 0 0 1 0 1
 			-- and then there are 2 runs of bits and those at the enc must be ignored (r older than first run)
 			
-			-- So, elems at the end are ignored when those conditions cooccur:
-			--		pStart > ins.groupTag and [match exists that match.groupTag < ins.groupTag]
-			matchBefore := isNonzero(cmpMask and before);
+			-- If there's a match before pStart, it is younger than those at or after pStart
+			tmpVec := cmpMask and older and before;
+			matchBefore := isNonzero(tmpVec);
 			
 			if matchBefore = '1' then
 				-- Ignore those after
-				res := invertVec(getFirstOne(invertVec(cmpMask and before)));
+				tmpVec := cmpMask and older and before;
+				res := invertVec(getFirstOne(invertVec(tmpVec)));
 			else
 				-- Don't ignore any matches
-				res := invertVec(getFirstOne(invertVec(cmpMask)));				
+				tmpVec := cmpMask and older;
+				res := invertVec(getFirstOne(invertVec(tmpVec)));
 			end if;
 			
 			return res;
 		end function;
 		
 		-- To check what in the LoadQueue has an error
-		function findOldestMatch(cmpMask: std_logic_vector; pStart: SmallNumber;
+		function findOldestMatch(content: InstructionStateArray;
+										 cmpMask: std_logic_vector; pStart: SmallNumber;
 										 ins: InstructionState)
 		return std_logic_vector is
 			constant LEN: integer := cmpMask'length;
-			variable res, newer, areAfter: std_logic_vector(0 to LEN-1) := (others => '0');
+			variable res, newer, areAtOrAfter: std_logic_vector(0 to LEN-1) := (others => '0');
 			variable indices, rawIndices: SmallNumberArray(0 to LEN-1) := (others => (others => '0'));
-			variable matchAfter: std_logic := '0';
+			variable matchAtOrAfter: std_logic := '0';
+			
+			variable tmpVec: std_logic_vector(0 to LEN-1) := (others => '0');
 		begin
 			-- From qs we must check which are newer than ins
 			indices := getQueueIndicesFrom(LEN, pStart);
 			rawIndices := getQueueIndicesFrom(LEN, (others => '0'));
-			newer := compareIndicesGreater(indices, ins.groupTag);
-			areAfter := compareIndicesGreater(rawIndices, ins.groupTag);
+			newer := TMP_cmpTagsAfter(content, ins.groupTag);
+			areAtOrAfter := not compareIndicesSmaller(rawIndices, pStart);
 			-- Use priority enc. to find first in the newer ones. But they may be divided:
 			--		V  1 1 1 0 0 0 0 1 1 1 and cmp  V
 			--		   0 1 0 0 0 0 0 1 0 1
@@ -145,14 +181,17 @@ end function;
 			
 			-- So, elems at the end are ignored when those conditions cooccur:
 			--		pStart > ins.groupTag and [match exists that match.groupTag < ins.groupTag]
-			matchAfter := isNonzero(cmpMask and areAfter);
+			tmpVec := cmpMask and newer and areAtOrAfter;
+			matchAtOrAfter := isNonzero(tmpVec);
 			
-			if matchAfter = '1' then
+			if matchAtOrAfter = '1' then
 				-- Ignore those before
-				res := getFirstOne(cmpMask and areAfter);
+				tmpVec := cmpMask and newer and areAtOrAfter;
+				res := getFirstOne(tmpVec);
 			else
 				-- Don't ignore any matches
-				res := getFirstOne(cmpMask);
+				tmpVec := cmpMask and newer;
+				res := getFirstOne(tmpVec);
 			end if;
 			
 			return res;

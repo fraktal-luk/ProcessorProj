@@ -318,7 +318,7 @@ begin
 			or fetchBlock(0)(15 downto 10) = opcode2slv(jz) 
 			or fetchBlock(0)(15 downto 10) = opcode2slv(jnz)
 		then
-			report "branch fetched!";
+			--report "branch fetched!";
 			
 				--res.controlInfo.newEvent := '1';
 				--res.controlInfo.hasBranch := '1';			
@@ -328,7 +328,7 @@ begin
 			res.target := tempTarget;
 		elsif fetchBlock(0)(15 downto 10) = opcode2slv(j)
 		then
-			report "long branch fetched";
+			--report "long branch fetched";
 			tempOffset := "000000" & fetchBlock(0)(9 downto 0) & fetchBlock(1);
 			tempTarget := addMwordFaster(res.basicInfo.ip, tempOffset);
 			res.target := tempTarget;
