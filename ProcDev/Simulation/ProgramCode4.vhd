@@ -326,12 +326,15 @@ package ProgramCode4 is
 			416 => insLOAD(r5, r0, 4*65 - 4), -- Should be forwarded as 22
 			417 => insSTORE(r3, r0, 4*66 - 8),
 			418 => insLOAD(r6, r0, 4*66 - 8), -- Should be forwarded as 33
-			419 => ins655H(subI, r5, r5, 22),
-			420 => ins65J(jnz, r5, 4*(1023 - 420)),
-			421 => ins655H(subI, r6, r6, 33),
-			422 => ins65J(jnz, r6, 4*(1023 - 422)),
-			423 => insNOP,
-			424 => insRET,
+			419 => insSTORE(r1, r0, 4*64),
+			420 => insLOAD(r7, r0, 4*64), -- Should be forwarded as 0
+			
+			421 => ins655H(subI, r5, r5, 22),
+			422 => ins65J(jnz, r5, 4*(1023 - 422)),
+			423 => ins655H(subI, r6, r6, 33),
+			424 => ins65J(jnz, r6, 4*(1023 - 424)),
+			425 => ins65J(jnz, r7, 4*(1023 - 425)),
+			426 => insRET,
 			
 			-- Error handler
 			-- @4000
