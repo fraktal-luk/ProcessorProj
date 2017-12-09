@@ -322,16 +322,19 @@ package ProgramCode4 is
 			412 => insSET(r2, 22),
 			413 => insSET(r3, 33),
 			414 => insLOAD(r1, r0, 4*64), -- Should be 0
-			415 => insSTORE(r2, r0, 4*64),
-			416 => insLOAD(r5, r0, 4*64), -- Should be forwarded as 22
-			417 => insSTORE(r3, r0, 4*64),
-			418 => insLOAD(r6, r0, 4*64), -- Should be forwarded as 33
-			419 => ins655H(subI, r5, r5, 22),
-			420 => ins65J(jnz, r5, 4*(1023 - 420)),
-			421 => ins655H(subI, r6, r6, 33),
-			422 => ins65J(jnz, r6, 4*(1023 - 422)),
-			423 => insNOP,
-			424 => insRET,
+			415 => insSTORE(r2, r0, 4*65 - 4),
+			416 => insLOAD(r5, r0, 4*65 - 4), -- Should be forwarded as 22
+			417 => insSTORE(r3, r0, 4*66 - 8),
+			418 => insLOAD(r6, r0, 4*66 - 8), -- Should be forwarded as 33
+			419 => insSTORE(r1, r0, 4*64),
+			420 => insLOAD(r7, r0, 4*64), -- Should be forwarded as 0
+			
+			421 => ins655H(subI, r5, r5, 22),
+			422 => ins65J(jnz, r5, 4*(1023 - 422)),
+			423 => ins655H(subI, r6, r6, 33),
+			424 => ins65J(jnz, r6, 4*(1023 - 424)),
+			425 => ins65J(jnz, r7, 4*(1023 - 425)),
+			426 => insRET,
 			
 			-- Error handler
 			-- @4000
@@ -346,6 +349,53 @@ package ProgramCode4 is
 			
 			others => insERROR -- undefined
 		);
+	
+	
+	constant testProgMem: WordMem := (
+		0 => insNOP,
+		1 => insSET(r1, 325),
+		2 => insSET(r2, 0),
+		3 => insSTORE(r1, r2, 12), -- This should go immediately
+		4 => insLOAD(r5, r0, 12), -- Addres hit, forwarding
+
+		5 => insNOP,
+				--insLOAD(r7, r0, 20), -- Addres hit, forwarding
+
+		6 => insNOP,
+		7 => --insNOP,
+				insSET(r5, 0),
+		8 => --insNOP,
+			  ins655655(ext0, r12, r5, mulS, r5, 0), -- long operation, delaying store address
+		9 => --insNOP,
+			  insSTORE(r2, r12, 16),
+		10 => --insNOP,
+				insLOAD(r10, r0, 16), -- younger load, address hit by older but later store
+		11 => insNOP,
+		12 => insNOP,
+		13 => insNOP,
+		14 => insNOP,
+		
+		15 => insSET(r2, 221),
+		16 => ins655655(ext0, r2, r5, mulS, r5, 0), -- long operation, delaying store address
+		17 => insNOP,--insSTORE(r2, r0, 16),
+		18 => insLOAD(r10, r0, 16), -- data not ready
+		
+		19 => insNOP,
+		20 => insNOP,
+		21 => insNOP,
+		22 => insNOP,
+		23 => insNOP,
+		24 => insNOP,
+		25 => insNOP,
+		26 => insNOP,
+		27 => insNOP,
+		28 => insNOP,
+		
+		29 => ins65J(jz, r0, -4*(29-0)),
+		
+		
+		others => insERROR
+	);
 	
 end ProgramCode4;
 

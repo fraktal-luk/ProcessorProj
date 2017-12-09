@@ -261,7 +261,7 @@ begin
 				regValsArr <= regValsA & regValsB & regValsC & regValsD & regValsE;
 				execAcceptingArr <= (execAcceptingA, execAcceptingB, execAcceptingC,
 												execAcceptingD, execAcceptingE);
-
+											--(others => '1');
 			ISSUE_STAGES: for letter in 'A' to 'E' generate
 				constant i: integer := character'pos(letter) - character'pos('A');
 				constant usesImm: boolean := (USE_IMM_VEC(i) = '1');

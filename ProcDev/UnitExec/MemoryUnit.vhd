@@ -166,11 +166,11 @@ begin
 	contentData <= extractData(content);
 
 
-		cmpMask <= compareAddress(TMP_content, compareAddressDataIn) and TMP_Mask;
+		cmpMask <= compareAddress(TMP_content, TMP_mask, compareAddressDataIn);
 		-- TEMP selection of hit checking mechanism 
-		matchedSlot <= findNewestMatch(cmpMask, qs0.pStart, compareAddressDataIn)
+		matchedSlot <= findNewestMatch(TMP_content, cmpMask, qs0.pStart, compareAddressDataIn)
 																										when MODE = store
-					else	findOldestMatch(cmpMask, qs0.pStart, compareAddressDataIn)
+					else	findOldestMatch(TMP_content, cmpMask, qs0.pStart, compareAddressDataIn)
 																										when MODE = load
 					else  findMatchingGroupTag(TMP_content, compareAddressDataIn) and TMP_mask
 																										when MODE = branch

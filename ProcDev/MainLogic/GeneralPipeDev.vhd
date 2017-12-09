@@ -73,6 +73,13 @@ function stageCQNext(content: StageDataCommitQueue; newContent: InstructionState
 		nFull, nOut, nIn: integer)
 return StageDataCommitQueue;
 
+function stageCQNext_New(content: StageDataCommitQueue; newContent: InstructionStateArray;
+		livingMask: std_logic_vector;
+		ready: std_logic_vector;
+		outWidth: integer;
+		nFull, nOut, nIn: integer)
+return StageDataCommitQueue;
+
 -----------------------									
 
 function getPhysicalSources(ins: InstructionState) return PhysNameArray;
@@ -828,6 +835,63 @@ begin
 	
 	return res;		
 end function;
+
+
+function stageCQNext_New(content: StageDataCommitQueue; newContent: InstructionStateArray;
+		livingMask: std_logic_vector;
+		ready: std_logic_vector;
+		outWidth: integer;
+		nFull, nOut, nIn: integer)
+return StageDataCommitQueue is
+	variable res: StageDataCommitQueue := (fullMask => (others=>'0'), 
+														data => (others=>defaultInstructionState));
+	variable dataTemp: InstructionStateArray(0 to CQ_SIZE-1) := (others => defaultInstructionState);
+	variable fullMaskTemp: std_logic_vector(0 to CQ_SIZE-1) := (others => '0');
+		
+	variable newFullMask: std_logic_vector(0 to content.fullMask'length-1) := (others => '0');
+		constant CLEAR_EMPTY_SLOTS_CQ: boolean := false;
+		
+	variable newCompactedData: InstructionStateArray(0 to 3);
+	variable newCompactedMask: std_logic_vector(0 to 3);
+begin
+	newCompactedData := newContent;
+	newCompactedMask := ready;
+	-- CAREFUL: even when not clearing empty slots, result tags probably should be cleared!
+	--				It's to prevent reading of fake results from empty slots
+	if not CLEAR_EMPTY_SLOTS_CQ then
+	end if;
+		
+	dataTemp := content.data(1 to CQ_SIZE-1) & newContent(newContent'right); 		
+	fullMaskTemp := content.fullMask(1 to CQ_SIZE-1) & '0';
+	
+	for i in 0 to content.fullMask'length-1 loop
+		if newCompactedMask(i) = '1' then
+			dataTemp(i) := newCompactedData(i);
+			fullMaskTemp(i) := '1';
+		end if;
+	end loop;
+	
+	res.data := dataTemp(0 to CQ_SIZE-1);
+	res.fullMask := fullMaskTemp(0 to CQ_SIZE-1);
+		
+	-- CAREFUL! Clearing tags in empty slots, to avoid incorrect info about available results!
+	for i in 0 to res.fullMask'length-1 loop
+		if res.fullMask(i) = '0' then
+			res.data(i).physicalDestArgs.d0 := (others => '0');
+		end if;
+		
+		-- TEMP: also clear unneeded data for all instructions
+		res.data(i).virtualArgs := defaultVirtualArgs;
+		--	res.data(i).virtualDestArgs := defaultVirtualDestArgs;
+		res.data(i).constantArgs := defaultConstantArgs; -- c0 needed for sysMtc if not using temp reg in Exec
+		res.data(i).argValues := defaultArgValues;
+		res.data(i).basicInfo := defaultBasicInfo;
+		res.data(i).bits := (others => '0');
+	end loop;
+	
+	return res;		
+end function;
+
 
 
 function getPhysicalSources(ins: InstructionState) return PhysNameArray is

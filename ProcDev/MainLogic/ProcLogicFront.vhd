@@ -59,7 +59,7 @@ function getInstructionClassInfo(ins: InstructionState) return InstructionClassI
 	variable ci: InstructionClassInfo := defaultClassInfo;
 begin
 				-- Which clusters?
-				-- TEMP!
+				-- CAREFUL, TODO: make it more regular and clear!
 				ci.mainCluster := '1';
 				if ins.operation = (Memory, store) then
 					ci.secCluster := '1';
@@ -71,6 +71,8 @@ begin
 					if isNonzero(ins.virtualDestArgs.d0) = '0' then
 						ci.mainCluster := '0';
 					end if;
+				elsif ins.operation = (System, sysMtc) then
+					ci.secCluster := '1';
 				elsif	(ins.operation.unit = System and ins.operation.func /= sysMfc) then
 					ci.mainCluster := '0';
 					ci.secCluster := '1';
@@ -316,7 +318,7 @@ begin
 			or fetchBlock(0)(15 downto 10) = opcode2slv(jz) 
 			or fetchBlock(0)(15 downto 10) = opcode2slv(jnz)
 		then
-			report "branch fetched!";
+			--report "branch fetched!";
 			
 				--res.controlInfo.newEvent := '1';
 				--res.controlInfo.hasBranch := '1';			
@@ -326,7 +328,7 @@ begin
 			res.target := tempTarget;
 		elsif fetchBlock(0)(15 downto 10) = opcode2slv(j)
 		then
-			report "long branch fetched";
+			--report "long branch fetched";
 			tempOffset := "000000" & fetchBlock(0)(9 downto 0) & fetchBlock(1);
 			tempTarget := addMwordFaster(res.basicInfo.ip, tempOffset);
 			res.target := tempTarget;
