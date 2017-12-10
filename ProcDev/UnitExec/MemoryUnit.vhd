@@ -69,6 +69,12 @@ entity MemoryUnit is
 		prevSending: in std_logic;
 		dataIn: in StageDataMulti;
 
+			storeAddressInput: in InstructionSlot;
+			storeValueInput: in InstructionSlot;
+			compareAddressInput: in InstructionSlot;
+
+			selectedDataOutput: out InstructionSlot;
+
 		storeAddressWr: in std_logic;
 		storeValueWr: in std_logic;
 
@@ -215,7 +221,8 @@ begin
 	
 	sendingSQOut <= sendingSQ;
 	
-	selectedDataOut <= selectedData;
-	selectedSending <= selectedSendingSig;
+		selectedDataOut <= selectedData;
+		selectedSending <= selectedSendingSig;
+	selectedDataOutput <= (selectedSendingSig, selectedData);
 end Behavioral;
 

@@ -225,9 +225,15 @@ begin
 				reset => reset,
 				en => en,
 				
-					acceptingOut => acceptingNewBQ,
-					prevSending => prevSendingToBQ,
-					dataIn => dataNewToBQ,
+				acceptingOut => acceptingNewBQ,
+				prevSending => prevSendingToBQ,
+				dataIn => dataNewToBQ,
+				
+					storeAddressInput => (storeTargetWrSig, storeTargetDataSig),
+					storeValueInput => (storeTargetWrSig, DEFAULT_INSTRUCTION_STATE),
+					compareAddressInput => (sendingIQD, dataIQD),
+					
+					selectedDataOutput => open,
 				
 				storeAddressWr => storeTargetWrSig,
 				storeValueWr => storeTargetWrSig,
@@ -238,11 +244,11 @@ begin
 				compareAddressDataIn => dataIQD,
 				compareAddressReady => sendingIQD,
 
-					selectedDataOut => branchQueueSelectedOut,
-					selectedSending => branchQueueSelectedSending,
+				selectedDataOut => branchQueueSelectedOut,
+				selectedSending => branchQueueSelectedSending,
 					
-					committing => committing,
-						groupCtrInc => groupCtrInc,
+				committing => committing,
+				groupCtrInc => groupCtrInc,
 						
 				lateEventSignal => lateEventSignal,
 				execEventSignal => eventSignal,

@@ -146,6 +146,9 @@ architecture Behavioral of UnitMemory is
 		signal dataIQC: InstructionState := DEFAULT_INSTRUCTION_STATE;
 		signal dataIQE: InstructionState := DEFAULT_INSTRUCTION_STATE;	-- Store data
 
+		signal sqSelectedOutput, lqSelectedOutput, lmqSelectedOutput: InstructionSlot
+					:= DEFAULT_INSTRUCTION_SLOT;
+
 	function TMP_setLoadException(ins: InstructionState) return InstructionState is
 		variable res: InstructionState := ins;
 	begin
@@ -361,9 +364,15 @@ begin
 				reset => reset,
 				en => en,
 				
-					acceptingOut => acceptingNewSQ,
-					prevSending => prevSendingToSQ,
-					dataIn => dataNewToSQ,
+				acceptingOut => acceptingNewSQ,
+				prevSending => prevSendingToSQ,
+				dataIn => dataNewToSQ,
+
+					storeAddressInput => (storeAddressWrSig, storeAddressDataSig),
+					storeValueInput => (storeValueWrSig, storeValueDataSig),
+					compareAddressInput => (sendingAddressingForLoad or sendingAddressingForMfc, addressingData),
+					
+					selectedDataOutput => sqSelectedOutput,
 				
 				storeAddressWr => storeAddressWrSig,
 				storeValueWr => storeValueWrSig,
@@ -374,13 +383,13 @@ begin
 					compareAddressDataIn => addressingData,
 					compareAddressReady => sendingAddressingForLoad or sendingAddressingForMfc,
 
-					selectedDataOut => storeForwardData,
-					selectedSending => storeForwardSending,
+					selectedDataOut => open,--storeForwardData,
+					selectedSending => open,--storeForwardSending,
 				
-					committing => committing,
-					groupCtrInc => groupCtrInc,
+				committing => committing,
+				groupCtrInc => groupCtrInc,
 						
-					lateEventSignal => lateEventSignal,	
+				lateEventSignal => lateEventSignal,	
 				execEventSignal => eventSignal,
 				execCausing => execCausing,
 				
@@ -389,6 +398,9 @@ begin
 				sendingSQOut => sendingOutSQ,
 					dataOutV => dataOutSQV
 			);
+
+				storeForwardSending <= sqSelectedOutput.full;
+				storeForwardData <= sqSelectedOutput.ins;
 
 			MEM_LOAD_QUEUE: entity work.MemoryUnit(Behavioral)
 			generic map(
@@ -400,10 +412,18 @@ begin
 				reset => reset,
 				en => en,
 				
-					acceptingOut => acceptingNewLQ,
-					prevSending => prevSendingToLQ,
-					dataIn => dataNewToLQ,
-				
+				acceptingOut => acceptingNewLQ,
+				prevSending => prevSendingToLQ,
+				dataIn => dataNewToLQ,
+
+					storeAddressInput => (sendingAddressingForLoad or sendingAddressingForMfc,
+														addressingData),
+					storeValueInput => (sendingAddressingForLoad or sendingAddressingForMfc,
+														DEFAULT_INSTRUCTION_STATE),
+					compareAddressInput => (storeAddressWrSig, storeAddressDataSig),
+					
+					selectedDataOutput => lqSelectedOutput,
+					
 				storeAddressWr => sendingAddressingForLoad or sendingAddressingForMfc,
 				storeValueWr => sendingAddressingForLoad or sendingAddressingForMfc,
 
@@ -413,8 +433,8 @@ begin
 					compareAddressDataIn => storeAddressDataSig,
 					compareAddressReady => storeAddressWrSig,
 
-					selectedDataOut => lqSelectedData,
-					selectedSending => lqSelectedSending,
+					selectedDataOut => open,--lqSelectedData,
+					selectedSending => open,--lqSelectedSending,
 					
 					committing => committing,
 					groupCtrInc => groupCtrInc,
@@ -429,6 +449,9 @@ begin
 					dataOutV => open
 			);
 
+				lqSelectedSending <= lqSelectedOutput.full;
+				lqSelectedData <= lqSelectedOutput.ins;
+
 			DELAYED_LOAD_QUEUE: entity work.MemoryUnit(LoadMissQueue)
 			generic map(
 				QUEUE_SIZE => LMQ_SIZE,
@@ -439,9 +462,15 @@ begin
 				reset => reset,
 				en => en,
 				
-					acceptingOut => dlqAccepting,
-					prevSending => sendingToDLQ,
-					dataIn => dataToDLQ,
+				acceptingOut => dlqAccepting,
+				prevSending => sendingToDLQ,
+				dataIn => dataToDLQ,
+				
+					storeAddressInput => ('0', DEFAULT_INSTRUCTION_STATE),
+					storeValueInput => ('0', DEFAULT_INSTRUCTION_STATE),
+					compareAddressInput => ('0', DEFAULT_INSTRUCTION_STATE),
+					
+					selectedDataOutput => lmqSelectedOutput,
 				
 				storeAddressWr => '0',
 				storeValueWr => '0',
@@ -467,6 +496,9 @@ begin
 				sendingSQOut => sendingFromDLQ,
 					dataOutV => stageDataMultiDLQ
 			);
+
+				-- [[]] <= lmqSelectedOutput.full;
+				-- [[]] <= lmqelectedOutput.ins;
 			
 			dataFromDLQ <= stageDataMultiDLQ.data(0);
 

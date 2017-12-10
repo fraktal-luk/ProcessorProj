@@ -199,6 +199,6 @@ begin
 			killMask <=	getKillMask(extractData(content), fullMask,
 											execCausing, execEventSignal, lateEventSignal);
 		
-	sendingSQOut <= sendingSQ;
+	sendingSQOut <= sendingSQ;	
 end LoadMissQueue;
 
