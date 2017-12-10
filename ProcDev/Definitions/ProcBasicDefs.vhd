@@ -57,6 +57,11 @@ function subSN(a, b: SmallNumber) return SmallNumber;
 function uminSN(a, b: SmallNumber) return SmallNumber;
 function sminSN(a, b: SmallNumber) return SmallNumber;
 
+function cmpLessSignedSN(a, b: SmallNumber) return std_logic;
+function cmpGreaterSignedSN(a, b: SmallNumber) return std_logic;
+function cmpLessUnsignedSN(a, b: SmallNumber) return std_logic;
+function cmpGreaterUnsignedSN(a, b: SmallNumber) return std_logic;
+
 function compareGreaterSNA(inds: SmallNumberArray; num: SmallNumber) return std_logic_vector;
 function compareSmallerSNA(inds: SmallNumberArray; num: SmallNumber) return std_logic_vector;
 function compareEqualSNA(inds: SmallNumberArray; num: SmallNumber) return std_logic_vector;
@@ -270,6 +275,67 @@ begin
 		end if;
 	end loop;
 	return res;
+end function;
+
+
+function cmpLessSignedSN(a, b: SmallNumber) return std_logic is
+begin
+		if a(i) = '1' and b(i) = '0' then
+			return '1';
+		elsif a(i) = '0' and b(i) = '1' then
+			return '0';
+		end if;		
+
+	for i in 1 to SMALL_NUMBER_SIZE-1 loop
+		if a(i) = '0' and b(i) = '1' then
+			return '1';
+		elsif a(i) = '1' and b(i) = '0' then
+			return '0';
+		end if;
+	end loop;
+	return '0';
+end function;
+
+function cmpGreaterSignedSN(a, b: SmallNumber) return std_logic is
+begin
+		if a(i) = '0' and b(i) = '1' then
+			return '1';
+		elsif a(i) = '1' and b(i) = '0' then
+			return '0';
+		end if;		
+
+	for i in 1 to SMALL_NUMBER_SIZE-1 loop
+		if a(i) = '1' and b(i) = '0' then
+			return '1';
+		elsif a(i) = '0' and b(i) = '1' then
+			return '0';
+		end if;
+	end loop;
+	return '0';
+end function;
+
+function cmpLessUnsignedSN(a, b: SmallNumber) return std_logic is
+begin
+	for i in 0 to SMALL_NUMBER_SIZE-1 loop
+		if a(i) = '1' and b(i) = '0' then
+			return '0';
+		elsif a(i) = '0' and b(i) = '1' then
+			return '1';
+		end if;
+	end loop;
+	return '0';
+end function;
+
+function cmpGreaterUnsignedSN(a, b: SmallNumber) return std_logic is
+begin
+	for i in 0 to SMALL_NUMBER_SIZE-1 loop
+		if a(i) = '1' and b(i) = '0' then
+			return '1';
+		elsif a(i) = '0' and b(i) = '1' then
+			return '0';
+		end if;
+	end loop;
+	return '0';
 end function;
 
 
