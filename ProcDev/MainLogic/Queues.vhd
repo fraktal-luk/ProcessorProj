@@ -275,11 +275,13 @@ begin
 	return res;
 end function;
 
+-- UNUSED
 function compareIndicesGreater(inds: SmallNumberArray; num: SmallNumber) return std_logic_vector is
 begin
 	return cmpGreaterThanUnsignedSNA(inds, num);
 end function;
 
+-- UNNEEDED? Just an alias
 function compareIndicesSmaller(inds: SmallNumberArray; num: SmallNumber) return std_logic_vector is
 begin
 	return cmpLessThanUnsignedSNA(inds, num);

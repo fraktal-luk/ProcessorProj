@@ -130,10 +130,6 @@ architecture Behavioral of OutOfOrderBox is
 
 	signal stageDataAfterCQ: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
 
-	-- writtenTags indicate registers written to GPR file in last cycle, so they can be read from there
-	--		rather than from forw. network, but readyRegFlags are not available in the 1st cycle after WB.
-	signal writtenTags: PhysNameArray(0 to PIPE_WIDTH-1) := (others => (others => '0'));
-
 	signal outputA, outputB, outputC, outputD, outputE: InstructionSlot := DEFAULT_INSTRUCTION_SLOT;
 	signal outputOpPreB, outputOpPreC: InstructionState := DEFAULT_INSTRUCTION_STATE;
 
@@ -158,7 +154,10 @@ architecture Behavioral of OutOfOrderBox is
 	signal queueSendingA, queueSendingB, queueSendingC, queueSendingD, queueSendingE: std_logic := '0';
 	signal issueAcceptingA, issueAcceptingB, issueAcceptingC, issueAcceptingD, issueAcceptingE:
 					std_logic := '0';
-						
+					
+		signal execOutputs1, execOutputs2, execOutputsPre: InstructionSlotArray(0 to 3)
+			:= (others => DEFAULT_INSTRUCTION_SLOT);
+					
 	type SLVA is array (integer range <>) of std_logic_vector(0 to PIPE_WIDTH-1);
 	signal iqAcceptingVecArr: SLVA(0 to 4) := (others => (others => '0'));
 	
@@ -319,13 +318,9 @@ begin
 				execAcceptingB => execAcceptingB,				
 				execAcceptingD => execAcceptingD,
 
-				sendingIQA => sendingSchedA,
-				sendingIQB => sendingSchedB,
-				sendingIQD => sendingSchedD,
-
-				dataIQA => dataOutIQA,
-				dataIQB => dataOutIQB,
-				dataIQD => dataOutIQD,
+				inputA => (sendingSchedA, dataOutIQA),
+				inputB => (sendingSchedB, dataOutIQB),
+				inputD => (sendingSchedD, dataOutIQD),
 				
 				outputA => outputA,
 				outputB => outputB,
@@ -358,12 +353,15 @@ begin
 
 					execAcceptingC => execAcceptingC,
 					execAcceptingE => execAcceptingE,
-					
-					sendingIQC => sendingSchedC,
-					sendingIQE => sendingSchedE,
 
-					dataIQC => dataOutIQC,
-					dataIQE => dataOutIQE,
+						inputC => (sendingSchedC, dataOutIQC),
+						inputE => (sendingSchedE, dataOutIQE),
+
+--					sendingIQC => sendingSchedC,
+--					sendingIQE => sendingSchedE,
+--
+--					dataIQC => dataOutIQC,
+--					dataIQE => dataOutIQE,
 					-------------
 
 					acceptingNewSQ => acceptingNewSQ,
@@ -408,6 +406,11 @@ begin
 					execEnds2 <= getExecEnds2(outputA, outputB, outputC, outputD, outputE);
 					execPreEnds <= getExecPreEnds(outputOpPreB, outputOpPreC);
 
+		execOutputs1 <= (0 => outputA, 1 => outputB, 2 => outputC, others => DEFAULT_INSTRUCTION_SLOT);
+		execOutputs2 <= (		2 => outputE, 3 => outputD, others => DEFAULT_INSTRUCTION_SLOT); -- (-,-,E,D)! 
+		execOutputsPre <= (0 => ('0', outputOpPreB), 1 => ('0', outputOpPreC),
+																				others => DEFAULT_INSTRUCTION_SLOT);
+
 			COMMIT_QUEUE: entity work.TestCQPart0(Implem)
 			generic map(
 				INPUT_WIDTH => 3,
@@ -420,8 +423,10 @@ begin
 				execEventSignal => '0',
 				execCausing => DEFAULT_INSTRUCTION_STATE,
 				
-					maskIn => execSending(0 to 2),
-					dataIn => execEnds(0 to 2),
+					maskIn => --execSending(0 to 2),
+									extractFullMask(execOutputs1(0 to 2)),
+					dataIn => --execEnds(0 to 2),
+									extractData(execOutputs1(0 to 2)),
 				
 				whichAcceptedCQ => whichAcceptedCQ,
 				anySending => anySendingFromCQ,
@@ -451,10 +456,11 @@ begin
 					
 					lockCommand => '0'			
 				);
-		
-	writtenTags <= getPhysicalDests(stageDataAfterCQ) when CQ_SINGLE_OUTPUT else (others => (others => '0'));
-		
-	fni.writtenTags <= writtenTags;
+
+	-- writtenTags indicate registers written to GPR file in last cycle, so they can be read from there
+	--		rather than from forw. network, but readyRegFlags are not available in the 1st cycle after WB.		
+	fni.writtenTags <=
+					getPhysicalDests(stageDataAfterCQ) when CQ_SINGLE_OUTPUT else (others => (others => '0'));
 	fni.resultTags <= getResultTags(execEnds, cqBufferData, dataOutIQA, dataOutIQB, dataOutIQC, dataOutIQD,
 																											DEFAULT_STAGE_DATA_MULTI);
 	fni.nextResultTags <= getNextResultTags(execPreEnds, dataOutIQA, dataOutIQB, dataOutIQC, dataOutIQD);
@@ -506,11 +512,14 @@ begin
 				commitGroupCtr => commitGroupCtrSig,
 				commitGroupCtrNext => commitGroupCtrNextSig,
 					
-				execEnds => execEnds,
-				execReady => execSending,
+--				execEnds => execEnds,
+--				execReady => execSending,
+--				
+--				execEnds2 => execEnds2,
+--				execReady2 => execSending2,
 				
-				execEnds2 => execEnds2,
-				execReady2 => execSending2,
+					execEndSigs1 => execOutputs1,
+					execEndSigs2 => execOutputs2,
 				
 				inputData => renamedDataLiving,
 				prevSending => renamedSending,

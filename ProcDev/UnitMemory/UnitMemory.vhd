@@ -48,12 +48,15 @@ entity UnitMemory is
 		clk : in  STD_LOGIC;
 		reset : in  STD_LOGIC;
 		en : in  STD_LOGIC;	
-
-		sendingIQC: in std_logic;
-		sendingIQE: in std_logic; -- Store data
-
-		dataIQC: in InstructionState;
-		dataIQE: in InstructionState;	-- Store data			
+			
+			inputC: in InstructionSlot;
+			inputE: in InstructionSlot;
+			
+--		sendingIQC: in std_logic;
+--		sendingIQE: in std_logic; -- Store data
+--
+--		dataIQC: in InstructionState;
+--		dataIQE: in InstructionState;	-- Store data			
 
 		execAcceptingC: out std_logic;
 		execAcceptingE: out std_logic; -- Store data
@@ -136,7 +139,13 @@ architecture Behavioral of UnitMemory is
 	signal storeForwardData, storeForwardDataDelay,
 				stageDataAfterForward: InstructionState := DEFAULT_INSTRUCTION_STATE;
 	signal storeForwardSending, storeForwardSendingDelay: std_logic := '0';
-	
+
+		signal sendingIQC: std_logic := '0';
+		signal sendingIQE: std_logic := '0'; -- Store data
+
+		signal dataIQC: InstructionState := DEFAULT_INSTRUCTION_STATE;
+		signal dataIQE: InstructionState := DEFAULT_INSTRUCTION_STATE;	-- Store data
+
 	function TMP_setLoadException(ins: InstructionState) return InstructionState is
 		variable res: InstructionState := ins;
 	begin
@@ -172,6 +181,12 @@ architecture Behavioral of UnitMemory is
 		signal ch0, ch1, ch2: std_logic := '0';
 begin
 		eventSignal <= execOrIntEventSignalIn;	
+
+			sendingIQC <= inputC.full;
+			sendingIQE <= inputE.full;
+			
+			dataIQC <= inputC.ins;
+			dataIQE <= inputE.ins;
 
 		inputDataC.data(0) <=			
 				 setInsResult(dataIQC, addMwordFaster(dataIQC.argValues.arg0, dataIQC.argValues.arg1));

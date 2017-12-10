@@ -51,15 +51,19 @@ entity UnitExec is
 		reset : in  STD_LOGIC;
 		en : in  STD_LOGIC;
 	  
-		sendingIQA: in std_logic;
-		sendingIQB: in std_logic;
-		sendingIQD: in std_logic;
-	  
 		whichAcceptedCQ: in std_logic_vector(0 to 3);
 
-		dataIQA: in InstructionState;
-		dataIQB: in InstructionState;
-		dataIQD: in InstructionState;		
+		inputA: in InstructionSlot;
+		inputB: in InstructionSlot;
+		inputD: in InstructionSlot;
+
+--		sendingIQA: in std_logic;
+--		sendingIQB: in std_logic;
+--		sendingIQD: in std_logic;
+
+--		dataIQA: in InstructionState;
+--		dataIQB: in InstructionState;
+--		dataIQD: in InstructionState;		
 
 		execAcceptingA: out std_logic;
 		execAcceptingB: out std_logic;
@@ -109,11 +113,27 @@ architecture Implem of UnitExec is
 		signal storeTargetWrSig: std_logic := '0';
 		signal storeTargetDataSig: InstructionState := DEFAULT_INSTRUCTION_STATE;
 
+		signal sendingIQA: std_logic := '0';
+		signal sendingIQB: std_logic := '0';
+		signal sendingIQD: std_logic := '0';
+
+		signal dataIQA: InstructionState := DEFAULT_INSTRUCTION_STATE;
+		signal dataIQB: InstructionState := DEFAULT_INSTRUCTION_STATE;
+		signal dataIQD: InstructionState := DEFAULT_INSTRUCTION_STATE;
+
 	constant HAS_RESET_EXEC: std_logic := '1';
 	constant HAS_EN_EXEC: std_logic := '1';	
 begin		
 		resetSig <= reset and HAS_RESET_EXEC;
 		enSig <= en or not HAS_EN_EXEC; 
+
+			sendingIQA <= inputA.full;
+			sendingIQB <= inputB.full;
+			sendingIQD <= inputD.full;
+			
+			dataIQA <= inputA.ins;
+			dataIQB <= inputB.ins;
+			dataIQD <= inputD.ins;
 
 					inputDataA.data(0) <= executeAlu(dataIQA);					
 					inputDataA.fullMask(0) <= sendingIQA;

@@ -57,11 +57,14 @@ entity ReorderBuffer is
 		
 		commitGroupCtr: in SmallNumber;
 		commitGroupCtrNext: in SmallNumber;
-		execEnds: in InstructionStateArray(0 to 3);
-		execReady: in std_logic_vector(0 to 3);
+
+		--execEnds: in InstructionStateArray(0 to 3);
+		--execReady: in std_logic_vector(0 to 3);
+		--execEnds2: in InstructionStateArray(0 to 3);
+		--execReady2:  in std_logic_vector(0 to 3);
 		
-			execEnds2: in InstructionStateArray(0 to 3);
-			execReady2:  in std_logic_vector(0 to 3);
+			execEndSigs1: in InstructionSlotArray(0 to 3);
+			execEndSigs2: in InstructionSlotArray(0 to 3);
 		
 		inputData: in StageDataMulti;
 		prevSending: in std_logic;
@@ -108,6 +111,11 @@ architecture Implem of ReorderBuffer is
 	signal robView, robLivingView, robNextView, robLivingViewU, robNextViewU:
 							StageDataROB := (fullMask => (others => '0'),
 																					 data => (others => DEFAULT_STAGE_DATA_MULTI));
+
+		signal execEnds: InstructionStateArray(0 to 3) := (others => DEFAULT_INSTRUCTION_STATE);
+		signal execReady: std_logic_vector(0 to 3) := (others => '0');
+		signal execEnds2: InstructionStateArray(0 to 3) := (others => DEFAULT_INSTRUCTION_STATE);
+		signal execReady2: std_logic_vector(0 to 3) := (others => '0');
 	
 	constant ROB_HAS_RESET: std_logic := '0';
 	constant ROB_HAS_EN: std_logic := '0';
@@ -115,7 +123,11 @@ begin
 	resetSig <= reset and ROB_HAS_RESET;
 	enSig <= en or not ROB_HAS_EN;
 	
-	
+		execEnds <= extractData(execEndSigs1);
+		execReady <= extractFullMask(execEndSigs1);
+		execEnds2 <= extractData(execEndSigs2);
+		execReady2 <= extractFullMask(execEndSigs2);
+		
 				--ta <= flowDrive.nextAccepting;
 				--tb <= flowDrive.prevSending;
 				qs1 <= TMP_change(qs0,-- ta, tb,
