@@ -277,17 +277,17 @@ end function;
 
 function compareIndicesGreater(inds: SmallNumberArray; num: SmallNumber) return std_logic_vector is
 begin
-	return compareGreaterSNA(inds, num);
+	return cmpGreaterThanUnsignedSNA(inds, num);
 end function;
 
 function compareIndicesSmaller(inds: SmallNumberArray; num: SmallNumber) return std_logic_vector is
 begin
-	return compareSmallerSNA(inds, num);
+	return cmpLessThanUnsignedSNA(inds, num);
 end function;
 
 function compareIndicesEqual(inds: SmallNumberArray; num: SmallNumber) return std_logic_vector is
 begin
-	return compareEqualSNA(inds, num);
+	return cmpEqualToSNA(inds, num);
 end function;
 
 function trimSNA(arr: SmallNumberArray; maskNum: SmallNumber) return SmallNumberArray is

@@ -57,14 +57,17 @@ function subSN(a, b: SmallNumber) return SmallNumber;
 function uminSN(a, b: SmallNumber) return SmallNumber;
 function sminSN(a, b: SmallNumber) return SmallNumber;
 
-function cmpLessSignedSN(a, b: SmallNumber) return std_logic;
-function cmpGreaterSignedSN(a, b: SmallNumber) return std_logic;
-function cmpLessUnsignedSN(a, b: SmallNumber) return std_logic;
-function cmpGreaterUnsignedSN(a, b: SmallNumber) return std_logic;
+function cmpLessSignedSN(a: SmallNumber; b: SmallNumber) return std_logic;
+function cmpGreaterSignedSN(a: SmallNumber; b: SmallNumber) return std_logic;
+function cmpLessUnsignedSN(a: SmallNumber; b: SmallNumber) return std_logic;
+function cmpGreaterUnsignedSN(a: SmallNumber; b: SmallNumber) return std_logic;
 
-function compareGreaterSNA(inds: SmallNumberArray; num: SmallNumber) return std_logic_vector;
-function compareSmallerSNA(inds: SmallNumberArray; num: SmallNumber) return std_logic_vector;
-function compareEqualSNA(inds: SmallNumberArray; num: SmallNumber) return std_logic_vector;
+
+function cmpGreaterThanUnsignedSNA(arr: SmallNumberArray; num: SmallNumber) return std_logic_vector;
+function cmpGreaterThanSignedSNA(arr: SmallNumberArray; num: SmallNumber) return std_logic_vector;
+function cmpLessThanUnsignedSNA(arr: SmallNumberArray; num: SmallNumber) return std_logic_vector;
+function cmpLessThanSignedSNA(arr: SmallNumberArray; num: SmallNumber) return std_logic_vector;
+function cmpEqualToSNA(arr: SmallNumberArray; num: SmallNumber) return std_logic_vector;
 
 end ProcBasicDefs;
 
@@ -278,15 +281,15 @@ begin
 end function;
 
 
-function cmpLessSignedSN(a, b: SmallNumber) return std_logic is
+function cmpLessSignedSN(a: SmallNumber; b: SmallNumber) return std_logic is
 begin
-		if a(i) = '1' and b(i) = '0' then
+		if a(SMALL_NUMBER_SIZE-1) = '1' and b(SMALL_NUMBER_SIZE-1) = '0' then
 			return '1';
-		elsif a(i) = '0' and b(i) = '1' then
+		elsif a(SMALL_NUMBER_SIZE-1) = '0' and b(SMALL_NUMBER_SIZE-1) = '1' then
 			return '0';
 		end if;		
 
-	for i in 1 to SMALL_NUMBER_SIZE-1 loop
+	for i in SMALL_NUMBER_SIZE-2 downto 0 loop
 		if a(i) = '0' and b(i) = '1' then
 			return '1';
 		elsif a(i) = '1' and b(i) = '0' then
@@ -296,15 +299,15 @@ begin
 	return '0';
 end function;
 
-function cmpGreaterSignedSN(a, b: SmallNumber) return std_logic is
+function cmpGreaterSignedSN(a: SmallNumber; b: SmallNumber) return std_logic is
 begin
-		if a(i) = '0' and b(i) = '1' then
+		if a(SMALL_NUMBER_SIZE-1) = '0' and b(SMALL_NUMBER_SIZE-1) = '1' then
 			return '1';
-		elsif a(i) = '1' and b(i) = '0' then
+		elsif a(SMALL_NUMBER_SIZE-1) = '1' and b(SMALL_NUMBER_SIZE-1) = '0' then
 			return '0';
 		end if;		
 
-	for i in 1 to SMALL_NUMBER_SIZE-1 loop
+	for i in SMALL_NUMBER_SIZE-2 downto 0 loop
 		if a(i) = '1' and b(i) = '0' then
 			return '1';
 		elsif a(i) = '0' and b(i) = '1' then
@@ -314,9 +317,9 @@ begin
 	return '0';
 end function;
 
-function cmpLessUnsignedSN(a, b: SmallNumber) return std_logic is
+function cmpLessUnsignedSN(a: SmallNumber; b: SmallNumber) return std_logic is
 begin
-	for i in 0 to SMALL_NUMBER_SIZE-1 loop
+	for i in SMALL_NUMBER_SIZE-1 downto 0 loop
 		if a(i) = '1' and b(i) = '0' then
 			return '0';
 		elsif a(i) = '0' and b(i) = '1' then
@@ -326,9 +329,9 @@ begin
 	return '0';
 end function;
 
-function cmpGreaterUnsignedSN(a, b: SmallNumber) return std_logic is
+function cmpGreaterUnsignedSN(a: SmallNumber; b: SmallNumber) return std_logic is
 begin
-	for i in 0 to SMALL_NUMBER_SIZE-1 loop
+	for i in SMALL_NUMBER_SIZE-1 downto 0 loop
 		if a(i) = '1' and b(i) = '0' then
 			return '1';
 		elsif a(i) = '0' and b(i) = '1' then
@@ -339,38 +342,49 @@ begin
 end function;
 
 
-
-function compareGreaterSNA(inds: SmallNumberArray; num: SmallNumber) return std_logic_vector is
-	constant LEN: integer := inds'length;
-	variable res: std_logic_vector(0 to LEN-1) := (others => '0');
-	variable sn: SmallNumber := (others => '0');
+function cmpGreaterThanUnsignedSNA(arr: SmallNumberArray; num: SmallNumber) return std_logic_vector is
+	variable res: std_logic_vector(0 to arr'length-1) := (others => '0');
 begin
-	for i in 0 to LEN-1 loop
-		sn := subSN(num, inds(i)); -- If starts with 1, then num is smaller
-		res(i) := sn(sn'high);
+	for i in 0 to res'length-1 loop
+		res(i) := cmpGreaterUnsignedSN(arr(i), num);
 	end loop;
 	return res;
 end function;
 
-function compareSmallerSNA(inds: SmallNumberArray; num: SmallNumber) return std_logic_vector is
-	constant LEN: integer := inds'length;
-	variable res: std_logic_vector(0 to LEN-1) := (others => '0');
-	variable sn: SmallNumber := (others => '0');
+function cmpGreaterThanSignedSNA(arr: SmallNumberArray; num: SmallNumber) return std_logic_vector is
+	variable res: std_logic_vector(0 to arr'length-1) := (others => '0');
 begin
-	for i in 0 to LEN-1 loop
-		sn := subSN(inds(i), num); -- If starts with 1, then num is greater
-		res(i) := sn(sn'high);
+	for i in 0 to res'length-1 loop
+		res(i) := cmpGreaterSignedSN(arr(i), num);
 	end loop;
 	return res;
 end function;
 
-function compareEqualSNA(inds: SmallNumberArray; num: SmallNumber) return std_logic_vector is
-	constant LEN: integer := inds'length;
+function cmpLessThanUnsignedSNA(arr: SmallNumberArray; num: SmallNumber) return std_logic_vector is
+	variable res: std_logic_vector(0 to arr'length-1) := (others => '0');
+begin
+	for i in 0 to res'length-1 loop
+		res(i) := cmpLessUnsignedSN(arr(i), num);
+	end loop;
+	return res;
+end function;
+
+function cmpLessThanSignedSNA(arr: SmallNumberArray; num: SmallNumber) return std_logic_vector is
+	variable res: std_logic_vector(0 to arr'length-1) := (others => '0');
+begin
+	for i in 0 to res'length-1 loop
+		res(i) := cmpLessSignedSN(arr(i), num);
+	end loop;
+	return res;
+end function;
+
+function cmpEqualToSNA(arr: SmallNumberArray; num: SmallNumber) return std_logic_vector is
+	constant LEN: integer := arr'length;
 	variable res: std_logic_vector(0 to LEN-1) := (others => '0');
 	variable sn: SmallNumber := (others => '0');
 begin
 	for i in 0 to LEN-1 loop
-		if num = inds(i) then
+		if num = arr(i) then
 			res(i) := '1';
 		else
 			res(i) := '0';
