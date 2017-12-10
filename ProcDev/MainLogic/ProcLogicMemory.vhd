@@ -21,14 +21,13 @@ use work.Decoding2.all;
 use work.TEMP_DEV.all;
 use work.GeneralPipeDev.all;
 
-use work.Queues.all;
+--use work.Queues.all;
 
 
 package ProcLogicMemory is
 
 function compareAddress(content: InstructionStateArray; fullMask: std_logic_vector;
 								ins: InstructionState) return std_logic_vector;
--- TODO: This function and findOldestMatch introduce dependency on Queues. May be good to remove it
 function findNewestMatch(content: InstructionStateArray;
 								 cmpMask: std_logic_vector; pStart: SmallNumber; ins: InstructionState)
 return std_logic_vector;
@@ -111,10 +110,10 @@ end function;
 			variable tmpVec: std_logic_vector(0 to LEN-1) := (others => '0');
 		begin
 			-- From qs we must check which are older than ins
-			indices := getQueueIndicesFrom(LEN, pStart);
-			rawIndices := getQueueIndicesFrom(LEN, (others => '0'));
+			--indices := getQueueIndicesFrom(LEN, pStart);
+			--rawIndices := getQueueIndicesFrom(LEN, (others => '0'));
 			older := TMP_cmpTagsBefore(content, ins.groupTag);
-			before := compareIndicesSmaller(rawIndices, pStart);
+			before := setToOnes(older, slv2u(pStart));
 			-- Use priority enc. to find last in the older ones. But they may be divided:
 			--		V  1 1 1 0 0 0 0 1 1 1 and cmp  V
 			--		   0 1 0 0 0 0 0 1 0 1
@@ -150,10 +149,10 @@ end function;
 			variable tmpVec: std_logic_vector(0 to LEN-1) := (others => '0');
 		begin
 			-- From qs we must check which are newer than ins
-			indices := getQueueIndicesFrom(LEN, pStart);
-			rawIndices := getQueueIndicesFrom(LEN, (others => '0'));
+			--indices := getQueueIndicesFrom(LEN, pStart);
+			--rawIndices := getQueueIndicesFrom(LEN, (others => '0'));
 			newer := TMP_cmpTagsAfter(content, ins.groupTag);
-			areAtOrAfter := not compareIndicesSmaller(rawIndices, pStart);
+			areAtOrAfter := not setToOnes(newer, slv2u(pStart));
 			-- Use priority enc. to find first in the newer ones. But they may be divided:
 			--		V  1 1 1 0 0 0 0 1 1 1 and cmp  V
 			--		   0 1 0 0 0 0 0 1 0 1

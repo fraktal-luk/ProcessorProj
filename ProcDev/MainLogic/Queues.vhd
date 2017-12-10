@@ -276,42 +276,18 @@ begin
 end function;
 
 function compareIndicesGreater(inds: SmallNumberArray; num: SmallNumber) return std_logic_vector is
-	constant LEN: integer := inds'length;
-	variable res: std_logic_vector(0 to LEN-1) := (others => '0');
-	variable sn: SmallNumber := (others => '0');
 begin
-	for i in 0 to LEN-1 loop
-		sn := subSN(num, inds(i)); -- If starts with 1, then num is smaller
-		res(i) := sn(sn'high);
-	end loop;
-	return res;
+	return compareGreaterSNA(inds, num);
 end function;
 
 function compareIndicesSmaller(inds: SmallNumberArray; num: SmallNumber) return std_logic_vector is
-	constant LEN: integer := inds'length;
-	variable res: std_logic_vector(0 to LEN-1) := (others => '0');
-	variable sn: SmallNumber := (others => '0');
 begin
-	for i in 0 to LEN-1 loop
-		sn := subSN(inds(i), num); -- If starts with 1, then num is greater
-		res(i) := sn(sn'high);
-	end loop;
-	return res;
+	return compareSmallerSNA(inds, num);
 end function;
 
 function compareIndicesEqual(inds: SmallNumberArray; num: SmallNumber) return std_logic_vector is
-	constant LEN: integer := inds'length;
-	variable res: std_logic_vector(0 to LEN-1) := (others => '0');
-	variable sn: SmallNumber := (others => '0');
 begin
-	for i in 0 to LEN-1 loop
-		if num = inds(i) then
-			res(i) := '1';
-		else
-			res(i) := '0';
-		end if;
-	end loop;
-	return res;
+	return compareEqualSNA(inds, num);
 end function;
 
 function trimSNA(arr: SmallNumberArray; maskNum: SmallNumber) return SmallNumberArray is

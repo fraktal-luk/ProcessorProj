@@ -57,6 +57,10 @@ function subSN(a, b: SmallNumber) return SmallNumber;
 function uminSN(a, b: SmallNumber) return SmallNumber;
 function sminSN(a, b: SmallNumber) return SmallNumber;
 
+function compareGreaterSNA(inds: SmallNumberArray; num: SmallNumber) return std_logic_vector;
+function compareSmallerSNA(inds: SmallNumberArray; num: SmallNumber) return std_logic_vector;
+function compareEqualSNA(inds: SmallNumberArray; num: SmallNumber) return std_logic_vector;
+
 end ProcBasicDefs;
 
 
@@ -263,6 +267,47 @@ begin
 			exit;
 		else
 			null;
+		end if;
+	end loop;
+	return res;
+end function;
+
+
+
+function compareGreaterSNA(inds: SmallNumberArray; num: SmallNumber) return std_logic_vector is
+	constant LEN: integer := inds'length;
+	variable res: std_logic_vector(0 to LEN-1) := (others => '0');
+	variable sn: SmallNumber := (others => '0');
+begin
+	for i in 0 to LEN-1 loop
+		sn := subSN(num, inds(i)); -- If starts with 1, then num is smaller
+		res(i) := sn(sn'high);
+	end loop;
+	return res;
+end function;
+
+function compareSmallerSNA(inds: SmallNumberArray; num: SmallNumber) return std_logic_vector is
+	constant LEN: integer := inds'length;
+	variable res: std_logic_vector(0 to LEN-1) := (others => '0');
+	variable sn: SmallNumber := (others => '0');
+begin
+	for i in 0 to LEN-1 loop
+		sn := subSN(inds(i), num); -- If starts with 1, then num is greater
+		res(i) := sn(sn'high);
+	end loop;
+	return res;
+end function;
+
+function compareEqualSNA(inds: SmallNumberArray; num: SmallNumber) return std_logic_vector is
+	constant LEN: integer := inds'length;
+	variable res: std_logic_vector(0 to LEN-1) := (others => '0');
+	variable sn: SmallNumber := (others => '0');
+begin
+	for i in 0 to LEN-1 loop
+		if num = inds(i) then
+			res(i) := '1';
+		else
+			res(i) := '0';
 		end if;
 	end loop;
 	return res;
