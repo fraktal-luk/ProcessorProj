@@ -75,17 +75,17 @@ entity MemoryUnit is
 
 			selectedDataOutput: out InstructionSlot;
 
-		storeAddressWr: in std_logic;
-		storeValueWr: in std_logic;
-
-		storeAddressDataIn: in InstructionState;
-		storeValueDataIn: in InstructionState;
-
-			compareAddressDataIn: in InstructionState;
-			compareAddressReady: in std_logic;
-
-			selectedDataOut: out InstructionState;
-			selectedSending: out std_logic;
+--		storeAddressWr: in std_logic;
+--		storeValueWr: in std_logic;
+--
+--		storeAddressDataIn: in InstructionState;
+--		storeValueDataIn: in InstructionState;
+--
+--			compareAddressDataIn: in InstructionState;
+--			compareAddressReady: in std_logic;
+--
+--			selectedDataOut: out InstructionState;
+--			selectedSending: out std_logic;
 
 		committing: in std_logic;
 		groupCtrInc: in SmallNumber;
@@ -147,11 +147,12 @@ begin
 	TMP_contentNext <=
 				TMP_getNewContentUpdate(TMP_content, dataIn.data, TMP_ckEnForInput, inputIndices,
 												TMP_maskA, TMP_maskD,
-												storeAddressWr, storeValueWr, storeAddressDataIn, storeValueDataIn,
+												storeAddressInput.full, storeValueInput.full,
+												storeAddressInput.ins, storeValueInput.ins,
 												CLEAR_COMPLETED, KEEP_INPUT_CONTENT);
 
-	TMP_maskA <= findMatching(makeSlotArray(TMP_content, TMP_mask), storeAddressDataIn);
-	TMP_maskD <= findMatching(makeSlotArray(TMP_content, TMP_mask), storeValueDataIn);
+	TMP_maskA <= findMatching(makeSlotArray(TMP_content, TMP_mask), storeAddressInput.ins);
+	TMP_maskD <= findMatching(makeSlotArray(TMP_content, TMP_mask), storeValueInput.ins);
 
 	-- View
 	contentView <= normalizeInsArray(qs0, TMP_content);
@@ -172,17 +173,17 @@ begin
 	contentData <= extractData(content);
 
 
-		cmpMask <= compareAddress(TMP_content, TMP_mask, compareAddressDataIn);
+		cmpMask <= compareAddress(TMP_content, TMP_mask, compareAddressInput.ins);
 		-- TEMP selection of hit checking mechanism 
-		matchedSlot <= findNewestMatch(TMP_content, cmpMask, qs0.pStart, compareAddressDataIn)
+		matchedSlot <= findNewestMatch(TMP_content, cmpMask, qs0.pStart, compareAddressInput.ins)
 																										when MODE = store
-					else	findOldestMatch(TMP_content, cmpMask, qs0.pStart, compareAddressDataIn)
+					else	findOldestMatch(TMP_content, cmpMask, qs0.pStart, compareAddressInput.ins)
 																										when MODE = load
 					else  --findMatchingGroupTag(TMP_content, compareAddressDataIn) and TMP_mask
-							findMatching(makeSlotArray(TMP_content, TMP_mask), compareAddressDataIn)
+							findMatching(makeSlotArray(TMP_content, TMP_mask), compareAddressInput.ins)
 																										when MODE = branch
 					else	(others => '0');
-		selectedSendingSig <= isNonzero(matchedSlot) and compareAddressReady;
+		selectedSendingSig <= isNonzero(matchedSlot) and compareAddressInput.full;
 		selectedData <= chooseIns(TMP_content, matchedSlot);
 	
 	
@@ -221,8 +222,8 @@ begin
 	
 	sendingSQOut <= sendingSQ;
 	
-		selectedDataOut <= selectedData;
-		selectedSending <= selectedSendingSig;
+	--	selectedDataOut <= selectedData;
+	--	selectedSending <= selectedSendingSig;
 	selectedDataOutput <= (selectedSendingSig, selectedData);
 end Behavioral;
 

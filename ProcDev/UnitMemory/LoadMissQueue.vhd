@@ -151,11 +151,11 @@ begin
 		
 			firstReadyVec <= findFirstFilled(extractData(content), livingMask, nextAccepting);
 				
-			wrAddress <= storeAddressWr;
-			wrData <= storeValueWr;
+			wrAddress <= storeAddressInput.full;
+			wrData <= storeValueInput.full;
 		
-			dataA <= storeAddressDataIn;
-			dataD <= storeValueDataIn;
+			dataA <= storeAddressInput.ins;
+			dataD <= storeValueInput.ins;
 					
 			sendingSQ <= isNonzero(firstReadyVec);
 				dataOutV.fullMask(0) <= sendingSq;

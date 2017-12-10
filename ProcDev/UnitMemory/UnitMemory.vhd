@@ -374,17 +374,17 @@ begin
 					
 					selectedDataOutput => sqSelectedOutput,
 				
-				storeAddressWr => storeAddressWrSig,
-				storeValueWr => storeValueWrSig,
-
-				storeAddressDataIn => storeAddressDataSig,
-				storeValueDataIn => storeValueDataSig,
-				
-					compareAddressDataIn => addressingData,
-					compareAddressReady => sendingAddressingForLoad or sendingAddressingForMfc,
-
-					selectedDataOut => open,--storeForwardData,
-					selectedSending => open,--storeForwardSending,
+--				storeAddressWr => storeAddressWrSig,
+--				storeValueWr => storeValueWrSig,
+--
+--				storeAddressDataIn => storeAddressDataSig,
+--				storeValueDataIn => storeValueDataSig,
+--				
+--					compareAddressDataIn => addressingData,
+--					compareAddressReady => sendingAddressingForLoad or sendingAddressingForMfc,
+--
+--					selectedDataOut => open,--storeForwardData,
+--					selectedSending => open,--storeForwardSending,
 				
 				committing => committing,
 				groupCtrInc => groupCtrInc,
@@ -424,17 +424,17 @@ begin
 					
 					selectedDataOutput => lqSelectedOutput,
 					
-				storeAddressWr => sendingAddressingForLoad or sendingAddressingForMfc,
-				storeValueWr => sendingAddressingForLoad or sendingAddressingForMfc,
-
-				storeAddressDataIn => addressingData, --?
-				storeValueDataIn => DEFAULT_INSTRUCTION_STATE,
-
-					compareAddressDataIn => storeAddressDataSig,
-					compareAddressReady => storeAddressWrSig,
-
-					selectedDataOut => open,--lqSelectedData,
-					selectedSending => open,--lqSelectedSending,
+--				storeAddressWr => sendingAddressingForLoad or sendingAddressingForMfc,
+--				storeValueWr => sendingAddressingForLoad or sendingAddressingForMfc,
+--
+--				storeAddressDataIn => addressingData, --?
+--				storeValueDataIn => DEFAULT_INSTRUCTION_STATE,
+--
+--					compareAddressDataIn => storeAddressDataSig,
+--					compareAddressReady => storeAddressWrSig,
+--
+--					selectedDataOut => open,--lqSelectedData,
+--					selectedSending => open,--lqSelectedSending,
 					
 					committing => committing,
 					groupCtrInc => groupCtrInc,
@@ -472,17 +472,17 @@ begin
 					
 					selectedDataOutput => lmqSelectedOutput,
 				
-				storeAddressWr => '0',
-				storeValueWr => '0',
-
-				storeAddressDataIn => DEFAULT_INSTRUCTION_STATE,
-				storeValueDataIn => DEFAULT_INSTRUCTION_STATE,
-
-					compareAddressDataIn => DEFAULT_INSTRUCTION_STATE,
-					compareAddressReady => '0',
-
-					selectedDataOut => open,
-					selectedSending => open,
+--				storeAddressWr => '0',
+--				storeValueWr => '0',
+--
+--				storeAddressDataIn => DEFAULT_INSTRUCTION_STATE,
+--				storeValueDataIn => DEFAULT_INSTRUCTION_STATE,
+--
+--					compareAddressDataIn => DEFAULT_INSTRUCTION_STATE,
+--					compareAddressReady => '0',
+--
+--					selectedDataOut => open,
+--					selectedSending => open,
 			
 					committing => committing,
 					groupCtrInc => (others => '0'),

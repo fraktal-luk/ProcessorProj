@@ -121,6 +121,8 @@ architecture Implem of UnitExec is
 		signal dataIQB: InstructionState := DEFAULT_INSTRUCTION_STATE;
 		signal dataIQD: InstructionState := DEFAULT_INSTRUCTION_STATE;
 
+		signal bqSelectedOutput: InstructionSlot := DEFAULT_INSTRUCTION_SLOT;
+
 	constant HAS_RESET_EXEC: std_logic := '1';
 	constant HAS_EN_EXEC: std_logic := '1';	
 begin		
@@ -233,19 +235,19 @@ begin
 					storeValueInput => (storeTargetWrSig, DEFAULT_INSTRUCTION_STATE),
 					compareAddressInput => (sendingIQD, dataIQD),
 					
-					selectedDataOutput => open,
+					selectedDataOutput => bqSelectedOutput,
 				
-				storeAddressWr => storeTargetWrSig,
-				storeValueWr => storeTargetWrSig,
-
-				storeAddressDataIn => storeTargetDataSig,
-				storeValueDataIn => DEFAULT_INSTRUCTION_STATE,
-				
-				compareAddressDataIn => dataIQD,
-				compareAddressReady => sendingIQD,
-
-				selectedDataOut => branchQueueSelectedOut,
-				selectedSending => branchQueueSelectedSending,
+--				storeAddressWr => storeTargetWrSig,
+--				storeValueWr => storeTargetWrSig,
+--
+--				storeAddressDataIn => storeTargetDataSig,
+--				storeValueDataIn => DEFAULT_INSTRUCTION_STATE,
+--				
+--				compareAddressDataIn => dataIQD,
+--				compareAddressReady => sendingIQD,
+--
+--				selectedDataOut => branchQueueSelectedOut,
+--				selectedSending => branchQueueSelectedSending,
 					
 				committing => committing,
 				groupCtrInc => groupCtrInc,
@@ -260,6 +262,8 @@ begin
 					dataOutV => dataOutBQV
 			);
 
+				branchQueueSelectedSending <= bqSelectedOutput.full;
+				branchQueueSelectedOut <= bqSelectedOutput.ins;
 		-- Data from sysreg reads goes to load pipe
 		-- CAREFUL: Don't send the same thing from both subpipes:
 

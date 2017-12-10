@@ -148,6 +148,11 @@ architecture Behavioral of OutOfOrderBox is
 	signal	cqMaskSig: std_logic_vector(0 to INTEGER_WRITE_WIDTH-1) := (others => '0');
 	signal	cqDataSig: InstructionStateArray(0 to INTEGER_WRITE_WIDTH-1)
 									:= (others => DEFAULT_INSTRUCTION_STATE);
+
+		signal cqOutputSig: InstructionSlotArray(0 to INTEGER_WRITE_WIDTH-1)
+						:= (others => DEFAULT_INSTRUCTION_SLOT);
+		signal cqBufferOutputSig: InstructionSlotArray(0 to CQ_SIZE-1)
+						:= (others => DEFAULT_INSTRUCTION_SLOT);
 	
 	signal queueDataA, queueDataB, queueDataC, queueDataD, queueDataE:
 					InstructionState := DEFAULT_INSTRUCTION_STATE;
@@ -432,18 +437,32 @@ begin
 				execEventSignal => '0',
 				execCausing => DEFAULT_INSTRUCTION_STATE,
 				
-					maskIn => --execSending(0 to 2),
-									extractFullMask(execOutputs1(0 to 2)),
-					dataIn => --execEnds(0 to 2),
-									extractData(execOutputs1(0 to 2)),
+				--	maskIn => --execSending(0 to 2),
+				--					extractFullMask(execOutputs1(0 to 2)),
+				--	dataIn => --execEnds(0 to 2),
+				--					extractData(execOutputs1(0 to 2)),
+						input => execOutputs1(0 to 2),
 				
 				whichAcceptedCQ => whichAcceptedCQ,
 				anySending => anySendingFromCQ,
-					cqMaskOut => cqMaskSig,
-					cqDataOut => cqDataSig,
-						bufferMaskOut => cqBufferMask,
-						bufferDataOut => cqBufferData
+					--cqMaskOut => open,--
+					--					--cqMaskSig,
+					--cqDataOut => open,--
+					--					--cqDataSig,
+					
+					cqOutput => cqOutputSig,
+					bufferOutput => cqBufferOutputSig
+					
+					--	bufferMaskOut => open,--
+					--							--cqBufferMask,
+					--	bufferDataOut => open--
+					--							--cqBufferData
 			);
+				
+				cqMaskSig <= extractFullMask(cqOutputSig);
+				cqDataSig <= extractData(cqOutputSig);
+				cqBufferMask <= extractFullMask(cqBufferOutputSig);
+				cqBufferData <= extractData(cqBufferOutputSig);
 				
 					cqDataLivingOut.fullMask(0) <= cqMaskSig(0);
 					cqDataLivingOut.data(0) <= cqDataSig(0);

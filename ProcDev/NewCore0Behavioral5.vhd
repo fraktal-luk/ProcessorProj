@@ -69,6 +69,11 @@ architecture Behavioral5 of NewCore0 is
 			signal sbDataOut: InstructionStateArray(0 to 0) := (others => DEFAULT_INSTRUCTION_STATE);	
 			signal sbFullMask: std_logic_vector(0 to SB_SIZE-1) := (others => '0');
 
+		signal sbOutputSig: InstructionSlotArray(0 to 1-1)
+						:= (others => DEFAULT_INSTRUCTION_SLOT);
+		signal sbBufferOutputSig: InstructionSlotArray(0 to SB_SIZE-1)
+						:= (others => DEFAULT_INSTRUCTION_SLOT);
+
 		signal sysStoreAllow: std_logic := '0';
 		signal sysStoreAddress: slv5 := (others => '0'); 
 		signal sysStoreValue: Mword := (others => '0');
@@ -338,20 +343,30 @@ begin
 						clk => clk, reset => reset, en => en,
 						
 						whichAcceptedCQ => sbAcceptingV,
-						maskIn => dataOutSQ.fullMask,
-						dataIn => dataOutSQ.data,
+						--maskIn => dataOutSQ.fullMask,
+						--dataIn => dataOutSQ.data,
+						input => makeSlotArray(dataOutSQ.data, dataOutSQ.fullMask),
 						
-						bufferMaskOut => sbFullMask,
-						bufferDataOut => open,
+						--bufferMaskOut => open,--
+						--						--sbFullMask,
+						--bufferDataOut => open,
 						
 						anySending => sbSending,
-						cqMaskOut => sbMaskOut,
-						cqDataOut => sbDataOut,
+						--cqMaskOut => open,--sbMaskOut,
+						--cqDataOut => open,--sbDataOut,
+
+							cqOutput => sbOutputSig,
+							bufferOutput => sbBufferOutputSig,
 						
 						execEventSignal => '0',
 						execCausing => DEFAULT_INSTRUCTION_STATE
 					);
 
+				sbMaskOut <= extractFullMask(sbOutputSig);
+				sbDataOut <= extractData(sbOutputSig);
+				sbFullMask <= extractFullMask(sbBufferOutputSig);
+				-- ignore <= extractData(sbBufferOutputSig);
+				
 				sbEmpty <= not sbFullMask(0);
 				dataFromSB <= sbDataOut(0);
 
