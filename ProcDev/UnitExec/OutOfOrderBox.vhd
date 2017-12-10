@@ -101,7 +101,8 @@ architecture Behavioral of OutOfOrderBox is
 	
 	signal resetSig, enSig: std_logic := '0';
 
-	signal dataToA, dataToB, dataToC, dataToD, dataToE: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;						
+	signal dataToA, dataToB, dataToC, dataToD, dataToE: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
+	
 	signal acceptingVecA, acceptingVecB, acceptingVecC, acceptingVecD, acceptingVecE:
 				std_logic_vector(0 to PIPE_WIDTH-1) := (others => '0');
 	signal compactedToSQ, compactedToLQ, compactedToBQ: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
@@ -110,7 +111,8 @@ architecture Behavioral of OutOfOrderBox is
 	signal robAccepting: std_logic := '0';	
 
 	signal dataOutIQA, dataOutIQB, dataOutIQC, dataOutIQD, dataOutIQE: InstructionState
-																	:= defaultInstructionState;	
+																	:= defaultInstructionState;
+		-- sendingSched* can be unified into InstructionSlot with instructions
 	signal sendingSchedA, sendingSchedB, sendingSchedC, sendingSchedD, sendingSchedE,
 			execAcceptingA, execAcceptingB, execAcceptingC, execAcceptingD, execAcceptingE: std_logic := '0';
 				

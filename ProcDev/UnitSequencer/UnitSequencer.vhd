@@ -125,8 +125,7 @@ entity UnitSequencer is
 	);
 end UnitSequencer;
 
--- TODO: add feature for invalid fetch: when (not ivalid), cancel fetched instruction and 
---			jump back to repeat fetching (or cause exception etc)
+
 architecture Behavioral of UnitSequencer is
 	signal resetSig, enSig: std_logic := '0';							
 

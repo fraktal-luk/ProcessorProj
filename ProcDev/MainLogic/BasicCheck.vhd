@@ -229,7 +229,7 @@ begin
 	
 	-- CHECK: does it make sense to examine this? Should other kinds of data be compared?
 	for i in 0 to nCommon-1 loop
-		assert commonPart1(i).groupTag = commonPart2(i).groupTag report "u"; -- TODO: is this the right tag field?
+		assert commonPart1(i).groupTag = commonPart2(i).groupTag report "u";
 		assert commonPart1(i).basicInfo.ip = commonPart2(i).basicInfo.ip report "yio";
 	end loop;
 	
@@ -321,7 +321,7 @@ begin
 					--report "rtttt";
 			insSendingMatch := bufferData(i);
 			-- Check the op that is sent?
-			assert insSendingMatch.groupTag = insSending.groupTag report "byj"; -- TODO: is this the right tag field?
+			assert insSendingMatch.groupTag = insSending.groupTag report "byj";
 			assert insSendingMatch.basicInfo.ip = insSending.basicInfo.ip report "jjj";		
 		end if;
 		
@@ -337,7 +337,7 @@ begin
 	
 	-- CHECK: does it make sense to examine this? Should other kinds of data be compared?
 	for i in 0 to nCommon-1 loop
-		assert commonPart1(i).groupTag = commonPart2(i).groupTag report "jutrrrr"; -- TODO: is this the right tag field?
+		assert commonPart1(i).groupTag = commonPart2(i).groupTag report "jutrrrr";
 		assert commonPart1(i).basicInfo.ip = commonPart2(i).basicInfo.ip report "oiu";
 	end loop;
 	

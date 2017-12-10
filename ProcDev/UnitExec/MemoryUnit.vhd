@@ -172,7 +172,8 @@ begin
 																										when MODE = store
 					else	findOldestMatch(TMP_content, cmpMask, qs0.pStart, compareAddressDataIn)
 																										when MODE = load
-					else  findMatchingGroupTag(TMP_content, compareAddressDataIn) and TMP_mask
+					else  --findMatchingGroupTag(TMP_content, compareAddressDataIn) and TMP_mask
+							findMatching(makeSlotArray(TMP_content, TMP_mask), compareAddressDataIn)
 																										when MODE = branch
 					else	(others => '0');
 		selectedSendingSig <= isNonzero(matchedSlot) and compareAddressReady;

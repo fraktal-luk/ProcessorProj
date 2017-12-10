@@ -318,7 +318,7 @@ begin
 		flowDrive => flowDrive,
 		flowResponse => flowResponse
 	);
-		-- TODO: move to visible package! 
+
 		stageEvents.causing <= setPhase(stageDataLiving.data(0),
 																	 evtPhase0, evtPhase1, evtPhase2);
 		stageEvents.eventOccured <= stageEvents.causing.controlInfo.newEvent;

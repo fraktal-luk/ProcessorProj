@@ -71,30 +71,10 @@ function lmMaskNext(livingMask: std_logic_vector;
 					  receiving: std_logic) return std_logic_vector;
 
 	function TMP_cmpTagsBefore(content: InstructionStateArray; tag: SmallNumber)
-	return std_logic_vector is
-		variable res: std_logic_vector(0 to content'length-1) := (others => '0');
-		variable diff: SmallNumber := (others => '0');
-	begin
-		for i in 0 to res'length-1 loop
-			diff := subSN(content(i).groupTag, tag); -- If grTag < tag then diff(high) = '1'
-			res(i) := diff(SMALL_NUMBER_SIZE-1);
-		end loop;
-		
-		return res;
-	end function;
+	return std_logic_vector;
 
 	function TMP_cmpTagsAfter(content: InstructionStateArray; tag: SmallNumber)
-	return std_logic_vector is
-		variable res: std_logic_vector(0 to content'length-1) := (others => '0');
-		variable diff: SmallNumber := (others => '0');
-	begin
-		for i in 0 to res'length-1 loop
-			diff := subSN(tag, content(i).groupTag); -- If grTag > tag then diff(high) = '1'
-			res(i) := diff(SMALL_NUMBER_SIZE-1);
-		end loop;
-		
-		return res;
-	end function;
+	return std_logic_vector;
 					  
 end ProcLogicMemory;
 
@@ -417,5 +397,31 @@ begin
 	
 	return outMask;
 end function;
+
+	function TMP_cmpTagsBefore(content: InstructionStateArray; tag: SmallNumber)
+	return std_logic_vector is
+		variable res: std_logic_vector(0 to content'length-1) := (others => '0');
+		variable diff: SmallNumber := (others => '0');
+	begin
+		for i in 0 to res'length-1 loop
+			diff := subSN(content(i).groupTag, tag); -- If grTag < tag then diff(high) = '1'
+			res(i) := diff(SMALL_NUMBER_SIZE-1);
+		end loop;
+		
+		return res;
+	end function;
+
+	function TMP_cmpTagsAfter(content: InstructionStateArray; tag: SmallNumber)
+	return std_logic_vector is
+		variable res: std_logic_vector(0 to content'length-1) := (others => '0');
+		variable diff: SmallNumber := (others => '0');
+	begin
+		for i in 0 to res'length-1 loop
+			diff := subSN(tag, content(i).groupTag); -- If grTag > tag then diff(high) = '1'
+			res(i) := diff(SMALL_NUMBER_SIZE-1);
+		end loop;
+		
+		return res;
+	end function;
 
 end ProcLogicMemory;

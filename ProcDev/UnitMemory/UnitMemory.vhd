@@ -106,8 +106,7 @@ architecture Behavioral of UnitMemory is
 	signal sendingToDLQ, sendingFromDLQ: std_logic := '0';
 	signal dataToDLQ: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
 	
-	signal stageDataAfterCache, stageDataAfterSysRegs, lsResultData, lsResultData_2,
-				execResultData, dataFromDLQ:
+	signal stageDataAfterCache, stageDataAfterSysRegs, lsResultData, execResultData, dataFromDLQ:
 					InstructionState := DEFAULT_INSTRUCTION_STATE;
 		signal stageDataMultiDLQ: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
 					
@@ -125,7 +124,7 @@ architecture Behavioral of UnitMemory is
 		signal effectiveAddressSending: std_logic := '0';
 	
 	signal lqSelectedData, lqSelectedDataWithErr,
-					 lqSelectedDataWithErrDelay : InstructionState := DEFAULT_INSTRUCTION_STATE;
+					 lqSelectedDataWithErrDelay: InstructionState := DEFAULT_INSTRUCTION_STATE;
 	signal lqSelectedSending, lqSelectedSendingDelay: std_logic := '0';
 	
 	signal sendingAddressToSQSig,
@@ -306,17 +305,10 @@ begin
 		stageDataAfterForward <= setInsResult(setDataCompleted(dataAfterRead, 
 																				 getDataCompleted(storeForwardDataDelay)),
 														  storeForwardDataDelay.argValues.arg2);
-		lsResultData_2 <= -- TODO: as with DLQ sending, what prios?
-					  stageDataAfterForward when storeForwardSendingDelay = '1'
-				else stageDataAfterSysRegs when sendingFromSysReg = '1'
-				--else dataFromDLQ when sendingFromDLQ = '1'
-				else stageDataAfterCache;
 
 			lsResultData <= TMP_lsResultData(dataAfterRead, memLoadReady, memLoadValue,
 																		sendingFromSysReg, sysLoadVal,
 																		storeForwardSendingDelay, storeForwardDataDelay);
-
-				ch0 <= '1' when lsResultData = lsResultData_2 else '0';
 
 		execResultData <= lqSelectedDataWithErrDelay when lqSelectedSendingDelay = '1'
 						else	lsResultData;

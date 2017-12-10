@@ -75,8 +75,7 @@ entity UnitFront is
 	);
 end UnitFront;
 
--- TODO: add feature for invalid "instruction": when (not ivalid), cancel fetched instruction and 
---			jump back to repeat fetching (or cause exception etc)
+
 architecture Behavioral of UnitFront is
 	signal resetSig, enSig: std_logic := '0';							
 		
