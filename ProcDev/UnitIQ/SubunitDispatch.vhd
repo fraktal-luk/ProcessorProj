@@ -58,8 +58,9 @@ entity SubunitDispatch is
 		
 	 	stageDataIn: in InstructionState;		
 		acceptingOut: out std_logic;
-		sendingOut: out std_logic;
-		stageDataOut: out InstructionState;
+		--sendingOut: out std_logic;
+		--stageDataOut: out InstructionState;
+			output: out InstructionSlot;
 		
 		execEventSignal: in std_logic;
 		lateEventSignal: in std_logic;
@@ -78,6 +79,9 @@ architecture Alternative of SubunitDispatch is
 	signal lockSend: std_logic := '0';
 	signal nextResultTags: PhysNameArray(0 to N_NEXT_RES_TAGS-1) := (others => (others => '0'));
 	signal writtenTags: PhysNameArray(0 to PIPE_WIDTH-1) := (others => (others => '0'));
+	
+	signal sendingOut: std_logic := '0';
+	signal stageDataOut: InstructionState := DEFAULT_INSTRUCTION_STATE;
 begin
 
 	inputDataWithArgs <= getDispatchArgValues(stageDataIn, resultVals,USE_IMM);
@@ -111,6 +115,7 @@ begin
 	
 	stageDataOut <= dispatchDataUpdated;
 	
+	output <= (sendingOut, stageDataOut);
 end Alternative;
 
 

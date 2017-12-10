@@ -165,6 +165,7 @@ architecture Behavioral of OutOfOrderBox is
 				std_logic_vector(0 to 4) := (others => '0');
 	signal queueDataArr, schedDataArr: InstructionStateArray(0 to 4)
 					:= (others => DEFAULT_INSTRUCTION_STATE);
+	signal iqOutputArr, schedOutputArr: InstructionSlotArray(0 to 4) := (others => DEFAULT_INSTRUCTION_SLOT);
 	signal dataToQueuesArr: StageDataMultiArray(0 to 4) := (others => DEFAULT_STAGE_DATA_MULTI);
 	signal regValsArr: MwordArray(0 to 3*5-1) := (others => (others => '0'));
 begin
@@ -221,13 +222,17 @@ begin
 				fni => fni,
 				readyRegFlags => readyRegFlags,
 					issueAccepting => issueAcceptingArr(i), --
-					queueSendingOut => queueSendingArr(i),
-					queueDataOut => queueDataArr(i),
+					--queueSendingOut => queueSendingArr(i),
+					--queueDataOut => queueDataArr(i),
 				execCausing => execCausing,
 					lateEventSignal => lateEventSignal,
-				execEventSignal => execEventSignal			
+				execEventSignal => execEventSignal,
+				queueOutput => iqOutputArr(i)
 			);
 		end generate;
+			
+			queueSendingArr <= extractFullMask(iqOutputArr);
+			queueDataArr <= extractData(iqOutputArr);
 		
 		-- Not used, for viewing
 		queueSendingA <= queueSendingArr(0);
@@ -283,11 +288,15 @@ begin
 					regValues => regValsArr(3*i to 3*i + 2),--
 					stageDataIn => queueDataArr(i),
 					acceptingOut => issueAcceptingArr(i),
-					sendingOut => sendingSchedArr(i),--
-					stageDataOut => schedDataArr(i)--
+					--sendingOut => sendingSchedArr(i),--
+					--stageDataOut => schedDataArr(i)--
+					output => schedOutputArr(i)
 				);
 				
 			end generate;
+			
+				sendingSchedArr <= extractFullMask(schedOutputArr);
+				schedDataArr <= extractData(schedOutputArr);
 			
 			-- Unused, only for viewing purpose
 			issueAcceptingA <= issueAcceptingArr(0);

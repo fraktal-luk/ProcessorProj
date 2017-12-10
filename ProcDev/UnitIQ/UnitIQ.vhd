@@ -58,8 +58,9 @@ entity UnitIQ is
 		acceptingVec: out std_logic_vector(0 to PIPE_WIDTH-1);
 			issueAccepting: in std_logic;
 		
-			queueSendingOut: out std_logic;
-			queueDataOut: out InstructionState;
+			--queueSendingOut: out std_logic;
+			--queueDataOut: out InstructionState;	
+			queueOutput: out InstructionSlot;
 		
 		newData: in StageDataMulti;			
 
@@ -70,16 +71,6 @@ entity UnitIQ is
 		lateEventSignal: in std_logic;
 			
 		fni: in ForwardingInfo
-			
-
-		-- Phys regs to read - only for "full read ports" configuration 
---		regsForDispatch: out PhysNameArray(0 to 2);
-		--regReadAllow: out std_logic;			
---		regValues: in MwordArray(0 to 2);
-
---			nextAccepting: in std_logic; -- from exec	
---		dataOutIQ: out InstructionState;
---		sendingOut: out std_logic
 	);
 
 end UnitIQ;
@@ -153,8 +144,10 @@ begin
 		aiArray => aiArray
 	);
 
-		queueSendingOut <= queueSending;
-		queueDataOut <= toDispatch;
+	--	queueSendingOut <= queueSending;
+	--	queueDataOut <= toDispatch;
+	
+	queueOutput <= (queueSending, toDispatch);
 	
 --	-- Dispatch stage			
 --	DISPATCH_MAIN_LOGIC: entity work.SubunitDispatch(Alternative)	
