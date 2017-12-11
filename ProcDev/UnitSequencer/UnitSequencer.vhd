@@ -226,12 +226,6 @@ begin
 
 	newTargetInfo <= stageDataToPC.basicInfo;
 
-	excInfoUpdate <= eiEvents.causing.controlInfo.phase1 and eiEvents.causing.controlInfo.hasException;
-	intInfoUpdate <= eiEvents.causing.controlInfo.phase1 and eiEvents.causing.controlInfo.hasInterrupt;
-	
-	excLinkInfo <= getLinkInfoNormal(eiEvents.causing);
-	intLinkInfo <= getLinkInfoSuper(eiEvents.causing);		
-
 	PC_STAGE: block
 		signal tmpPcIn, tmpPcOut: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
 		signal newSysLevel, newIntLevel: SmallNumber := (others => '0');
@@ -267,6 +261,14 @@ begin
 	end block;
 
 
+	-- TODO: signals for updating sys regs can be moved to sys reg block
+	excInfoUpdate <= eiEvents.causing.controlInfo.phase1 and eiEvents.causing.controlInfo.hasException;
+	intInfoUpdate <= eiEvents.causing.controlInfo.phase1 and eiEvents.causing.controlInfo.hasInterrupt;
+	
+	excLinkInfo <= getLinkInfoNormal(eiEvents.causing);
+	intLinkInfo <= getLinkInfoSuper(eiEvents.causing);		
+	----------------------------------------------------------------------
+	
 	SYS_REGS: block
 		signal sysRegArray: MwordArray(0 to 31) := (0 => PROCESSOR_ID, others => (others => '0'));	
 
@@ -415,6 +417,7 @@ begin
 
 		renameLockEnd <= renameLockState and renameLockRelease;
 
+		-- TODO: use nextCtr?
 		commitGroupCtrInc <= i2slv(slv2u(commitGroupCtr) + PIPE_WIDTH, SMALL_NUMBER_SIZE);
 
 	COMMON_STATE: block
@@ -484,7 +487,8 @@ begin
 			--			The 'target' field will be used to update return address for exc/int
 			stageDataToCommit <= recreateGroup(robDataLiving, dataFromBQV, dataFromLastEffective.data(0).target);
 			insToLastEffective <= getLastEffective(stageDataToCommit);		
-															
+							
+				-- TODO: make a function to create interruptCause
 				interruptCause.controlInfo.hasInterrupt <= intSignal;
 				interruptCause.controlInfo.hasReset <= start;
 				interruptCause.target <= TMP_targetIns.basicInfo.ip;

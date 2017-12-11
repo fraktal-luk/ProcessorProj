@@ -226,11 +226,9 @@ begin
 				newData => dataToQueuesArr(i),
 				fni => fni,
 				readyRegFlags => readyRegFlags,
-					issueAccepting => issueAcceptingArr(i), --
-					--queueSendingOut => queueSendingArr(i),
-					--queueDataOut => queueDataArr(i),
+				issueAccepting => issueAcceptingArr(i),
 				execCausing => execCausing,
-					lateEventSignal => lateEventSignal,
+				lateEventSignal => lateEventSignal,
 				execEventSignal => execEventSignal,
 				queueOutput => iqOutputArr(i)
 			);
@@ -293,8 +291,6 @@ begin
 					regValues => regValsArr(3*i to 3*i + 2),--
 					stageDataIn => queueDataArr(i),
 					acceptingOut => issueAcceptingArr(i),
-					--sendingOut => sendingSchedArr(i),--
-					--stageDataOut => schedDataArr(i)--
 					output => schedOutputArr(i)
 				);
 				
@@ -368,15 +364,8 @@ begin
 					execAcceptingC => execAcceptingC,
 					execAcceptingE => execAcceptingE,
 
-						inputC => (sendingSchedC, dataOutIQC),
-						inputE => (sendingSchedE, dataOutIQE),
-
---					sendingIQC => sendingSchedC,
---					sendingIQE => sendingSchedE,
---
---					dataIQC => dataOutIQC,
---					dataIQE => dataOutIQE,
-					-------------
+					inputC => (sendingSchedC, dataOutIQC),
+					inputE => (sendingSchedE, dataOutIQE),
 
 					acceptingNewSQ => acceptingNewSQ,
 					acceptingNewLQ => acceptingNewLQ,
@@ -436,27 +425,13 @@ begin
 				
 				execEventSignal => '0',
 				execCausing => DEFAULT_INSTRUCTION_STATE,
-				
-				--	maskIn => --execSending(0 to 2),
-				--					extractFullMask(execOutputs1(0 to 2)),
-				--	dataIn => --execEnds(0 to 2),
-				--					extractData(execOutputs1(0 to 2)),
-						input => execOutputs1(0 to 2),
+
+				input => execOutputs1(0 to 2),
 				
 				whichAcceptedCQ => whichAcceptedCQ,
 				anySending => anySendingFromCQ,
-					--cqMaskOut => open,--
-					--					--cqMaskSig,
-					--cqDataOut => open,--
-					--					--cqDataSig,
-					
-					cqOutput => cqOutputSig,
-					bufferOutput => cqBufferOutputSig
-					
-					--	bufferMaskOut => open,--
-					--							--cqBufferMask,
-					--	bufferDataOut => open--
-					--							--cqBufferData
+				cqOutput => cqOutputSig,
+				bufferOutput => cqBufferOutputSig
 			);
 				
 				cqMaskSig <= extractFullMask(cqOutputSig);
@@ -539,21 +514,15 @@ begin
 				
 				commitGroupCtr => commitGroupCtrSig,
 				commitGroupCtrNext => commitGroupCtrNextSig,
-					
---				execEnds => execEnds,
---				execReady => execSending,
---				
---				execEnds2 => execEnds2,
---				execReady2 => execSending2,
-				
-					execEndSigs1 => execOutputs1,
-					execEndSigs2 => execOutputs2,
+
+				execEndSigs1 => execOutputs1,
+				execEndSigs2 => execOutputs2,
 				
 				inputData => renamedDataLiving,
 				prevSending => renamedSending,
 				acceptingOut => robAccepting,
 				
-					nextAccepting => commitAccepting and sbAccepting,
+				nextAccepting => commitAccepting and sbAccepting,
 				sendingOut => robSending, 
 				outputData => dataOutROB		
 			);

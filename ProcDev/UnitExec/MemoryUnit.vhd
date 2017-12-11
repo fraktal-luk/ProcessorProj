@@ -131,6 +131,7 @@ architecture Behavioral of MemoryUnit is
 		
 		signal selectedData: InstructionState := DEFAULT_INSTRUCTION_STATE;
 		signal selectedSendingSig: std_logic := '0';
+		signal selectedDataOutputSig: InstructionSlot := DEFAULT_INSTRUCTION_SLOT;
 begin				
 	qs1 <= TMP_change(qs0, bufferDrive.nextAccepting, bufferDrive.prevSending,
 							TMP_mask, TMP_killMask, lateEventSignal or execEventSignal, TMP_maskNext);
@@ -194,6 +195,8 @@ begin
 			TMP_mask <= TMP_maskNext;	
 			TMP_content <= TMP_contentNext;
 			
+			selectedDataOutputSig <= (selectedSendingSig, selectedData);
+			
 			logBuffer(contentView, maskView, liveMaskView, bufferResponse);					
 			
 			-- NOTE: below has no info about flow constraints. It just checks data against
@@ -224,6 +227,6 @@ begin
 	
 	--	selectedDataOut <= selectedData;
 	--	selectedSending <= selectedSendingSig;
-	selectedDataOutput <= (selectedSendingSig, selectedData);
+	selectedDataOutput <= selectedDataOutputSig;--(selectedSendingSig, selectedData);
 end Behavioral;
 

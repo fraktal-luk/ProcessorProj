@@ -126,7 +126,7 @@ architecture Behavioral of UnitMemory is
 		signal effectiveAddressData: InstructionState := DEFAULT_INSTRUCTION_STATE;
 		signal effectiveAddressSending: std_logic := '0';
 	
-	signal lqSelectedData, lqSelectedDataWithErr,
+	signal lqSelectedData, lqSelectedDataDelay, lqSelectedDataWithErr,
 					 lqSelectedDataWithErrDelay: InstructionState := DEFAULT_INSTRUCTION_STATE;
 	signal lqSelectedSending, lqSelectedSendingDelay: std_logic := '0';
 	
@@ -293,7 +293,7 @@ begin
 					-- CAREFUL: when miss (incl. forwarding miss), no 'completed' signal.
 					--				
 					addressUnitSendingSig <= (sendingAfterRead and (not sendingToDLQ))
-												 or lqSelectedSendingDelay; --??? -- because load exc to ROB
+												 or lqSelectedSending; --??? -- because load exc to ROB
 										
 					outputData.data(0) <= execResultData;
 					outputData.fullMask(0) <= '0';-- UNUSED
@@ -321,16 +321,17 @@ begin
 		stageDataAfterCache <= setInsResult(setDataCompleted(dataAfterRead, memLoadReady), memLoadValue);
 		stageDataAfterSysRegs <= setInsResult(setDataCompleted(dataAfterRead, sendingFromSysReg), sysLoadVal);
 		stageDataAfterForward <= setInsResult(setDataCompleted(dataAfterRead, 
-																				 getDataCompleted(storeForwardDataDelay)),
-														  storeForwardDataDelay.argValues.arg2);
+																				 getDataCompleted(storeForwardData)),
+														  storeForwardData.argValues.arg2);
 
 			lsResultData <= TMP_lsResultData(dataAfterRead, memLoadReady, memLoadValue,
 																		sendingFromSysReg, sysLoadVal,
-																		storeForwardSendingDelay, storeForwardDataDelay);
+																		storeForwardSending, storeForwardData);
 
-		execResultData <= lqSelectedDataWithErrDelay when lqSelectedSendingDelay = '1'
+		execResultData <= lqSelectedDataWithErr when lqSelectedSending = '1'
 						else	lsResultData;
 	
+		--lqSelectedDataWithErr <= TMP_setLoadException(lqSelectedData);
 		lqSelectedDataWithErr <= TMP_setLoadException(lqSelectedData);
 	
 			-- Sending to Delayed Load Queue: when load miss or load and sending from sys reg
@@ -507,13 +508,16 @@ begin
 				if rising_edge(clk) then
 					sendingFromSysReg <= sendingAddressingForMfc;
 					
+
+				end if;
+			end process;
+
 					storeForwardDataDelay <= storeForwardData;
 					storeForwardSendingDelay <= storeForwardSending;
 
 					lqSelectedSendingDelay <= lqSelectedSending;
-					lqSelectedDataWithErrDelay <= lqSelectedDataWithErr;
-				end if;
-			end process;
+					--lqSelectedDataWithErrDelay <= lqSelectedDataWithErr;
+					lqSelectedDataDelay <= lqSelectedData;
 
 
 			execAcceptingC <= execAcceptingCSig;

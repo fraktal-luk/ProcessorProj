@@ -158,6 +158,11 @@ return std_logic_vector;
 function setInstructionTarget(ins: InstructionState; target: Mword) return InstructionState;
 function setInsResult(ins: InstructionState; result: Mword) return InstructionState;
 
+	function isLoad(ins: InstructionState) return std_logic;
+	function isSysRegRead(ins: InstructionState) return std_logic;
+	function isStore(ins: InstructionState) return std_logic;
+	function isSysRegWrite(ins: InstructionState) return std_logic;
+
 end GeneralPipeDev;
 
 
@@ -1005,5 +1010,41 @@ begin
 	res.result := result;
 	return res;
 end function;
+
+	function isLoad(ins: InstructionState) return std_logic is
+	begin
+		if ins.operation.func = load then
+			return '1';
+		else
+			return '0';
+		end if;
+	end function;
+	
+	function isSysRegRead(ins: InstructionState) return std_logic is
+	begin
+		if ins.operation = (System, sysMfc) then
+			return '1';
+		else
+			return '0';
+		end if;
+	end function;
+	
+	function isStore(ins: InstructionState) return std_logic is
+	begin
+		if ins.operation.func = store then
+			return '1';
+		else
+			return '0';
+		end if;
+	end function;
+
+	function isSysRegWrite(ins: InstructionState) return std_logic is
+	begin
+		if ins.operation = (System, sysMtc) then
+			return '1';
+		else
+			return '0';
+		end if;
+	end function;
 
 end GeneralPipeDev;

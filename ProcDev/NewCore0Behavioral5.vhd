@@ -116,7 +116,6 @@ begin
 		frontEventSignal => frontEventSignal,
 		frontCausing => frontCausing,
 		
-		--stage0EventInfo => stage0Events, -- from front
 		-- Events out
 		execOrIntEventSignalOut => execOrIntEventSignal,
 		execOrIntCausingOut => execOrIntCausing,
@@ -174,9 +173,8 @@ begin
 		dataLastLiving => frontDataLastLiving,
 		lastSending => frontLastSending,
 		
-		--stage0EventsOut => stage0Events,
-			frontEventSignal => frontEventSignal,
-			frontCausing => frontCausing,
+		frontEventSignal => frontEventSignal,
+		frontCausing => frontCausing,
 		
 		execEventSignal => execEventSignal,
 		lateEventSignal => lateEventSignal		
@@ -343,20 +341,12 @@ begin
 						clk => clk, reset => reset, en => en,
 						
 						whichAcceptedCQ => sbAcceptingV,
-						--maskIn => dataOutSQ.fullMask,
-						--dataIn => dataOutSQ.data,
 						input => makeSlotArray(dataOutSQ.data, dataOutSQ.fullMask),
 						
-						--bufferMaskOut => open,--
-						--						--sbFullMask,
-						--bufferDataOut => open,
-						
 						anySending => sbSending,
-						--cqMaskOut => open,--sbMaskOut,
-						--cqDataOut => open,--sbDataOut,
 
-							cqOutput => sbOutputSig,
-							bufferOutput => sbBufferOutputSig,
+						cqOutput => sbOutputSig,
+						bufferOutput => sbBufferOutputSig,
 						
 						execEventSignal => '0',
 						execCausing => DEFAULT_INSTRUCTION_STATE
@@ -370,12 +360,14 @@ begin
 				sbEmpty <= not sbFullMask(0);
 				dataFromSB <= sbDataOut(0);
 
+-----------------------------------------
+----- Mem signals -----------------------
 				memStoreAddress <= sbDataOut(0).argValues.arg1;
 				memStoreValue <= sbDataOut(0).argValues.arg2;
-				memStoreAllow <= sbSending when sbDataOut(0).operation = (Memory, store) else '0';
+				memStoreAllow <= sbSending and isStore(sbDataOut(0));
 				
-				sysStoreAllow <= sbSending when sbDataOut(0).operation = (System, sysMTC) 
-							 else '0'; 
+				sysStoreAllow <= sbSending and isSysRegWrite(sbDataOut(0));
+
 				sysStoreAddress <= sbDataOut(0).argValues.arg1(4 downto 0);
 				sysStoreValue <= sbDataOut(0).argValues.arg2;				
 
@@ -387,6 +379,6 @@ begin
 	dout <= memStoreValue;
 	memLoadValue <= din;
 	memLoadReady <= dvalid;
-
+---------------------------------------------
 end Behavioral5;
 
