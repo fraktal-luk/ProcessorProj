@@ -36,6 +36,8 @@ use work.ProcInstructionsNew.all;
 
 use work.NewPipelineData.all;
 
+use work.GeneralPipeDev.all;
+
 
 entity RegisterFile0 is
 	generic(
@@ -48,9 +50,11 @@ entity RegisterFile0 is
            en : in  STD_LOGIC;
 
 			  writeAllow: in std_logic;
-			  writeVec: in std_logic_vector(0 to WIDTH-1);			  
-			  selectWrite: in PhysNameArray(0 to WIDTH-1);			  	
-			  writeValues: in MwordArray(0 to WIDTH-1);	
+					writeInput: in InstructionSlotArray(0 to WRITE_WIDTH-1);
+			  
+--			  writeVec: in std_logic_vector(0 to WIDTH-1);			  
+--			  selectWrite: in PhysNameArray(0 to WIDTH-1);			  	
+--			  writeValues: in MwordArray(0 to WIDTH-1);	
 
 			  readAllowVec: in std_logic_vector(0 to 3*WIDTH-1);
 			  selectRead: in PhysNameArray(0 to 3*WIDTH-1);
@@ -68,6 +72,11 @@ architecture Behavioral of RegisterFile0 is
 	signal selectReadMW: PhysNameArray(0 to 3*MAX_WIDTH-1) := (others => (others => '0'));	
 	signal readValuesMW: MwordArray(0 to 3*MAX_WIDTH-1) := (others => (others => '0'));	
 
+
+			signal  writeVec: std_logic_vector(0 to WIDTH-1) := (others => '0');
+			signal  selectWrite: PhysNameArray(0 to WIDTH-1) := (others => (others => '0'));
+			signal  writeValues: MwordArray(0 to WIDTH-1) := (others => (others => '0'));
+
 	-- Memory block
 	signal content: MwordArray(0 to N_PHYSICAL_REGS-1) := (others => (others => '0'));
 
@@ -76,6 +85,13 @@ architecture Behavioral of RegisterFile0 is
 begin
 	resetSig <= reset and HAS_RESET_REGFILE;
 	enSig <= en or not HAS_EN_REGFILE;
+
+		
+		writeVec(0 to INTEGER_WRITE_WIDTH-1) <= 
+										getArrayDestMask(extractData(writeInput), extractFullMask(writeInput));
+		selectWrite(0 to INTEGER_WRITE_WIDTH-1) <= getArrayPhysicalDests(extractData(writeInput));
+		writeValues(0 to INTEGER_WRITE_WIDTH-1) <= getArrayResults(extractData(writeInput));
+
 
 	writeVecMW(0 to WIDTH-1) <= writeVec;
 		writeVecMW(WIDTH to MAX_WIDTH-1) <= (others => '0');

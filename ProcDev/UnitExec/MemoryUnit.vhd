@@ -69,23 +69,11 @@ entity MemoryUnit is
 		prevSending: in std_logic;
 		dataIn: in StageDataMulti;
 
-			storeAddressInput: in InstructionSlot;
-			storeValueInput: in InstructionSlot;
-			compareAddressInput: in InstructionSlot;
+		storeAddressInput: in InstructionSlot;
+		storeValueInput: in InstructionSlot;
+		compareAddressInput: in InstructionSlot;
 
-			selectedDataOutput: out InstructionSlot;
-
---		storeAddressWr: in std_logic;
---		storeValueWr: in std_logic;
---
---		storeAddressDataIn: in InstructionState;
---		storeValueDataIn: in InstructionState;
---
---			compareAddressDataIn: in InstructionState;
---			compareAddressReady: in std_logic;
---
---			selectedDataOut: out InstructionState;
---			selectedSending: out std_logic;
+		selectedDataOutput: out InstructionSlot;
 
 		committing: in std_logic;
 		groupCtrInc: in SmallNumber;
@@ -96,7 +84,7 @@ entity MemoryUnit is
 		
 		nextAccepting: in std_logic;		
 		sendingSQOut: out std_logic;
-			dataOutV: out StageDataMulti
+		dataOutV: out StageDataMulti
 	);
 end MemoryUnit;
 
@@ -217,16 +205,14 @@ begin
 		flowResponse => bufferResponse
 	);						
 
-	bufferDrive.prevSending <=num2flow(countOnes(dataIn.fullMask)) when prevSending = '1' else (others => '0');
+	bufferDrive.prevSending <= num2flow(countOnes(dataIn.fullMask)) when prevSending = '1' else (others => '0');
 	bufferDrive.kill <= num2flow(countOnes(TMP_killMask));
 	bufferDrive.nextAccepting <= num2flow(countOnes(sqOutData.fullMask));
 					
 	acceptingOut <= not TMP_preFrontW.fullMask(0);
 	
 	sendingSQOut <= sendingSQ;
-	
-	--	selectedDataOut <= selectedData;
-	--	selectedSending <= selectedSendingSig;
-	selectedDataOutput <= selectedDataOutputSig;--(selectedSendingSig, selectedData);
+
+	selectedDataOutput <= selectedDataOutputSig;
 end Behavioral;
 

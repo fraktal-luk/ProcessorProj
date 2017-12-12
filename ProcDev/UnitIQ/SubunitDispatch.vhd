@@ -52,11 +52,13 @@ entity SubunitDispatch is
 		clk: in std_logic;
 		reset: in std_logic;
 		en: in std_logic;
-		
-	 	prevSending: in std_logic;
+
 	 	nextAccepting: in std_logic;
 		
-	 	stageDataIn: in InstructionState;		
+	 	--prevSending: in std_logic;		
+	 	--stageDataIn: in InstructionState;
+		input: in InstructionSlot;
+		
 		acceptingOut: out std_logic;
 		--sendingOut: out std_logic;
 		--stageDataOut: out InstructionState;
@@ -80,11 +82,15 @@ architecture Alternative of SubunitDispatch is
 	signal nextResultTags: PhysNameArray(0 to N_NEXT_RES_TAGS-1) := (others => (others => '0'));
 	signal writtenTags: PhysNameArray(0 to PIPE_WIDTH-1) := (others => (others => '0'));
 	
+	signal prevSending: std_logic := '0';		
+	signal stageDataIn: InstructionState := DEFAULT_INSTRUCTION_STATE;
 	signal sendingOut: std_logic := '0';
 	signal stageDataOut: InstructionState := DEFAULT_INSTRUCTION_STATE;
 begin
+	prevSending <= input.full;
+	stageDataIn <= input.ins;
 
-	inputDataWithArgs <= getDispatchArgValues(stageDataIn, resultVals,USE_IMM);
+	inputDataWithArgs <= getDispatchArgValues(stageDataIn, resultVals, USE_IMM);
 	stageDataM.fullMask(0) <= prevSending;
 	stageDataM.data(0) <= inputDataWithArgs;
 	

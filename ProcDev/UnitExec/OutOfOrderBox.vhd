@@ -83,15 +83,15 @@ entity OutOfOrderBox is
 			dataOutSQ: out StageDataMulti; -- OUTPUT			  
 			
 				readyRegFlags: in std_logic_vector(0 to 3*PIPE_WIDTH-1);		
-			
-				cqMaskOut: out std_logic_vector(0 to INTEGER_WRITE_WIDTH-1);
-				cqDataOut: out InstructionStateArray(0 to INTEGER_WRITE_WIDTH-1)			
-			  
+	
+				cqOutput: out InstructionSlotArray(0 to INTEGER_WRITE_WIDTH-1)
 			  );
 end OutOfOrderBox;
 
 
 architecture Behavioral of OutOfOrderBox is
+	signal resetSig, enSig: std_logic := '0';
+
 	signal execEventSignal: std_logic := '0';
 	signal execCausing: InstructionState := defaultInstructionState; -- OUTPUT/SIG
 
@@ -99,10 +99,7 @@ architecture Behavioral of OutOfOrderBox is
 
 	signal memLoadAddress: Mword := (others => '0');
 	
-	signal resetSig, enSig: std_logic := '0';
-
-	signal dataToA, dataToB, dataToC, dataToD, dataToE: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
-	
+	signal dataToA, dataToB, dataToC, dataToD, dataToE: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;	
 	signal acceptingVecA, acceptingVecB, acceptingVecC, acceptingVecD, acceptingVecE:
 				std_logic_vector(0 to PIPE_WIDTH-1) := (others => '0');
 	signal compactedToSQ, compactedToLQ, compactedToBQ: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
@@ -124,10 +121,6 @@ architecture Behavioral of OutOfOrderBox is
 		
 	signal fni: ForwardingInfo := DEFAULT_FORWARDING_INFO;
 
-	signal rfWriteVec: std_logic_vector(0 to 3) := (others => '0');
-	signal rfSelectWrite: PhysNameArray(0 to 3) := (others => (others => '0'));
-	signal rfWriteValues: MwordArray(0 to 3) := (others => (others => '0'));
-
 	signal stageDataAfterCQ: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
 
 	signal outputA, outputB, outputC, outputD, outputE: InstructionSlot := DEFAULT_INSTRUCTION_SLOT;
@@ -140,29 +133,20 @@ architecture Behavioral of OutOfOrderBox is
 	-- back end interfaces
 	signal whichAcceptedCQ: std_logic_vector(0 to 3) := (others=>'0');	
 	signal anySendingFromCQ: std_logic := '0';
-
-	signal cqBufferMask: std_logic_vector(0 to CQ_SIZE-1) := (others => '0');
-	signal cqBufferData: InstructionStateArray(0 to CQ_SIZE-1) := (others => DEFAULT_INSTRUCTION_STATE);
 	signal cqDataLivingOut: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
 
-	signal	cqMaskSig: std_logic_vector(0 to INTEGER_WRITE_WIDTH-1) := (others => '0');
-	signal	cqDataSig: InstructionStateArray(0 to INTEGER_WRITE_WIDTH-1)
-									:= (others => DEFAULT_INSTRUCTION_STATE);
-
-		signal cqOutputSig: InstructionSlotArray(0 to INTEGER_WRITE_WIDTH-1)
+	signal cqOutputSig: InstructionSlotArray(0 to INTEGER_WRITE_WIDTH-1)
 						:= (others => DEFAULT_INSTRUCTION_SLOT);
-		signal cqBufferOutputSig: InstructionSlotArray(0 to CQ_SIZE-1)
-						:= (others => DEFAULT_INSTRUCTION_SLOT);
+	signal cqBufferOutputSig: InstructionSlotArray(0 to CQ_SIZE-1) := (others => DEFAULT_INSTRUCTION_SLOT);
 	
 	signal queueDataA, queueDataB, queueDataC, queueDataD, queueDataE:
 					InstructionState := DEFAULT_INSTRUCTION_STATE;
 	signal queueSendingA, queueSendingB, queueSendingC, queueSendingD, queueSendingE: std_logic := '0';
 	signal issueAcceptingA, issueAcceptingB, issueAcceptingC, issueAcceptingD, issueAcceptingE:
-					std_logic := '0';
-					
-		signal execOutputs1, execOutputs2, execOutputsPre: InstructionSlotArray(0 to 3)
+					std_logic := '0';				
+	signal execOutputs1, execOutputs2, execOutputsPre: InstructionSlotArray(0 to 3)
 			:= (others => DEFAULT_INSTRUCTION_SLOT);
-					
+
 	type SLVA is array (integer range <>) of std_logic_vector(0 to PIPE_WIDTH-1);
 	signal iqAcceptingVecArr: SLVA(0 to 4) := (others => (others => '0'));
 	
@@ -173,8 +157,7 @@ architecture Behavioral of OutOfOrderBox is
 	signal iqOutputArr, schedOutputArr: InstructionSlotArray(0 to 4) := (others => DEFAULT_INSTRUCTION_SLOT);
 	signal dataToQueuesArr: StageDataMultiArray(0 to 4) := (others => DEFAULT_STAGE_DATA_MULTI);
 	signal regValsArr: MwordArray(0 to 3*5-1) := (others => (others => '0'));
-begin
-		
+begin		
 	resetSig <= reset;
 	enSig <= en;
 		
@@ -261,16 +244,16 @@ begin
 		EXEC_AREA: block
 			constant USE_IMM_VEC: std_logic_vector(0 to 4) := "10110";
 		begin
-				regsSelA <= getPhysicalSources(queueDataA);
-				regsSelB <= getPhysicalSources(queueDataB);
-				regsSelC <= getPhysicalSources(queueDataC);
-				regsSelD <= getPhysicalSources(queueDataD);
-				regsSelE <= getPhysicalSources(queueDataE);
+			regsSelA <= getPhysicalSources(queueDataA);
+			regsSelB <= getPhysicalSources(queueDataB);
+			regsSelC <= getPhysicalSources(queueDataC);
+			regsSelD <= getPhysicalSources(queueDataD);
+			regsSelE <= getPhysicalSources(queueDataE);
 
-				regValsArr <= regValsA & regValsB & regValsC & regValsD & regValsE;
-				execAcceptingArr <= (execAcceptingA, execAcceptingB, execAcceptingC,
-												execAcceptingD, execAcceptingE);
-											--(others => '1');
+			regValsArr <= regValsA & regValsB & regValsC & regValsD & regValsE;
+			execAcceptingArr <= (execAcceptingA, execAcceptingB, execAcceptingC,
+											execAcceptingD, execAcceptingE);
+
 			ISSUE_STAGES: for letter in 'A' to 'E' generate
 				constant i: integer := character'pos(letter) - character'pos('A');
 				constant usesImm: boolean := (USE_IMM_VEC(i) = '1');
@@ -281,7 +264,7 @@ begin
 				)
 				port map(
 					clk => clk, reset => resetSig, en => enSig,
-					prevSending => queueSendingArr(i),
+					input => iqOutputArr(i),
 					nextAccepting => execAcceptingArr(i),--
 					execEventSignal => execEventSignal,
 					lateEventSignal => lateEventSignal,
@@ -289,11 +272,9 @@ begin
 					resultTags => fni.resultTags,
 					resultVals => fni.resultValues,
 					regValues => regValsArr(3*i to 3*i + 2),--
-					stageDataIn => queueDataArr(i),
 					acceptingOut => issueAcceptingArr(i),
 					output => schedOutputArr(i)
-				);
-				
+				);			
 			end generate;
 			
 				sendingSchedArr <= extractFullMask(schedOutputArr);
@@ -413,7 +394,6 @@ begin
 		execOutputs2 <= (		2 => outputE, 3 => outputD, others => DEFAULT_INSTRUCTION_SLOT); -- (-,-,E,D)! 
 		execOutputsPre <= (0 => ('0', outputOpPreB), 1 => ('0', outputOpPreC),
 																				others => DEFAULT_INSTRUCTION_SLOT);
-
 			COMMIT_QUEUE: entity work.TestCQPart0(Implem)
 			generic map(
 				INPUT_WIDTH => 3,
@@ -433,14 +413,9 @@ begin
 				cqOutput => cqOutputSig,
 				bufferOutput => cqBufferOutputSig
 			);
-				
-				cqMaskSig <= extractFullMask(cqOutputSig);
-				cqDataSig <= extractData(cqOutputSig);
-				cqBufferMask <= extractFullMask(cqBufferOutputSig);
-				cqBufferData <= extractData(cqBufferOutputSig);
-				
-					cqDataLivingOut.fullMask(0) <= cqMaskSig(0);
-					cqDataLivingOut.data(0) <= cqDataSig(0);
+
+			cqDataLivingOut.fullMask(0) <= cqOutputSig(0).full;--cqMaskSig(0);
+			cqDataLivingOut.data(0) <= cqOutputSig(0).ins;--cqDataSig(0);
 
 				-- CAREFUL! This stage is needed to keep result tags 1 for cycle when writing to reg file,
 				--				so that "black hole" of invisible readiness doesn't occur
@@ -464,31 +439,25 @@ begin
 	--		rather than from forw. network, but readyRegFlags are not available in the 1st cycle after WB.		
 	fni.writtenTags <=
 					getPhysicalDests(stageDataAfterCQ) when CQ_SINGLE_OUTPUT else (others => (others => '0'));
-	fni.resultTags <= getResultTags(execEnds, cqBufferData, dataOutIQA, dataOutIQB, dataOutIQC, dataOutIQD,
-																											DEFAULT_STAGE_DATA_MULTI);
+	fni.resultTags <= getResultTags(execEnds, extractData(cqBufferOutputSig),
+										dataOutIQA, dataOutIQB, dataOutIQC, dataOutIQD, DEFAULT_STAGE_DATA_MULTI);
 	fni.nextResultTags <= getNextResultTags(execPreEnds, dataOutIQA, dataOutIQB, dataOutIQC, dataOutIQD);
-	fni.resultValues <= getResultValues(execEnds, cqBufferData, DEFAULT_STAGE_DATA_MULTI);
+	fni.resultValues <= getResultValues(execEnds, extractData(cqBufferOutputSig), DEFAULT_STAGE_DATA_MULTI);
 					
 				-- Int register block
 					regsSelCE(0 to 1) <= regsSelC(0 to 1);
 					regsSelCE(2) <= regsSelE(2);
 					regValsC(0 to 1) <= regValsCE(0 to 1);
 					regValsE(2) <= regValsCE(2);	
-
-					rfWriteVec(0 to INTEGER_WRITE_WIDTH-1) <= getArrayDestMask(cqDataSig, cqMaskSig);
-					rfSelectWrite(0 to INTEGER_WRITE_WIDTH-1) <= getArrayPhysicalDests(cqDataSig);
-					rfWriteValues(0 to INTEGER_WRITE_WIDTH-1) <= getArrayResults(cqDataSig);
-				
+	
 				GPR_FILE_DISPATCH: entity work.RegisterFile0 (Behavioral)
 				generic map(WIDTH => 4, WRITE_WIDTH => INTEGER_WRITE_WIDTH)
 				port map(
 					clk => clk, reset => resetSig, en => enSig,
 						
 					writeAllow => '1',
-					writeVec => rfWriteVec,
-					selectWrite => rfSelectWrite, -- NOTE: unneeded writing isn't harmful anyway
-					writeValues => rfWriteValues,
-					
+					writeInput => cqOutputSig,
+
 					readAllowVec => (others => '1'), -- TEMP!
 					
 					selectRead(0 to 2) => regsSelA,
@@ -527,14 +496,11 @@ begin
 				outputData => dataOutROB		
 			);
 
-
 	execEventSignalOut <= execEventSignal;
 	execCausingOut <= execCausing;
 
 	robSendingOut <= robSending;
 	memLoadAddressOut <= memLoadAddress;
-	
-	cqMaskOut <= cqMaskSig;
-	cqDataOut <= cqDataSig;
 
+	cqOutput <= cqOutputSig;
 end Behavioral;

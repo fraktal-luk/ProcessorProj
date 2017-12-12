@@ -132,13 +132,12 @@ architecture Behavioral of UnitSequencer is
 	constant PC_INC: Mword := (ALIGN_BITS => '1', others => '0');	
 	signal pcBase, pcNext: Mword := (others => '0');
 
-	signal stageDataToPC, stageDataOutPC, stageDataToPC_C: InstructionState := DEFAULT_INSTRUCTION_STATE;
-
+	signal stageDataToPC, stageDataOutPC: InstructionState := DEFAULT_INSTRUCTION_STATE;
 	signal sendingToPC, sendingOutPC, acceptingOutPC: std_logic := '0';
 		
 	signal generalEvents: GeneralEventInfo;
 
-	signal excLinkInfo, intLinkInfo, newTargetInfo: InstructionBasicInfo := defaultBasicInfo;
+	signal excLinkInfo, intLinkInfo: InstructionBasicInfo := defaultBasicInfo;
 	signal excInfoUpdate, intInfoUpdate: std_logic := '0';
 		
 	signal sysRegWriteAllow: std_logic := '0';
@@ -189,14 +188,11 @@ begin
 
 	EVENTS: block
 	begin	
-		generalEvents <= NEW_generalEvents(
-											stageDataOutPC,
-												TMP_phase0, 
-											eiEvents.causing,
-											execEventSignal, execCausing,
-											frontEventSignal, frontCausing,
-											pcNext
-										);
+		generalEvents <= NEW_generalEvents( stageDataOutPC, TMP_phase0, eiEvents.causing,
+														execEventSignal, execCausing,
+														frontEventSignal, frontCausing,
+														pcNext
+													);
 
 			lateEventOut <= TMP_phase0;
 		execOrIntEventSignal <= execEventSignal or TMP_phase0;
@@ -209,23 +205,20 @@ begin
 	pcBase <= stageDataOutPC.basicInfo.ip and i2slv(-PIPE_WIDTH*4, MWORD_SIZE); -- Clearing low bits
 	pcNext <= addMwordBasic(pcBase, PC_INC);
 
-			stageDataToPC <= newPCData(
-											stageDataOutPC,
-											TMP_phase2,
-											eiEvents.causing,
-											execEventSignal, execCausing,
-											frontEventSignal, frontCausing,
-											pcNext
-										);
+	stageDataToPC <= newPCData(
+									stageDataOutPC,
+									TMP_phase2,
+									eiEvents.causing,
+									execEventSignal, execCausing,
+									frontEventSignal, frontCausing,
+									pcNext
+								);
 
 	-- CAREFUL: prevSending normally means that 'full' bit inside will be set, but
 	--				when en = '0' this won't happen.
 	--				To be fully correct, prevSending should not be '1' when receiving prevented.			
-	sendingToPC <= acceptingOutPC and (sendingOutPC
-												or (generalEvents.eventOccured and not generalEvents.killPC) or TMP_phase2);
-
-	newTargetInfo <= stageDataToPC.basicInfo;
-
+	sendingToPC <= acceptingOutPC and 
+					  (sendingOutPC or (generalEvents.eventOccured and not generalEvents.killPC) or TMP_phase2);
 	PC_STAGE: block
 		signal tmpPcIn, tmpPcOut: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
 		signal newSysLevel, newIntLevel: SmallNumber := (others => '0');
@@ -293,45 +286,45 @@ begin
 				-- Reading sys regs
 				sysRegReadValue <= sysRegArray(slv2u(sysRegReadSel));			
 			
-					-- CAREFUL: writing to currentState BEFORE normal sys reg write gives priority to the latter;
-					--				otherwise explicit setting of currentState wouldn't work.
-					--				So maybe other sys regs should have it done the same way, not conversely? 
-					--				In any case, the requirement is that younger instructions must take effect later
-					--				and override earlier content.
+				-- CAREFUL: writing to currentState BEFORE normal sys reg write gives priority to the latter;
+				--				otherwise explicit setting of currentState wouldn't work.
+				--				So maybe other sys regs should have it done the same way, not conversely? 
+				--				In any case, the requirement is that younger instructions must take effect later
+				--				and override earlier content.
 
-					-- Write from system write instruction
-					if sysRegWriteAllow = '1' then
-						sysRegArray(slv2u(srWriteSel)) <= srWriteVal;
-					end if;
+				-- Write from system write instruction
+				if sysRegWriteAllow = '1' then
+					sysRegArray(slv2u(srWriteSel)) <= srWriteVal;
+				end if;
 
-					-- Writing specialized fields on events
-					if eiEvents.causing.controlInfo.phase1 = '1' then
-						currentState <= X"0000" & TMP_targetIns.basicInfo.systemLevel & TMP_targetIns.basicInfo.intLevel;
-					end if;
-					
-					currentState <= currentState and X"FFFF0303";
-					
-					-- NOTE: writing to link registers after sys reg writing gives priority to the former,
-					--			but committing a sysMtc shouldn't happen in parallel with any control event
-					-- Writing exc status registers
-					if excInfoUpdate = '1' then
-						linkRegExc <= excLinkInfo.ip;
-						savedStateExc <= X"0000" & excLinkInfo.systemLevel & excLinkInfo.intLevel;
-					end if;
-					
-					-- Writing int status registers
-					if intInfoUpdate = '1' then
-						linkRegInt <= intLinkInfo.ip;
-						savedStateInt <= X"0000" & intLinkInfo.systemLevel & intLinkInfo.intLevel;
-					end if;
-					
-					-- Enforcing content of read-only registers
-					sysRegArray(0) <= PROCESSOR_ID;
-					
-					-- Only some number of system regs exists		
-					for i in 6 to 31 loop
-						sysRegArray(i) <= (others => '0');
-					end loop;				
+				-- Writing specialized fields on events
+				if eiEvents.causing.controlInfo.phase1 = '1' then
+					currentState <= X"0000" & TMP_targetIns.basicInfo.systemLevel & TMP_targetIns.basicInfo.intLevel;
+				end if;
+				
+				currentState <= currentState and X"FFFF0303";
+				
+				-- NOTE: writing to link registers after sys reg writing gives priority to the former,
+				--			but committing a sysMtc shouldn't happen in parallel with any control event
+				-- Writing exc status registers
+				if excInfoUpdate = '1' then
+					linkRegExc <= excLinkInfo.ip;
+					savedStateExc <= X"0000" & excLinkInfo.systemLevel & excLinkInfo.intLevel;
+				end if;
+				
+				-- Writing int status registers
+				if intInfoUpdate = '1' then
+					linkRegInt <= intLinkInfo.ip;
+					savedStateInt <= X"0000" & intLinkInfo.systemLevel & intLinkInfo.intLevel;
+				end if;
+				
+				-- Enforcing content of read-only registers
+				sysRegArray(0) <= PROCESSOR_ID;
+				
+				-- Only some number of system regs exists		
+				for i in 6 to 31 loop
+					sysRegArray(i) <= (others => '0');
+				end loop;				
 			end if;	
 		end process;
 		
@@ -341,7 +334,6 @@ begin
 													linkRegExc, linkRegInt,
 													savedStateExc, savedStateInt); -- Here, becaue needs sys regs
 	end block;
-
 
 	iadr <= pcBase; -- Clearing low bits				
 	iadrvalid <= sendingOutPC;
@@ -406,7 +398,20 @@ begin
 			lockCommand => renameLockState		
 		);
 	end block;
-			
+
+	COMMON_STATE: block
+	begin
+		renameGroupCtrNext <= nextCtr(renameGroupCtr, execOrIntEventSignal,
+												execOrIntCausing.groupTag and i2slv(-PIPE_WIDTH, SMALL_NUMBER_SIZE),
+												frontLastSending, ALL_FULL);
+		renameCtrNext <= nextCtr(renameCtr, execOrIntEventSignal, execOrIntCausing.numberTag,
+										 frontLastSending, frontDataLastLiving.fullMask);
+		commitGroupCtrNext <= nextCtr(commitGroupCtr, '0', (others => '0'), sendingToCommit, ALL_FULL);
+		commitCtrNext <= nextCtr(commitCtr, '0', (others => '0'), sendingToCommit, effectiveMask);
+
+		-- TODO: use nextCtr?
+		commitGroupCtrInc <= i2slv(slv2u(commitGroupCtr) + PIPE_WIDTH, SMALL_NUMBER_SIZE);
+
 		-- Re-allow renaming when everything from rename/exec is committed - reg map will be well defined now
 		renameLockRelease <= '1' when commitGroupCtr = renameGroupCtr else '0';
 			-- CAREFUL, CHECK: when the counters are equal, renaming can be resumed, but renameLockRelease
@@ -416,20 +421,6 @@ begin
 			--						 renaming can't be done! So this delay may be caused by this problem.
 
 		renameLockEnd <= renameLockState and renameLockRelease;
-
-		-- TODO: use nextCtr?
-		commitGroupCtrInc <= i2slv(slv2u(commitGroupCtr) + PIPE_WIDTH, SMALL_NUMBER_SIZE);
-
-	COMMON_STATE: block
-	begin
-		renameGroupCtrNext <= nextCtr(renameGroupCtr, execOrIntEventSignal,
-												execOrIntCausing.groupTag and i2slv(-PIPE_WIDTH, SMALL_NUMBER_SIZE),
-												frontLastSending, ALL_FULL);
-		renameCtrNext <= nextCtr(renameCtr, execOrIntEventSignal, execOrIntCausing.numberTag,
-										 frontLastSending, frontDataLastLiving.fullMask);
-
-		commitGroupCtrNext <= nextCtr(commitGroupCtr, '0', (others => '0'), sendingToCommit, ALL_FULL);
-		commitCtrNext <= nextCtr(commitCtr, '0', (others => '0'), sendingToCommit, effectiveMask);
 
 		effectiveMask <= getEffectiveMask(stageDataToCommit);
 			
@@ -477,24 +468,21 @@ begin
 		lockCommand => '0'
 	);
 
-			-- Tracking of target:
-			--			'target' field of last effective will hold the address of next instruction
-			--			to commit after lastEffective; it will be known with certainty because lastEffective is 
-			--			already committed. 
-			--			When committing a taken branch -> fill with target from BQ output
-			--			When committing normal op -> increment by length of the op 
-			--			
-			--			The 'target' field will be used to update return address for exc/int
-			stageDataToCommit <= recreateGroup(robDataLiving, dataFromBQV, dataFromLastEffective.data(0).target);
-			insToLastEffective <= getLastEffective(stageDataToCommit);		
-							
-				-- TODO: make a function to create interruptCause
-				interruptCause.controlInfo.hasInterrupt <= intSignal;
-				interruptCause.controlInfo.hasReset <= start;
-				interruptCause.target <= TMP_targetIns.basicInfo.ip;
+		-- Tracking of target:
+		--			'target' field of last effective will hold the address of next instruction
+		--			to commit after lastEffective; it will be known with certainty because lastEffective is 
+		--			already committed. 
+		--			When committing a taken branch -> fill with target from BQ output
+		--			When committing normal op -> increment by length of the op 
+		--			
+		--			The 'target' field will be used to update return address for exc/int
+		stageDataToCommit <= recreateGroup(robDataLiving, dataFromBQV, dataFromLastEffective.data(0).target);
+		insToLastEffective <= getLastEffective(stageDataToCommit);		
 
-			dataToLastEffective.fullMask(0) <= sendingToCommit;
-			dataToLastEffective.data(0) <= insToLastEffective;
+		interruptCause <= makeInterruptCause(TMP_targetIns, intSignal, start);
+
+		dataToLastEffective.fullMask(0) <= sendingToCommit;
+		dataToLastEffective.data(0) <= insToLastEffective;
 
 			LAST_EFFECTIVE_SLOT: entity work.GenericStageMulti(LastEffective)
 			port map(

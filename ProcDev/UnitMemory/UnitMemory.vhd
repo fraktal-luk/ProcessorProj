@@ -50,13 +50,7 @@ entity UnitMemory is
 		en : in  STD_LOGIC;	
 			
 			inputC: in InstructionSlot;
-			inputE: in InstructionSlot;
-			
---		sendingIQC: in std_logic;
---		sendingIQE: in std_logic; -- Store data
---
---		dataIQC: in InstructionState;
---		dataIQE: in InstructionState;	-- Store data			
+			inputE: in InstructionSlot;			
 
 		execAcceptingC: out std_logic;
 		execAcceptingE: out std_logic; -- Store data
@@ -109,138 +103,78 @@ architecture Behavioral of UnitMemory is
 	signal sendingToDLQ, sendingFromDLQ: std_logic := '0';
 	signal dataToDLQ: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
 	
-	signal stageDataAfterCache, stageDataAfterSysRegs, lsResultData, execResultData, dataFromDLQ:
-					InstructionState := DEFAULT_INSTRUCTION_STATE;
-		signal stageDataMultiDLQ: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
+	signal lsResultData, execResultData, dataFromDLQ: InstructionState := DEFAULT_INSTRUCTION_STATE;
+	signal stageDataMultiDLQ: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
 					
 	signal sendingMem0, sendingMem1, sendingAfterTranslation, sendingAfterRead: std_logic := '0';
-		signal dataAfterTranslation, dataAfterRead: InstructionState := DEFAULT_INSTRUCTION_STATE;
+	signal dataAfterTranslation, dataAfterRead: InstructionState := DEFAULT_INSTRUCTION_STATE;
 	
 	signal execAcceptingCSig, execAcceptingESig: std_logic := '0';	
 	signal inputDataC: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
 	
-	signal acceptingLS: std_logic := '0';
-	signal sendingFromSysReg: std_logic := '0';	
+	signal acceptingLS, sendingFromSysReg: std_logic := '0';	
 	signal addressingData: InstructionState := DEFAULT_INSTRUCTION_STATE;
 	
-		signal effectiveAddressData: InstructionState := DEFAULT_INSTRUCTION_STATE;
-		signal effectiveAddressSending: std_logic := '0';
+	signal effectiveAddressData: InstructionState := DEFAULT_INSTRUCTION_STATE;
+	signal effectiveAddressSending: std_logic := '0';
 	
-	signal lqSelectedData, lqSelectedDataDelay, lqSelectedDataWithErr,
-					 lqSelectedDataWithErrDelay: InstructionState := DEFAULT_INSTRUCTION_STATE;
-	signal lqSelectedSending, lqSelectedSendingDelay: std_logic := '0';
+	signal lqSelectedDataWithErr: InstructionState := DEFAULT_INSTRUCTION_STATE;
 	
-	signal sendingAddressToSQSig,
-				 storeAddressWrSig, storeValueWrSig,
-				 sendingAddressing,
-				 sendingAddressingForLoad, sendingAddressingForMfc,
-				 sendingAddressingForStore, sendingAddressingForMtc: std_logic := '0';
+	signal sendingAddressToSQSig, storeAddressWrSig, storeValueWrSig, sendingAddressing,
+			 sendingAddressingForLoad, sendingAddressingForMfc,
+			 sendingAddressingForStore, sendingAddressingForMtc: std_logic := '0';
 	signal storeAddressDataSig, storeValueDataSig: InstructionState := DEFAULT_INSTRUCTION_STATE;
-	signal storeForwardData, storeForwardDataDelay,
-				stageDataAfterForward: InstructionState := DEFAULT_INSTRUCTION_STATE;
-	signal storeForwardSending, storeForwardSendingDelay: std_logic := '0';
-
-		signal sendingIQC: std_logic := '0';
-		signal sendingIQE: std_logic := '0'; -- Store data
-
-		signal dataIQC: InstructionState := DEFAULT_INSTRUCTION_STATE;
-		signal dataIQE: InstructionState := DEFAULT_INSTRUCTION_STATE;	-- Store data
-
-		signal sqSelectedOutput, lqSelectedOutput, lmqSelectedOutput: InstructionSlot
-					:= DEFAULT_INSTRUCTION_SLOT;
-
-	function TMP_setLoadException(ins: InstructionState) return InstructionState is
-		variable res: InstructionState := ins;
-	begin
-		res.controlInfo.hasException := '1';
-		return res;
-	end function;
-	
-	function TMP_lsResultData(ins: InstructionState;
-									  memLoadReady: std_logic; memLoadValue: Mword;
-									  sysLoadReady: std_logic; sysLoadValue: Mword;
-									  storeForwardSending: std_logic; storeForwardIns: InstructionState
-										) return InstructionState is
-		variable res: InstructionState := ins;
-	begin
-		-- TODO: remember about miss/hit status and reason of miss if relevant!
-		if storeForwardSending = '1' then
-			res := setDataCompleted(res, getDataCompleted(storeForwardIns));
-			res := setInsResult(res, storeForwardIns.argValues.arg2);
-		elsif isSysRegRead(res) = '1' then
-			res := setDataCompleted(res, sysLoadReady);
-			res := setInsResult(res, sysLoadValue);		
-		elsif isLoad(res) = '1' then 
-			res := setDataCompleted(res, memLoadReady);
-			res := setInsResult(res, memLoadValue);
-		else -- is store or sys reg write?
-			--res := setDataCompleted(res, '1'); -- ?
-			--res := setAddressCompleted(res, '1'); -- ?
-		end if;
-		
-		return res;
-	end function;
-	
-		signal ch0, ch1, ch2: std_logic := '0';
+	signal sqSelectedOutput, lqSelectedOutput, lmqSelectedOutput: InstructionSlot
+				:= DEFAULT_INSTRUCTION_SLOT;	
 begin
-		eventSignal <= execOrIntEventSignalIn;	
+	eventSignal <= execOrIntEventSignalIn;	
 
-			sendingIQC <= inputC.full;
-			sendingIQE <= inputE.full;
+	inputDataC.data(0) <=			
+				setInsResult(inputC.ins, addMwordFaster(inputC.ins.argValues.arg0, inputC.ins.argValues.arg1));
+	inputDataC.fullMask(0) <= inputC.full;
+
+	SUBPIPE_C: block
+		signal stageDataOutAGU: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
+		signal sendingAGU: std_logic := '0';
+	begin
+		STAGE_AGU: entity work.GenericStageMulti(SingleTagged)
+		port map(
+			clk => clk, reset => reset, en => en,
 			
-			dataIQC <= inputC.ins;
-			dataIQE <= inputE.ins;
-
-		inputDataC.data(0) <=			
-				 setInsResult(dataIQC, addMwordFaster(dataIQC.argValues.arg0, dataIQC.argValues.arg1));
+			prevSending => inputC.full,
+			nextAccepting => acceptingLS,
+			
+			stageDataIn => inputDataC, 
+			acceptingOut => execAcceptingCSig,
+			sendingOut => sendingAGU,
+			stageDataOut => stageDataOutAGU,
+			
+			execEventSignal => eventSignal,
+			lateEventSignal => lateEventSignal,
+			execCausing => execCausing,
+			lockCommand => '0',
+			
+			stageEventsOut => open
+		);
 	
-			inputDataC.fullMask(0) <= sendingIQC;
-
-			SUBPIPE_C: block
-				signal stageDataOutAGU: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
-				signal sendingAGU: std_logic := '0';
-			begin
-				STAGE_AGU: entity work.GenericStageMulti(SingleTagged)
-				port map(
-					clk => clk, reset => reset, en => en,
-					
-					prevSending => sendingIQC,
-					nextAccepting => acceptingLS,
-					
-					stageDataIn => inputDataC, 
-					acceptingOut => execAcceptingCSig,
-					sendingOut => sendingAGU,
-					stageDataOut => stageDataOutAGU,
-					
-					execEventSignal => eventSignal,
-					lateEventSignal => lateEventSignal,
-					execCausing => execCausing,
-					lockCommand => '0',
-					
-					stageEventsOut => open
-				);
-			
-				effectiveAddressData <= stageDataOutAGU.data(0);
-				effectiveAddressSending <= sendingAGU;	
-			end block;
+		effectiveAddressData <= stageDataOutAGU.data(0);
+		effectiveAddressSending <= sendingAGU;	
+	end block;
 				
-		--	block empty
-		SUBPIPE_E: block
-		begin
-		end block;
+	--	block empty
+	SUBPIPE_E: block begin end block;
 
-		outputE <= (sendingIQE, dataIQE);
+	outputE <= (inputE.full, inputE.ins); -- <= inputE;
 
-			addressingData <= dataAfterTranslation;
-			sendingAddressing <= sendingAfterTranslation;
+		addressingData <= dataAfterTranslation;
+		sendingAddressing <= sendingAfterTranslation;
 
 		-- CAREFUL: Here we could inject form DLQ when needed
-		inputDataLoadUnit.data(0) <= dataFromDLQ when sendingFromDLQ = '1'
-										else effectiveAddressData;
+		inputDataLoadUnit.data(0) <= dataFromDLQ when sendingFromDLQ = '1' else effectiveAddressData;
 		inputDataLoadUnit.fullMask(0) <= effectiveAddressSending or sendingFromDLQ;		
 
 		SUBPIPE_LOAD_UNIT: block
-			signal dataM, dataN, outputData, stageDataOutMem0: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;			
+			signal dataM, dataN, stageDataOutMem0: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;			
 			signal acceptingMem1: std_logic := '0';
 		begin
 				STAGE_MEM0: entity work.GenericStageMulti(SingleTagged)
@@ -287,25 +221,18 @@ begin
 					stageEventsOut => open					
 				);
 
-					sendingAfterRead <= sendingMem1; -- TEMP!
-					dataAfterRead <= dataN.data(0);
+				sendingAfterRead <= sendingMem1; -- TEMP!
+				dataAfterRead <= dataN.data(0);
 
-					-- CAREFUL: when miss (incl. forwarding miss), no 'completed' signal.
-					--				
-					addressUnitSendingSig <= (sendingAfterRead and (not sendingToDLQ))
-												 or lqSelectedSending; --??? -- because load exc to ROB
-										
-					outputData.data(0) <= execResultData;
-					outputData.fullMask(0) <= '0';-- UNUSED
-
-			outputC <= (addressUnitSendingSig, clearTempControlInfoSimple(outputData.data(0)));
-
+				-- CAREFUL: when miss (incl. forwarding miss), no 'completed' signal.
+				addressUnitSendingSig <= (sendingAfterRead and (not sendingToDLQ)) or lqSelectedOutput.full;
+																									--??? -- because load exc to ROB
+			outputC <= (addressUnitSendingSig, clearTempControlInfoSimple(execResultData));
 			outputOpPreC <= stageDataOutMem0.data(0);
 		end block;
 
 		sendingAddressingForLoad <= sendingAddressing and isLoad(addressingData);		
-		sendingAddressingForMfc <= sendingAddressing and isSysRegRead(addressingData);
-			
+		sendingAddressingForMfc <= sendingAddressing and isSysRegRead(addressingData);		
 		sendingAddressingForStore <= sendingAddressing and isStore(addressingData);
 		sendingAddressingForMtc <= sendingAddressing and isSysRegWrite(addressingData);
 			
@@ -318,42 +245,31 @@ begin
 		--						So there would be a need to distinguish "missed" from "not received"
 		--						as the latter would go to LMQ as "ready" from the start.
 		--						OFC it is simpler never to stall the mem subpipe.
-		stageDataAfterCache <= setInsResult(setDataCompleted(dataAfterRead, memLoadReady), memLoadValue);
-		stageDataAfterSysRegs <= setInsResult(setDataCompleted(dataAfterRead, sendingFromSysReg), sysLoadVal);
-		stageDataAfterForward <= setInsResult(setDataCompleted(dataAfterRead, 
-																				 getDataCompleted(storeForwardData)),
-														  storeForwardData.argValues.arg2);
-
-			lsResultData <= TMP_lsResultData(dataAfterRead, memLoadReady, memLoadValue,
-																		sendingFromSysReg, sysLoadVal,
-																		storeForwardSending, storeForwardData);
-
-		execResultData <= lqSelectedDataWithErr when lqSelectedSending = '1'
-						else	lsResultData;
+		lsResultData <= getLSResultData(dataAfterRead, memLoadReady, memLoadValue,
+										sendingFromSysReg, sysLoadVal, sqSelectedOutput.full, sqSelectedOutput.ins);
+		execResultData <= lqSelectedDataWithErr when lqSelectedOutput.full = '1' else lsResultData;
 	
-		--lqSelectedDataWithErr <= TMP_setLoadException(lqSelectedData);
-		lqSelectedDataWithErr <= TMP_setLoadException(lqSelectedData);
+		lqSelectedDataWithErr <= setLoadException(lqSelectedOutput.ins);
 	
 			-- Sending to Delayed Load Queue: when load miss or load and sending from sys reg
 			sendingToDLQ <= (		sendingAfterRead
 								 and (isLoad(lsResultData) or isSysRegRead(lsResultData))
 								 and not getDataCompleted(lsResultData))  -- When missed etc.
-							or  lqSelectedSending; -- When store hits younger load and must get off the way
-								 
-			dataToDLQ.data(0) <= lsResultData; -- CAREFUL: when older store hit after younger load,
-																	--	 		giving here the store address op.
-																	--			Selection from LQ will go forward instead,
-																	--			to write err signal to ROB
+							or  lqSelectedOutput.full; -- When store hits younger load and must get off the way
+
+			-- CAREFUL: when older store hit after younger load, giving here the store address op.
+			--			Selection from LQ will go forward instead, to write err signal to ROB								 
+			dataToDLQ.data(0) <= lsResultData;
 			dataToDLQ.fullMask(0) <= sendingToDLQ;
 
 ------------------------------------------------------------------------------------------------
 		-- SQ inputs
 		storeAddressWrSig <= sendingAddressToSQSig;
-		storeValueWrSig <= sendingIQE;
+		storeValueWrSig <= inputE.full;
 				
 		-- SQ inputs
 		storeAddressDataSig <= addressingData; -- Mem unit interface
-		storeValueDataSig <= dataIQE; -- Mem unit interface		
+		storeValueDataSig <= inputE.ins; -- Mem unit interface		
 
 			STORE_QUEUE: entity work.MemoryUnit(Behavioral)
 			generic map(
@@ -361,32 +277,18 @@ begin
 				MODE => store
 			)
 			port map(
-				clk => clk,
-				reset => reset,
-				en => en,
+				clk => clk, reset => reset, en => en,
 				
 				acceptingOut => acceptingNewSQ,
 				prevSending => prevSendingToSQ,
 				dataIn => dataNewToSQ,
 
-					storeAddressInput => (storeAddressWrSig, storeAddressDataSig),
-					storeValueInput => (storeValueWrSig, storeValueDataSig),
-					compareAddressInput => (sendingAddressingForLoad or sendingAddressingForMfc, addressingData),
+				storeAddressInput => (storeAddressWrSig, storeAddressDataSig),
+				storeValueInput => (storeValueWrSig, storeValueDataSig),
+				compareAddressInput => (sendingAddressingForLoad or sendingAddressingForMfc, addressingData),
 					
-					selectedDataOutput => sqSelectedOutput,
-				
---				storeAddressWr => storeAddressWrSig,
---				storeValueWr => storeValueWrSig,
---
---				storeAddressDataIn => storeAddressDataSig,
---				storeValueDataIn => storeValueDataSig,
---				
---					compareAddressDataIn => addressingData,
---					compareAddressReady => sendingAddressingForLoad or sendingAddressingForMfc,
---
---					selectedDataOut => open,--storeForwardData,
---					selectedSending => open,--storeForwardSending,
-				
+				selectedDataOutput => sqSelectedOutput,
+
 				committing => committing,
 				groupCtrInc => groupCtrInc,
 						
@@ -400,43 +302,25 @@ begin
 					dataOutV => dataOutSQV
 			);
 
-				storeForwardSending <= sqSelectedOutput.full;
-				storeForwardData <= sqSelectedOutput.ins;
-
 			MEM_LOAD_QUEUE: entity work.MemoryUnit(Behavioral)
 			generic map(
 				QUEUE_SIZE => LQ_SIZE,
 				MODE => load
 			)											
 			port map(
-				clk => clk,
-				reset => reset,
-				en => en,
+				clk => clk, reset => reset, en => en,
 				
 				acceptingOut => acceptingNewLQ,
 				prevSending => prevSendingToLQ,
 				dataIn => dataNewToLQ,
 
-					storeAddressInput => (sendingAddressingForLoad or sendingAddressingForMfc,
-														addressingData),
-					storeValueInput => (sendingAddressingForLoad or sendingAddressingForMfc,
+				storeAddressInput => (sendingAddressingForLoad or sendingAddressingForMfc, addressingData),
+				storeValueInput => (sendingAddressingForLoad or sendingAddressingForMfc,
 														DEFAULT_INSTRUCTION_STATE),
-					compareAddressInput => (storeAddressWrSig, storeAddressDataSig),
+				compareAddressInput => (storeAddressWrSig, storeAddressDataSig),
 					
-					selectedDataOutput => lqSelectedOutput,
-					
---				storeAddressWr => sendingAddressingForLoad or sendingAddressingForMfc,
---				storeValueWr => sendingAddressingForLoad or sendingAddressingForMfc,
---
---				storeAddressDataIn => addressingData, --?
---				storeValueDataIn => DEFAULT_INSTRUCTION_STATE,
---
---					compareAddressDataIn => storeAddressDataSig,
---					compareAddressReady => storeAddressWrSig,
---
---					selectedDataOut => open,--lqSelectedData,
---					selectedSending => open,--lqSelectedSending,
-					
+				selectedDataOutput => lqSelectedOutput,
+			
 					committing => committing,
 					groupCtrInc => groupCtrInc,
 
@@ -450,18 +334,13 @@ begin
 					dataOutV => open
 			);
 
-				lqSelectedSending <= lqSelectedOutput.full;
-				lqSelectedData <= lqSelectedOutput.ins;
-
 			DELAYED_LOAD_QUEUE: entity work.MemoryUnit(LoadMissQueue)
 			generic map(
 				QUEUE_SIZE => LMQ_SIZE,
 				CLEAR_COMPLETED => false
 			)
 			port map(
-				clk => clk,
-				reset => reset,
-				en => en,
+				clk => clk, reset => reset, en => en,
 				
 				acceptingOut => dlqAccepting,
 				prevSending => sendingToDLQ,
@@ -472,19 +351,7 @@ begin
 					compareAddressInput => ('0', DEFAULT_INSTRUCTION_STATE),
 					
 					selectedDataOutput => lmqSelectedOutput,
-				
---				storeAddressWr => '0',
---				storeValueWr => '0',
---
---				storeAddressDataIn => DEFAULT_INSTRUCTION_STATE,
---				storeValueDataIn => DEFAULT_INSTRUCTION_STATE,
---
---					compareAddressDataIn => DEFAULT_INSTRUCTION_STATE,
---					compareAddressReady => '0',
---
---					selectedDataOut => open,
---					selectedSending => open,
-			
+		
 					committing => committing,
 					groupCtrInc => (others => '0'),
 					
@@ -492,41 +359,27 @@ begin
 				execEventSignal => eventSignal,
 				execCausing => execCausing,
 				
-				nextAccepting => '1', -- TODO: when should it be allowed to send?
-											 --		 Priorities!				
+				nextAccepting => '1', -- TODO: when should it be allowed to send? Priorities!				
 				sendingSQOut => sendingFromDLQ,
 					dataOutV => stageDataMultiDLQ
 			);
-
-				-- [[]] <= lmqSelectedOutput.full;
-				-- [[]] <= lmqelectedOutput.ins;
 			
 			dataFromDLQ <= stageDataMultiDLQ.data(0);
 
-			TMP_REG: process(clk)
+			TMP_REG: process(clk) -- TODO: move the delayed signal to sys reg block
 			begin
 				if rising_edge(clk) then
 					sendingFromSysReg <= sendingAddressingForMfc;
-					
-
 				end if;
 			end process;
 
-					storeForwardDataDelay <= storeForwardData;
-					storeForwardSendingDelay <= storeForwardSending;
-
-					lqSelectedSendingDelay <= lqSelectedSending;
-					--lqSelectedDataWithErrDelay <= lqSelectedDataWithErr;
-					lqSelectedDataDelay <= lqSelectedData;
-
-
 			execAcceptingC <= execAcceptingCSig;
-			execAcceptingE <= '1'; --???  -- execAcceptingESig;
+			execAcceptingE <= '1';
 			
-				-- Mem interface
-				memLoadAddress <= addressingData.result; -- in LoadUnit
-				memLoadAllow <= sendingAddressingForLoad;
-				sysLoadAllow <= sendingAddressingForMfc;	 
+			-- Mem interface
+			memLoadAddress <= addressingData.result;
+			memLoadAllow <= sendingAddressingForLoad;
+			sysLoadAllow <= sendingAddressingForMfc;	 
 				 
 			dataOutSQ <= dataOutSQV;
 end Behavioral;

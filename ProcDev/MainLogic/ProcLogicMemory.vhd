@@ -74,6 +74,14 @@ function lmMaskNext(livingMask: std_logic_vector;
 
 	function TMP_cmpTagsAfter(content: InstructionStateArray; tag: SmallNumber)
 	return std_logic_vector;
+
+	function setLoadException(ins: InstructionState) return InstructionState;
+	
+	function getLSResultData(ins: InstructionState;
+									  memLoadReady: std_logic; memLoadValue: Mword;
+									  sysLoadReady: std_logic; sysLoadValue: Mword;
+									  storeForwardSending: std_logic; storeForwardIns: InstructionState
+										) return InstructionState;
 					  
 end ProcLogicMemory;
 
@@ -419,6 +427,38 @@ end function;
 			diff := subSN(tag, content(i).groupTag); -- If grTag > tag then diff(high) = '1'
 			res(i) := diff(SMALL_NUMBER_SIZE-1);
 		end loop;
+		
+		return res;
+	end function;
+
+	function setLoadException(ins: InstructionState) return InstructionState is
+		variable res: InstructionState := ins;
+	begin
+		res.controlInfo.hasException := '1';
+		return res;
+	end function;
+	
+	function getLSResultData(ins: InstructionState;
+									  memLoadReady: std_logic; memLoadValue: Mword;
+									  sysLoadReady: std_logic; sysLoadValue: Mword;
+									  storeForwardSending: std_logic; storeForwardIns: InstructionState
+										) return InstructionState is
+		variable res: InstructionState := ins;
+	begin
+		-- TODO: remember about miss/hit status and reason of miss if relevant!
+		if storeForwardSending = '1' then
+			res := setDataCompleted(res, getDataCompleted(storeForwardIns));
+			res := setInsResult(res, storeForwardIns.argValues.arg2);
+		elsif isSysRegRead(res) = '1' then
+			res := setDataCompleted(res, sysLoadReady);
+			res := setInsResult(res, sysLoadValue);		
+		elsif isLoad(res) = '1' then 
+			res := setDataCompleted(res, memLoadReady);
+			res := setInsResult(res, memLoadValue);
+		else -- is store or sys reg write?
+			--res := setDataCompleted(res, '1'); -- ?
+			--res := setAddressCompleted(res, '1'); -- ?
+		end if;
 		
 		return res;
 	end function;
