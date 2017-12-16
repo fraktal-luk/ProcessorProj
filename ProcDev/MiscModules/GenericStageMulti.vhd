@@ -127,8 +127,11 @@ begin
 
 	acceptingOut <= flowResponse.accepting;		
 	sendingOut <= flowResponse.sending;
-	stageDataOut <= stageDataLiving; -- TODO: clear temp ctrl info?
-	
+	--stageDataOut <= stageDataLiving; -- TODO: clear temp ctrl info?
+		stageDataOut.data <= stageDataLiving.data;
+		stageDataOut.fullMask <= stageDataLiving.fullMask when flowResponse.sending = '1'
+								 else (others => '0');
+								 
 	stageEventsOut <= stageEvents;
 end Behavioral;
 
@@ -176,7 +179,10 @@ begin
 
 	acceptingOut <= flowResponse.accepting;		
 	sendingOut <= flowResponse.sending;
-	stageDataOut <= stageDataLiving; -- TODO: clear temp ctrl info?
+	--stageDataOut <= stageDataLiving; -- TODO: clear temp ctrl info?
+		stageDataOut.data <= stageDataLiving.data;
+		stageDataOut.fullMask <= stageDataLiving.fullMask when flowResponse.sending = '1'
+								 else (others => '0');
 	
 	stageEventsOut <= stageEvents;
 end Renaming;
@@ -238,8 +244,11 @@ begin
 
 	acceptingOut <= flowResponse.accepting;		
 	sendingOut <= flowResponse.sending;
-	stageDataOut <= stageDataLiving; -- TODO: clear temp ctrl info?
-	
+	--stageDataOut <= stageDataLiving; -- TODO: clear temp ctrl info?
+		stageDataOut.data <= stageDataLiving.data;
+		stageDataOut.fullMask <= stageDataLiving.fullMask when flowResponse.sending = '1'
+								 else (others => '0');
+								 
 	stageEventsOut <= stageEvents;
 end SingleTagged;
 
@@ -330,8 +339,10 @@ begin
 
 	acceptingOut <= flowResponse.accepting;		
 	sendingOut <= flowResponse.sending;
-	stageDataOut <= stageDataLiving; -- TODO: clear temp ctrl info?
-	
+	--stageDataOut <= stageDataLiving; -- TODO: clear temp ctrl info?
+		stageDataOut.data <= stageDataLiving.data;
+		stageDataOut.fullMask <= stageDataLiving.fullMask when flowResponse.sending = '1'
+								 else (others => '0');	
 	stageEventsOut <= stageEvents;
 end LastEffective;
 
