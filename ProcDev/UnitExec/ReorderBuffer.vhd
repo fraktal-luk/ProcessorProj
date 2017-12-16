@@ -219,7 +219,9 @@ begin
 	-- TODO: allow accepting also when queue full but sending, that is freeing a place?
 	acceptingOut <= not getBitFromROBMaskPre(TMP_stageData, qs0.pStart);
 								
-	outputData <= TMP_frontCircular;
+	--outputData <= TMP_frontCircular;
+		outputData.data <= TMP_frontCircular.data;
+		outputData.fullMask <= TMP_frontCircular.fullMask when isSending = '1' else (others => '0');
 
 	sendingOut <= isSending;
 end Implem;

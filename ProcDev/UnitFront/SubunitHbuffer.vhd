@@ -191,7 +191,11 @@ begin
 
 	hbufferDrive.kill <=	num2flow(countOnes(fullMask and partialKillMaskHbuffer));
 
-	stageDataOut <= hbuffOut.sd;				
+	--stageDataOut <= hbuffOut.sd;
+		stageDataOut.data <= hbuffOut.sd.data;
+		stageDataOut.fullMask <= hbuffOut.sd.fullMask when isNonzero(sendingSig) = '1'
+								  else (others => '0');
+	
 	acceptingOut <= not isNonzero(fullMask(HBUFFER_SIZE - FETCH_BLOCK_SIZE to HBUFFER_SIZE-1));
 	sendingOut <= isNonzero(sendingSig);	
 

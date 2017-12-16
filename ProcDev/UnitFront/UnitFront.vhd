@@ -210,7 +210,8 @@ begin
 			earlyBranchDataIn.data(0) <= getFrontEvent(stageDataOutFetchFinal,
 															pcSendingDelayedFinal, ivalidFinal, '1',
 															fetchBlockFinal);
-			earlyBranchdataIn.fullMask(0) <= pcSendingDelayedFinal;
+			earlyBranchdataIn.fullMask(0) <= --pcSendingDelayedFinal;
+														sendingOutFetchFinal;
 			
 			sendingToEarlyBranch <= sendingOutFetchFinal;
 											
