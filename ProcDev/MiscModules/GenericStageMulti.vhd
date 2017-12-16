@@ -120,7 +120,8 @@ begin
 		stageEvents <= stageMultiEvents(stageData, flowResponse.isNew);								
 		partialKillMask <= stageEvents.partialKillMask;
 	
-	flowDrive.prevSending <= prevSending;
+	flowDrive.prevSending <= --prevSending;
+										stageDataIn.fullMask(0);
 	flowDrive.nextAccepting <= nextAccepting;
 	flowDrive.kill <= execEventSignal or lateEventSignal;
 	flowDrive.lockAccept <= lockCommand;
@@ -172,7 +173,8 @@ begin
 		stageEvents <= stageMultiEvents(stageData, flowResponse.isNew);								
 		partialKillMask <= stageEvents.partialKillMask;
 	
-	flowDrive.prevSending <= prevSending;
+	flowDrive.prevSending <= --prevSending;
+										stageDataIn.fullMask(0);
 	flowDrive.nextAccepting <= nextAccepting;
 	flowDrive.kill <= execEventSignal or lateEventSignal;
 	flowDrive.lockAccept <= lockCommand;
@@ -237,7 +239,8 @@ begin
 
 		stageEvents <= stageMultiEvents(stageData, flowResponse.isNew);
 	
-	flowDrive.prevSending <= prevSending;
+	flowDrive.prevSending <= --prevSending;
+										stageDataIn.fullMask(0);
 	flowDrive.nextAccepting <= nextAccepting;
 	--flowDrive.kill <= execEventSignal;
 	flowDrive.lockAccept <= lockCommand;
@@ -332,7 +335,8 @@ begin
 																	 evtPhase0, evtPhase1, evtPhase2);
 		stageEvents.eventOccured <= stageEvents.causing.controlInfo.newEvent;
 		
-	flowDrive.prevSending <= prevSending;
+	flowDrive.prevSending <= --prevSending;
+										stageDataIn.fullMask(0);
 	flowDrive.nextAccepting <= nextAccepting;
 	--flowDrive.kill <= execEventSignal;
 	--flowDrive.lockAccept <= lockCommand;
