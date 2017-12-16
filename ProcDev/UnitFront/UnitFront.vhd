@@ -156,7 +156,7 @@ begin
 	FETCH_DELAY: process (clk)
 	begin
 		if rising_edge(clk) then
-			if sendingOutFetch = '1' then
+			--if sendingOutFetch = '1' then
 				pcSendingDelayed0 <= pcSending;
 				pcSendingDelayed1 <= pcSendingDelayed0;
 				
@@ -164,7 +164,7 @@ begin
 				fetchBlock1 <= fetchBlock;
 
 				fetchBlockBP <= fetchBlockFinal;
-			end if;
+			--end if;
 		end if;	
 	end process;				
 
@@ -207,7 +207,6 @@ begin
 	
 	hbufferDataIn <= checkIvalid(earlyBranchDataOut.data(0), '1');
 	
-		-- Branch prediction stub. This stage is in parallel with Hbuff
 			earlyBranchDataIn.data(0) <= getFrontEvent(stageDataOutFetchFinal,
 															pcSendingDelayedFinal, ivalidFinal, '1',
 															fetchBlockFinal);

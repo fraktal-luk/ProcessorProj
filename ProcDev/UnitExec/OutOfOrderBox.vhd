@@ -409,11 +409,12 @@ begin
 				input => execOutputs1(0 to 2),
 				
 				whichAcceptedCQ => whichAcceptedCQ,
-				anySending => anySendingFromCQ,
+				anySending => open,--anySendingFromCQ,
 				cqOutput => cqOutputSig,
 				bufferOutput => cqBufferOutputSig
 			);
 
+				anySendingFromCQ <= cqOutputSig(0).full; -- CAREFUL, only used for SINGLE_OUTPUT
 			cqDataLivingOut.fullMask(0) <= cqOutputSig(0).full;--cqMaskSig(0);
 			cqDataLivingOut.data(0) <= cqOutputSig(0).ins;--cqDataSig(0);
 

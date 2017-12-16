@@ -338,7 +338,7 @@ begin
 						whichAcceptedCQ => sbAcceptingV,
 						input => makeSlotArray(dataOutSQ.data, dataOutSQ.fullMask),
 						
-						anySending => sbSending,
+						anySending => open,--sbSending,
 
 						cqOutput => sbOutputSig,
 						bufferOutput => sbBufferOutputSig,
@@ -346,7 +346,8 @@ begin
 						execEventSignal => '0',
 						execCausing => DEFAULT_INSTRUCTION_STATE
 					);
-
+				
+				sbSending <= sbOutputSig(0).full;
 			sbEmpty <= not sbBufferOutputSig(0).full;-- sbFullMask(0);
 			dataFromSB <= sbOutputSig(0).ins;--sbDataOut(0);
 
