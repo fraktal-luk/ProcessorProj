@@ -158,7 +158,7 @@ begin
 	data1Prev <= data1.data(0);				
 	dataOut <= setInsResult(outputData.data(0), multResult(31 downto 0));
 	
-	
+	-- CAREFUL, TODO: implement individual CK EN for ultiplier stages or disallow stalling mul pipe!!
 	MP: entity work.NewMultiplierPipe(Behavioral)
 	port map(
 		clk => clk, reset => reset, en => en,

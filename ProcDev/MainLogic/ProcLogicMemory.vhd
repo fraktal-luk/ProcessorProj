@@ -82,7 +82,10 @@ function lmMaskNext(livingMask: std_logic_vector;
 									  sysLoadReady: std_logic; sysLoadValue: Mword;
 									  storeForwardSending: std_logic; storeForwardIns: InstructionState
 										) return InstructionState;
-					  
+
+	function getSendingToDLQ(sendingAfterRead, sendingSelectedLQ: std_logic;
+									 lsResultData: InstructionState) return std_logic;	
+	function calcEffectiveAddress(ins: InstructionState) return InstructionState;	
 end ProcLogicMemory;
 
 
@@ -461,6 +464,20 @@ end function;
 		end if;
 		
 		return res;
+	end function;
+
+	function getSendingToDLQ(sendingAfterRead, sendingSelectedLQ: std_logic;
+									 lsResultData: InstructionState) return std_logic is
+	begin
+		return		(		sendingAfterRead
+								 and (isLoad(lsResultData) or isSysRegRead(lsResultData))
+								 and not getDataCompleted(lsResultData))  -- When missed etc.
+							or  sendingSelectedLQ; -- When store hits younger load and must get off the way	
+	end function;
+	
+	function calcEffectiveAddress(ins: InstructionState) return InstructionState is
+	begin
+		return setInsResult(ins, addMwordFaster(ins.argValues.arg0, ins.argValues.arg1));
 	end function;
 
 end ProcLogicMemory;

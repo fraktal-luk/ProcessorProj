@@ -115,13 +115,13 @@ architecture Implem of UnitExec is
 		signal storeTargetWrSig: std_logic := '0';
 		signal storeTargetDataSig: InstructionState := DEFAULT_INSTRUCTION_STATE;
 
-		signal sendingIQA: std_logic := '0';
-		signal sendingIQB: std_logic := '0';
-		signal sendingIQD: std_logic := '0';
+		--signal sendingIQA: std_logic := '0';
+		--signal sendingIQB: std_logic := '0';
+		--signal sendingIQD: std_logic := '0';
 
-		signal dataIQA: InstructionState := DEFAULT_INSTRUCTION_STATE;
-		signal dataIQB: InstructionState := DEFAULT_INSTRUCTION_STATE;
-		signal dataIQD: InstructionState := DEFAULT_INSTRUCTION_STATE;
+		--signal dataIQA: InstructionState := DEFAULT_INSTRUCTION_STATE;
+		--signal dataIQB: InstructionState := DEFAULT_INSTRUCTION_STATE;
+		--signal dataIQD: InstructionState := DEFAULT_INSTRUCTION_STATE;
 
 		signal bqSelectedOutput: InstructionSlot := DEFAULT_INSTRUCTION_SLOT;
 
@@ -131,17 +131,17 @@ begin
 		resetSig <= reset and HAS_RESET_EXEC;
 		enSig <= en or not HAS_EN_EXEC; 
 
-			sendingIQA <= inputA.full;
-			sendingIQB <= inputB.full;
-			sendingIQD <= inputD.full;
+			--sendingIQA <= inputA.full;
+			--sendingIQB <= inputB.full;
+			--sendingIQD <= inputD.full;
 			
-			dataIQA <= inputA.ins;
-			dataIQB <= inputB.ins;
-			dataIQD <= inputD.ins;
+			--dataIQA <= inputA.ins;
+			--dataIQB <= inputB.ins;
+			--dataIQD <= inputD.ins;
 
 					--inputDataA.data(0) <= executeAlu(dataIQA);					
 					--inputDataA.fullMask(0) <= sendingIQA;
-					inputDataA <= makeSDM((0 => (sendingIQA, executeAlu(dataIQA))));
+					inputDataA <= makeSDM((0 => (inputA.full, executeAlu(inputA.ins))));
 
 					dataA0 <= outputDataA.data(0);
 					
@@ -149,7 +149,7 @@ begin
 					port map(
 						clk => clk, reset => resetSig, en => enSig,
 						
-						prevSending => sendingIQA,
+						prevSending => '0',--sendingIQA,
 						nextAccepting => whichAcceptedCQ(0),
 						
 						stageDataIn => inputDataA,
@@ -171,7 +171,7 @@ begin
 					
 					--prevSending => sendingIQB,
 					nextAccepting => whichAcceptedCQ(1),
-						input => (sendingIQB, dataIQB),
+						input => inputB,--(inputB.full, inputB.ins),
 					--dataIn => dataIQB, 
 					acceptingOut => execAcceptingBSig,
 					sendingOut => execSendingB,
@@ -189,13 +189,13 @@ begin
 -- Branch
 					branchData <=
 					--inputDataD.data(0) <= 
-										basicBranch(setInstructionTarget(dataIQD,
-																 dataIQD.constantArgs.imm),
+										basicBranch(setInstructionTarget(inputD.ins,
+																 inputD.ins.constantArgs.imm),
 																 (others => '0'),
-																 dataIQD.result);					
+																 inputD.ins.result);					
 					
 					--inputDataD.fullMask(0) <= sendingIQD;
-					inputDataD <= makeSDM((0 => (sendingIQD, branchData)));
+					inputDataD <= makeSDM((0 => (inputD.full, branchData)));
 					
 					dataD0 <= outputDataD.data(0);
 					
@@ -203,7 +203,7 @@ begin
 					port map(
 						clk => clk, reset => resetSig, en => enSig,
 						
-						prevSending => sendingIQD,
+						prevSending => '0',--sendingIQD,
 						nextAccepting => whichAcceptedCQ(3),
 						
 						stageDataIn => inputDataD, 
@@ -239,7 +239,7 @@ begin
 				
 					storeAddressInput => (storeTargetWrSig, storeTargetDataSig),
 					storeValueInput => (storeTargetWrSig, DEFAULT_INSTRUCTION_STATE),
-					compareAddressInput => (sendingIQD, dataIQD),
+					compareAddressInput => inputD,--(sendingIQD, dataIQD),
 					
 					selectedDataOutput => bqSelectedOutput,
 				
