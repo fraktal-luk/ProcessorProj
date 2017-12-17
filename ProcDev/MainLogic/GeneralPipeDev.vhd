@@ -24,6 +24,8 @@ use work.TEMP_DEV.all;
 
 package GeneralPipeDev is
 
+function makeSDM(arr: InstructionSlotArray) return StageDataMulti;
+
 function makeSlotArray(insVec: InstructionStateArray; mask: std_logic_vector) return InstructionSlotArray;
 
 function extractFullMask(queueContent: InstructionSlotArray) return std_logic_vector;
@@ -168,6 +170,22 @@ end GeneralPipeDev;
 
 
 package body GeneralPipeDev is
+
+function makeSDM(arr: InstructionSlotArray) return StageDataMulti is
+	variable res: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
+	constant LEN: integer := arr'length;
+begin
+	
+	for i in 0 to PIPE_WIDTH-1 loop
+		if i >= LEN then
+			exit;
+		end if;
+		res.fullMask(i) := arr(i).full;
+		res.data(i) := arr(i).ins;
+	end loop;
+	
+	return res;
+end function;
 
 function makeSlotArray(insVec: InstructionStateArray; mask: std_logic_vector) return InstructionSlotArray is
 	variable res: InstructionSlotArray(0 to insVec'length-1) := (others => DEFAULT_INSTRUCTION_SLOT);

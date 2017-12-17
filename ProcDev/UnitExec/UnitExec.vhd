@@ -107,6 +107,8 @@ architecture Implem of UnitExec is
 	signal inputDataA, outputDataA: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
 	signal inputDataD, outputDataD: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
 
+	signal branchData: InstructionState := DEFAULT_INSTRUCTION_STATE;
+	
 	signal branchQueueSelectedOut: InstructionState := DEFAULT_INSTRUCTION_STATE;
 	signal branchQueueSelectedSending: std_logic := '0';
 
@@ -137,9 +139,10 @@ begin
 			dataIQB <= inputB.ins;
 			dataIQD <= inputD.ins;
 
-					inputDataA.data(0) <= executeAlu(dataIQA);					
-					inputDataA.fullMask(0) <= sendingIQA;
-					
+					--inputDataA.data(0) <= executeAlu(dataIQA);					
+					--inputDataA.fullMask(0) <= sendingIQA;
+					inputDataA <= makeSDM((0 => (sendingIQA, executeAlu(dataIQA))));
+
 					dataA0 <= outputDataA.data(0);
 					
 					SUBPIPE_A: entity work.GenericStageMulti(SingleTagged)
@@ -149,7 +152,7 @@ begin
 						prevSending => sendingIQA,
 						nextAccepting => whichAcceptedCQ(0),
 						
-						stageDataIn => inputDataA, 
+						stageDataIn => inputDataA,
 						acceptingOut => execAcceptingASig,
 						sendingOut => execSendingA,
 						stageDataOut => outputDataA,
@@ -166,10 +169,10 @@ begin
 				port map(
 					clk => clk, reset => resetSig, en => enSig,
 					
-					prevSending => sendingIQB,
+					--prevSending => sendingIQB,
 					nextAccepting => whichAcceptedCQ(1),
-					
-					dataIn => dataIQB, 
+						input => (sendingIQB, dataIQB),
+					--dataIn => dataIQB, 
 					acceptingOut => execAcceptingBSig,
 					sendingOut => execSendingB,
 					
@@ -184,12 +187,15 @@ begin
 				
 ------------------------------------------------
 -- Branch
-					inputDataD.data(0) <= basicBranch(setInstructionTarget(dataIQD,
+					branchData <=
+					--inputDataD.data(0) <= 
+										basicBranch(setInstructionTarget(dataIQD,
 																 dataIQD.constantArgs.imm),
 																 (others => '0'),
 																 dataIQD.result);					
 					
-					inputDataD.fullMask(0) <= sendingIQD;
+					--inputDataD.fullMask(0) <= sendingIQD;
+					inputDataD <= makeSDM((0 => (sendingIQD, branchData)));
 					
 					dataD0 <= outputDataD.data(0);
 					

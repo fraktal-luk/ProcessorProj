@@ -91,8 +91,9 @@ begin
 	stageDataIn <= input.ins;
 
 	inputDataWithArgs <= getDispatchArgValues(stageDataIn, resultVals, USE_IMM);
-	stageDataM.fullMask(0) <= prevSending;
-	stageDataM.data(0) <= inputDataWithArgs;
+	--stageDataM.fullMask(0) <= prevSending;
+	--stageDataM.data(0) <= inputDataWithArgs;
+	stageDataM <= makeSDM((0 => (prevSending, inputDataWithArgs)));
 	
 	BASIC_LOGIC: entity work.GenericStageMulti(SingleTagged)
 	port map(

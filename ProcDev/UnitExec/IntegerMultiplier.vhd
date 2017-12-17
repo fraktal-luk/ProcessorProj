@@ -54,11 +54,11 @@ entity IntegerMultiplier is
 		reset: in std_logic;
 		en: in std_logic;
 		
-		prevSending: in std_logic;
+		--prevSending: in std_logic;
 		nextAccepting: in std_logic;
+		input: in InstructionSlot;
 
-
-		dataIn: in InstructionState;		
+		--dataIn: in InstructionState;		
 		acceptingOut: out std_logic;
 		sendingOut: out std_logic;
 		
@@ -87,17 +87,18 @@ architecture Behavioral of IntegerMultiplier is
 begin
 		eventCausing <= execCausing;
 
-	inputData.data(0) <= dataIn;
-	inputData.fullMask(0) <= prevSending;
+	--inputData.data(0) <= dataIn;
+	--inputData.fullMask(0) <= prevSending;
 	
 	STAGE_0: entity work.GenericStageMulti(SingleTagged)
 	port map(
 		clk => clk, reset => reset, en => en,
 		
-		prevSending => prevSending,
+		prevSending => '0',--prevSending,
 		nextAccepting => acc1,
 		
-		stageDataIn => inputData, 
+		stageDataIn => --inputData,
+								makeSDM((0 => input)),
 		acceptingOut => acceptingOut,
 		sendingOut => sending0,
 		stageDataOut => data0,
@@ -130,9 +131,9 @@ begin
 		stageEventsOut => open					
 	);
 	
-	 dataM.data(0) <= execLogicXor(data1.data(0));
-	 dataM.fullMask(0) <= sending1;
-	
+	 --dataM.data(0) <= execLogicXor(data1.data(0));
+	 --dataM.fullMask(0) <= sending1;
+		
 	STAGE_2: entity work.GenericStageMulti(SingleTagged)
 	port map(
 		clk => clk, reset => reset, en => en,
@@ -140,7 +141,8 @@ begin
 		prevSending => sending1,
 		nextAccepting => nextAccepting, --flowResponseAPost.accepting,
 		
-		stageDataIn => dataM, 
+		stageDataIn => --dataM,
+							data1,
 		acceptingOut => acc2,
 		sendingOut => sendingOut,
 		stageDataOut => outputData,
@@ -160,8 +162,8 @@ begin
 	MP: entity work.NewMultiplierPipe(Behavioral)
 	port map(
 		clk => clk, reset => reset, en => en,
-		inA => dataIn.argValues.arg0,
-		inB => dataIn.argValues.arg1,
+		inA => input.ins.argValues.arg0,
+		inB => input.ins.argValues.arg1,
 		inC => (others => '0'),
 		result => multResult
 	);

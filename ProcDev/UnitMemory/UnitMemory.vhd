@@ -91,7 +91,6 @@ end UnitMemory;
 
 
 architecture Behavioral of UnitMemory is
-	signal inputDataLoadUnit: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
 	signal eventSignal: std_logic := '0';	
 	
 	signal addressUnitSendingSig: std_logic := '0';
@@ -169,14 +168,21 @@ begin
 		addressingData <= dataAfterTranslation;
 		sendingAddressing <= sendingAfterTranslation;
 
-		-- CAREFUL: Here we could inject form DLQ when needed
-		inputDataLoadUnit.data(0) <= dataFromDLQ when sendingFromDLQ = '1' else effectiveAddressData;
-		inputDataLoadUnit.fullMask(0) <= effectiveAddressSending or sendingFromDLQ;		
+		--inputDataLoadUnit.data(0) <= dataFromDLQ when sendingFromDLQ = '1' else effectiveAddressData;
+		--inputDataLoadUnit.fullMask(0) <= effectiveAddressSending or sendingFromDLQ;		
 
 		SUBPIPE_LOAD_UNIT: block
+			signal inputDataLoadUnit: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
+			signal dataToMemPipe: InstructionState := DEFAULT_INSTRUCTION_STATE;
+			signal sendingToMemPipe: std_logic := '0';
 			signal dataM, dataN, stageDataOutMem0: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;			
 			signal acceptingMem1: std_logic := '0';
 		begin
+			dataToMemPipe <= dataFromDLQ when sendingFromDLQ = '1' else effectiveAddressData;
+			sendingToMemPipe <= effectiveAddressSending or sendingFromDLQ;
+			
+			inputDataLoadUnit <= makeSDM((0 => (sendingToMemPipe, dataToMemPipe)));
+			
 				STAGE_MEM0: entity work.GenericStageMulti(SingleTagged)
 				port map(
 					clk => clk, reset => reset, en => en,

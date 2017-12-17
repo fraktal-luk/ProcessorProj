@@ -481,8 +481,9 @@ begin
 
 		interruptCause <= makeInterruptCause(TMP_targetIns, intSignal, start);
 
-		dataToLastEffective.fullMask(0) <= sendingToCommit;
-		dataToLastEffective.data(0) <= insToLastEffective;
+		--dataToLastEffective.fullMask(0) <= sendingToCommit;
+		--dataToLastEffective.data(0) <= insToLastEffective;
+		dataToLastEffective <= makeSDM((0 => (sendingToCommit, insToLastEffective)));
 
 			LAST_EFFECTIVE_SLOT: entity work.GenericStageMulti(LastEffective)
 			port map(
