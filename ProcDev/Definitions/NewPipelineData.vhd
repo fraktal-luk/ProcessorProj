@@ -406,6 +406,7 @@ constant DEFAULT_PHYSICAL_DEST_ARGS: InstructionPhysicalDestArgs := defaultPhysi
 constant DEFAULT_ARG_VALUES: InstructionArgValues := defaultArgValues;
 
 constant DEFAULT_INSTRUCTION_STATE: InstructionState := defaultInstructionState;
+constant DEFAULT_INS_STATE: InstructionState := defaultInstructionState;
 	
 -- Created to enable *Array				
 type InstructionSlot is record 
@@ -414,6 +415,7 @@ type InstructionSlot is record
 end record;
 	
 constant DEFAULT_INSTRUCTION_SLOT: InstructionSlot := ('0', defaultInstructionState);
+constant DEFAULT_INS_SLOT: InstructionSlot := ('0', defaultInstructionState);
 	
 -- NOTE: index can be negative to enable logical division into 2 different ranges 
 type InstructionSlotArray is array(integer range <>) of InstructionSlot;

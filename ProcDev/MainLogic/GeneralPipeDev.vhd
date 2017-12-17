@@ -119,21 +119,21 @@ function killByTag(before, ei, int: std_logic) return std_logic;
 -- FORWARDING NETWORK ------------
 function getWrittenTags(lastCommitted: StageDataMulti) return PhysNameArray; -- DEPREC
 
-function getResultTags(execEnds: InstructionStateArray;
-			stageDataCQ: InstructionStateArray;
+function getResultTags(execOutputs: InstructionSlotArray;
+			stageDataCQ: InstructionSlotArray;
 			--schedOutputArr: InstructionSlotArray;
 			--dispatchDataA, dispatchDataB, dispatchDataC, dispatchDataD: InstructionState;
 			lastCommitted: StageDataMulti) 
 return PhysNameArray;
 
-function getNextResultTags(execPreEnds: InstructionStateArray;
+function getNextResultTags(execOutputsPre: InstructionSlotArray;
 			schedOutputArr: InstructionSlotArray
 			--dispatchDataA, dispatchDataB, dispatchDataC, dispatchDataD: InstructionState
 			)
 return PhysNameArray;
 	
-function getResultValues(execEnds: InstructionStateArray; 
-										stageDataCQ: InstructionStateArray;
+function getResultValues(execOutputs: InstructionSlotArray; 
+										stageDataCQ: InstructionSlotArray;
 										lastCommitted: StageDataMulti)
 return MwordArray;	
 ---------------------
@@ -167,6 +167,66 @@ function setInsResult(ins: InstructionState; result: Mword) return InstructionSt
 	function isSysRegRead(ins: InstructionState) return std_logic;
 	function isStore(ins: InstructionState) return std_logic;
 	function isSysRegWrite(ins: InstructionState) return std_logic;
+
+
+	type SLVA is array (integer range <>) of std_logic_vector(0 to PIPE_WIDTH-1);
+
+	type IssueView is record
+		acceptingVecA, acceptingVecB, acceptingVecC, acceptingVecD, acceptingVecE:
+													std_logic_vector(0 to PIPE_WIDTH-1);
+		queueSendingA, queueSendingB, queueSendingC, queueSendingD, queueSendingE: std_logic;
+		queueDataA, queueDataB, queueDataC, queueDataD, queueDataE: InstructionState;
+		---
+		issueAcceptingA, issueAcceptingB, issueAcceptingC, issueAcceptingD, issueAcceptingE: std_logic;
+		sendingSchedA, sendingSchedB, sendingSchedC, sendingSchedD, sendingSchedE,
+			execAcceptingA, execAcceptingB, execAcceptingC, execAcceptingD, execAcceptingE: std_logic;
+		dataOutSchedA, dataOutSchedB, dataOutSchedC, dataOutSchedD, dataOutSchedE: InstructionState;		
+	end record;
+
+	constant DEFAULT_ISSUE_VIEW: IssueView := (
+		acceptingVecA => (others => '0'), 
+		acceptingVecB => (others => '0'), 
+		acceptingVecC => (others => '0'), 
+		acceptingVecD => (others => '0'), 
+		acceptingVecE => (others => '0'),
+		queueSendingA => '0',
+		queueSendingB => '0',
+		queueSendingC => '0',
+		queueSendingD => '0',
+		queueSendingE => '0',
+		queueDataA => DEFAULT_INSTRUCTION_STATE,
+		queueDataB => DEFAULT_INSTRUCTION_STATE,
+		queueDataC => DEFAULT_INSTRUCTION_STATE,
+		queueDataD => DEFAULT_INSTRUCTION_STATE,
+		queueDataE => DEFAULT_INSTRUCTION_STATE,
+		sendingSchedA => '0',
+		sendingSchedB => '0',
+		sendingSchedC => '0',
+		sendingSchedD => '0',
+		sendingSchedE => '0',
+		issueAcceptingA => '0',
+		issueAcceptingB => '0',
+		issueAcceptingC => '0',
+		issueAcceptingD => '0',
+		issueAcceptingE => '0',
+		execAcceptingA => '0',
+		execAcceptingB => '0',
+		execAcceptingC => '0',
+		execAcceptingD => '0',
+		execAcceptingE => '0',
+		dataOutSchedA => DEFAULT_INSTRUCTION_STATE,
+		dataOutSchedB => DEFAULT_INSTRUCTION_STATE,
+		dataOutSchedC => DEFAULT_INSTRUCTION_STATE,
+		dataOutSchedD => DEFAULT_INSTRUCTION_STATE,
+		dataOutSchedE => DEFAULT_INSTRUCTION_STATE		
+	);
+	
+	signal theIssueView: IssueView := DEFAULT_ISSUE_VIEW;
+	
+	function getIssueView(iqOutputArr, schedOutputArr: InstructionSlotArray;
+								 iqAcceptingVecArr: SLVA;
+								 issueAcceptingArr, execAcceptingArr: std_logic_vector)
+	return IssueView;
 
 end GeneralPipeDev;
 
@@ -569,8 +629,8 @@ begin
 end function;
 
 
-function getResultTags(execEnds: InstructionStateArray; 
-						stageDataCQ: InstructionStateArray;
+function getResultTags(execOutputs: InstructionSlotArray; 
+						stageDataCQ: InstructionSlotArray;
 						--schedOutputArr: InstructionSlotArray;
 						--dispatchDataA, dispatchDataB, dispatchDataC, dispatchDataD: InstructionState;
 						lastCommitted: StageDataMulti) 
@@ -579,18 +639,18 @@ return PhysNameArray is
 begin
 	-- CAREFUL! Remember tht empty slots should have 0 as result tag, even though the rest of 
 	--				their state may remain invalid for simplicity!
-	resultTags(0) := execEnds(0).physicalDestArgs.d0;
-	resultTags(1) := execEnds(1).physicalDestArgs.d0;
-	resultTags(2) := execEnds(2).physicalDestArgs.d0;
+	resultTags(0) := execOutputs(0).ins.physicalDestArgs.d0;
+	resultTags(1) := execOutputs(1).ins.physicalDestArgs.d0;
+	resultTags(2) := execOutputs(2).ins.physicalDestArgs.d0;
 	
 	-- CQ slots
 	for i in 0 to CQ_SIZE-1 loop 
-		resultTags(4-1 + i) := stageDataCQ(i).physicalDestArgs.d0;  	
+		resultTags(4-1 + i) := stageDataCQ(i).ins.physicalDestArgs.d0;  	
 	end loop;
 	return resultTags;
 end function;		
 
-function getNextResultTags(execPreEnds: InstructionStateArray;
+function getNextResultTags(execOutputsPre: InstructionSlotArray;
 						schedOutputArr: InstructionSlotArray
 						--dispatchDataA, dispatchDataB, dispatchDataC, dispatchDataD: InstructionState
 						) 
@@ -598,24 +658,24 @@ return PhysNameArray is
 	variable nextResultTags: PhysNameArray(0 to N_NEXT_RES_TAGS-1) := (others=>(others=>'0'));
 begin
 	nextResultTags(0) := schedOutputArr(0).ins.physicalDestArgs.d0; -- sched stage for A	
-	nextResultTags(1) := execPreEnds(1).physicalDestArgs.d0;
+	nextResultTags(1) := execOutputsPre(1).ins.physicalDestArgs.d0;
 	--nextResultTags(2) := execPreEnds(2).physicalDestArgs.d0;
 	return nextResultTags;
 end function;
 
 
-function getResultValues(execEnds: InstructionStateArray; 
-						stageDataCQ: InstructionStateArray;
+function getResultValues(execOutputs: InstructionSlotArray; 
+						stageDataCQ: InstructionSlotArray;
 						lastCommitted: StageDataMulti)
 return MwordArray is
 	variable resultVals: MwordArray(0 to N_RES_TAGS-1) := (others=>(others=>'0'));		
 begin
-	resultVals(0) := execEnds(0).result;
-	resultVals(1) := execEnds(1).result;
-	resultVals(2) := execEnds(2).result;
+	resultVals(0) := execOutputs(0).ins.result;
+	resultVals(1) := execOutputs(1).ins.result;
+	resultVals(2) := execOutputs(2).ins.result;
 			
 	for i in 0 to CQ_SIZE-1 loop 	-- CQ slots
-		resultVals(4-1 + i) := stageDataCQ(i).result;  	
+		resultVals(4-1 + i) := stageDataCQ(i).ins.result;  	
 	end loop;
 	return resultVals;
 end function;	
@@ -1069,6 +1129,67 @@ end function;
 		else
 			return '0';
 		end if;
+	end function;
+
+	function getIssueView(iqOutputArr, schedOutputArr: InstructionSlotArray;
+								 iqAcceptingVecArr: SLVA;
+								 issueAcceptingArr, execAcceptingArr: std_logic_vector)
+	return IssueView is
+		variable res: IssueView := DEFAULT_ISSUE_VIEW;
+		variable queueSendingArr, schedSendingArr: std_logic_vector(0 to 5-1) := (others => '0');
+		variable queueDataArr, schedDataArr: InstructionStateArray(0 to 5-1)
+								:= (others => DEFAULT_INSTRUCTION_STATE);
+	begin
+			queueSendingArr := extractFullMask(iqOutputArr); -- For viewing
+			queueDataArr := extractData(iqOutputArr); -- For viewing
+		
+		res.queueSendingA := queueSendingArr(0);
+		res.queueSendingB := queueSendingArr(1);
+		res.queueSendingC := queueSendingArr(2);
+		res.queueSendingD := queueSendingArr(3);
+		res.queueSendingE := queueSendingArr(4);
+		
+		res.queueDataA := queueDataArr(0);
+		res.queueDataB := queueDataArr(1);
+		res.queueDataC := queueDataArr(2);
+		res.queueDataD := queueDataArr(3);
+		res.queueDataE := queueDataArr(4);
+		
+		res.acceptingVecA := iqAcceptingVecArr(0);
+		res.acceptingVecB := iqAcceptingVecArr(1);
+		res.acceptingVecC := iqAcceptingVecArr(2);
+		res.acceptingVecD := iqAcceptingVecArr(3);
+		res.acceptingVecE := iqAcceptingVecArr(4);
+
+			schedSendingArr := extractFullMask(schedOutputArr); -- Only for viewing
+			schedDataArr := extractData(schedOutputArr); -- Only for viewing
+
+			res.issueAcceptingA := issueAcceptingArr(0);
+			res.issueAcceptingB := issueAcceptingArr(1);
+			res.issueAcceptingC := issueAcceptingArr(2);
+			res.issueAcceptingD := issueAcceptingArr(3);
+			res.issueAcceptingE := issueAcceptingArr(4);
+
+			res.execAcceptingA := execAcceptingArr(0);
+			res.execAcceptingB := execAcceptingArr(1);
+			res.execAcceptingC := execAcceptingArr(2);
+			res.execAcceptingD := execAcceptingArr(3);
+			res.execAcceptingE := execAcceptingArr(4);
+		
+			res.dataOutSchedA := schedDataArr(0);
+			res.dataOutSchedB := schedDataArr(1);
+			res.dataOutSchedC := schedDataArr(2);
+			res.dataOutSchedD := schedDataArr(3);
+			res.dataOutSchedE := schedDataArr(4);
+			
+			-- Not used
+			res.sendingSchedA := schedSendingArr(0);
+			res.sendingSchedB := schedSendingArr(1);
+			res.sendingSchedC := schedSendingArr(2);
+			res.sendingSchedD := schedSendingArr(3);
+			res.sendingSchedE := schedSendingArr(4);		
+		
+		return res;
 	end function;
 
 end GeneralPipeDev;

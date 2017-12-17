@@ -477,12 +477,10 @@ begin
 		--			
 		--			The 'target' field will be used to update return address for exc/int
 		stageDataToCommit <= recreateGroup(robDataLiving, dataFromBQV, dataFromLastEffective.data(0).target);
-		insToLastEffective <= getLastEffective(stageDataToCommit);		
+		insToLastEffective <= getLastEffective(stageDataToCommit);	
 
 		interruptCause <= makeInterruptCause(TMP_targetIns, intSignal, start);
 
-		--dataToLastEffective.fullMask(0) <= sendingToCommit;
-		--dataToLastEffective.data(0) <= insToLastEffective;
 		dataToLastEffective <= makeSDM((0 => (sendingToCommit, insToLastEffective)));
 
 			LAST_EFFECTIVE_SLOT: entity work.GenericStageMulti(LastEffective)
