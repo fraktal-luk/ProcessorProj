@@ -99,20 +99,29 @@ architecture Behavioral of OutOfOrderBox is
 
 	signal memLoadAddress: Mword := (others => '0');
 	
-	signal dataToA, dataToB, dataToC, dataToD, dataToE: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;	
+	--signal dataToA, dataToB, dataToC, dataToD, dataToE: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;	
+	-------------------
 	signal acceptingVecA, acceptingVecB, acceptingVecC, acceptingVecD, acceptingVecE:
 				std_logic_vector(0 to PIPE_WIDTH-1) := (others => '0');
+	signal queueSendingA, queueSendingB, queueSendingC, queueSendingD, queueSendingE: std_logic := '0';
+	signal queueDataA, queueDataB, queueDataC, queueDataD, queueDataE:
+					InstructionState := DEFAULT_INSTRUCTION_STATE;
+	-----------------
+	signal sendingSchedA, sendingSchedB, sendingSchedC, sendingSchedD, sendingSchedE,
+			execAcceptingA, execAcceptingB, execAcceptingC, execAcceptingD, execAcceptingE: std_logic := '0';
+	signal dataOutIQA, dataOutIQB, dataOutIQC, dataOutIQD, dataOutIQE: InstructionState
+																	:= DEFAULT_INSTRUCTION_STATE;
+	---------------
+
+	
+	
 	signal compactedToSQ, compactedToLQ, compactedToBQ: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
 
 	signal acceptingNewSQ, acceptingNewLQ, acceptingNewBQ: std_logic := '0';
 	signal robAccepting: std_logic := '0';	
 
-	signal dataOutIQA, dataOutIQB, dataOutIQC, dataOutIQD, dataOutIQE: InstructionState
-																	:= defaultInstructionState;
-		-- sendingSched* can be unified into InstructionSlot with instructions
-	signal sendingSchedA, sendingSchedB, sendingSchedC, sendingSchedD, sendingSchedE,
-			execAcceptingA, execAcceptingB, execAcceptingC, execAcceptingD, execAcceptingE: std_logic := '0';
-				
+
+	
 	-- Physical register interface
 	signal regsSelA, regsSelB, regsSelC, regsSelD, regsSelE, regsSelCE: PhysNameArray(0 to 2)
 					:= (others => (others => '0'));
@@ -139,9 +148,6 @@ architecture Behavioral of OutOfOrderBox is
 						:= (others => DEFAULT_INSTRUCTION_SLOT);
 	signal cqBufferOutputSig: InstructionSlotArray(0 to CQ_SIZE-1) := (others => DEFAULT_INSTRUCTION_SLOT);
 	
-	signal queueDataA, queueDataB, queueDataC, queueDataD, queueDataE:
-					InstructionState := DEFAULT_INSTRUCTION_STATE;
-	signal queueSendingA, queueSendingB, queueSendingC, queueSendingD, queueSendingE: std_logic := '0';
 	signal issueAcceptingA, issueAcceptingB, issueAcceptingC, issueAcceptingD, issueAcceptingE:
 					std_logic := '0';				
 	signal execOutputs1, execOutputs2, execOutputsPre: InstructionSlotArray(0 to 3)
@@ -157,19 +163,138 @@ architecture Behavioral of OutOfOrderBox is
 	signal iqOutputArr, schedOutputArr: InstructionSlotArray(0 to 4) := (others => DEFAULT_INSTRUCTION_SLOT);
 	signal dataToQueuesArr: StageDataMultiArray(0 to 4) := (others => DEFAULT_STAGE_DATA_MULTI);
 	signal regValsArr: MwordArray(0 to 3*5-1) := (others => (others => '0'));
+	
+
+	type IssueView is record
+		acceptingVecA, acceptingVecB, acceptingVecC, acceptingVecD, acceptingVecE:
+													std_logic_vector(0 to PIPE_WIDTH-1);
+		queueSendingA, queueSendingB, queueSendingC, queueSendingD, queueSendingE: std_logic;
+		queueDataA, queueDataB, queueDataC, queueDataD, queueDataE: InstructionState;
+		---
+		issueAcceptingA, issueAcceptingB, issueAcceptingC, issueAcceptingD, issueAcceptingE: std_logic;
+		sendingSchedA, sendingSchedB, sendingSchedC, sendingSchedD, sendingSchedE,
+			execAcceptingA, execAcceptingB, execAcceptingC, execAcceptingD, execAcceptingE: std_logic;
+		dataOutSchedA, dataOutSchedB, dataOutSchedC, dataOutSchedD, dataOutSchedE: InstructionState;		
+	end record;
+
+	constant DEFAULT_ISSUE_VIEW: IssueView := (
+		acceptingVecA => (others => '0'), 
+		acceptingVecB => (others => '0'), 
+		acceptingVecC => (others => '0'), 
+		acceptingVecD => (others => '0'), 
+		acceptingVecE => (others => '0'),
+		queueSendingA => '0',
+		queueSendingB => '0',
+		queueSendingC => '0',
+		queueSendingD => '0',
+		queueSendingE => '0',
+		queueDataA => DEFAULT_INSTRUCTION_STATE,
+		queueDataB => DEFAULT_INSTRUCTION_STATE,
+		queueDataC => DEFAULT_INSTRUCTION_STATE,
+		queueDataD => DEFAULT_INSTRUCTION_STATE,
+		queueDataE => DEFAULT_INSTRUCTION_STATE,
+		sendingSchedA => '0',
+		sendingSchedB => '0',
+		sendingSchedC => '0',
+		sendingSchedD => '0',
+		sendingSchedE => '0',
+		issueAcceptingA => '0',
+		issueAcceptingB => '0',
+		issueAcceptingC => '0',
+		issueAcceptingD => '0',
+		issueAcceptingE => '0',
+		execAcceptingA => '0',
+		execAcceptingB => '0',
+		execAcceptingC => '0',
+		execAcceptingD => '0',
+		execAcceptingE => '0',
+		dataOutSchedA => DEFAULT_INSTRUCTION_STATE,
+		dataOutSchedB => DEFAULT_INSTRUCTION_STATE,
+		dataOutSchedC => DEFAULT_INSTRUCTION_STATE,
+		dataOutSchedD => DEFAULT_INSTRUCTION_STATE,
+		dataOutSchedE => DEFAULT_INSTRUCTION_STATE		
+	);
+	
+	signal theIssueView: IssueView := DEFAULT_ISSUE_VIEW;
+	
+	function getIssueView(iqOutputArr, schedOutputArr: InstructionSlotArray;
+								 iqAcceptingVecArr: SLVA;
+								 issueAcceptingArr, execAcceptingArr: std_logic_vector)
+	return IssueView is
+		variable res: IssueView := DEFAULT_ISSUE_VIEW;
+		variable queueSendingArr, schedSendingArr: std_logic_vector(0 to 5-1) := (others => '0');
+		variable queueDataArr, schedDataArr: InstructionStateArray(0 to 5-1)
+								:= (others => DEFAULT_INSTRUCTION_STATE);
+	begin
+			queueSendingArr := extractFullMask(iqOutputArr); -- For viewing
+			queueDataArr := extractData(iqOutputArr); -- For viewing
+		
+		res.queueSendingA := queueSendingArr(0);
+		res.queueSendingB := queueSendingArr(1);
+		res.queueSendingC := queueSendingArr(2);
+		res.queueSendingD := queueSendingArr(3);
+		res.queueSendingE := queueSendingArr(4);
+		
+		res.queueDataA := queueDataArr(0);
+		res.queueDataB := queueDataArr(1);
+		res.queueDataC := queueDataArr(2);
+		res.queueDataD := queueDataArr(3);
+		res.queueDataE := queueDataArr(4);
+		
+		res.acceptingVecA := iqAcceptingVecArr(0);
+		res.acceptingVecB := iqAcceptingVecArr(1);
+		res.acceptingVecC := iqAcceptingVecArr(2);
+		res.acceptingVecD := iqAcceptingVecArr(3);
+		res.acceptingVecE := iqAcceptingVecArr(4);
+
+			schedSendingArr := extractFullMask(schedOutputArr); -- Only for viewing
+			schedDataArr := extractData(schedOutputArr); -- Only for viewing
+
+			res.issueAcceptingA := issueAcceptingArr(0);
+			res.issueAcceptingB := issueAcceptingArr(1);
+			res.issueAcceptingC := issueAcceptingArr(2);
+			res.issueAcceptingD := issueAcceptingArr(3);
+			res.issueAcceptingE := issueAcceptingArr(4);
+
+			res.execAcceptingA := execAcceptingArr(0);
+			res.execAcceptingB := execAcceptingArr(1);
+			res.execAcceptingC := execAcceptingArr(2);
+			res.execAcceptingD := execAcceptingArr(3);
+			res.execAcceptingE := execAcceptingArr(4);
+		
+			res.dataOutSchedA := schedDataArr(0);
+			res.dataOutSchedB := schedDataArr(1);
+			res.dataOutSchedC := schedDataArr(2);
+			res.dataOutSchedD := schedDataArr(3);
+			res.dataOutSchedE := schedDataArr(4);
+			
+			-- Not used
+			res.sendingSchedA := schedSendingArr(0);
+			res.sendingSchedB := schedSendingArr(1);
+			res.sendingSchedC := schedSendingArr(2);
+			res.sendingSchedD := schedSendingArr(3);
+			res.sendingSchedE := schedSendingArr(4);		
+		
+		return res;
+	end function;
+
 begin		
 	resetSig <= reset;
 	enSig <= en;
+		
+	theIssueView <= getIssueView(iqOutputArr, schedOutputArr,
+								 iqAcceptingVecArr,
+								 issueAcceptingArr, execAcceptingArr);
 		
 			ISSUE_ROUTING: entity work.SubunitIssueRouting(Behavioral)
 			port map(
 				renamedDataLiving => renamedDataLiving,
 
-				acceptingVecA => acceptingVecA,
-				acceptingVecB => acceptingVecB,
-				acceptingVecC => acceptingVecC,
-				acceptingVecD => acceptingVecD,
-				acceptingVecE => acceptingVecE,
+				acceptingVecA => iqAcceptingVecArr(0),
+				acceptingVecB => iqAcceptingVecArr(1),
+				acceptingVecC => iqAcceptingVecArr(2),
+				acceptingVecD => iqAcceptingVecArr(3),
+				acceptingVecE => iqAcceptingVecArr(4),
 
 				acceptingROB => robAccepting,
 				acceptingSQ => acceptingNewSQ,
@@ -181,18 +306,18 @@ begin
 				renamedSendingOut => open, -- DEPREC??
 				iqAccepts => iqAccepts,		
 				
-				dataOutA => dataToA,
-				dataOutB => dataToB,
-				dataOutC => dataToC,
-				dataOutD => dataToD,
-				dataOutE => dataToE,
+				dataOutA => dataToQueuesArr(0),--dataToA,
+				dataOutB => dataToQueuesArr(1),--dataToB,
+				dataOutC => dataToQueuesArr(2),--dataToC,
+				dataOutD => dataToQueuesArr(3),--dataToD,
+				dataOutE => dataToQueuesArr(4),--dataToE,
 				
 				dataOutSQ => compactedToSQ,
 				dataOutLQ => compactedToLQ,
 				dataOutBQ => compactedToBQ
 			);
 
-		dataToQueuesArr <= (dataToA, dataToB, dataToC, dataToD, dataToE);
+		--dataToQueuesArr <= (dataToA, dataToB, dataToC, dataToD, dataToE);
 		ISSUE_QUEUES: for letter in 'A' to 'E' generate
 			constant i: integer := character'pos(letter) - character'pos('A');
 		begin
@@ -217,8 +342,8 @@ begin
 			);
 		end generate;
 			
-			queueSendingArr <= extractFullMask(iqOutputArr);
-			queueDataArr <= extractData(iqOutputArr);
+			queueSendingArr <= extractFullMask(iqOutputArr); -- For viewing
+			queueDataArr <= extractData(iqOutputArr); -- For viewing
 		
 		-- Not used, for viewing
 		queueSendingA <= queueSendingArr(0);
@@ -227,28 +352,53 @@ begin
 		queueSendingD <= queueSendingArr(3);
 		queueSendingE <= queueSendingArr(4);
 		
-		-- Used once
+		-- Not used
 		queueDataA <= queueDataArr(0);
 		queueDataB <= queueDataArr(1);
 		queueDataC <= queueDataArr(2);
 		queueDataD <= queueDataArr(3);
 		queueDataE <= queueDataArr(4);
 		
-		-- Used
+		-- Not used
 		acceptingVecA <= iqAcceptingVecArr(0);
 		acceptingVecB <= iqAcceptingVecArr(1);
 		acceptingVecC <= iqAcceptingVecArr(2);
 		acceptingVecD <= iqAcceptingVecArr(3);
 		acceptingVecE <= iqAcceptingVecArr(4);
 
+			sendingSchedArr <= extractFullMask(schedOutputArr); -- Only for viewing
+			schedDataArr <= extractData(schedOutputArr); -- Only for viewing
+
+			-- Unused, only for viewing purpose
+			issueAcceptingA <= issueAcceptingArr(0);
+			issueAcceptingB <= issueAcceptingArr(1);
+			issueAcceptingC <= issueAcceptingArr(2);
+			issueAcceptingD <= issueAcceptingArr(3);
+			issueAcceptingE <= issueAcceptingArr(4);
+			
+			-- No used
+			dataOutIQA <= schedDataArr(0);
+			dataOutIQB <= schedDataArr(1);
+			dataOutIQC <= schedDataArr(2);
+			dataOutIQD <= schedDataArr(3);
+			dataOutIQE <= schedDataArr(4);
+			
+			-- Not used
+			sendingSchedA <= sendingSchedArr(0);
+			sendingSchedB <= sendingSchedArr(1);
+			sendingSchedC <= sendingSchedArr(2);
+			sendingSchedD <= sendingSchedArr(3);
+			sendingSchedE <= sendingSchedArr(4);
+
+
 		EXEC_AREA: block
 			constant USE_IMM_VEC: std_logic_vector(0 to 4) := "10110";
 		begin
-			regsSelA <= getPhysicalSources(queueDataA);
-			regsSelB <= getPhysicalSources(queueDataB);
-			regsSelC <= getPhysicalSources(queueDataC);
-			regsSelD <= getPhysicalSources(queueDataD);
-			regsSelE <= getPhysicalSources(queueDataE);
+			regsSelA <= getPhysicalSources(iqOutputArr(0).ins);
+			regsSelB <= getPhysicalSources(iqOutputArr(1).ins);
+			regsSelC <= getPhysicalSources(iqOutputArr(2).ins);
+			regsSelD <= getPhysicalSources(iqOutputArr(3).ins);
+			regsSelE <= getPhysicalSources(iqOutputArr(4).ins);
 
 			regValsArr <= regValsA & regValsB & regValsC & regValsD & regValsE;
 			execAcceptingArr <= (execAcceptingA, execAcceptingB, execAcceptingC,
@@ -277,30 +427,6 @@ begin
 				);			
 			end generate;
 			
-				sendingSchedArr <= extractFullMask(schedOutputArr);
-				schedDataArr <= extractData(schedOutputArr);
-			
-			-- Unused, only for viewing purpose
-			issueAcceptingA <= issueAcceptingArr(0);
-			issueAcceptingB <= issueAcceptingArr(1);
-			issueAcceptingC <= issueAcceptingArr(2);
-			issueAcceptingD <= issueAcceptingArr(3);
-			issueAcceptingE <= issueAcceptingArr(4);
-			
-			-- This IS used
-			dataOutIQA <= schedDataArr(0);
-			dataOutIQB <= schedDataArr(1);
-			dataOutIQC <= schedDataArr(2);
-			dataOutIQD <= schedDataArr(3);
-			dataOutIQE <= schedDataArr(4);
-			
-			-- This is used probably once
-			sendingSchedA <= sendingSchedArr(0);
-			sendingSchedB <= sendingSchedArr(1);
-			sendingSchedC <= sendingSchedArr(2);
-			sendingSchedD <= sendingSchedArr(3);
-			sendingSchedE <= sendingSchedArr(4);
-			
 			EXEC_BLOCK: entity work.UnitExec(Implem)
 			port map(
 				clk => clk, reset => resetSig, en => enSig,
@@ -309,9 +435,12 @@ begin
 				execAcceptingB => execAcceptingB,				
 				execAcceptingD => execAcceptingD,
 
-				inputA => (sendingSchedA, dataOutIQA),
-				inputB => (sendingSchedB, dataOutIQB),
-				inputD => (sendingSchedD, dataOutIQD),
+				inputA => --(sendingSchedA, dataOutIQA),
+								schedOutputArr(0),
+				inputB => --(sendingSchedB, dataOutIQB),
+								schedOutputArr(1),
+				inputD => --(sendingSchedD, dataOutIQD),
+								schedOutputArr(3),
 				
 				outputA => outputA,
 				outputB => outputB,
@@ -345,8 +474,10 @@ begin
 					execAcceptingC => execAcceptingC,
 					execAcceptingE => execAcceptingE,
 
-					inputC => (sendingSchedC, dataOutIQC),
-					inputE => (sendingSchedE, dataOutIQE),
+					inputC => --(sendingSchedC, dataOutIQC),
+								schedOutputArr(2),
+					inputE => --(sendingSchedE, dataOutIQE),
+								schedOutputArr(4),
 
 					acceptingNewSQ => acceptingNewSQ,
 					acceptingNewLQ => acceptingNewLQ,
@@ -441,8 +572,14 @@ begin
 	fni.writtenTags <=
 					getPhysicalDests(stageDataAfterCQ) when CQ_SINGLE_OUTPUT else (others => (others => '0'));
 	fni.resultTags <= getResultTags(execEnds, extractData(cqBufferOutputSig),
-										dataOutIQA, dataOutIQB, dataOutIQC, dataOutIQD, DEFAULT_STAGE_DATA_MULTI);
-	fni.nextResultTags <= getNextResultTags(execPreEnds, dataOutIQA, dataOutIQB, dataOutIQC, dataOutIQD);
+										--schedOutputArr,
+										--dataOutIQA, dataOutIQB, dataOutIQC, dataOutIQD, 
+										DEFAULT_STAGE_DATA_MULTI
+										);
+	fni.nextResultTags <= getNextResultTags(execPreEnds,
+										schedOutputArr
+										--dataOutIQA, dataOutIQB, dataOutIQC, dataOutIQD
+										);
 	fni.resultValues <= getResultValues(execEnds, extractData(cqBufferOutputSig), DEFAULT_STAGE_DATA_MULTI);
 					
 				-- Int register block

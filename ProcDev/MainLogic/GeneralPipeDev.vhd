@@ -121,12 +121,15 @@ function getWrittenTags(lastCommitted: StageDataMulti) return PhysNameArray; -- 
 
 function getResultTags(execEnds: InstructionStateArray;
 			stageDataCQ: InstructionStateArray;
-			dispatchDataA, dispatchDataB, dispatchDataC, dispatchDataD: InstructionState;
+			--schedOutputArr: InstructionSlotArray;
+			--dispatchDataA, dispatchDataB, dispatchDataC, dispatchDataD: InstructionState;
 			lastCommitted: StageDataMulti) 
 return PhysNameArray;
 
 function getNextResultTags(execPreEnds: InstructionStateArray;
-			dispatchDataA, dispatchDataB, dispatchDataC, dispatchDataD: InstructionState) 
+			schedOutputArr: InstructionSlotArray
+			--dispatchDataA, dispatchDataB, dispatchDataC, dispatchDataD: InstructionState
+			)
 return PhysNameArray;
 	
 function getResultValues(execEnds: InstructionStateArray; 
@@ -568,7 +571,8 @@ end function;
 
 function getResultTags(execEnds: InstructionStateArray; 
 						stageDataCQ: InstructionStateArray;
-						dispatchDataA, dispatchDataB, dispatchDataC, dispatchDataD: InstructionState;
+						--schedOutputArr: InstructionSlotArray;
+						--dispatchDataA, dispatchDataB, dispatchDataC, dispatchDataD: InstructionState;
 						lastCommitted: StageDataMulti) 
 return PhysNameArray is
 	variable resultTags: PhysNameArray(0 to N_RES_TAGS-1) := (others=>(others=>'0'));	
@@ -587,11 +591,13 @@ begin
 end function;		
 
 function getNextResultTags(execPreEnds: InstructionStateArray;
-						dispatchDataA, dispatchDataB, dispatchDataC, dispatchDataD: InstructionState) 
+						schedOutputArr: InstructionSlotArray
+						--dispatchDataA, dispatchDataB, dispatchDataC, dispatchDataD: InstructionState
+						) 
 return PhysNameArray is
 	variable nextResultTags: PhysNameArray(0 to N_NEXT_RES_TAGS-1) := (others=>(others=>'0'));
 begin
-	nextResultTags(0) := dispatchDataA.physicalDestArgs.d0;	
+	nextResultTags(0) := schedOutputArr(0).ins.physicalDestArgs.d0; -- sched stage for A	
 	nextResultTags(1) := execPreEnds(1).physicalDestArgs.d0;
 	--nextResultTags(2) := execPreEnds(2).physicalDestArgs.d0;
 	return nextResultTags;
