@@ -21,6 +21,16 @@ use work.GeneralPipeDev.all;
 
 
 package ProcLogicSequence is
+
+type GeneralEventInfo is record
+	eventOccured: std_logic;
+		killPC: std_logic;
+	causing: InstructionState;
+end record;
+
+constant DEFAULT_GENERAL_EVENT_INFO: GeneralEventInfo := (eventOccured => '0', killPC => '0',
+																			 causing => DEFAULT_INS_STATE);
+
 		-- group:  revTag = causing.groupTag and i2slv(-PIPE_WIDTH, SMALL_NUMBER_SIZE), mask = all ones
 		-- sequential: revTag = causing.numberTag, mask = new group's fullMask		
 		function nextCtr(ctr: SmallNumber; rewind: std_logic; revTag: SmallNumber;
@@ -206,9 +216,9 @@ end function;
 										frontEvent: std_logic; frontCausing: InstructionState;
 										pcNext: Mword)
 	return GeneralEventInfo is
-		variable res: GeneralEventInfo;
+		variable res: GeneralEventInfo := DEFAULT_GENERAL_EVENT_INFO;
 	begin
-		res.affectedVec := (others => '0');
+		--res.affectedVec := (others => '0');
 		res.eventOccured := '1';
 			res.killPC := '0';
 			

@@ -27,6 +27,12 @@ use std.textio.all;
 
 package ProcLogicROB is
 
+type StageDataROB is record
+	fullMask: std_logic_vector(0 to ROB_SIZE-1); 
+	data: StageDataMultiArray(0 to ROB_SIZE-1);
+end record;
+
+
 -- pragma synthesis off
 procedure logROBImplem(sd, sdl: StageDataROB; fr: FlowResponseBuffer;
 								filename: string; desc: string);

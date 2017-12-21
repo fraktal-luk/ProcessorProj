@@ -69,9 +69,6 @@ package NewPipelineData is
 	constant ROB_SIZE: natural := 8; -- ??
 	
 		type MemQueueMode is (none, store, load, branch);
-	
-		constant INITIAL_GROUP_TAG: SmallNumber := (others => '0');
-															-- i2slv(-PIPE_WIDTH, SMALL_NUMBER_SIZE)
 		
 		-- Allows to raise 'lockSend' for instruction before Exec when source which was 'readyNext'
 		--	doesn't show in 'ready'	when expected	
@@ -93,48 +90,52 @@ package NewPipelineData is
 	subtype PhysName is std_logic_vector(PHYS_NAME_SIZE-1 downto 0);
 	type PhysNameArray is array(natural range <>) of PhysName;
 
-	constant TAG_SIZE: integer := 8;
-	subtype InsTag is std_logic_vector(TAG_SIZE-1 downto 0);
-
-	function getTagHigh(tag: std_logic_vector) return std_logic_vector;
-	function getTagLow(tag: std_logic_vector) return std_logic_vector;
-	function getTagHighSN(tag: SmallNumber) return SmallNumber;
-	function getTagLowSN(tag: SmallNumber) return SmallNumber;	
-	function clearTagLow(tag: std_logic_vector) return std_logic_vector;	
-	function clearTagHigh(tag: std_logic_vector) return std_logic_vector;	
-	function alignAddress(adr: std_logic_vector) return std_logic_vector;
-	function clearLowBits(vec: std_logic_vector; n: integer) return std_logic_vector;
-	function getLowBits(vec: std_logic_vector; n: integer) return std_logic_vector;
-
-constant PROCESSOR_ID: Mword := X"001100aa";
+	constant PROCESSOR_ID: Mword := X"001100aa";
 
 type ExecUnit is (General, ALU, MAC, Divide, Jump, Memory, System );
-type ExecFunc is (unknown,	
-										arithAdd, arithSub, arithShra,
-										logicAnd, logicOr, logicShl, logicShrl,
-										
-										mulS, mulU, 
-									
-										divS, divU,
-										
-										load, store,
-										
-										jump,
-										
-										sysRetI, sysRetE,
-										sysHalt,
-										sysSync, sysReplay,
-										sysMTC, sysMFC, -- move to/from control
-										sysError,
-										
-										sysUndef
-							);	
+type ExecFunc is (unknown,
+
+						arithAdd, arithSub, arithShra,
+						logicAnd, logicOr, logicShl, logicShrl,
+						
+						mulS, mulU, 
+					
+						divS, divU,
+						
+						load, store,
+						
+						jump,
+						
+						sysRetI, sysRetE,
+						sysHalt,
+						sysSync, sysReplay,
+						sysMTC, sysMFC, -- move to/from control
+						sysError,
+						
+						sysUndef
+						);	
+
+
+constant TAG_SIZE: integer := 8;
+subtype InsTag is std_logic_vector(TAG_SIZE-1 downto 0);
+
+function getTagHigh(tag: std_logic_vector) return std_logic_vector;
+function getTagLow(tag: std_logic_vector) return std_logic_vector;
+function getTagHighSN(tag: SmallNumber) return SmallNumber;
+function getTagLowSN(tag: SmallNumber) return SmallNumber;	
+function clearTagLow(tag: std_logic_vector) return std_logic_vector;	
+function clearTagHigh(tag: std_logic_vector) return std_logic_vector;	
+function alignAddress(adr: std_logic_vector) return std_logic_vector;
+function clearLowBits(vec: std_logic_vector; n: integer) return std_logic_vector;
+function getLowBits(vec: std_logic_vector; n: integer) return std_logic_vector;
+
+constant INITIAL_GROUP_TAG: SmallNumber := (others => '0');
+
 							
 type BinomialOp is record
 	unit: ExecUnit;
 	func: ExecFunc;
 end record;
-
 
 type InstructionBasicInfo is record
 	ip: Mword;
@@ -247,141 +248,6 @@ type InstructionStateArray is array(integer range <>) of InstructionState;
 -- Number of words proper for fetch group size
 subtype InsGroup is WordArray(0 to PIPE_WIDTH-1);
 
--- Flow definitions / CAREFUL, TODO: move to GeneralPipeDev?
-
--- Flow control: input structure
-type FlowDriveSimple is record
-	lockAccept: std_logic;
-	lockSend: std_logic;
-	kill: std_logic;
-	prevSending: std_logic;
-	nextAccepting: std_logic;	
-end record;
-
--- Flow control: output structure
-type FlowResponseSimple is record
-	accepting: std_logic;
-	sending: std_logic;
-	isNew: std_logic;
-	full: std_logic;
-	living: std_logic;	
-end record;
-
-		type ContentStateSimple is record
-			isFull: std_logic;
-			isNew: std_logic;
-		end record;
-
-constant DEFAULT_FD_SIMPLE: FlowDriveSimple := FlowDriveSimple'(others => '0');
-constant DEFAULT_FR_SIMPLE: FlowResponseSimple := FlowResponseSimple'(others => '0');
-constant DEFAULT_CS_SIMPLE: ContentStateSimple := ContentStateSimple'(others => '0');
-
-		-- CAREFUL: below functions for Simple slot have some duplicate code
-		function nextContentState(cs: ContentStateSimple; drive: FlowDriveSimple; reset, en: std_logic)
-		return ContentStateSimple is
-			variable res: ContentStateSimple := cs;
-			variable isNewSig: std_logic := '0';
-			variable fullSig: std_logic := '0';
-			variable livingSig: std_logic := '0';		
-			
-			variable canAccept: std_logic := '0';
-			variable wantSend: std_logic := '0';
-			variable acceptingSig: std_logic := '0';
-			variable sendingSig: std_logic := '0';	
-
-			variable afterSending: std_logic := '0';
-			variable afterReceiving: std_logic := '0';			
-		begin
-			if reset = '1' then
-				res.isFull := '0';
-				res.isNew := '0';
-			elsif en = '0' then -- If no enable, don't change
-				return res;
-			end if;
-			
-			livingSig := cs.isFull and not drive.kill; -- CHECK: killing mechanism correct?
-
-			canAccept := not drive.lockAccept;
-			wantSend := livingSig and not drive.lockSend;
-			
-			-- Determine what will be sent
-			sendingSig := drive.nextAccepting and wantSend;
-			afterSending := livingSig and not sendingSig;
-
-			-- Determine what will be received
-			acceptingSig := canAccept and not afterSending;	
-			afterReceiving := afterSending or drive.prevSending;
-			
-			res.isFull := afterReceiving;
-			res.isNew := drive.prevSending;
-			
-			return res;
-		end function;
-		
-		
-		function getResponse(cs: ContentStateSimple; drive: FlowDriveSimple) return FlowResponseSimple is
-			variable res: FlowResponseSimple;
-			variable isNewSig: std_logic := '0';
-			variable fullSig: std_logic := '0';
-			variable livingSig: std_logic := '0';		
-			
-			variable canAccept: std_logic := '0';
-			variable wantSend: std_logic := '0';
-			variable acceptingSig: std_logic := '0';
-			variable sendingSig: std_logic := '0';	
-
-			variable afterSending: std_logic := '0';
-			variable afterReceiving: std_logic := '0';			
-		begin
-
-			livingSig := cs.isFull and not drive.kill; -- CHECK: killing mechanism correct?
-
-			canAccept := not drive.lockAccept;
-			wantSend := livingSig and not drive.lockSend;
-			
-			-- Determine what will be sent
-			sendingSig := drive.nextAccepting and wantSend;
-			afterSending := livingSig and not sendingSig;
-
-			-- Determine what will be received
-			acceptingSig := canAccept and not afterSending;	
-			afterReceiving := afterSending or drive.prevSending;
-
-			res.sending := sendingSig;
-			res.accepting := acceptingSig;
-			res.full := cs.isFull;	
-			res.living := livingSig;	
-			res.isNew := cs.isNew;
-					
-			return res;
-		end function;
-
-
--- Input structure
-type FlowDriveBuffer is record
-	lockAccept: std_logic;
-	lockSend: std_logic;
-	killAll: std_logic;
-	kill: SmallNumber;
-	prevSending: SmallNumber;
-	nextAccepting: SmallNumber;	
-end record;
-
--- Output structure
-type FlowResponseBuffer is record
-	accepting: SmallNumber;
-	sending: SmallNumber;
-	isNew: SmallNumber;
-	full: SmallNumber;
-	living: SmallNumber;	
-end record;
-
-	subtype PipeFlow is SmallNumber;
-
--- Use this to convert PipeFlow to numbers 
-function binFlowNum(flow: PipeFlow) return natural;
-function num2flow(n: natural) return PipeFlow;
-
 
 function defaultBasicInfo return InstructionBasicInfo;
 function defaultControlInfo return InstructionControlInfo;
@@ -420,7 +286,6 @@ constant DEFAULT_INS_SLOT: InstructionSlot := ('0', defaultInstructionState);
 -- NOTE: index can be negative to enable logical division into 2 different ranges 
 type InstructionSlotArray is array(integer range <>) of InstructionSlot;
 
-
 type StageDataMulti is record
 	fullMask: std_logic_vector(0 to PIPE_WIDTH-1);
 	data: InstructionStateArray(0 to PIPE_WIDTH-1);	
@@ -428,23 +293,10 @@ end record;
 
 constant DEFAULT_STAGE_DATA_MULTI: StageDataMulti := (fullMask=>(others=>'0'),
 																		data=>(others=>defaultInstructionState)
-																		);	
+																		);
 
+type StageDataMultiArray is array (integer range <>) of StageDataMulti;
 
-type StageDataCommitQueue is record
-	fullMask: std_logic_vector(0 to CQ_SIZE-1); 
-	data: InstructionStateArray(0 to CQ_SIZE-1);
-end record;
-
-	type StageDataMultiArray is array (integer range <>) of StageDataMulti;
-
-	type StageDataROB is record
-		fullMask: std_logic_vector(0 to ROB_SIZE-1); 
-		data: StageDataMultiArray(0 to ROB_SIZE-1);
-	end record;
-
-
-function initialPCData return InstructionState;
 
 constant INITIAL_PC: Mword := i2slv(-PIPE_WIDTH*4, MWORD_SIZE);
 
@@ -453,72 +305,21 @@ constant INITIAL_BASIC_INFO: InstructionBasicInfo := (ip => INITIAL_PC,
 																		intLevel => (others => '0'));																		
 
 constant DEFAULT_DATA_PC: InstructionState := defaultInstructionState;
-constant INITIAL_DATA_PC: InstructionState := initialPCData;
 
 constant DEFAULT_ANNOTATED_HWORD: InstructionState := defaultInstructionState;
-	
-	-- CAREFUL! Only needed for 1 function (a possible optimization idea, may be implemented with I.Slot.Arr.)
-	type StageDataHbuffer is record
-		fullMask: std_logic_vector(0 to HBUFFER_SIZE-1);
-		data: InstructionStateArray(0 to HBUFFER_SIZE-1);
-	end record;
-	
-	constant DEFAULT_STAGE_DATA_HBUFFER: StageDataHbuffer := 
-		(fullMask => (others => '0'), data => (others => DEFAULT_ANNOTATED_HWORD));
 
-type HbuffOutData is record
-	sd: StageDataMulti;
-	nOut: SmallNumber;
-	nHOut: SmallNumber;
-end record;
-
-
-type GeneralEventInfo is record
-	eventOccured: std_logic;
-		killPC: std_logic;
-	causing: InstructionState;
-	affectedVec: std_logic_vector(0 to 4);		
-end record;
-
- 
-type StageMultiEventInfo is record
-	eventOccured: std_logic;
-	causing: InstructionState;
-	partialKillMask: std_logic_vector(0 to PIPE_WIDTH-1);
-end record;
-
-constant DEFAULT_STAGE_MULTI_EVENT_INFO: StageMultiEventInfo
-													:= (eventOccured => '0',
-														  causing => defaultInstructionState,
-														  partialKillMask => (others => '0'));
 					
-			type ArgStatusInfo is record
-				stored: std_logic_vector(0 to 2); -- those that were already present in prev cycle	
-				written: std_logic_vector(0 to 2);
-				ready: std_logic_vector(0 to 2);
-				locs: SmallNumberArray(0 to 2);
-				--vals: MwordArray(0 to 2);
-				nextReady: std_logic_vector(0 to 2);
-				nextLocs: SmallNumberArray(0 to 2);
-			end record;
+type ArgStatusInfo is record
+	stored: std_logic_vector(0 to 2); -- those that were already present in prev cycle	
+	written: std_logic_vector(0 to 2);
+	ready: std_logic_vector(0 to 2);
+	locs: SmallNumberArray(0 to 2);
+	--vals: MwordArray(0 to 2);
+	nextReady: std_logic_vector(0 to 2);
+	nextLocs: SmallNumberArray(0 to 2);
+end record;
 
-			type ArgStatusInfoArray is array(integer range <>) of ArgStatusInfo;
-
-	function defaultLastCommitted return InstructionState;
-
-	type ForwardingInfo is record
-		writtenTags: PhysNameArray(0 to PIPE_WIDTH-1);
-		resultTags: PhysNameArray(0 to N_RES_TAGS-1);
-		nextResultTags: PhysNameArray(0 to N_NEXT_RES_TAGS-1);
-		resultValues: MwordArray(0 to N_RES_TAGS-1);
-	end record;
-	
-	constant DEFAULT_FORWARDING_INFO: ForwardingInfo := (
-		writtenTags => (others => (others => '0')),
-		resultTags => (others => (others => '0')),
-		nextResultTags => (others => (others => '0')),
-		resultValues => (others => (others => '0'))
-	);
+type ArgStatusInfoArray is array(integer range <>) of ArgStatusInfo;
 
 end NewPipelineData;
 
@@ -526,86 +327,71 @@ end NewPipelineData;
 
 package body NewPipelineData is
 
-	function getTagHigh(tag: std_logic_vector) return std_logic_vector is
-		variable res: std_logic_vector(tag'high-LOG2_PIPE_WIDTH downto 0) := (others => '0');
-	begin
-		res := tag(tag'high downto LOG2_PIPE_WIDTH);
-		return res;
-	end function;
-
-	function getTagLow(tag: std_logic_vector) return std_logic_vector is
-		variable res: std_logic_vector(LOG2_PIPE_WIDTH-1 downto 0) := (others => '0');
-	begin
-		res := tag(LOG2_PIPE_WIDTH-1 downto 0);
-		return res;
-	end function;
-
-		function getTagHighSN(tag: SmallNumber) return SmallNumber is
-			variable res: SmallNumber := (others => '0');
-		begin
-			res(SMALL_NUMBER_SIZE-1-LOG2_PIPE_WIDTH downto 0) := tag(SMALL_NUMBER_SIZE-1 downto LOG2_PIPE_WIDTH);
-			return res;
-		end function;
-
-		function getTagLowSN(tag: SmallNumber) return SmallNumber is
-			variable res: SmallNumber := (others => '0');
-		begin
-			res(LOG2_PIPE_WIDTH-1 downto 0) := tag(LOG2_PIPE_WIDTH-1 downto 0);
-			return res;
-		end function;
-
-
-	function clearTagLow(tag: std_logic_vector) return std_logic_vector is
-		variable res: std_logic_vector(tag'high downto 0) := (others => '0');
-	begin
-		res := tag;
-		res(LOG2_PIPE_WIDTH-1 downto 0) := (others => '0');
-		return res;
-	end function;	
-
-	function clearTagHigh(tag: std_logic_vector) return std_logic_vector is
-		variable res: std_logic_vector(tag'high downto 0) := (others => '0');
-	begin
-		res := tag;
-		res(tag'high downto LOG2_PIPE_WIDTH) := (others => '0');
-		return res;
-	end function;
-
-	function alignAddress(adr: std_logic_vector) return std_logic_vector is
-		variable res: std_logic_vector(adr'high downto 0) := (others => '0');
-	begin
-		res := adr;
-		res(ALIGN_BITS-1 downto 0) := (others => '0');
-		return res;
-	end function;
-
-	function clearLowBits(vec: std_logic_vector; n: integer) return std_logic_vector is
-		variable res: std_logic_vector(vec'high downto 0) := (others => '0');
-	begin
-		res := vec;
-		res(n-1 downto 0) := (others => '0');
-		return res;
-	end function;
-	
-	function getLowBits(vec: std_logic_vector; n: integer) return std_logic_vector is
-		variable res: std_logic_vector(n-1 downto 0) := (others => '0');
-	begin
-		res(n-1 downto 0) := vec(n-1 downto 0);
-		return res;
-	end function;
-
-
-function binFlowNum(flow: PipeFlow) return natural is
-	variable vec: std_logic_vector(PipeFlow'length-1 downto 0) := flow;
+function getTagHigh(tag: std_logic_vector) return std_logic_vector is
+	variable res: std_logic_vector(tag'high-LOG2_PIPE_WIDTH downto 0) := (others => '0');
 begin
-	return slv2u(vec);
+	res := tag(tag'high downto LOG2_PIPE_WIDTH);
+	return res;
 end function;
 
-function num2flow(n: natural) return PipeFlow is
-	variable res: PipeFlow := (others=>'0');
-	variable b: natural := n;
-begin	
-	res := i2slv(n, PipeFlow'length);
+function getTagLow(tag: std_logic_vector) return std_logic_vector is
+	variable res: std_logic_vector(LOG2_PIPE_WIDTH-1 downto 0) := (others => '0');
+begin
+	res := tag(LOG2_PIPE_WIDTH-1 downto 0);
+	return res;
+end function;
+
+function getTagHighSN(tag: SmallNumber) return SmallNumber is
+	variable res: SmallNumber := (others => '0');
+begin
+	res(SMALL_NUMBER_SIZE-1-LOG2_PIPE_WIDTH downto 0) := tag(SMALL_NUMBER_SIZE-1 downto LOG2_PIPE_WIDTH);
+	return res;
+end function;
+
+function getTagLowSN(tag: SmallNumber) return SmallNumber is
+	variable res: SmallNumber := (others => '0');
+begin
+	res(LOG2_PIPE_WIDTH-1 downto 0) := tag(LOG2_PIPE_WIDTH-1 downto 0);
+	return res;
+end function;
+
+
+function clearTagLow(tag: std_logic_vector) return std_logic_vector is
+	variable res: std_logic_vector(tag'high downto 0) := (others => '0');
+begin
+	res := tag;
+	res(LOG2_PIPE_WIDTH-1 downto 0) := (others => '0');
+	return res;
+end function;	
+
+function clearTagHigh(tag: std_logic_vector) return std_logic_vector is
+	variable res: std_logic_vector(tag'high downto 0) := (others => '0');
+begin
+	res := tag;
+	res(tag'high downto LOG2_PIPE_WIDTH) := (others => '0');
+	return res;
+end function;
+
+function alignAddress(adr: std_logic_vector) return std_logic_vector is
+	variable res: std_logic_vector(adr'high downto 0) := (others => '0');
+begin
+	res := adr;
+	res(ALIGN_BITS-1 downto 0) := (others => '0');
+	return res;
+end function;
+
+function clearLowBits(vec: std_logic_vector; n: integer) return std_logic_vector is
+	variable res: std_logic_vector(vec'high downto 0) := (others => '0');
+begin
+	res := vec;
+	res(n-1 downto 0) := (others => '0');
+	return res;
+end function;
+
+function getLowBits(vec: std_logic_vector; n: integer) return std_logic_vector is
+	variable res: std_logic_vector(n-1 downto 0) := (others => '0');
+begin
+	res(n-1 downto 0) := vec(n-1 downto 0);
 	return res;
 end function;
 
@@ -723,37 +509,5 @@ begin
 	res.target := (others => '0');
 	return res;
 end function;
-
-
-function initialPCData return InstructionState is
-	variable res: InstructionState := defaultInstructionState;
-begin
-	res.basicInfo := INITIAL_BASIC_INFO;
-	return res;
-end function;
-
-
-	function defaultLastCommitted return InstructionState is
-		variable res: InstructionState;
-	begin
-		res.controlInfo := defaultControlInfo;
-		res.basicInfo := defaultBasicInfo;
-		res.bits := (others=>'0');
-		--res.operation := BinomialOp'(unknown, unknown);
-		res.classInfo := defaultClassInfo;
-		res.constantArgs := defaultConstantArgs;
-		res.virtualArgs := defaultVirtualArgs;
-		res.virtualDestArgs := defaultVirtualDestArgs;
-		res.physicalArgs := defaultPhysicalArgs;
-		res.physicalDestArgs := defaultPhysicalDestArgs;
-		res.numberTag := (others => '1');
-		res.gprTag := (others => '0');
-		res.groupTag := INITIAL_GROUP_TAG;
-		res.argValues := defaultArgValues;
-		res.result := (others => '0');
-		res.target := (others => '0');
-		return res;
-	end function;
-
 
 end NewPipelineData;

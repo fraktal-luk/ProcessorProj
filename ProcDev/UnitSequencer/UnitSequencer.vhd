@@ -135,7 +135,7 @@ architecture Behavioral of UnitSequencer is
 	signal stageDataToPC, stageDataOutPC: InstructionState := DEFAULT_INSTRUCTION_STATE;
 	signal sendingToPC, sendingOutPC, acceptingOutPC: std_logic := '0';
 		
-	signal generalEvents: GeneralEventInfo;
+	signal generalEvents: GeneralEventInfo := DEFAULT_GENERAL_EVENT_INFO;
 
 	signal excLinkInfo, intLinkInfo: InstructionBasicInfo := defaultBasicInfo;
 	signal excInfoUpdate, intInfoUpdate: std_logic := '0';
