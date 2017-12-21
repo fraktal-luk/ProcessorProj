@@ -119,18 +119,6 @@ type ExecFunc is (unknown,
 constant TAG_SIZE: integer := 8;
 subtype InsTag is std_logic_vector(TAG_SIZE-1 downto 0);
 
-function getTagHigh(tag: std_logic_vector) return std_logic_vector;
-function getTagLow(tag: std_logic_vector) return std_logic_vector;
-function getTagHighSN(tag: SmallNumber) return SmallNumber;
-function getTagLowSN(tag: SmallNumber) return SmallNumber;	
-function clearTagLow(tag: std_logic_vector) return std_logic_vector;	
-function clearTagHigh(tag: std_logic_vector) return std_logic_vector;	
-function alignAddress(adr: std_logic_vector) return std_logic_vector;
-function clearLowBits(vec: std_logic_vector; n: integer) return std_logic_vector;
-function getLowBits(vec: std_logic_vector; n: integer) return std_logic_vector;
-
-constant INITIAL_GROUP_TAG: SmallNumber := (others => '0');
-
 							
 type BinomialOp is record
 	unit: ExecUnit;
@@ -297,17 +285,6 @@ constant DEFAULT_STAGE_DATA_MULTI: StageDataMulti := (fullMask=>(others=>'0'),
 
 type StageDataMultiArray is array (integer range <>) of StageDataMulti;
 
-
-constant INITIAL_PC: Mword := i2slv(-PIPE_WIDTH*4, MWORD_SIZE);
-
-constant INITIAL_BASIC_INFO: InstructionBasicInfo := (ip => INITIAL_PC,
-																		systemLevel => (others => '0'),
-																		intLevel => (others => '0'));																		
-
-constant DEFAULT_DATA_PC: InstructionState := defaultInstructionState;
-
-constant DEFAULT_ANNOTATED_HWORD: InstructionState := defaultInstructionState;
-
 					
 type ArgStatusInfo is record
 	stored: std_logic_vector(0 to 2); -- those that were already present in prev cycle	
@@ -326,75 +303,6 @@ end NewPipelineData;
 
 
 package body NewPipelineData is
-
-function getTagHigh(tag: std_logic_vector) return std_logic_vector is
-	variable res: std_logic_vector(tag'high-LOG2_PIPE_WIDTH downto 0) := (others => '0');
-begin
-	res := tag(tag'high downto LOG2_PIPE_WIDTH);
-	return res;
-end function;
-
-function getTagLow(tag: std_logic_vector) return std_logic_vector is
-	variable res: std_logic_vector(LOG2_PIPE_WIDTH-1 downto 0) := (others => '0');
-begin
-	res := tag(LOG2_PIPE_WIDTH-1 downto 0);
-	return res;
-end function;
-
-function getTagHighSN(tag: SmallNumber) return SmallNumber is
-	variable res: SmallNumber := (others => '0');
-begin
-	res(SMALL_NUMBER_SIZE-1-LOG2_PIPE_WIDTH downto 0) := tag(SMALL_NUMBER_SIZE-1 downto LOG2_PIPE_WIDTH);
-	return res;
-end function;
-
-function getTagLowSN(tag: SmallNumber) return SmallNumber is
-	variable res: SmallNumber := (others => '0');
-begin
-	res(LOG2_PIPE_WIDTH-1 downto 0) := tag(LOG2_PIPE_WIDTH-1 downto 0);
-	return res;
-end function;
-
-
-function clearTagLow(tag: std_logic_vector) return std_logic_vector is
-	variable res: std_logic_vector(tag'high downto 0) := (others => '0');
-begin
-	res := tag;
-	res(LOG2_PIPE_WIDTH-1 downto 0) := (others => '0');
-	return res;
-end function;	
-
-function clearTagHigh(tag: std_logic_vector) return std_logic_vector is
-	variable res: std_logic_vector(tag'high downto 0) := (others => '0');
-begin
-	res := tag;
-	res(tag'high downto LOG2_PIPE_WIDTH) := (others => '0');
-	return res;
-end function;
-
-function alignAddress(adr: std_logic_vector) return std_logic_vector is
-	variable res: std_logic_vector(adr'high downto 0) := (others => '0');
-begin
-	res := adr;
-	res(ALIGN_BITS-1 downto 0) := (others => '0');
-	return res;
-end function;
-
-function clearLowBits(vec: std_logic_vector; n: integer) return std_logic_vector is
-	variable res: std_logic_vector(vec'high downto 0) := (others => '0');
-begin
-	res := vec;
-	res(n-1 downto 0) := (others => '0');
-	return res;
-end function;
-
-function getLowBits(vec: std_logic_vector; n: integer) return std_logic_vector is
-	variable res: std_logic_vector(n-1 downto 0) := (others => '0');
-begin
-	res(n-1 downto 0) := vec(n-1 downto 0);
-	return res;
-end function;
-
  
 function defaultBasicInfo return InstructionBasicInfo is
 begin

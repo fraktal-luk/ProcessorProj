@@ -24,140 +24,27 @@ use work.TEMP_DEV.all;
 
 package GeneralPipeDev is
 
--- Flow definitions / CAREFUL, TODO: move to GeneralPipeDev?
+function getTagHigh(tag: std_logic_vector) return std_logic_vector;
+function getTagLow(tag: std_logic_vector) return std_logic_vector;
+function getTagHighSN(tag: SmallNumber) return SmallNumber;
+function getTagLowSN(tag: SmallNumber) return SmallNumber;	
+function clearTagLow(tag: std_logic_vector) return std_logic_vector;	
+function clearTagHigh(tag: std_logic_vector) return std_logic_vector;	
+function alignAddress(adr: std_logic_vector) return std_logic_vector;
+function clearLowBits(vec: std_logic_vector; n: integer) return std_logic_vector;
+function getLowBits(vec: std_logic_vector; n: integer) return std_logic_vector;
 
--- Flow control: input structure
-type FlowDriveSimple is record
-	lockAccept: std_logic;
-	lockSend: std_logic;
-	kill: std_logic;
-	prevSending: std_logic;
-	nextAccepting: std_logic;	
-end record;
+constant INITIAL_GROUP_TAG: SmallNumber := (others => '0');
 
--- Flow control: output structure
-type FlowResponseSimple is record
-	accepting: std_logic;
-	sending: std_logic;
-	isNew: std_logic;
-	full: std_logic;
-	living: std_logic;	
-end record;
+constant INITIAL_PC: Mword := i2slv(-PIPE_WIDTH*4, MWORD_SIZE);
 
-		type ContentStateSimple is record
-			isFull: std_logic;
-			isNew: std_logic;
-		end record;
+constant INITIAL_BASIC_INFO: InstructionBasicInfo := (ip => INITIAL_PC,
+																		systemLevel => (others => '0'),
+																		intLevel => (others => '0'));																		
 
-constant DEFAULT_FD_SIMPLE: FlowDriveSimple := FlowDriveSimple'(others => '0');
-constant DEFAULT_FR_SIMPLE: FlowResponseSimple := FlowResponseSimple'(others => '0');
-constant DEFAULT_CS_SIMPLE: ContentStateSimple := ContentStateSimple'(others => '0');
+constant DEFAULT_DATA_PC: InstructionState := defaultInstructionState;
 
-		-- CAREFUL: below functions for Simple slot have some duplicate code
-		function nextContentState(cs: ContentStateSimple; drive: FlowDriveSimple; reset, en: std_logic)
-		return ContentStateSimple is
-			variable res: ContentStateSimple := cs;
-			variable isNewSig: std_logic := '0';
-			variable fullSig: std_logic := '0';
-			variable livingSig: std_logic := '0';		
-			
-			variable canAccept: std_logic := '0';
-			variable wantSend: std_logic := '0';
-			variable acceptingSig: std_logic := '0';
-			variable sendingSig: std_logic := '0';	
-
-			variable afterSending: std_logic := '0';
-			variable afterReceiving: std_logic := '0';			
-		begin
-			if reset = '1' then
-				res.isFull := '0';
-				res.isNew := '0';
-			elsif en = '0' then -- If no enable, don't change
-				return res;
-			end if;
-			
-			livingSig := cs.isFull and not drive.kill; -- CHECK: killing mechanism correct?
-
-			canAccept := not drive.lockAccept;
-			wantSend := livingSig and not drive.lockSend;
-			
-			-- Determine what will be sent
-			sendingSig := drive.nextAccepting and wantSend;
-			afterSending := livingSig and not sendingSig;
-
-			-- Determine what will be received
-			acceptingSig := canAccept and not afterSending;	
-			afterReceiving := afterSending or drive.prevSending;
-			
-			res.isFull := afterReceiving;
-			res.isNew := drive.prevSending;
-			
-			return res;
-		end function;
-		
-		
-		function getResponse(cs: ContentStateSimple; drive: FlowDriveSimple) return FlowResponseSimple is
-			variable res: FlowResponseSimple;
-			variable isNewSig: std_logic := '0';
-			variable fullSig: std_logic := '0';
-			variable livingSig: std_logic := '0';		
-			
-			variable canAccept: std_logic := '0';
-			variable wantSend: std_logic := '0';
-			variable acceptingSig: std_logic := '0';
-			variable sendingSig: std_logic := '0';	
-
-			variable afterSending: std_logic := '0';
-			variable afterReceiving: std_logic := '0';			
-		begin
-
-			livingSig := cs.isFull and not drive.kill; -- CHECK: killing mechanism correct?
-
-			canAccept := not drive.lockAccept;
-			wantSend := livingSig and not drive.lockSend;
-			
-			-- Determine what will be sent
-			sendingSig := drive.nextAccepting and wantSend;
-			afterSending := livingSig and not sendingSig;
-
-			-- Determine what will be received
-			acceptingSig := canAccept and not afterSending;	
-			afterReceiving := afterSending or drive.prevSending;
-
-			res.sending := sendingSig;
-			res.accepting := acceptingSig;
-			res.full := cs.isFull;	
-			res.living := livingSig;	
-			res.isNew := cs.isNew;
-					
-			return res;
-		end function;
-
-
--- Input structure
-type FlowDriveBuffer is record
-	lockAccept: std_logic;
-	lockSend: std_logic;
-	killAll: std_logic;
-	kill: SmallNumber;
-	prevSending: SmallNumber;
-	nextAccepting: SmallNumber;	
-end record;
-
--- Output structure
-type FlowResponseBuffer is record
-	accepting: SmallNumber;
-	sending: SmallNumber;
-	isNew: SmallNumber;
-	full: SmallNumber;
-	living: SmallNumber;	
-end record;
-
-	subtype PipeFlow is SmallNumber;
-
--- Use this to convert PipeFlow to numbers 
-function binFlowNum(flow: PipeFlow) return natural;
-function num2flow(n: natural) return PipeFlow;
+constant DEFAULT_ANNOTATED_HWORD: InstructionState := defaultInstructionState;
 
 
 type StageDataCommitQueue is record
@@ -333,17 +220,71 @@ end GeneralPipeDev;
 
 package body GeneralPipeDev is
 
-function binFlowNum(flow: PipeFlow) return natural is
-	variable vec: std_logic_vector(PipeFlow'length-1 downto 0) := flow;
+function getTagHigh(tag: std_logic_vector) return std_logic_vector is
+	variable res: std_logic_vector(tag'high-LOG2_PIPE_WIDTH downto 0) := (others => '0');
 begin
-	return slv2u(vec);
+	res := tag(tag'high downto LOG2_PIPE_WIDTH);
+	return res;
 end function;
 
-function num2flow(n: natural) return PipeFlow is
-	variable res: PipeFlow := (others=>'0');
-	variable b: natural := n;
-begin	
-	res := i2slv(n, PipeFlow'length);
+function getTagLow(tag: std_logic_vector) return std_logic_vector is
+	variable res: std_logic_vector(LOG2_PIPE_WIDTH-1 downto 0) := (others => '0');
+begin
+	res := tag(LOG2_PIPE_WIDTH-1 downto 0);
+	return res;
+end function;
+
+function getTagHighSN(tag: SmallNumber) return SmallNumber is
+	variable res: SmallNumber := (others => '0');
+begin
+	res(SMALL_NUMBER_SIZE-1-LOG2_PIPE_WIDTH downto 0) := tag(SMALL_NUMBER_SIZE-1 downto LOG2_PIPE_WIDTH);
+	return res;
+end function;
+
+function getTagLowSN(tag: SmallNumber) return SmallNumber is
+	variable res: SmallNumber := (others => '0');
+begin
+	res(LOG2_PIPE_WIDTH-1 downto 0) := tag(LOG2_PIPE_WIDTH-1 downto 0);
+	return res;
+end function;
+
+
+function clearTagLow(tag: std_logic_vector) return std_logic_vector is
+	variable res: std_logic_vector(tag'high downto 0) := (others => '0');
+begin
+	res := tag;
+	res(LOG2_PIPE_WIDTH-1 downto 0) := (others => '0');
+	return res;
+end function;	
+
+function clearTagHigh(tag: std_logic_vector) return std_logic_vector is
+	variable res: std_logic_vector(tag'high downto 0) := (others => '0');
+begin
+	res := tag;
+	res(tag'high downto LOG2_PIPE_WIDTH) := (others => '0');
+	return res;
+end function;
+
+function alignAddress(adr: std_logic_vector) return std_logic_vector is
+	variable res: std_logic_vector(adr'high downto 0) := (others => '0');
+begin
+	res := adr;
+	res(ALIGN_BITS-1 downto 0) := (others => '0');
+	return res;
+end function;
+
+function clearLowBits(vec: std_logic_vector; n: integer) return std_logic_vector is
+	variable res: std_logic_vector(vec'high downto 0) := (others => '0');
+begin
+	res := vec;
+	res(n-1 downto 0) := (others => '0');
+	return res;
+end function;
+
+function getLowBits(vec: std_logic_vector; n: integer) return std_logic_vector is
+	variable res: std_logic_vector(n-1 downto 0) := (others => '0');
+begin
+	res(n-1 downto 0) := vec(n-1 downto 0);
 	return res;
 end function;
 
