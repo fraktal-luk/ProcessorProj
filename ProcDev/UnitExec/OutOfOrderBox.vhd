@@ -41,6 +41,8 @@ use work.GeneralPipeDev.all;
 
 use work.ProcComponents.all;
 
+use work.Viewing.all;
+
 
 entity OutOfOrderBox is
     Port ( clk : in  STD_LOGIC;
@@ -135,6 +137,8 @@ architecture Behavioral of OutOfOrderBox is
 	signal iqOutputArr, schedOutputArr: InstructionSlotArray(0 to 4) := (others => DEFAULT_INS_SLOT);
 	signal dataToQueuesArr: StageDataMultiArray(0 to 4) := (others => DEFAULT_STAGE_DATA_MULTI);
 	signal regValsArr: MwordArray(0 to 3*5-1) := (others => (others => '0'));
+	
+	signal theIssueView: IssueView := DEFAULT_ISSUE_VIEW;
 begin		
 	resetSig <= reset;
 	enSig <= en;
