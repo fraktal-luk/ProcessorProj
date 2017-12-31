@@ -9,7 +9,6 @@ architecture Behavioral5 of NewCore0 is
 	signal pcSendingSig: std_logic := '0';
 
 	signal acceptingOutFront: std_logic := '0';
-	--signal stage0Events: StageMultiEventInfo;
 	
 	signal frontDataLastLiving: StageDataMulti;
 	signal frontLastSending, renameAccepting: std_logic := '0';
@@ -56,19 +55,19 @@ architecture Behavioral5 of NewCore0 is
 		signal newPhysDestPointer: SmallNumber := (others => '0');
 		signal newPhysSources: PhysNameArray(0 to 3*PIPE_WIDTH-1) := (others => (others => '0'));
 
-
 		signal committingSig: std_logic := '0';	-- !! Just a copy of robSending
 			
 		signal committedSending, renameLockEnd: std_logic := '0';
 		signal committedDataOut: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
 
-			signal sbEmpty, sbSending: std_logic := '0';
-			signal dataFromSB: InstructionState := DEFAULT_INSTRUCTION_STATE;
-			signal sbAcceptingV: std_logic_vector(0 to 3) := (others => '0');				
-			signal sbMaskOut: std_logic_vector(0 to 0) := (others => '0');
-			signal sbDataOut: InstructionStateArray(0 to 0) := (others => DEFAULT_INSTRUCTION_STATE);	
-			signal sbFullMask: std_logic_vector(0 to SB_SIZE-1) := (others => '0');
+		signal sbEmpty, sbSending: std_logic := '0';
+		signal dataFromSB: InstructionState := DEFAULT_INSTRUCTION_STATE;
+		signal sbAcceptingV: std_logic_vector(0 to 3) := (others => '0');				
 
+		signal sbOutputSig: InstructionSlotArray(0 to 1-1)
+						:= (others => DEFAULT_INSTRUCTION_SLOT);
+		signal sbBufferOutputSig: InstructionSlotArray(0 to SB_SIZE-1)
+						:= (others => DEFAULT_INSTRUCTION_SLOT);
 		signal sysStoreAllow: std_logic := '0';
 		signal sysStoreAddress: slv5 := (others => '0'); 
 		signal sysStoreValue: Mword := (others => '0');
@@ -111,7 +110,6 @@ begin
 		frontEventSignal => frontEventSignal,
 		frontCausing => frontCausing,
 		
-		--stage0EventInfo => stage0Events, -- from front
 		-- Events out
 		execOrIntEventSignalOut => execOrIntEventSignal,
 		execOrIntCausingOut => execOrIntCausing,
@@ -169,23 +167,24 @@ begin
 		dataLastLiving => frontDataLastLiving,
 		lastSending => frontLastSending,
 		
-		--stage0EventsOut => stage0Events,
-			frontEventSignal => frontEventSignal,
-			frontCausing => frontCausing,
+		frontEventSignal => frontEventSignal,
+		frontCausing => frontCausing,
 		
 		execEventSignal => execEventSignal,
 		lateEventSignal => lateEventSignal		
 	);
 
-
 	--------------------------------
 	--- Out of order domain
 	OUTER_OOO_AREA: block
-			signal cqMaskOut: std_logic_vector(0 to INTEGER_WRITE_WIDTH-1) := (others => '0');
-			signal cqDataOut: InstructionStateArray(0 to INTEGER_WRITE_WIDTH-1)
+		signal cqMaskOut: std_logic_vector(0 to INTEGER_WRITE_WIDTH-1) := (others => '0');
+		signal cqDataOut: InstructionStateArray(0 to INTEGER_WRITE_WIDTH-1)
 					:= (others => DEFAULT_INSTRUCTION_STATE);
-			signal readyRegFlags: std_logic_vector(0 to 3*PIPE_WIDTH-1) := (others => '0');		
-			signal readyRegFlagsNext: std_logic_vector(0 to 3*PIPE_WIDTH-1) := (others => '0');					
+		signal cqOutput: InstructionSlotArray(0 to INTEGER_WRITE_WIDTH-1)
+					:= (others => DEFAULT_INSTRUCTION_SLOT);
+
+		signal readyRegFlags: std_logic_vector(0 to 3*PIPE_WIDTH-1) := (others => '0');		
+		signal readyRegFlagsNext: std_logic_vector(0 to 3*PIPE_WIDTH-1) := (others => '0');					
 	begin
 
 		OOO_BOX: entity work.OutOfOrderBox(Behavioral)
@@ -226,11 +225,11 @@ begin
 				dataOutBQV => dataOutBQV,
 				dataOutSQ => dataOutSQ,
 				readyRegFlags => readyRegFlags,
-				
-				cqMaskOut => cqMaskOut,
-				cqDataOut => cqDataOut
+				cqOutput => cqOutput
 		);
 
+			cqMaskOut <= extractFullMask(cqOutput);
+			cqDataOut <= extractData(cqOutput);
 
 				INT_READY_TABLE: entity work.ReadyRegisterTable(Behavioral)
 				generic map(
@@ -244,9 +243,10 @@ begin
 						
 					newPhysDests => newPhysDests,	-- FOR MAPPING
 					stageDataReserved => renamedDataLiving, --stageDataOutRename,
-					
-						writingMask => cqMaskOut,
-						writingData => cqDataOut,
+						
+					-- TODO: change to ins slot based
+					writingMask => cqMaskOut,
+					writingData => cqDataOut,
 					readyRegFlagsNext => readyRegFlagsNext -- FOR IQs
 				);
 
@@ -256,7 +256,6 @@ begin
 						readyRegFlags <= readyRegFlagsNext;
 					end if;
 				end process;
-
 			
 		INT_REG_MAPPING: block
 			signal physStable, physStableDelayed: PhysNameArray(0 to PIPE_WIDTH-1) := (others=>(others=>'0'));
@@ -325,7 +324,6 @@ begin
 	
 	end block; -- OUTER_OOO
 
-
 					sbAccepting <= sbAcceptingV(0);
 
 					STORE_BUFFER: entity work.TestCQPart0(WriteBuffer)
@@ -338,40 +336,42 @@ begin
 						clk => clk, reset => reset, en => en,
 						
 						whichAcceptedCQ => sbAcceptingV,
-						maskIn => dataOutSQ.fullMask,
-						dataIn => dataOutSQ.data,
+						input => makeSlotArray(dataOutSQ.data, dataOutSQ.fullMask),
 						
-						bufferMaskOut => sbFullMask,
-						bufferDataOut => open,
-						
-						anySending => sbSending,
-						cqMaskOut => sbMaskOut,
-						cqDataOut => sbDataOut,
+						anySending => open,--sbSending,
+
+						cqOutput => sbOutputSig,
+						bufferOutput => sbBufferOutputSig,
 						
 						execEventSignal => '0',
 						execCausing => DEFAULT_INSTRUCTION_STATE
 					);
-
-				sbEmpty <= not sbFullMask(0);
-				dataFromSB <= sbDataOut(0);
-
-				memStoreAddress <= sbDataOut(0).argValues.arg1;
-				memStoreValue <= sbDataOut(0).argValues.arg2;
-				memStoreAllow <= sbSending when sbDataOut(0).operation = (Memory, store) else '0';
 				
-				sysStoreAllow <= sbSending when sbDataOut(0).operation = (System, sysMTC) 
-							 else '0'; 
-				sysStoreAddress <= sbDataOut(0).argValues.arg1(4 downto 0);
-				sysStoreValue <= sbDataOut(0).argValues.arg2;				
+				sbSending <= sbOutputSig(0).full;
+			sbEmpty <= not sbBufferOutputSig(0).full;-- sbFullMask(0);
+			dataFromSB <= sbOutputSig(0).ins;--sbDataOut(0);
 
+-----------------------------------------
+----- Mem signals -----------------------
+	MEMORY_INTERFACE: block
+	begin
+		memStoreAddress <= dataFromSB.argValues.arg1;
+		memStoreValue <= dataFromSB.argValues.arg2;
+		memStoreAllow <= sbSending and isStore(dataFromSB);
+				
+		sysStoreAllow <= sbSending and isSysRegWrite(dataFromSB);
 
-	dadr <= memLoadAddress;
-	doutadr <= memStoreAddress;
-	dread <= memLoadAllow;
-	dwrite <= memStoreAllow;
-	dout <= memStoreValue;
-	memLoadValue <= din;
-	memLoadReady <= dvalid;
+		sysStoreAddress <= dataFromSB.argValues.arg1(4 downto 0);
+		sysStoreValue <= dataFromSB.argValues.arg2;				
 
+		dadr <= memLoadAddress;
+		doutadr <= memStoreAddress;
+		dread <= memLoadAllow;
+		dwrite <= memStoreAllow;
+		dout <= memStoreValue;
+		memLoadValue <= din;
+		memLoadReady <= dvalid;
+	end block;
+---------------------------------------------
 end Behavioral5;
 

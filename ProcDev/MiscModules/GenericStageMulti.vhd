@@ -35,6 +35,7 @@ use work.Helpers.all;
 use work.ProcInstructionsNew.all;
 
 use work.NewPipelineData.all;
+use work.BasicFlow.all;
 
 use work.GeneralPipeDev.all;
 
@@ -120,15 +121,19 @@ begin
 		stageEvents <= stageMultiEvents(stageData, flowResponse.isNew);								
 		partialKillMask <= stageEvents.partialKillMask;
 	
-	flowDrive.prevSending <= prevSending;
+	flowDrive.prevSending <= --prevSending;
+										stageDataIn.fullMask(0);
 	flowDrive.nextAccepting <= nextAccepting;
 	flowDrive.kill <= execEventSignal or lateEventSignal;
 	flowDrive.lockAccept <= lockCommand;
 
 	acceptingOut <= flowResponse.accepting;		
 	sendingOut <= flowResponse.sending;
-	stageDataOut <= stageDataLiving; -- TODO: clear temp ctrl info?
-	
+	--stageDataOut <= stageDataLiving; -- TODO: clear temp ctrl info?
+		stageDataOut.data <= stageDataLiving.data;
+		stageDataOut.fullMask <= stageDataLiving.fullMask when flowResponse.sending = '1'
+								 else (others => '0');
+								 
 	stageEventsOut <= stageEvents;
 end Behavioral;
 
@@ -169,14 +174,18 @@ begin
 		stageEvents <= stageMultiEvents(stageData, flowResponse.isNew);								
 		partialKillMask <= stageEvents.partialKillMask;
 	
-	flowDrive.prevSending <= prevSending;
+	flowDrive.prevSending <= --prevSending;
+										stageDataIn.fullMask(0);
 	flowDrive.nextAccepting <= nextAccepting;
 	flowDrive.kill <= execEventSignal or lateEventSignal;
 	flowDrive.lockAccept <= lockCommand;
 
 	acceptingOut <= flowResponse.accepting;		
 	sendingOut <= flowResponse.sending;
-	stageDataOut <= stageDataLiving; -- TODO: clear temp ctrl info?
+	--stageDataOut <= stageDataLiving; -- TODO: clear temp ctrl info?
+		stageDataOut.data <= stageDataLiving.data;
+		stageDataOut.fullMask <= stageDataLiving.fullMask when flowResponse.sending = '1'
+								 else (others => '0');
 	
 	stageEventsOut <= stageEvents;
 end Renaming;
@@ -231,15 +240,19 @@ begin
 
 		stageEvents <= stageMultiEvents(stageData, flowResponse.isNew);
 	
-	flowDrive.prevSending <= prevSending;
+	flowDrive.prevSending <= --prevSending;
+										stageDataIn.fullMask(0);
 	flowDrive.nextAccepting <= nextAccepting;
 	--flowDrive.kill <= execEventSignal;
 	flowDrive.lockAccept <= lockCommand;
 
 	acceptingOut <= flowResponse.accepting;		
 	sendingOut <= flowResponse.sending;
-	stageDataOut <= stageDataLiving; -- TODO: clear temp ctrl info?
-	
+	--stageDataOut <= stageDataLiving; -- TODO: clear temp ctrl info?
+		stageDataOut.data <= stageDataLiving.data;
+		stageDataOut.fullMask <= stageDataLiving.fullMask when flowResponse.sending = '1'
+								 else (others => '0');
+								 
 	stageEventsOut <= stageEvents;
 end SingleTagged;
 
@@ -318,20 +331,23 @@ begin
 		flowDrive => flowDrive,
 		flowResponse => flowResponse
 	);
-		-- TODO: move to visible package! 
+
 		stageEvents.causing <= setPhase(stageDataLiving.data(0),
 																	 evtPhase0, evtPhase1, evtPhase2);
 		stageEvents.eventOccured <= stageEvents.causing.controlInfo.newEvent;
 		
-	flowDrive.prevSending <= prevSending;
+	flowDrive.prevSending <= --prevSending;
+										stageDataIn.fullMask(0);
 	flowDrive.nextAccepting <= nextAccepting;
 	--flowDrive.kill <= execEventSignal;
 	--flowDrive.lockAccept <= lockCommand;
 
 	acceptingOut <= flowResponse.accepting;		
 	sendingOut <= flowResponse.sending;
-	stageDataOut <= stageDataLiving; -- TODO: clear temp ctrl info?
-	
+	--stageDataOut <= stageDataLiving; -- TODO: clear temp ctrl info?
+		stageDataOut.data <= stageDataLiving.data;
+		stageDataOut.fullMask <= stageDataLiving.fullMask when flowResponse.sending = '1'
+								 else (others => '0');	
 	stageEventsOut <= stageEvents;
 end LastEffective;
 

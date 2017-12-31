@@ -21,14 +21,13 @@ use work.Decoding2.all;
 use work.TEMP_DEV.all;
 use work.GeneralPipeDev.all;
 
-use work.Queues.all;
+--use work.Queues.all;
 
 
 package ProcLogicMemory is
 
 function compareAddress(content: InstructionStateArray; fullMask: std_logic_vector;
 								ins: InstructionState) return std_logic_vector;
--- TODO: This function and findOldestMatch introduce dependency on Queues. May be good to remove it
 function findNewestMatch(content: InstructionStateArray;
 								 cmpMask: std_logic_vector; pStart: SmallNumber; ins: InstructionState)
 return std_logic_vector;
@@ -71,31 +70,22 @@ function lmMaskNext(livingMask: std_logic_vector;
 					  receiving: std_logic) return std_logic_vector;
 
 	function TMP_cmpTagsBefore(content: InstructionStateArray; tag: SmallNumber)
-	return std_logic_vector is
-		variable res: std_logic_vector(0 to content'length-1) := (others => '0');
-		variable diff: SmallNumber := (others => '0');
-	begin
-		for i in 0 to res'length-1 loop
-			diff := subSN(content(i).groupTag, tag); -- If grTag < tag then diff(high) = '1'
-			res(i) := diff(SMALL_NUMBER_SIZE-1);
-		end loop;
-		
-		return res;
-	end function;
+	return std_logic_vector;
 
 	function TMP_cmpTagsAfter(content: InstructionStateArray; tag: SmallNumber)
-	return std_logic_vector is
-		variable res: std_logic_vector(0 to content'length-1) := (others => '0');
-		variable diff: SmallNumber := (others => '0');
-	begin
-		for i in 0 to res'length-1 loop
-			diff := subSN(tag, content(i).groupTag); -- If grTag > tag then diff(high) = '1'
-			res(i) := diff(SMALL_NUMBER_SIZE-1);
-		end loop;
-		
-		return res;
-	end function;
-					  
+	return std_logic_vector;
+
+	function setLoadException(ins: InstructionState) return InstructionState;
+	
+	function getLSResultData(ins: InstructionState;
+									  memLoadReady: std_logic; memLoadValue: Mword;
+									  sysLoadReady: std_logic; sysLoadValue: Mword;
+									  storeForwardSending: std_logic; storeForwardIns: InstructionState
+										) return InstructionState;
+
+	function getSendingToDLQ(sendingAfterRead, sendingSelectedLQ: std_logic;
+									 lsResultData: InstructionState) return std_logic;	
+	function calcEffectiveAddress(ins: InstructionState) return InstructionState;	
 end ProcLogicMemory;
 
 
@@ -131,10 +121,10 @@ end function;
 			variable tmpVec: std_logic_vector(0 to LEN-1) := (others => '0');
 		begin
 			-- From qs we must check which are older than ins
-			indices := getQueueIndicesFrom(LEN, pStart);
-			rawIndices := getQueueIndicesFrom(LEN, (others => '0'));
+			--indices := getQueueIndicesFrom(LEN, pStart);
+			--rawIndices := getQueueIndicesFrom(LEN, (others => '0'));
 			older := TMP_cmpTagsBefore(content, ins.groupTag);
-			before := compareIndicesSmaller(rawIndices, pStart);
+			before := setToOnes(older, slv2u(pStart));
 			-- Use priority enc. to find last in the older ones. But they may be divided:
 			--		V  1 1 1 0 0 0 0 1 1 1 and cmp  V
 			--		   0 1 0 0 0 0 0 1 0 1
@@ -170,10 +160,10 @@ end function;
 			variable tmpVec: std_logic_vector(0 to LEN-1) := (others => '0');
 		begin
 			-- From qs we must check which are newer than ins
-			indices := getQueueIndicesFrom(LEN, pStart);
-			rawIndices := getQueueIndicesFrom(LEN, (others => '0'));
+			--indices := getQueueIndicesFrom(LEN, pStart);
+			--rawIndices := getQueueIndicesFrom(LEN, (others => '0'));
 			newer := TMP_cmpTagsAfter(content, ins.groupTag);
-			areAtOrAfter := not compareIndicesSmaller(rawIndices, pStart);
+			areAtOrAfter := not setToOnes(newer, slv2u(pStart));
 			-- Use priority enc. to find first in the newer ones. But they may be divided:
 			--		V  1 1 1 0 0 0 0 1 1 1 and cmp  V
 			--		   0 1 0 0 0 0 0 1 0 1
@@ -417,5 +407,77 @@ begin
 	
 	return outMask;
 end function;
+
+	function TMP_cmpTagsBefore(content: InstructionStateArray; tag: SmallNumber)
+	return std_logic_vector is
+		variable res: std_logic_vector(0 to content'length-1) := (others => '0');
+		variable diff: SmallNumber := (others => '0');
+	begin
+		for i in 0 to res'length-1 loop
+			diff := subSN(content(i).groupTag, tag); -- If grTag < tag then diff(high) = '1'
+			res(i) := diff(SMALL_NUMBER_SIZE-1);
+		end loop;
+		
+		return res;
+	end function;
+
+	function TMP_cmpTagsAfter(content: InstructionStateArray; tag: SmallNumber)
+	return std_logic_vector is
+		variable res: std_logic_vector(0 to content'length-1) := (others => '0');
+		variable diff: SmallNumber := (others => '0');
+	begin
+		for i in 0 to res'length-1 loop
+			diff := subSN(tag, content(i).groupTag); -- If grTag > tag then diff(high) = '1'
+			res(i) := diff(SMALL_NUMBER_SIZE-1);
+		end loop;
+		
+		return res;
+	end function;
+
+	function setLoadException(ins: InstructionState) return InstructionState is
+		variable res: InstructionState := ins;
+	begin
+		res.controlInfo.hasException := '1';
+		return res;
+	end function;
+	
+	function getLSResultData(ins: InstructionState;
+									  memLoadReady: std_logic; memLoadValue: Mword;
+									  sysLoadReady: std_logic; sysLoadValue: Mword;
+									  storeForwardSending: std_logic; storeForwardIns: InstructionState
+										) return InstructionState is
+		variable res: InstructionState := ins;
+	begin
+		-- TODO: remember about miss/hit status and reason of miss if relevant!
+		if storeForwardSending = '1' then
+			res := setDataCompleted(res, getDataCompleted(storeForwardIns));
+			res := setInsResult(res, storeForwardIns.argValues.arg2);
+		elsif isSysRegRead(res) = '1' then
+			res := setDataCompleted(res, sysLoadReady);
+			res := setInsResult(res, sysLoadValue);		
+		elsif isLoad(res) = '1' then 
+			res := setDataCompleted(res, memLoadReady);
+			res := setInsResult(res, memLoadValue);
+		else -- is store or sys reg write?
+			--res := setDataCompleted(res, '1'); -- ?
+			--res := setAddressCompleted(res, '1'); -- ?
+		end if;
+		
+		return res;
+	end function;
+
+	function getSendingToDLQ(sendingAfterRead, sendingSelectedLQ: std_logic;
+									 lsResultData: InstructionState) return std_logic is
+	begin
+		return		(		sendingAfterRead
+								 and (isLoad(lsResultData) or isSysRegRead(lsResultData))
+								 and not getDataCompleted(lsResultData))  -- When missed etc.
+							or  sendingSelectedLQ; -- When store hits younger load and must get off the way	
+	end function;
+	
+	function calcEffectiveAddress(ins: InstructionState) return InstructionState is
+	begin
+		return setInsResult(ins, addMwordFaster(ins.argValues.arg0, ins.argValues.arg1));
+	end function;
 
 end ProcLogicMemory;

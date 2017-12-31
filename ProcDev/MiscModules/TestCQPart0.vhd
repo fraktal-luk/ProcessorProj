@@ -35,7 +35,7 @@ use work.Helpers.all;
 use work.ProcInstructionsNew.all;
 
 use work.NewPipelineData.all;
-
+use work.BasicFlow.all;
 use work.GeneralPipeDev.all;
 
 use work.TEMP_DEV.all;
@@ -58,16 +58,12 @@ entity TestCQPart0 is
 
 		whichAcceptedCQ: out std_logic_vector(0 to 3) := (others=>'0');
 
-		maskIn: in std_logic_vector(0 to INPUT_WIDTH-1);
-		dataIn: in InstructionStateArray(0 to INPUT_WIDTH-1);
+		input: in InstructionSlotArray(0 to INPUT_WIDTH-1);
 		
 		anySending: out std_logic;		
 
-		cqMaskOut: out std_logic_vector(0 to OUTPUT_SIZE-1);
-		cqDataOut: out InstructionStateArray(0 to OUTPUT_SIZE-1);
-				
-		bufferMaskOut: out std_logic_vector(0 to QUEUE_SIZE-1);
-		bufferDataOut: out InstructionStateArray(0 to QUEUE_SIZE-1);
+		cqOutput: out InstructionSlotArray(0 to OUTPUT_SIZE-1);
+		bufferOutput: out InstructionSlotArray(0 to QUEUE_SIZE-1);
 		
 		execEventSignal: in std_logic;
 		execCausing: in InstructionState -- Redundant cause we have inputs from all Exec ends? 		
@@ -92,18 +88,23 @@ architecture Implem of TestCQPart0 is
 		signal compareMaskCQ: std_logic_vector(0 to QUEUE_SIZE-1) := (others=>'0');
 	
 	signal stageDataCQ, stageDataCQLiving, stageDataCQNext,
-									stageDataCQNextCheckOld, stageDataCQNextCheckNew
-							: StageDataCommitQueue 
+									stageDataCQNextCheckOld, stageDataCQNextCheckNew: StageDataCommitQueue 
 									:= (fullMask=>(others=>'0'), data=>(others=>defaultInstructionState));
 			
 	signal whichSendingFromCQ: std_logic_vector(0 to PIPE_WIDTH-1) := (others=>'0'); 
 	signal whichAcceptedCQSig: std_logic_vector(0 to 3) := (others=>'0');
+
+		signal maskIn: std_logic_vector(0 to INPUT_WIDTH-1) := (others => '0');
+		signal dataIn: InstructionStateArray(0 to INPUT_WIDTH-1) := (others => DEFAULT_INSTRUCTION_STATE);
 
 	constant HAS_RESET_CQ: std_logic := '0';
 	constant HAS_EN_CQ: std_logic := '0';
 begin
 	resetSig <= reset and HAS_RESET_CQ;
 	enSig <= en or not HAS_EN_CQ;
+
+		maskIn <= extractFullMask(input);
+		dataIn <= extractData(input);
 
 	CQ_SYNCHRONOUS: process(clk)
 		variable fullMaskShifted: std_logic_vector(0 to PIPE_WIDTH-1) := (others => '0');
@@ -131,10 +132,8 @@ begin
 	
 	SINGLE_OUTPUT_REGS: if CQ_SINGLE_OUTPUT generate
 		stageDataCQNext <= stageCQNext_New(stageDataCQ,
-													--compactData(stageDataCQNew, maskNew),
 														stageDataCQNew,
 												livingMaskCQ,
-													--compactMask(stageDataCQNew, maskNew),
 														maskNew,
 												PIPE_WIDTH,
 												binFlowNum(flowResponseCQ.living),
@@ -142,10 +141,8 @@ begin
 												binFlowNum(flowDriveCQ.prevSending));
 
 		stageDataCQNextCheckOld <= stageCQNext_New(stageDataCQ,
-													--compactData(stageDataCQNew, maskNew),
 														stageDataCQNew,
 												livingMaskCQ,
-													--compactMask(stageDataCQNew, zeroInputMask),
 														zeroInputMask,
 												PIPE_WIDTH,
 												binFlowNum(flowResponseCQ.living),
@@ -153,19 +150,15 @@ begin
 												binFlowNum(flowDriveCQ.prevSending));
 
 		stageDataCQNextCheckNew <= stageCQNext_New(stageDataCQ,
-													--compactData(stageDataCQNew, maskNew),
 														stageDataCQNew,
 												zeroMaskCQ,
-													--compactMask(stageDataCQNew, maskNew),
 														maskNew,
 												PIPE_WIDTH,
 												binFlowNum(flowResponseCQ.living),
 												binFlowNum(flowResponseCQ.sending),
 												binFlowNum(flowDriveCQ.prevSending));
 
-		compareMaskCQ <= stageDataCQNextCheckOld.fullMask and maskNew(0 to 2);
-																				--stageDataCQNextCheckNew.fullMask;
-		
+		compareMaskCQ <= stageDataCQNextCheckOld.fullMask and maskNew(0 to 2);		
 												
 		flowDriveCQ.prevSending <=	num2flow(countOnes(maskIn));
 		flowDriveCQ.nextAccepting <= num2flow(countOnes(whichSendingFromCQ));												
@@ -197,21 +190,19 @@ begin
 	whichSendingFromCQ <= getSendingFromCQ(livingMaskRaw);
 	
 	anySending <= whichSendingFromCQ(0); -- Because CQ(0) must be committing if any other is 
-			
-		bufferMaskOut <= stageDataCQLiving.fullMask;
-		bufferDataOut <= stageDataCQLiving.data;
+
+	bufferOutput <= makeSlotArray(stageDataCQLiving.data, stageDataCQLiving.fullMask);
 			
 	whichAcceptedCQ <= whichAcceptedCQSig;	
 	
 	-- CAREFUL, TODO: this conditional generation seems to slow down timing without need, fix it!
 	SINGLE_OUTPUT: if CQ_SINGLE_OUTPUT generate
-		cqMaskOut <= (0 => whichSendingFromCQ(0), others => '0');
-		cqDataOut <= (0 => stageDataCQLiving.data(0), others => DEFAULT_INSTRUCTION_STATE);
+		cqOutput <= (0 => (whichSendingFromCQ(0), stageDataCQLiving.data(0)),
+										others => DEFAULT_INSTRUCTION_SLOT);
 	end generate;
 
 	THREE_OUTPUTS: if CQ_THREE_OUTPUTS generate
-		cqMaskOut <= maskIn(0 to 2);
-		cqDataOut <= dataIn(0 to 2);
+		cqOutput <= makeSlotArray(dataIn(0 to 2), maskIn(0 to 2));
 	end generate;
 	
 end Implem;
@@ -242,11 +233,17 @@ architecture WriteBuffer of TestCQPart0 is
 	signal whichSendingFromCQ: std_logic_vector(0 to PIPE_WIDTH-1) := (others=>'0'); 
 	signal whichAcceptedCQSig: std_logic_vector(0 to 3) := (others=>'0');
 
+		signal maskIn: std_logic_vector(0 to INPUT_WIDTH-1) := (others => '0');
+		signal dataIn: InstructionStateArray(0 to INPUT_WIDTH-1) := (others => DEFAULT_INSTRUCTION_STATE);
+
 	constant HAS_RESET_CQ: std_logic := '0';
 	constant HAS_EN_CQ: std_logic := '0';
 begin
 	resetSig <= reset and HAS_RESET_CQ;
 	enSig <= en or not HAS_EN_CQ;
+
+		maskIn <= extractFullMask(input);
+		dataIn <= extractData(input);
 
 	CQ_SYNCHRONOUS: process(clk)
 	begin
@@ -292,13 +289,10 @@ begin
 	
 	anySending <= isSending; -- Because CQ(0) must be committing if any other is 
 			
-		bufferMaskOut <= stageFullMask;
-		bufferDataOut <= stageData;
+	bufferOutput <= makeSlotArray(stageData, stageFullMask);
 			
 	whichAcceptedCQ <= whichAcceptedCQSig;	
 	
-		cqMaskOut <= (0 => isSending, others => '0');
-		cqDataOut <= (0 => stageData(0), others => DEFAULT_INSTRUCTION_STATE);
-	
+	cqOutput <= (0 => (isSending, stageData(0)), others => DEFAULT_INSTRUCTION_SLOT);	
 end WriteBuffer;
 

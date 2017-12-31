@@ -18,6 +18,7 @@ use work.ProcInstructionsNew.all;
 use work.NewPipelineData.all;
 
 use work.TEMP_DEV.all;
+use work.BasicFlow.all;
 use work.GeneralPipeDev.all;
 
 use work.BasicCheck.all;
@@ -26,6 +27,12 @@ use std.textio.all;
 
 
 package ProcLogicROB is
+
+type StageDataROB is record
+	fullMask: std_logic_vector(0 to ROB_SIZE-1); 
+	data: StageDataMultiArray(0 to ROB_SIZE-1);
+end record;
+
 
 -- pragma synthesis off
 procedure logROBImplem(sd, sdl: StageDataROB; fr: FlowResponseBuffer;
@@ -653,7 +660,6 @@ begin
 				exit;
 			end if;	
 			assert sd.data(i).data(j).groupTag = sd.data(i).data(j).groupTag report "koho";
-								-- TODO: is this the right tag field?
 			assert sd.data(i).data(j).basicInfo.ip = sd.data(i).data(j).basicInfo.ip report "jor";
 		end loop;
 	end loop;

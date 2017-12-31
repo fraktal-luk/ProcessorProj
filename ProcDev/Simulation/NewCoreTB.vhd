@@ -217,7 +217,7 @@ BEGIN
 						end loop;
 					end if;
 					
-					if iadrvalid = '1' and countOnes(iadr(iadr'high downto 10)) = 0 then
+					if iadrvalid = '1' and countOnes(iadr(iadr'high downto 12)) = 0 then
 						ivalid <= '1';					
 					else
 						ivalid <= '0';	

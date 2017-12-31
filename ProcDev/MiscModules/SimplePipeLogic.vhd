@@ -32,7 +32,8 @@ use IEEE.STD_LOGIC_1164.ALL;
 use work.ProcBasicDefs.all;
 
 use work.NewPipelineData.all;
---use work.GeneralPipeDev.all;
+use work.BasicFlow.all;
+use work.GeneralPipeDev.all;
 
 --use work.TEMP_DEV.all;
 --use work.CommonRouting.all;

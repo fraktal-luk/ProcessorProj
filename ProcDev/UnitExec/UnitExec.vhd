@@ -51,15 +51,11 @@ entity UnitExec is
 		reset : in  STD_LOGIC;
 		en : in  STD_LOGIC;
 	  
-		sendingIQA: in std_logic;
-		sendingIQB: in std_logic;
-		sendingIQD: in std_logic;
-	  
 		whichAcceptedCQ: in std_logic_vector(0 to 3);
 
-		dataIQA: in InstructionState;
-		dataIQB: in InstructionState;
-		dataIQD: in InstructionState;		
+		inputA: in InstructionSlot;
+		inputB: in InstructionSlot;
+		inputD: in InstructionSlot;	
 
 		execAcceptingA: out std_logic;
 		execAcceptingB: out std_logic;
@@ -103,11 +99,15 @@ architecture Implem of UnitExec is
 	signal inputDataA, outputDataA: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
 	signal inputDataD, outputDataD: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
 
+	signal branchData: InstructionState := DEFAULT_INSTRUCTION_STATE;
+	
 	signal branchQueueSelectedOut: InstructionState := DEFAULT_INSTRUCTION_STATE;
 	signal branchQueueSelectedSending: std_logic := '0';
 
-		signal storeTargetWrSig: std_logic := '0';
-		signal storeTargetDataSig: InstructionState := DEFAULT_INSTRUCTION_STATE;
+	signal storeTargetWrSig: std_logic := '0';
+	signal storeTargetDataSig: InstructionState := DEFAULT_INSTRUCTION_STATE;
+	
+	signal bqSelectedOutput: InstructionSlot := DEFAULT_INSTRUCTION_SLOT;
 
 	constant HAS_RESET_EXEC: std_logic := '1';
 	constant HAS_EN_EXEC: std_logic := '1';	
@@ -115,81 +115,76 @@ begin
 		resetSig <= reset and HAS_RESET_EXEC;
 		enSig <= en or not HAS_EN_EXEC; 
 
-					inputDataA.data(0) <= executeAlu(dataIQA);					
-					inputDataA.fullMask(0) <= sendingIQA;
-					
-					dataA0 <= outputDataA.data(0);
-					
-					SUBPIPE_A: entity work.GenericStageMulti(SingleTagged)
-					port map(
-						clk => clk, reset => resetSig, en => enSig,
-						
-						prevSending => sendingIQA,
-						nextAccepting => whichAcceptedCQ(0),
-						
-						stageDataIn => inputDataA, 
-						acceptingOut => execAcceptingASig,
-						sendingOut => execSendingA,
-						stageDataOut => outputDataA,
-						
-						execEventSignal => eventSignal,
-						lateEventSignal => lateEventSignal,
-						execCausing => execCausing,
-						lockCommand => '0',
-						
-						stageEventsOut => open
-					);
+		inputDataA <= makeSDM((0 => (inputA.full, executeAlu(inputA.ins))));
+
+		dataA0 <= outputDataA.data(0);
 		
-				SUBPIPE_B: entity work.IntegerMultiplier(Behavioral)
-				port map(
-					clk => clk, reset => resetSig, en => enSig,
-					
-					prevSending => sendingIQB,
-					nextAccepting => whichAcceptedCQ(1),
-					
-					dataIn => dataIQB, 
-					acceptingOut => execAcceptingBSig,
-					sendingOut => execSendingB,
-					
-						dataOut => dataB2,
-						data1Prev => dataB1,
-					
-					lateEventSignal => lateEventSignal,
-					execEventSignal => eventSignal,
-					execCausing => execCausing,
-					lockCommand => '0'					
-				);
+		SUBPIPE_A: entity work.GenericStageMulti(SingleTagged)
+		port map(
+			clk => clk, reset => resetSig, en => enSig,
+			
+			prevSending => '0',
+			nextAccepting => whichAcceptedCQ(0),
+			
+			stageDataIn => inputDataA,
+			acceptingOut => execAcceptingASig,
+			sendingOut => execSendingA,
+			stageDataOut => outputDataA,
+			
+			execEventSignal => eventSignal,
+			lateEventSignal => lateEventSignal,
+			execCausing => execCausing,
+			lockCommand => '0',
+			
+			stageEventsOut => open
+		);
+
+	SUBPIPE_B: entity work.IntegerMultiplier(Behavioral)
+	port map(
+		clk => clk, reset => resetSig, en => enSig,
+		
+		nextAccepting => whichAcceptedCQ(1),
+		input => inputB,
+		acceptingOut => execAcceptingBSig,
+		sendingOut => execSendingB,
+		
+		dataOut => dataB2,
+		data1Prev => dataB1,
+		
+		lateEventSignal => lateEventSignal,
+		execEventSignal => eventSignal,
+		execCausing => execCausing,
+		lockCommand => '0'					
+	);
 				
 ------------------------------------------------
 -- Branch
-					inputDataD.data(0) <= basicBranch(setInstructionTarget(dataIQD,
-																 dataIQD.constantArgs.imm),
-																 (others => '0'),
-																 dataIQD.result);					
-					
-					inputDataD.fullMask(0) <= sendingIQD;
-					
-					dataD0 <= outputDataD.data(0);
-					
-					SUBPIPE_D: entity work.GenericStageMulti(SingleTagged)
-					port map(
-						clk => clk, reset => resetSig, en => enSig,
-						
-						prevSending => sendingIQD,
-						nextAccepting => whichAcceptedCQ(3),
-						
-						stageDataIn => inputDataD, 
-						acceptingOut => execAcceptingDSig,
-						sendingOut => execSendingD,
-						stageDataOut => outputDataD,
-						
-						execEventSignal => eventSignal,
-						lateEventSignal => lateEventSignal,
-						execCausing => execCausing,
-						lockCommand => '0',
-						
-						stageEventsOut => eventsD						
-					);	
+		branchData <=  basicBranch(setInstructionTarget(inputD.ins, inputD.ins.constantArgs.imm),
+											inputD.ins.result);					
+		
+		inputDataD <= makeSDM((0 => (inputD.full, branchData)));
+		
+		dataD0 <= outputDataD.data(0);
+		
+		SUBPIPE_D: entity work.GenericStageMulti(SingleTagged)
+		port map(
+			clk => clk, reset => resetSig, en => enSig,
+			
+			prevSending => '0',
+			nextAccepting => whichAcceptedCQ(3),
+			
+			stageDataIn => inputDataD, 
+			acceptingOut => execAcceptingDSig,
+			sendingOut => execSendingD,
+			stageDataOut => outputDataD,
+			
+			execEventSignal => eventSignal,
+			lateEventSignal => lateEventSignal,
+			execCausing => execCausing,
+			lockCommand => '0',
+			
+			stageEventsOut => eventsD						
+		);	
 
 		storeTargetDataSig <= setInsResult(dataD0, dataD0.target);
 		storeTargetWrSig <= execSendingD and isIndirectBranchOrReturn(dataD0);
@@ -205,24 +200,18 @@ begin
 				reset => reset,
 				en => en,
 				
-					acceptingOut => acceptingNewBQ,
-					prevSending => prevSendingToBQ,
-					dataIn => dataNewToBQ,
+				acceptingOut => acceptingNewBQ,
+				prevSending => prevSendingToBQ,
+				dataIn => dataNewToBQ,
 				
-				storeAddressWr => storeTargetWrSig,
-				storeValueWr => storeTargetWrSig,
-
-				storeAddressDataIn => storeTargetDataSig,
-				storeValueDataIn => DEFAULT_INSTRUCTION_STATE,
-				
-				compareAddressDataIn => dataIQD,
-				compareAddressReady => sendingIQD,
-
-					selectedDataOut => branchQueueSelectedOut,
-					selectedSending => branchQueueSelectedSending,
+					storeAddressInput => (storeTargetWrSig, storeTargetDataSig),
+					storeValueInput => (storeTargetWrSig, DEFAULT_INSTRUCTION_STATE),
+					compareAddressInput => inputD,
 					
-					committing => committing,
-						groupCtrInc => groupCtrInc,
+					selectedDataOutput => bqSelectedOutput,
+	
+				committing => committing,
+				groupCtrInc => groupCtrInc,
 						
 				lateEventSignal => lateEventSignal,
 				execEventSignal => eventSignal,
@@ -234,8 +223,8 @@ begin
 					dataOutV => dataOutBQV
 			);
 
-		-- Data from sysreg reads goes to load pipe
-		-- CAREFUL: Don't send the same thing from both subpipes:
+			branchQueueSelectedSending <= bqSelectedOutput.full;
+			branchQueueSelectedOut <= bqSelectedOutput.ins;
 
 		execEventSignal <= eventsD.eventOccured;
 		execCausing <= eventsD.causing;

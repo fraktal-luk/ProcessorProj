@@ -24,6 +24,14 @@ use work.GeneralPipeDev.all;
 
 package ProcLogicFront is
 
+type HbuffOutData is record
+	sd: StageDataMulti;
+	nOut: SmallNumber;
+	nHOut: SmallNumber;
+end record;
+
+constant DEFAULT_HBUFF_OUT: HbuffOutData := (sd => DEFAULT_STAGE_DATA_MULTI, nOut => (others => '0'),
+															nHOut => (others => '0'));
 
 function getInstructionClassInfo(ins: InstructionState) return InstructionClassInfo;
 
@@ -189,7 +197,7 @@ end function;
 function newFromHbuffer(content: InstructionStateArray; fullMask: std_logic_vector)
 return HbuffOutData is
 	variable res: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
-	variable ret: HbuffOutData;
+	variable ret: HbuffOutData := DEFAULT_HBUFF_OUT;
 	variable j: integer := 0;
 	variable nOut: integer;
 begin

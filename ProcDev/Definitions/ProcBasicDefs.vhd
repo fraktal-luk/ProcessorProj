@@ -53,11 +53,21 @@ constant SMALL_NUMBER_SIZE: natural := SmallNumber'length;
 
 function addSN(a, b: SmallNumber) return SmallNumber;
 function subSN(a, b: SmallNumber) return SmallNumber;
-function lessThan(v: SmallNumber; ref: integer; nb: integer) return std_logic;
-function greaterThan(v: SmallNumber; ref: integer; nb: integer) return std_logic;
-function lessThanSigned(v: SmallNumber; ref: integer; nb: integer) return std_logic;
+
 function uminSN(a, b: SmallNumber) return SmallNumber;
 function sminSN(a, b: SmallNumber) return SmallNumber;
+
+function cmpLessSignedSN(a: SmallNumber; b: SmallNumber) return std_logic;
+function cmpGreaterSignedSN(a: SmallNumber; b: SmallNumber) return std_logic;
+function cmpLessUnsignedSN(a: SmallNumber; b: SmallNumber) return std_logic;
+function cmpGreaterUnsignedSN(a: SmallNumber; b: SmallNumber) return std_logic;
+
+
+function cmpGreaterThanUnsignedSNA(arr: SmallNumberArray; num: SmallNumber) return std_logic_vector;
+function cmpGreaterThanSignedSNA(arr: SmallNumberArray; num: SmallNumber) return std_logic_vector;
+function cmpLessThanUnsignedSNA(arr: SmallNumberArray; num: SmallNumber) return std_logic_vector;
+function cmpLessThanSignedSNA(arr: SmallNumberArray; num: SmallNumber) return std_logic_vector;
+function cmpEqualToSNA(arr: SmallNumberArray; num: SmallNumber) return std_logic_vector;
 
 end ProcBasicDefs;
 
@@ -222,96 +232,6 @@ begin
 end function;
 
 
-constant IGNORE_CMP_NB: boolean := true;--false;
-
-function getCNB(nbi: integer) return integer is
-begin
-	if IGNORE_CMP_NB then
-		return 8;
-	else
-		return nbi;
-	end if;
-end function;
-
-
-function lessThan(v: SmallNumber; ref: integer; nbi: integer) return std_logic is
-	variable nb: integer := getCNB(nbi);
-	variable res: std_logic := '0';
-	variable table: std_logic_vector(0 to 2**nb-1) := (others => '0');
-	
-	variable vv, rv: std_logic_vector(nb-1 downto 0) := (others => '0');
-begin
-	assert nb < 9 report "Dont use so large numbers!" severity failure;
-
-	rv := i2slv(ref, nb); 
-	vv := v(nb-1 downto 0);
-
-	-- Generate truth table 
-	for i in 0 to 2**nb-1 loop
-		if i < ref then
-			table(i) := '1';
-		else
-			table(i) := '0';
-		end if;
-	end loop;
-	
-	res := table(slv2u(vv));
-	
-	return res;
-end function;
-
-function greaterThan(v: SmallNumber; ref: integer; nbi: integer) return std_logic is
-	variable nb: integer := getCNB(nbi);
-	variable res: std_logic := '0';
-	variable table: std_logic_vector(0 to 2**nb-1) := (others => '0');
-	
-	variable vv, rv: std_logic_vector(nb-1 downto 0) := (others => '0');
-begin
-	assert nb < 9 report "Dont use so large numbers!" severity failure;
-
-	rv := i2slv(ref, nb); 
-	vv := v(nb-1 downto 0);
-
-	-- Generate truth table 
-	for i in 0 to 2**nb-1 loop
-		if i > ref then
-			table(i) := '1';
-		else
-			table(i) := '0';
-		end if;
-	end loop;
-	
-	res := table(slv2u(vv));
-	
-	return res;
-end function;
-
-function lessThanSigned(v: SmallNumber; ref: integer; nbi: integer) return std_logic is
-	variable nb: integer := getCNB(nbi);
-	variable res: std_logic := '0';
-	variable table: std_logic_vector(0 to 2**nb-1) := (others => '0');
-	
-	variable vv, rv: std_logic_vector(nb-1 downto 0) := (others => '0');
-begin
-	assert nb < 9 report "Dont use so large numbers!" severity failure;
-
-	rv := i2slv(ref, nb); 
-	vv := v(nb-1 downto 0);
-
-	-- Generate truth table 
-	for i in 0 to 2**nb-1 loop
-		if i - 2**(nb-1) < ref then
-			table(i) := '1';
-		else
-			table(i) := '0';
-		end if;
-	end loop;
-	
-	res := table(slv2s(vv) + 2**(nb-1));
-	
-	return res;
-end function;
-
 function uminSN(a, b: SmallNumber) return SmallNumber is
 	variable res: SmallNumber := (others => '0');
 	variable rdigit, carry: std_logic := '0';
@@ -355,6 +275,119 @@ begin
 			exit;
 		else
 			null;
+		end if;
+	end loop;
+	return res;
+end function;
+
+
+function cmpLessSignedSN(a: SmallNumber; b: SmallNumber) return std_logic is
+begin
+		if a(SMALL_NUMBER_SIZE-1) = '1' and b(SMALL_NUMBER_SIZE-1) = '0' then
+			return '1';
+		elsif a(SMALL_NUMBER_SIZE-1) = '0' and b(SMALL_NUMBER_SIZE-1) = '1' then
+			return '0';
+		end if;		
+
+	for i in SMALL_NUMBER_SIZE-2 downto 0 loop
+		if a(i) = '0' and b(i) = '1' then
+			return '1';
+		elsif a(i) = '1' and b(i) = '0' then
+			return '0';
+		end if;
+	end loop;
+	return '0';
+end function;
+
+function cmpGreaterSignedSN(a: SmallNumber; b: SmallNumber) return std_logic is
+begin
+		if a(SMALL_NUMBER_SIZE-1) = '0' and b(SMALL_NUMBER_SIZE-1) = '1' then
+			return '1';
+		elsif a(SMALL_NUMBER_SIZE-1) = '1' and b(SMALL_NUMBER_SIZE-1) = '0' then
+			return '0';
+		end if;		
+
+	for i in SMALL_NUMBER_SIZE-2 downto 0 loop
+		if a(i) = '1' and b(i) = '0' then
+			return '1';
+		elsif a(i) = '0' and b(i) = '1' then
+			return '0';
+		end if;
+	end loop;
+	return '0';
+end function;
+
+function cmpLessUnsignedSN(a: SmallNumber; b: SmallNumber) return std_logic is
+begin
+	for i in SMALL_NUMBER_SIZE-1 downto 0 loop
+		if a(i) = '1' and b(i) = '0' then
+			return '0';
+		elsif a(i) = '0' and b(i) = '1' then
+			return '1';
+		end if;
+	end loop;
+	return '0';
+end function;
+
+function cmpGreaterUnsignedSN(a: SmallNumber; b: SmallNumber) return std_logic is
+begin
+	for i in SMALL_NUMBER_SIZE-1 downto 0 loop
+		if a(i) = '1' and b(i) = '0' then
+			return '1';
+		elsif a(i) = '0' and b(i) = '1' then
+			return '0';
+		end if;
+	end loop;
+	return '0';
+end function;
+
+
+function cmpGreaterThanUnsignedSNA(arr: SmallNumberArray; num: SmallNumber) return std_logic_vector is
+	variable res: std_logic_vector(0 to arr'length-1) := (others => '0');
+begin
+	for i in 0 to res'length-1 loop
+		res(i) := cmpGreaterUnsignedSN(arr(i), num);
+	end loop;
+	return res;
+end function;
+
+function cmpGreaterThanSignedSNA(arr: SmallNumberArray; num: SmallNumber) return std_logic_vector is
+	variable res: std_logic_vector(0 to arr'length-1) := (others => '0');
+begin
+	for i in 0 to res'length-1 loop
+		res(i) := cmpGreaterSignedSN(arr(i), num);
+	end loop;
+	return res;
+end function;
+
+function cmpLessThanUnsignedSNA(arr: SmallNumberArray; num: SmallNumber) return std_logic_vector is
+	variable res: std_logic_vector(0 to arr'length-1) := (others => '0');
+begin
+	for i in 0 to res'length-1 loop
+		res(i) := cmpLessUnsignedSN(arr(i), num);
+	end loop;
+	return res;
+end function;
+
+function cmpLessThanSignedSNA(arr: SmallNumberArray; num: SmallNumber) return std_logic_vector is
+	variable res: std_logic_vector(0 to arr'length-1) := (others => '0');
+begin
+	for i in 0 to res'length-1 loop
+		res(i) := cmpLessSignedSN(arr(i), num);
+	end loop;
+	return res;
+end function;
+
+function cmpEqualToSNA(arr: SmallNumberArray; num: SmallNumber) return std_logic_vector is
+	constant LEN: integer := arr'length;
+	variable res: std_logic_vector(0 to LEN-1) := (others => '0');
+	variable sn: SmallNumber := (others => '0');
+begin
+	for i in 0 to LEN-1 loop
+		if num = arr(i) then
+			res(i) := '1';
+		else
+			res(i) := '0';
 		end if;
 	end loop;
 	return res;

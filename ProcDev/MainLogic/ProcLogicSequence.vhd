@@ -22,6 +22,15 @@ use work.GeneralPipeDev.all;
 
 package ProcLogicSequence is
 
+type GeneralEventInfo is record
+	eventOccured: std_logic;
+		killPC: std_logic;
+	causing: InstructionState;
+end record;
+
+constant DEFAULT_GENERAL_EVENT_INFO: GeneralEventInfo := (eventOccured => '0', killPC => '0',
+																			 causing => DEFAULT_INS_STATE);
+
 		-- group:  revTag = causing.groupTag and i2slv(-PIPE_WIDTH, SMALL_NUMBER_SIZE), mask = all ones
 		-- sequential: revTag = causing.numberTag, mask = new group's fullMask		
 		function nextCtr(ctr: SmallNumber; rewind: std_logic; revTag: SmallNumber;
@@ -30,8 +39,6 @@ package ProcLogicSequence is
 		
 		constant ALL_FULL: std_logic_vector(0 to PIPE_WIDTH-1) := (others => '1');
 
-
--- SEQUENCE ---------
 -- Jump target, increment if not jump 
 function getLinkInfoNormal(ins: InstructionState) return InstructionBasicInfo;
 -- Handler address and system state
@@ -39,7 +46,6 @@ function getExceptionTarget(ins: InstructionState) return InstructionBasicInfo;
 -- Target, which may be exception handler call
 function getLinkInfoSuper(ins: InstructionState) return InstructionBasicInfo;
 ----------------
-
 
 function getLatePCData(commitEvent: std_logic; commitCausing: InstructionState;
 								linkExc, linkInt, stateExc, stateInt: Mword)
@@ -61,16 +67,14 @@ return InstructionState;
 
 -- BACK ROUTING
 -- Unifies content of ROB slot with BQ, others queues etc. to restore full state needed at Commit
-function recreateGroup(insVec: StageDataMulti; bqGroup: StageDataMulti;
-							  prevAddress: Mword--; tempValue: Mword; useTemp: std_logic
-							  ) return StageDataMulti;
+function recreateGroup(insVec: StageDataMulti; bqGroup: StageDataMulti; prevAddress: Mword)
+return StageDataMulti;
 
 function setException2(ins, causing: InstructionState;
 							  intSignal, resetSignal, isNew, phase0, phase1, phase2: std_logic)
 return InstructionState;
 
-function setPhase(ins: InstructionState;
-							 phase0, phase1, phase2: std_logic)
+function setPhase(ins: InstructionState; phase0, phase1, phase2: std_logic)
 return InstructionState;
 
 function setLateTargetAndLink(ins: InstructionState; target: Mword; link: Mword; phase1: std_logic)
@@ -80,12 +84,14 @@ function getAddressIncrement(ins: InstructionState) return Mword;
 
 function checkIvalid(ins: InstructionState; ivalid: std_logic) return InstructionState;
 
+function makeInterruptCause(targetIns: InstructionState; intSignal, start: std_logic)
+return InstructionState;
+
 end ProcLogicSequence;
 
 
 
 package body ProcLogicSequence is
-
 		-- group:  revTag = causing.groupTag and i2slv(-PIPE_WIDTH, SMALL_NUMBER_SIZE), mask = all ones
 		-- sequential: revTag = causing.numberTag, mask = new group's fullMask		
 		function nextCtr(ctr: SmallNumber; rewind: std_logic; revTag: SmallNumber;
@@ -210,9 +216,9 @@ end function;
 										frontEvent: std_logic; frontCausing: InstructionState;
 										pcNext: Mword)
 	return GeneralEventInfo is
-		variable res: GeneralEventInfo;
+		variable res: GeneralEventInfo := DEFAULT_GENERAL_EVENT_INFO;
 	begin
-		res.affectedVec := (others => '0');
+		--res.affectedVec := (others => '0');
 		res.eventOccured := '1';
 			res.killPC := '0';
 			
@@ -234,8 +240,6 @@ end function;
 		
 		return res;
 	end function;
-
-
 
 -- Unifies content of ROB slot with BQ, others queues etc. to restore full state needed at Commit
 function recreateGroup(insVec: StageDataMulti; bqGroup: StageDataMulti;
@@ -306,13 +310,12 @@ begin
 	res.controlInfo.hasReset := resetSignal;
 		
 	if phase1 = '1' then
-			res.result := res.target;
+		res.result := res.target;
 		--res.target := causing.target;
 	end if;
 	
 	if phase2 = '1' then
 		res.controlInfo.newEvent := '0';	
-
 			res.controlInfo.hasException := '0';
 			res.controlInfo.hasInterrupt := '0';
 			res.controlInfo.hasReset := '0';
@@ -351,6 +354,16 @@ function checkIvalid(ins: InstructionState; ivalid: std_logic) return Instructio
 	variable res: InstructionState := ins;
 begin
 	res.controlInfo.squashed := not ivalid; -- CAREFUL: here we'll use 'squashed', must be cleared before ROB 
+	return res;
+end function;
+
+function makeInterruptCause(targetIns: InstructionState; intSignal, start: std_logic)
+return InstructionState is
+	variable res: InstructionState := DEFAULT_INSTRUCTION_STATE;
+begin
+	res.controlInfo.hasInterrupt := intSignal;
+	res.controlInfo.hasReset := start;
+	res.target := targetIns.basicInfo.ip;	
 	return res;
 end function;
 

@@ -75,8 +75,7 @@ entity UnitFront is
 	);
 end UnitFront;
 
--- TODO: add feature for invalid "instruction": when (not ivalid), cancel fetched instruction and 
---			jump back to repeat fetching (or cause exception etc)
+
 architecture Behavioral of UnitFront is
 	signal resetSig, enSig: std_logic := '0';							
 		
@@ -157,7 +156,7 @@ begin
 	FETCH_DELAY: process (clk)
 	begin
 		if rising_edge(clk) then
-			if sendingOutFetch = '1' then
+			--if sendingOutFetch = '1' then
 				pcSendingDelayed0 <= pcSending;
 				pcSendingDelayed1 <= pcSendingDelayed0;
 				
@@ -165,7 +164,7 @@ begin
 				fetchBlock1 <= fetchBlock;
 
 				fetchBlockBP <= fetchBlockFinal;
-			end if;
+			--end if;
 		end if;	
 	end process;				
 
@@ -208,11 +207,11 @@ begin
 	
 	hbufferDataIn <= checkIvalid(earlyBranchDataOut.data(0), '1');
 	
-		-- Branch prediction stub. This stage is in parallel with Hbuff
 			earlyBranchDataIn.data(0) <= getFrontEvent(stageDataOutFetchFinal,
 															pcSendingDelayedFinal, ivalidFinal, '1',
 															fetchBlockFinal);
-			earlyBranchdataIn.fullMask(0) <= pcSendingDelayedFinal;
+			earlyBranchdataIn.fullMask(0) <= --pcSendingDelayedFinal;
+														sendingOutFetchFinal;
 			
 			sendingToEarlyBranch <= sendingOutFetchFinal;
 											

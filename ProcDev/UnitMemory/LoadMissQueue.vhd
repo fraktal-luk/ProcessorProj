@@ -49,7 +49,7 @@ use work.ProcLogicMemory.all;
 
 use work.BasicCheck.all;
 
---entity LoadMissQueue is -- TODO: this is copy-paste from MemoryUnit - should be done by parameters or so!
+--entity LoadMissQueue is
 --	generic(
 --		QUEUE_SIZE: integer := 4;
 --		CLEAR_COMPLETED: boolean := true
@@ -119,7 +119,6 @@ begin
 							
 		sendingVec <= firstReadyVec when nextAccepting = '1' else (others => '0');					
 							
-		-- TODO!
 		matchingShA <= lmMaskNext(matchingA, zeroMask,
 																 binFlowNum(bufferResponse.living),
 																 --binFlowNum(bufferResponse.sending),
@@ -142,7 +141,6 @@ begin
 																 dataA, dataD, wrAddress, wrData,
 																 matchingShA, matchingShD,
 																 CLEAR_COMPLETED);
-		-- TODO: enable sending from any slot!
 		contentMaskNext <= lmMaskNext(livingMask, dataIn.fullMask,
 																 binFlowNum(bufferResponse.living),
 																 --binFlowNum(bufferResponse.sending),
@@ -153,11 +151,11 @@ begin
 		
 			firstReadyVec <= findFirstFilled(extractData(content), livingMask, nextAccepting);
 				
-			wrAddress <= storeAddressWr;
-			wrData <= storeValueWr;
+			wrAddress <= storeAddressInput.full;
+			wrData <= storeValueInput.full;
 		
-			dataA <= storeAddressDataIn;
-			dataD <= storeValueDataIn;
+			dataA <= storeAddressInput.ins;
+			dataD <= storeValueInput.ins;
 					
 			sendingSQ <= isNonzero(firstReadyVec);
 				dataOutV.fullMask(0) <= sendingSq;
@@ -201,6 +199,6 @@ begin
 			killMask <=	getKillMask(extractData(content), fullMask,
 											execCausing, execEventSignal, lateEventSignal);
 		
-	sendingSQOut <= sendingSQ;
+	sendingSQOut <= sendingSQ;	
 end LoadMissQueue;
 

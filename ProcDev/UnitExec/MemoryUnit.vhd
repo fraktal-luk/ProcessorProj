@@ -36,7 +36,7 @@ use work.Helpers.all;
 use work.ProcInstructionsNew.all;
 
 use work.NewPipelineData.all;
-
+use work.BasicFlow.all;
 use work.GeneralPipeDev.all;
 
 use work.TEMP_DEV.all;
@@ -69,17 +69,11 @@ entity MemoryUnit is
 		prevSending: in std_logic;
 		dataIn: in StageDataMulti;
 
-		storeAddressWr: in std_logic;
-		storeValueWr: in std_logic;
+		storeAddressInput: in InstructionSlot;
+		storeValueInput: in InstructionSlot;
+		compareAddressInput: in InstructionSlot;
 
-		storeAddressDataIn: in InstructionState;
-		storeValueDataIn: in InstructionState;
-
-			compareAddressDataIn: in InstructionState;
-			compareAddressReady: in std_logic;
-
-			selectedDataOut: out InstructionState;
-			selectedSending: out std_logic;
+		selectedDataOutput: out InstructionSlot;
 
 		committing: in std_logic;
 		groupCtrInc: in SmallNumber;
@@ -90,7 +84,7 @@ entity MemoryUnit is
 		
 		nextAccepting: in std_logic;		
 		sendingSQOut: out std_logic;
-			dataOutV: out StageDataMulti
+		dataOutV: out StageDataMulti
 	);
 end MemoryUnit;
 
@@ -125,6 +119,7 @@ architecture Behavioral of MemoryUnit is
 		
 		signal selectedData: InstructionState := DEFAULT_INSTRUCTION_STATE;
 		signal selectedSendingSig: std_logic := '0';
+		signal selectedDataOutputSig: InstructionSlot := DEFAULT_INSTRUCTION_SLOT;
 begin				
 	qs1 <= TMP_change(qs0, bufferDrive.nextAccepting, bufferDrive.prevSending,
 							TMP_mask, TMP_killMask, lateEventSignal or execEventSignal, TMP_maskNext);
@@ -141,11 +136,12 @@ begin
 	TMP_contentNext <=
 				TMP_getNewContentUpdate(TMP_content, dataIn.data, TMP_ckEnForInput, inputIndices,
 												TMP_maskA, TMP_maskD,
-												storeAddressWr, storeValueWr, storeAddressDataIn, storeValueDataIn,
+												storeAddressInput.full, storeValueInput.full,
+												storeAddressInput.ins, storeValueInput.ins,
 												CLEAR_COMPLETED, KEEP_INPUT_CONTENT);
 
-	TMP_maskA <= findMatching(makeSlotArray(TMP_content, TMP_mask), storeAddressDataIn);
-	TMP_maskD <= findMatching(makeSlotArray(TMP_content, TMP_mask), storeValueDataIn);
+	TMP_maskA <= findMatching(makeSlotArray(TMP_content, TMP_mask), storeAddressInput.ins);
+	TMP_maskD <= findMatching(makeSlotArray(TMP_content, TMP_mask), storeValueInput.ins);
 
 	-- View
 	contentView <= normalizeInsArray(qs0, TMP_content);
@@ -166,16 +162,17 @@ begin
 	contentData <= extractData(content);
 
 
-		cmpMask <= compareAddress(TMP_content, TMP_mask, compareAddressDataIn);
+		cmpMask <= compareAddress(TMP_content, TMP_mask, compareAddressInput.ins);
 		-- TEMP selection of hit checking mechanism 
-		matchedSlot <= findNewestMatch(TMP_content, cmpMask, qs0.pStart, compareAddressDataIn)
+		matchedSlot <= findNewestMatch(TMP_content, cmpMask, qs0.pStart, compareAddressInput.ins)
 																										when MODE = store
-					else	findOldestMatch(TMP_content, cmpMask, qs0.pStart, compareAddressDataIn)
+					else	findOldestMatch(TMP_content, cmpMask, qs0.pStart, compareAddressInput.ins)
 																										when MODE = load
-					else  findMatchingGroupTag(TMP_content, compareAddressDataIn) and TMP_mask
+					else  --findMatchingGroupTag(TMP_content, compareAddressDataIn) and TMP_mask
+							findMatching(makeSlotArray(TMP_content, TMP_mask), compareAddressInput.ins)
 																										when MODE = branch
 					else	(others => '0');
-		selectedSendingSig <= isNonzero(matchedSlot) and compareAddressReady;
+		selectedSendingSig <= isNonzero(matchedSlot) and compareAddressInput.full;
 		selectedData <= chooseIns(TMP_content, matchedSlot);
 	
 	
@@ -185,6 +182,8 @@ begin
 			qs0 <= qs1;
 			TMP_mask <= TMP_maskNext;	
 			TMP_content <= TMP_contentNext;
+			
+			selectedDataOutputSig <= (selectedSendingSig, selectedData);
 			
 			logBuffer(contentView, maskView, liveMaskView, bufferResponse);					
 			
@@ -206,15 +205,14 @@ begin
 		flowResponse => bufferResponse
 	);						
 
-	bufferDrive.prevSending <=num2flow(countOnes(dataIn.fullMask)) when prevSending = '1' else (others => '0');
+	bufferDrive.prevSending <= num2flow(countOnes(dataIn.fullMask)) when prevSending = '1' else (others => '0');
 	bufferDrive.kill <= num2flow(countOnes(TMP_killMask));
 	bufferDrive.nextAccepting <= num2flow(countOnes(sqOutData.fullMask));
 					
 	acceptingOut <= not TMP_preFrontW.fullMask(0);
 	
 	sendingSQOut <= sendingSQ;
-	
-	selectedDataOut <= selectedData;
-	selectedSending <= selectedSendingSig;
+
+	selectedDataOutput <= selectedDataOutputSig;
 end Behavioral;
 

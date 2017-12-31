@@ -129,11 +129,16 @@ begin
 		invD <= invertVec(acceptingVecD);
 		invE <= invertVec(acceptingVecE);
 	
-		iqAcceptingA <= not isNonzero(dataToA.fullMask and not invA);
-		iqAcceptingB <= not isNonzero(dataToB.fullMask and not invB);							 
-		iqAcceptingC <= not isNonzero(dataToC.fullMask and not invC);							 
-		iqAcceptingD <= not isNonzero(dataToD.fullMask and not invD);							 
-		iqAcceptingE <= not isNonzero(dataToE.fullMask and not invE);							 
+		iqAcceptingA <= --not isNonzero(dataToA.fullMask and not invA);
+								not isNonzero(not invA);
+		iqAcceptingB <= --not isNonzero(dataToB.fullMask and not invB);							 
+								not isNonzero(not invB);
+		iqAcceptingC <= --not isNonzero(dataToC.fullMask and not invC);							 
+								not isNonzero(not invC);
+		iqAcceptingD <= --not isNonzero(dataToD.fullMask and not invD);							 
+								not isNonzero(not invD);
+		iqAcceptingE <= --not isNonzero(dataToE.fullMask and not invE);							 
+								not isNonzero(not invE);
 			
 		iqAccepts <= iqAcceptingA and iqAcceptingB and iqAcceptingC and iqAcceptingD and iqAcceptingE
 							and acceptingROB and acceptingSQ and acceptingLQ and acceptingBQ;

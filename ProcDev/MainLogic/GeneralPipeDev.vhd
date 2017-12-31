@@ -24,6 +24,62 @@ use work.TEMP_DEV.all;
 
 package GeneralPipeDev is
 
+function getTagHigh(tag: std_logic_vector) return std_logic_vector;
+function getTagLow(tag: std_logic_vector) return std_logic_vector;
+function getTagHighSN(tag: SmallNumber) return SmallNumber;
+function getTagLowSN(tag: SmallNumber) return SmallNumber;	
+function clearTagLow(tag: std_logic_vector) return std_logic_vector;	
+function clearTagHigh(tag: std_logic_vector) return std_logic_vector;	
+function alignAddress(adr: std_logic_vector) return std_logic_vector;
+function clearLowBits(vec: std_logic_vector; n: integer) return std_logic_vector;
+function getLowBits(vec: std_logic_vector; n: integer) return std_logic_vector;
+
+constant INITIAL_GROUP_TAG: SmallNumber := (others => '0');
+
+constant INITIAL_PC: Mword := i2slv(-PIPE_WIDTH*4, MWORD_SIZE);
+
+constant INITIAL_BASIC_INFO: InstructionBasicInfo := (ip => INITIAL_PC,
+																		systemLevel => (others => '0'),
+																		intLevel => (others => '0'));																		
+
+constant DEFAULT_DATA_PC: InstructionState := defaultInstructionState;
+
+constant DEFAULT_ANNOTATED_HWORD: InstructionState := defaultInstructionState;
+
+
+type StageDataCommitQueue is record
+	fullMask: std_logic_vector(0 to CQ_SIZE-1); 
+	data: InstructionStateArray(0 to CQ_SIZE-1);
+end record;
+
+type ForwardingInfo is record
+	writtenTags: PhysNameArray(0 to PIPE_WIDTH-1);
+	resultTags: PhysNameArray(0 to N_RES_TAGS-1);
+	nextResultTags: PhysNameArray(0 to N_NEXT_RES_TAGS-1);
+	resultValues: MwordArray(0 to N_RES_TAGS-1);
+end record;
+
+constant DEFAULT_FORWARDING_INFO: ForwardingInfo := (
+	writtenTags => (others => (others => '0')),
+	resultTags => (others => (others => '0')),
+	nextResultTags => (others => (others => '0')),
+	resultValues => (others => (others => '0'))
+);
+
+type StageMultiEventInfo is record
+	eventOccured: std_logic;
+	causing: InstructionState;
+	partialKillMask: std_logic_vector(0 to PIPE_WIDTH-1);
+end record;
+
+constant DEFAULT_STAGE_MULTI_EVENT_INFO: StageMultiEventInfo
+													:= (eventOccured => '0',
+														  causing => defaultInstructionState,
+														  partialKillMask => (others => '0'));
+
+
+function makeSDM(arr: InstructionSlotArray) return StageDataMulti;
+
 function makeSlotArray(insVec: InstructionStateArray; mask: std_logic_vector) return InstructionSlotArray;
 
 function extractFullMask(queueContent: InstructionSlotArray) return std_logic_vector;
@@ -117,29 +173,20 @@ function killByTag(before, ei, int: std_logic) return std_logic;
 -- FORWARDING NETWORK ------------
 function getWrittenTags(lastCommitted: StageDataMulti) return PhysNameArray; -- DEPREC
 
-function getResultTags(execEnds: InstructionStateArray;
-			stageDataCQ: InstructionStateArray;
-			dispatchDataA, dispatchDataB, dispatchDataC, dispatchDataD: InstructionState;
+function getResultTags(execOutputs: InstructionSlotArray;
+			stageDataCQ: InstructionSlotArray;
 			lastCommitted: StageDataMulti) 
 return PhysNameArray;
 
-function getNextResultTags(execPreEnds: InstructionStateArray;
-			dispatchDataA, dispatchDataB, dispatchDataC, dispatchDataD: InstructionState) 
+function getNextResultTags(execOutputsPre: InstructionSlotArray;
+			schedOutputArr: InstructionSlotArray)
 return PhysNameArray;
 	
-function getResultValues(execEnds: InstructionStateArray; 
-										stageDataCQ: InstructionStateArray;
+function getResultValues(execOutputs: InstructionSlotArray; 
+										stageDataCQ: InstructionSlotArray;
 										lastCommitted: StageDataMulti)
 return MwordArray;	
 ---------------------
-
--- OTHER EXEC -----------
-function getExecEnds(oA, oB, oC, oD, oE: InstructionSlot) return InstructionStateArray;
-function getExecEnds2(oA, oB, oC, oD, oE: InstructionSlot) return InstructionStateArray;
-function getExecSending(oA, oB, oC, oD, oE: InstructionSlot) return std_logic_vector;
-function getExecSending2(oA, oB, oC, oD, oE: InstructionSlot) return std_logic_vector;
-function getExecPreEnds(opB, opC: InstructionState) return InstructionStateArray;
------------------------
 
 
 function simpleQueueNext(content: InstructionStateArray; newContent: InstructionStateArray;
@@ -158,11 +205,105 @@ return std_logic_vector;
 function setInstructionTarget(ins: InstructionState; target: Mword) return InstructionState;
 function setInsResult(ins: InstructionState; result: Mword) return InstructionState;
 
+	function isLoad(ins: InstructionState) return std_logic;
+	function isSysRegRead(ins: InstructionState) return std_logic;
+	function isStore(ins: InstructionState) return std_logic;
+	function isSysRegWrite(ins: InstructionState) return std_logic;
+
+
+	type SLVA is array (integer range <>) of std_logic_vector(0 to PIPE_WIDTH-1);
+
+
 end GeneralPipeDev;
 
 
 
 package body GeneralPipeDev is
+
+function getTagHigh(tag: std_logic_vector) return std_logic_vector is
+	variable res: std_logic_vector(tag'high-LOG2_PIPE_WIDTH downto 0) := (others => '0');
+begin
+	res := tag(tag'high downto LOG2_PIPE_WIDTH);
+	return res;
+end function;
+
+function getTagLow(tag: std_logic_vector) return std_logic_vector is
+	variable res: std_logic_vector(LOG2_PIPE_WIDTH-1 downto 0) := (others => '0');
+begin
+	res := tag(LOG2_PIPE_WIDTH-1 downto 0);
+	return res;
+end function;
+
+function getTagHighSN(tag: SmallNumber) return SmallNumber is
+	variable res: SmallNumber := (others => '0');
+begin
+	res(SMALL_NUMBER_SIZE-1-LOG2_PIPE_WIDTH downto 0) := tag(SMALL_NUMBER_SIZE-1 downto LOG2_PIPE_WIDTH);
+	return res;
+end function;
+
+function getTagLowSN(tag: SmallNumber) return SmallNumber is
+	variable res: SmallNumber := (others => '0');
+begin
+	res(LOG2_PIPE_WIDTH-1 downto 0) := tag(LOG2_PIPE_WIDTH-1 downto 0);
+	return res;
+end function;
+
+
+function clearTagLow(tag: std_logic_vector) return std_logic_vector is
+	variable res: std_logic_vector(tag'high downto 0) := (others => '0');
+begin
+	res := tag;
+	res(LOG2_PIPE_WIDTH-1 downto 0) := (others => '0');
+	return res;
+end function;	
+
+function clearTagHigh(tag: std_logic_vector) return std_logic_vector is
+	variable res: std_logic_vector(tag'high downto 0) := (others => '0');
+begin
+	res := tag;
+	res(tag'high downto LOG2_PIPE_WIDTH) := (others => '0');
+	return res;
+end function;
+
+function alignAddress(adr: std_logic_vector) return std_logic_vector is
+	variable res: std_logic_vector(adr'high downto 0) := (others => '0');
+begin
+	res := adr;
+	res(ALIGN_BITS-1 downto 0) := (others => '0');
+	return res;
+end function;
+
+function clearLowBits(vec: std_logic_vector; n: integer) return std_logic_vector is
+	variable res: std_logic_vector(vec'high downto 0) := (others => '0');
+begin
+	res := vec;
+	res(n-1 downto 0) := (others => '0');
+	return res;
+end function;
+
+function getLowBits(vec: std_logic_vector; n: integer) return std_logic_vector is
+	variable res: std_logic_vector(n-1 downto 0) := (others => '0');
+begin
+	res(n-1 downto 0) := vec(n-1 downto 0);
+	return res;
+end function;
+
+
+function makeSDM(arr: InstructionSlotArray) return StageDataMulti is
+	variable res: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
+	constant LEN: integer := arr'length;
+begin
+	
+	for i in 0 to PIPE_WIDTH-1 loop
+		if i >= LEN then
+			exit;
+		end if;
+		res.fullMask(i) := arr(i).full;
+		res.data(i) := arr(i).ins;
+	end loop;
+	
+	return res;
+end function;
 
 function makeSlotArray(insVec: InstructionStateArray; mask: std_logic_vector) return InstructionSlotArray is
 	variable res: InstructionSlotArray(0 to insVec'length-1) := (others => DEFAULT_INSTRUCTION_SLOT);
@@ -543,101 +684,53 @@ begin
 end function;
 
 
-function getResultTags(execEnds: InstructionStateArray; 
-						stageDataCQ: InstructionStateArray;
-						dispatchDataA, dispatchDataB, dispatchDataC, dispatchDataD: InstructionState;
-						lastCommitted: StageDataMulti) 
+function getResultTags(execOutputs: InstructionSlotArray; stageDataCQ: InstructionSlotArray;
+							  lastCommitted: StageDataMulti)
 return PhysNameArray is
 	variable resultTags: PhysNameArray(0 to N_RES_TAGS-1) := (others=>(others=>'0'));	
 begin
 	-- CAREFUL! Remember tht empty slots should have 0 as result tag, even though the rest of 
 	--				their state may remain invalid for simplicity!
-	resultTags(0) := execEnds(0).physicalDestArgs.d0;
-	resultTags(1) := execEnds(1).physicalDestArgs.d0;
-	resultTags(2) := execEnds(2).physicalDestArgs.d0;
+	resultTags(0) := execOutputs(0).ins.physicalDestArgs.d0;
+	resultTags(1) := execOutputs(1).ins.physicalDestArgs.d0;
+	resultTags(2) := execOutputs(2).ins.physicalDestArgs.d0;
 	
 	-- CQ slots
 	for i in 0 to CQ_SIZE-1 loop 
-		resultTags(4-1 + i) := stageDataCQ(i).physicalDestArgs.d0;  	
+		resultTags(4-1 + i) := stageDataCQ(i).ins.physicalDestArgs.d0;  	
 	end loop;
 	return resultTags;
 end function;		
 
-function getNextResultTags(execPreEnds: InstructionStateArray;
-						dispatchDataA, dispatchDataB, dispatchDataC, dispatchDataD: InstructionState) 
+function getNextResultTags(execOutputsPre: InstructionSlotArray;
+						schedOutputArr: InstructionSlotArray
+						) 
 return PhysNameArray is
 	variable nextResultTags: PhysNameArray(0 to N_NEXT_RES_TAGS-1) := (others=>(others=>'0'));
 begin
-	nextResultTags(0) := dispatchDataA.physicalDestArgs.d0;	
-	nextResultTags(1) := execPreEnds(1).physicalDestArgs.d0;
+	nextResultTags(0) := schedOutputArr(0).ins.physicalDestArgs.d0; -- sched stage for A	
+	nextResultTags(1) := execOutputsPre(1).ins.physicalDestArgs.d0;
 	--nextResultTags(2) := execPreEnds(2).physicalDestArgs.d0;
 	return nextResultTags;
 end function;
 
 
-function getResultValues(execEnds: InstructionStateArray; 
-						stageDataCQ: InstructionStateArray;
+function getResultValues(execOutputs: InstructionSlotArray; 
+						stageDataCQ: InstructionSlotArray;
 						lastCommitted: StageDataMulti)
 return MwordArray is
 	variable resultVals: MwordArray(0 to N_RES_TAGS-1) := (others=>(others=>'0'));		
 begin
-	resultVals(0) := execEnds(0).result;
-	resultVals(1) := execEnds(1).result;
-	resultVals(2) := execEnds(2).result;
+	resultVals(0) := execOutputs(0).ins.result;
+	resultVals(1) := execOutputs(1).ins.result;
+	resultVals(2) := execOutputs(2).ins.result;
 			
 	for i in 0 to CQ_SIZE-1 loop 	-- CQ slots
-		resultVals(4-1 + i) := stageDataCQ(i).result;  	
+		resultVals(4-1 + i) := stageDataCQ(i).ins.result;  	
 	end loop;
 	return resultVals;
 end function;	
 
-			
-function getExecEnds(oA, oB, oC, oD, oE: InstructionSlot) return InstructionStateArray is
-	variable res: InstructionStateArray(0 to 3) := (others => DEFAULT_INSTRUCTION_STATE);
-begin
-	res(0) := oA.ins;
-	res(1) := oB.ins;
-	res(2) := oC.ins;
-	
-	return res;
-end function;
-
-function getExecEnds2(oA, oB, oC, oD, oE: InstructionSlot) return InstructionStateArray is
-	variable res: InstructionStateArray(0 to 3) := (others => DEFAULT_INSTRUCTION_STATE);
-begin
-	res(2) := oE.ins;
-	res(3) := oD.ins;
-	
-	return res;
-end function;
-
-function getExecSending(oA, oB, oC, oD, oE: InstructionSlot) return std_logic_vector is
-	variable res: std_logic_vector(0 to 3) := (others => '0');
-begin
-	res(0) := oA.full;
-	res(1) := oB.full;
-	res(2) := oC.full;
-	
-	return res;
-end function;
-
-function getExecSending2(oA, oB, oC, oD, oE: InstructionSlot) return std_logic_vector is
-	variable res: std_logic_vector(0 to 3) := (others => '0');
-begin
-	res(2) := oE.full;
-	res(3) := oD.full;
-	
-	return res;
-end function;
-
-function getExecPreEnds(opB, opC: InstructionState) return InstructionStateArray is
-	variable res: InstructionStateArray(0 to 3) := (others => DEFAULT_INSTRUCTION_STATE);
-begin
-	res(1) := opB;
-	res(2) := opC;
-	
-	return res;
-end function;
 
 	function getLastEffective(newContent: StageDataMulti) return InstructionState is
 		variable res: InstructionState := newContent.data(0);
@@ -1005,5 +1098,42 @@ begin
 	res.result := result;
 	return res;
 end function;
+
+	function isLoad(ins: InstructionState) return std_logic is
+	begin
+		if ins.operation.func = load then
+			return '1';
+		else
+			return '0';
+		end if;
+	end function;
+	
+	function isSysRegRead(ins: InstructionState) return std_logic is
+	begin
+		if ins.operation = (System, sysMfc) then
+			return '1';
+		else
+			return '0';
+		end if;
+	end function;
+	
+	function isStore(ins: InstructionState) return std_logic is
+	begin
+		if ins.operation.func = store then
+			return '1';
+		else
+			return '0';
+		end if;
+	end function;
+
+	function isSysRegWrite(ins: InstructionState) return std_logic is
+	begin
+		if ins.operation = (System, sysMtc) then
+			return '1';
+		else
+			return '0';
+		end if;
+	end function;
+
 
 end GeneralPipeDev;

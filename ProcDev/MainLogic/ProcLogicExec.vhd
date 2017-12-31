@@ -35,8 +35,7 @@ package ProcLogicExec is
 	
 	function resolveBranchCondition(av: InstructionArgValues; ca: InstructionConstantArgs) return std_logic;
 
-	function basicBranch(ins: InstructionState; sysRegValue: Mword;
-								linkAddress: Mword) return InstructionState;
+	function basicBranch(ins: InstructionState; linkAddress: Mword) return InstructionState;
 
 	function setExecState(ins: InstructionState;
 								result: Mword; carry: std_logic; exc: std_logic_vector(3 downto 0))
@@ -45,11 +44,6 @@ package ProcLogicExec is
 	function executeAlu(ins: InstructionState) return InstructionState;
 
 	function isIndirectBranchOrReturn(ins: InstructionState) return std_logic;
-	
-	function isLoad(ins: InstructionState) return std_logic;
-	function isSysRegRead(ins: InstructionState) return std_logic;
-	function isStore(ins: InstructionState) return std_logic;
-	function isSysRegWrite(ins: InstructionState) return std_logic;
 	
 end ProcLogicExec;
 
@@ -113,34 +107,47 @@ package body ProcLogicExec is
 		
 	end function;
 
-	function basicBranch(ins: InstructionState; sysRegValue: Mword;
-								linkAddress: Mword) return InstructionState is
+	function basicBranch(ins: InstructionState; linkAddress: Mword) return InstructionState is
 		variable res: InstructionState := ins;
 		variable branchTaken: std_logic := '0';
+		variable storedTarget, storedReturn: Mword := (others => '0');
+		variable targetEqual: std_logic := '0';
 	begin		
-			res.operation := (General, Unknown);
+		res.operation := (General, Unknown);
 	
-			-- Return address
-			res.result := linkAddress;
-			if ins.classInfo.branchCond = '1' then
-				branchTaken := resolveBranchCondition(ins.argValues, ins.constantArgs);
-				if res.controlInfo.hasBranch = '1' and branchTaken = '0' then
-					res.controlInfo.hasBranch := '0';
-					--res.controlInfo.newReturn := '1';
-					res.controlInfo.hasReturn := '1';						
-					res.controlInfo.newEvent := '1';
-					--res.controlInfo.hasEvent := '1';						
-				elsif res.controlInfo.hasBranch = '0' and branchTaken = '1' then				
-					res.controlInfo.hasReturn := '0';
-					res.controlInfo.newBranch := '1';
-					res.controlInfo.hasBranch := '1';						
-					res.controlInfo.newEvent := '1';
-					--res.controlInfo.hasEvent := '1';					
-				end if;
-			end if;	
+		-- TODO: cases to handle
+		-- jr taken		: if not taken goto return, if taken and not equal goto reg, if taken and equal ok 
+		-- jr not taken: if not taken ok, if taken goto reg
+		-- j taken		: if not taken goto return, if taken equal
+		-- j not taken : if not taken ok, if taken goto dest
+		
+		-- Can keep dest and returnAdr from BQ in (target, result)?
+		-- 	Then return := result, dest := target
+		-- storedTarget := res.target; 
+		-- storedReturn := res.result;
+		-- targetEqual := [if storedTarget = reg then '1' else '0'];
+		
+		if ins.classInfo.branchCond = '1' then
+			branchTaken := resolveBranchCondition(ins.argValues, ins.constantArgs);
+			if res.controlInfo.hasBranch = '1' and branchTaken = '0' then
+				res.controlInfo.hasBranch := '0';
+				--res.controlInfo.newReturn := '1';
+				res.controlInfo.hasReturn := '1';						
+				res.controlInfo.newEvent := '1';
+				--res.controlInfo.hasEvent := '1';						
+			elsif res.controlInfo.hasBranch = '0' and branchTaken = '1' then				
+				res.controlInfo.hasReturn := '0';
+				res.controlInfo.newBranch := '1';
+				res.controlInfo.hasBranch := '1';						
+				res.controlInfo.newEvent := '1';
+				--res.controlInfo.hasEvent := '1';					
+			end if;
+		end if;	
 
-			res.target := ins.argValues.arg1;
-								
+		res.target := ins.argValues.arg1;
+		-- Return address
+		res.result := linkAddress;
+							
 		return res;
 	end function;
  
@@ -292,41 +299,5 @@ package body ProcLogicExec is
 			return 	  (ins.controlInfo.hasBranch and not ins.constantArgs.immSel)
 					 or   ins.controlInfo.hasReturn;
 		end function;
-		
-	function isLoad(ins: InstructionState) return std_logic is
-	begin
-		if ins.operation.func = load then
-			return '1';
-		else
-			return '0';
-		end if;
-	end function;
-	
-	function isSysRegRead(ins: InstructionState) return std_logic is
-	begin
-		if ins.operation = (System, sysMfc) then
-			return '1';
-		else
-			return '0';
-		end if;
-	end function;
-	
-	function isStore(ins: InstructionState) return std_logic is
-	begin
-		if ins.operation.func = store then
-			return '1';
-		else
-			return '0';
-		end if;
-	end function;
-
-	function isSysRegWrite(ins: InstructionState) return std_logic is
-	begin
-		if ins.operation = (System, sysMtc) then
-			return '1';
-		else
-			return '0';
-		end if;
-	end function;
 
 end ProcLogicExec;
