@@ -1,4 +1,7 @@
 # Output products list for <Mult16>
+Mult16/doc/dsp48_macro_ds754.pdf
+Mult16/doc/xbip_dsp48_macro_v2_1_readme.txt
+Mult16/doc/xbip_dsp48_macro_v2_1_vinfo.html
 Mult16.asy
 Mult16.gise
 Mult16.ngc
@@ -7,9 +10,6 @@ Mult16.vhd
 Mult16.vho
 Mult16.xco
 Mult16.xise
-Mult16\doc\dsp48_macro_ds754.pdf
-Mult16\doc\xbip_dsp48_macro_v2_1_readme.txt
-Mult16\doc\xbip_dsp48_macro_v2_1_vinfo.html
 Mult16_flist.txt
 Mult16_xmdf.tcl
-_xmsgs\pn_parser.xmsgs
+_xmsgs/pn_parser.xmsgs
