@@ -19,6 +19,9 @@ package NewPipelineData is
 	constant LOG_PIPELINE: boolean := false;
 	constant LOG_FREE_LIST: boolean := false;
 
+	constant REPORT_MEM_QUEUE_WRITES: boolean := false;
+	constant REPORT_MEM_QUEUE_FORWARDING: boolean := false;
+
 	-- Configuration defs 
 	constant MW: natural := 4; -- Max pipe width  
 

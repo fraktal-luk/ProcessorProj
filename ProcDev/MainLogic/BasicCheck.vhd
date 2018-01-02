@@ -78,6 +78,12 @@ procedure logFreeList(indTake, indPut, nTaken, nPut: in integer;
 							 takeAllow: in std_logic; putAllow: in std_logic;
 							 freeListRewind: in std_logic; freeListWriteTag: in SmallNumber);
 
+
+procedure reportWriting(signal storeAddressInput, storeValueInput: in InstructionSlot; mode: in MemQueueMode);
+
+procedure reportForwarding(signal compareAddressInput: InstructionSlot;
+											selectedDataOutputSig: InstructionSlot; mode: in MemQueueMode);
+
 end BasicCheck;
 
 
@@ -440,5 +446,82 @@ begin
 	--	pragma synthesis on
 end procedure;
 
+
+procedure reportWriting(signal storeAddressInput, storeValueInput: in InstructionSlot; mode: in MemQueueMode) is
+begin
+	-- pragma synthesis off
+	if not REPORT_MEM_QUEUE_WRITES then
+		return;
+	end if;
+	
+	case mode is
+		when store =>
+			if storeAddressInput.full = '1' then
+				report makeLogPath(storeAddressInput'path_name) & ": " &
+							"writing store address " & integer'image(slv2u(storeAddressInput.ins.result)) &
+							" by " & integer'image(slv2u(storeAddressInput.ins.groupTag));
+			end if;
+
+			if storeValueInput.full = '1' then
+				report makeLogPath(storeAddressInput'path_name) & ": " &
+							"writing store value " & integer'image(slv2u(storeAddressInput.ins.argValues.arg2)) &
+							" by " & integer'image(slv2u(storeAddressInput.ins.groupTag));
+			end if;
+			
+		when load =>
+			if storeAddressInput.full = '1' then
+				report makeLogPath(storeAddressInput'path_name) & ": " &
+							"writing load address " & integer'image(slv2u(storeAddressInput.ins.result)) &
+							" by " & integer'image(slv2u(storeAddressInput.ins.groupTag));
+			end if;
+
+--			if storeValueInput.full = '1' then
+--				report makeLogPath(storeAddressInput'path_name) & ": " &
+--							"writing value " & integer'image(slv2u(storeAddressInput.ins.argValues.arg2)) &
+--							" by " & integer'image(slv2u(storeAddressInput.ins.groupTag));
+--			end if;
+		when others =>
+	end case;
+	-- pragma synthesis on
+end procedure;
+
+procedure reportForwarding(signal compareAddressInput: InstructionSlot;
+											selectedDataOutputSig: InstructionSlot; mode: in MemQueueMode) is
+begin	
+	-- pragma synthesis off
+	if not REPORT_MEM_QUEUE_FORWARDING then
+		return;
+	end if;
+	
+	case mode is
+		when store => -- Checking what to forward from store queue
+			if compareAddressInput.full = '1' then
+				report makeLogPath(compareAddressInput'path_name) & ": " &
+							"checking loading address " & integer'image(slv2u(compareAddressInput.ins.result)) &
+							" by " & integer'image(slv2u(compareAddressInput.ins.groupTag));
+			end if;
+
+			if selectedDataOutputSig.full = '1' then
+				report makeLogPath(compareAddressInput'path_name) & ": " &
+							"matched storeded value " & integer'image(slv2u(selectedDataOutputSig.ins.argValues.arg2)) &
+							" by " & integer'image(slv2u(selectedDataOutputSig.ins.groupTag));
+			end if;
+			
+		when load => -- checking in load queue if there was a hazard
+			if compareAddressInput.full = '1' then
+				report makeLogPath(compareAddressInput'path_name) & ": " &
+							"checking storing address " & integer'image(slv2u(compareAddressInput.ins.result)) &
+							" by " & integer'image(slv2u(compareAddressInput.ins.groupTag));
+			end if;
+
+			if selectedDataOutputSig.full = '1' then
+				report makeLogPath(compareAddressInput'path_name) & ": " &
+							"matched load" &
+							" by " & integer'image(slv2u(selectedDataOutputSig.ins.groupTag));
+			end if;
+		when others =>
+	end case;
+	-- pragma synthesis on
+end procedure;
 
 end BasicCheck;

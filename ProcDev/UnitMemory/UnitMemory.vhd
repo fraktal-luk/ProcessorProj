@@ -208,7 +208,7 @@ begin
 	addressUnitSendingSig <= (dataAfterMem.fullMask(0) and not sendingToDLQ) or lqSelectedOutput.full;
 																									--??? -- because load exc to ROB
 	outputC <= (addressUnitSendingSig, clearTempControlInfoSimple(execResultData));
-	outputOpPreC <= stageDataOutMem0.data(0);
+	outputOpPreC <= DEFAULT_INS_STATE;-- stageDataOutMem0.data(0); -- CAREFUL: Don't show this because not supported
 
 		-- CAREFUL, TODO: if mem subpipe can be locked, then memLoadReady will expire while the
 		--						corresponding load is stalled, and it will go to LMQ. In such case

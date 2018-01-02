@@ -190,6 +190,9 @@ begin
 			-- NOTE: below has no info about flow constraints. It just checks data against
 			--			flow numbers, while the validity of those numbers is checked by slot logic	
 			checkBuffer(contentView, maskView, contentNextView, maskNextView, bufferDrive, bufferResponse);
+			
+				reportWriting(storeAddressInput, storeValueInput, MODE);
+				reportForwarding(compareAddressInput, (selectedSendingSig, selectedData), MODE);
 		end if;
 	end process;
 			

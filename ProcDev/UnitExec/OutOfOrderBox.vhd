@@ -322,7 +322,7 @@ begin
 
 		execOutputs1 <= (0 => outputA, 1 => outputB, 2 => outputC, others => DEFAULT_INSTRUCTION_SLOT);
 		execOutputs2 <= (		2 => outputE, 3 => outputD, others => DEFAULT_INSTRUCTION_SLOT); -- (-,-,E,D)! 
-		execOutputsPre <= (0 => ('0', outputOpPreB), 1 => ('0', outputOpPreC),
+		execOutputsPre <= (0 => ('0', outputOpPreB), --1 => ('0', outputOpPreC),
 																				others => DEFAULT_INSTRUCTION_SLOT);
 			COMMIT_QUEUE: entity work.TestCQPart0(Implem)
 			generic map(

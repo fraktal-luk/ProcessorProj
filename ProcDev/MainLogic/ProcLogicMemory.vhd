@@ -85,7 +85,8 @@ function lmMaskNext(livingMask: std_logic_vector;
 
 	function getSendingToDLQ(sendingAfterRead, sendingSelectedLQ: std_logic;
 									 lsResultData: InstructionState) return std_logic;	
-	function calcEffectiveAddress(ins: InstructionState) return InstructionState;	
+	function calcEffectiveAddress(ins: InstructionState) return InstructionState;
+
 end ProcLogicMemory;
 
 
