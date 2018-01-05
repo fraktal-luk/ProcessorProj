@@ -241,7 +241,7 @@ begin
 				
 		-- SQ inputs
 		storeAddressDataSig <= addressingData; -- Mem unit interface
-		storeValueDataSig <= inputE.ins; -- Mem unit interface		
+		storeValueDataSig <= setInsResult(inputE.ins, inputE.ins.argValues.arg2); -- Mem unit interface		
 
 			STORE_QUEUE: entity work.MemoryUnit(Behavioral)
 			generic map(
@@ -348,7 +348,8 @@ begin
 			execAcceptingE <= '1';
 			
 			-- Mem interface
-			memLoadAddress <= addressingData.result;
+			memLoadAddress <= addressingData.--result;
+														target;
 			memLoadAllow <= sendingAddressingForLoad;
 			sysLoadAllow <= sendingAddressingForMfc;	 
 				 

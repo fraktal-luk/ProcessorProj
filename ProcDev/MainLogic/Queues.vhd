@@ -454,14 +454,16 @@ begin
 		if (wrA and maskA(i)) = '1' then
 			res(i).--target 
 					argValues.arg1
-					:= insA.result;
+					:= insA.--result;
+								target;
 			res(i).controlInfo.completed := '1';
 		end if;
 		
 		if (wrD and maskD(i)) = '1' then
 			res(i).--result
 					argValues.arg2
-					:= insD.argValues.arg2;
+					:= insD.--argValues.arg2;
+								result;
 			res(i).controlInfo.completed2 := '1';						
 		end if;
 

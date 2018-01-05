@@ -186,7 +186,8 @@ begin
 			stageEventsOut => eventsD						
 		);	
 
-		storeTargetDataSig <= setInsResult(dataD0, dataD0.target);
+		storeTargetDataSig <= --setInsResult(dataD0, dataD0.target);
+										dataD0;
 		storeTargetWrSig <= execSendingD and isIndirectBranchOrReturn(dataD0);
 
 			BRANCH_QUEUE: entity work.MemoryUnit(Behavioral)

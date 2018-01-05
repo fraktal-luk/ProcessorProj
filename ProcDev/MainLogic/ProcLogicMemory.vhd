@@ -478,7 +478,7 @@ end function;
 	
 	function calcEffectiveAddress(ins: InstructionState) return InstructionState is
 	begin
-		return setInsResult(ins, addMwordFaster(ins.argValues.arg0, ins.argValues.arg1));
+		return setInstructionTarget(ins, addMwordFaster(ins.argValues.arg0, ins.argValues.arg1));
 	end function;
 
 end ProcLogicMemory;
