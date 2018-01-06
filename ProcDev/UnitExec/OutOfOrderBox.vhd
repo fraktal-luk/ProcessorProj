@@ -153,7 +153,7 @@ begin
 				acceptingVecA => iqAcceptingVecArr(0),
 				acceptingVecB => iqAcceptingVecArr(1),
 				acceptingVecC => iqAcceptingVecArr(2),
-				acceptingVecD => iqAcceptingVecArr(3),
+				acceptingVecD => (others => '1'),--iqAcceptingVecArr(3),
 				acceptingVecE => iqAcceptingVecArr(4),
 
 				acceptingROB => robAccepting,
@@ -169,7 +169,8 @@ begin
 				dataOutA => dataToQueuesArr(0),--dataToA,
 				dataOutB => dataToQueuesArr(1),--dataToB,
 				dataOutC => dataToQueuesArr(2),--dataToC,
-				dataOutD => dataToQueuesArr(3),--dataToD,
+				dataOutD => --dataToQueuesArr(3),--dataToD,
+								open,
 				dataOutE => dataToQueuesArr(4),--dataToE,
 				
 				dataOutSQ => compactedToSQ,
@@ -247,7 +248,7 @@ begin
 
 				inputA => schedOutputArr(0),
 				inputB => schedOutputArr(1),
-				inputD => schedOutputArr(3),
+				inputD => DEFAULT_INS_SLOT,--schedOutputArr(3),
 				
 				outputA => outputA,
 				outputB => outputB,

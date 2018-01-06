@@ -115,7 +115,7 @@ begin
 		resetSig <= reset and HAS_RESET_EXEC;
 		enSig <= en or not HAS_EN_EXEC; 
 
-		inputDataA <= makeSDM((0 => (inputA.full, executeAlu(inputA.ins))));
+		inputDataA <= makeSDM((0 => (inputA.full, executeAlu(inputA.ins, branchQueueSelectedOut))));
 
 		dataA0 <= outputDataA.data(0);
 		
@@ -159,10 +159,10 @@ begin
 				
 ------------------------------------------------
 -- Branch
-		branchData <=  basicBranch2(setInstructionTarget(inputD.ins, inputD.ins.constantArgs.imm),
+		branchData <=  basicBranch2(setInstructionTarget(inputA.ins, inputD.ins.constantArgs.imm),
 											 branchQueueSelectedOut, branchQueueSelectedSending);					
 		
-		inputDataD <= makeSDM((0 => (inputD.full, branchData)));
+		inputDataD <= makeSDM((0 => (inputA.full and isBranch(inputA.ins), branchData)));
 		
 		dataD0 <= outputDataD.data(0);
 		
@@ -208,7 +208,7 @@ begin
 				
 					storeAddressInput => (storeTargetWrSig, storeTargetDataSig),
 					storeValueInput => (storeTargetWrSig, DEFAULT_INSTRUCTION_STATE),
-					compareAddressInput => inputD,
+					compareAddressInput => (inputA.full and isBranch(inputA.ins), inputA.ins),
 					
 					selectedDataOutput => bqSelectedOutput,
 	

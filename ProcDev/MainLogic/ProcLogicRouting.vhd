@@ -281,20 +281,20 @@ begin
 	for i in 0 to PIPE_WIDTH-1 loop
 		--if 	 res.data(i).operation = (Jump, jump) and isNonzero(res.data(i).virtualDestArgs.d0) = '1'
 		--	and res.data(i).virtualDestArgs.sel(0) = '1'
-		if bl(i) = '1'
-		then
-			--		assert bl(i) = '1' report "ttttt";
-		
-			res.data(i).operation := (Alu, arithAdd);
-		
-			res.data(i).physicalArgs.s0 := (others => '0');
-			res.data(i).argValues.zero(0) := '1';
-			res.data(i).argValues.missing(0) := '0';
-			
-			res.data(i).constantArgs.imm := res.data(i).result;
-		--else	
-			--		assert bl(i) = '0' report "rrrrrrrrrr";
-		end if;
+--		if bl(i) = '1'
+--		then
+--			--		assert bl(i) = '1' report "ttttt";
+--		
+--			res.data(i).operation := (Alu, arithAdd);
+--		
+--			res.data(i).physicalArgs.s0 := (others => '0');
+--			res.data(i).argValues.zero(0) := '1';
+--			res.data(i).argValues.missing(0) := '0';
+--			
+--			res.data(i).constantArgs.imm := res.data(i).result;
+--		--else	
+--			--		assert bl(i) = '0' report "rrrrrrrrrr";
+--		end if;
 	end loop;
 	return res;
 end function;

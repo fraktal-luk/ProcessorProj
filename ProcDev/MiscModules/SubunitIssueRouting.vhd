@@ -102,7 +102,7 @@ begin
 	-- New concept for IQ routing.  {renamedData, srcVec*} -> (StageDataMulti){A,B,C,D}
 	-- Based on "push left" of each destination type, generating "New" StageDataMulti data for each one
 	-- dataToA <= [func](stageData1Living, srcVecA); -- s.d.1.l includes fullMask!		
-		srcVecA <= (findByNumber(issueRouteVec, 0) or whichBranchLink(renamedDataLiving))
+		srcVecA <= (findByNumber(issueRouteVec, 0) or srcVecD)--or whichBranchLink(renamedDataLiving))
 																							and renamedDataLiving.fullMask;
 		srcVecB <= findByNumber(issueRouteVec, 1) and renamedDataLiving.fullMask;
 		srcVecC <= (findByNumber(issueRouteVec, 2)
@@ -114,7 +114,7 @@ begin
 		dataToA <= routeToIQ2(prepareForAlu(renamedDataLiving, whichBranchLink(renamedDataLiving)), srcVecA);
 		dataToB <= routeToIQ2(renamedDataLiving, srcVecB);
 		dataToC <= routeToIQ2(prepareForAGU(renamedDataLiving), srcVecC);
-		dataToD <= routeToIQ2(prepareForBranch(renamedDataLiving), srcVecD);
+		--dataToD <= routeToIQ2(prepareForBranch(renamedDataLiving), srcVecD);
 		dataToE <= --routeToIQ2(prepareForStoreData(renamedDataLiving), srcVecE);
 						prepareForStoreData(dataToSQ);
 	
