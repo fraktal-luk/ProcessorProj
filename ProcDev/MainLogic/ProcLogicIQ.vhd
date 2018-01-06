@@ -237,7 +237,7 @@ begin
 	
 	if res.argValues.immediate = '1' and USE_IMM then
 		res.argValues.arg1 := res.constantArgs.imm;
-			--res.argValues.arg1(31 downto 16) := (others => res.constantArgs.imm(15));
+			res.argValues.arg1(31 downto 17) := (others => res.constantArgs.imm(16)); -- 16b + addditional sign bit
 	else
 		res.argValues.arg1 := vals(slv2u(res.argValues.locs(1)));
 	end if;

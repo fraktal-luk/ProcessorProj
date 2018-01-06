@@ -208,7 +208,7 @@ begin
 			regsSelA <= getPhysicalSources(iqOutputArr(0).ins);
 			regsSelB <= getPhysicalSources(iqOutputArr(1).ins);
 			regsSelC <= getPhysicalSources(iqOutputArr(2).ins);
-			regsSelD <= getPhysicalSources(iqOutputArr(3).ins);
+			--regsSelD <= getPhysicalSources(iqOutputArr(3).ins);
 			regsSelE <= getPhysicalSources(iqOutputArr(4).ins);
 
 			regValsArr <= regValsA & regValsB & regValsC & regValsD & regValsE;
