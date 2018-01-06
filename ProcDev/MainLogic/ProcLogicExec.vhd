@@ -37,6 +37,10 @@ package ProcLogicExec is
 
 	function basicBranch(ins: InstructionState; linkAddress: Mword) return InstructionState;
 
+	function basicBranch2(ins: InstructionState; linkAddress: Mword; queueData: InstructionState; qs: std_logic
+								) return InstructionState;
+
+
 	function setExecState(ins: InstructionState;
 								result: Mword; carry: std_logic; exc: std_logic_vector(3 downto 0))
 	return InstructionState;
@@ -150,7 +154,55 @@ package body ProcLogicExec is
 							
 		return res;
 	end function;
- 
+
+
+
+	function basicBranch2(ins: InstructionState; linkAddress: Mword; queueData: InstructionState; qs: std_logic
+									) return InstructionState is
+		variable res: InstructionState := ins;
+		variable branchTaken: std_logic := '0';
+		variable storedTarget, storedReturn: Mword := (others => '0');
+		variable targetEqual: std_logic := '0';
+	begin		
+		res.operation := (General, Unknown);
+	
+		-- TODO: cases to handle
+		-- jr taken		: if not taken goto return, if taken and not equal goto reg, if taken and equal ok 
+		-- jr not taken: if not taken ok, if taken goto reg
+		-- j taken		: if not taken goto return, if taken equal
+		-- j not taken : if not taken ok, if taken goto dest
+		
+		-- Can keep dest and returnAdr from BQ in (target, result)?
+		-- 	Then return := result, dest := target
+		-- storedTarget := res.target; 
+		-- storedReturn := res.result;
+		-- targetEqual := [if storedTarget = reg then '1' else '0'];
+		
+		if ins.classInfo.branchCond = '1' then
+			branchTaken := resolveBranchCondition(ins.argValues, ins.constantArgs);
+			if res.controlInfo.hasBranch = '1' and branchTaken = '0' then
+				res.controlInfo.hasBranch := '0';
+				--res.controlInfo.newReturn := '1';
+				res.controlInfo.hasReturn := '1';						
+				res.controlInfo.newEvent := '1';
+				--res.controlInfo.hasEvent := '1';						
+			elsif res.controlInfo.hasBranch = '0' and branchTaken = '1' then				
+				res.controlInfo.hasReturn := '0';
+				res.controlInfo.newBranch := '1';
+				res.controlInfo.hasBranch := '1';						
+				res.controlInfo.newEvent := '1';
+				--res.controlInfo.hasEvent := '1';					
+			end if;
+		end if;	
+
+		res.target := ins.argValues.arg1;
+		-- Return address
+		res.result := linkAddress;
+							
+		return res;
+	end function;
+
+
 	function setExecState(ins: InstructionState;
 								result: Mword; carry: std_logic; exc: std_logic_vector(3 downto 0))
 	return InstructionState is

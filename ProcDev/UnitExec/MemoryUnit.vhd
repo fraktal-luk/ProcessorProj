@@ -58,7 +58,8 @@ entity MemoryUnit is
 		QUEUE_SIZE: integer := 4;
 		CLEAR_COMPLETED: boolean := true;
 		KEEP_INPUT_CONTENT: boolean := false;
-		MODE: MemQueueMode := none
+		MODE: MemQueueMode := none;
+		ACCESS_REG: boolean := true
 	);
 	port(
 		clk: in std_logic;
@@ -216,6 +217,7 @@ begin
 	
 	sendingSQOut <= sendingSQ;
 
-	selectedDataOutput <= selectedDataOutputSig;
+	selectedDataOutput <= selectedDataOutputSig when ACCESS_REG
+						 else (selectedSendingSig, selectedData);
 end Behavioral;
 

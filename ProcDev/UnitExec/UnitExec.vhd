@@ -159,8 +159,8 @@ begin
 				
 ------------------------------------------------
 -- Branch
-		branchData <=  basicBranch(setInstructionTarget(inputD.ins, inputD.ins.constantArgs.imm),
-											inputD.ins.result);					
+		branchData <=  basicBranch2(setInstructionTarget(inputD.ins, inputD.ins.constantArgs.imm),
+											inputD.ins.result, branchQueueSelectedOut, branchQueueSelectedSending);					
 		
 		inputDataD <= makeSDM((0 => (inputD.full, branchData)));
 		
@@ -194,7 +194,8 @@ begin
 			generic map(
 				QUEUE_SIZE => BQ_SIZE,
 				KEEP_INPUT_CONTENT => true,
-				MODE => branch
+				MODE => branch,
+				ACCESS_REG => false
 			)
 			port map(
 				clk => clk,

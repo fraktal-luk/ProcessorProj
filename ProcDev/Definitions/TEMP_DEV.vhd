@@ -134,6 +134,7 @@ function trgForBQ(insVec: StageDataMulti) return StageDataMulti is
 begin
 	for i in 0 to PIPE_WIDTH-1 loop
 		res.data(i).argValues.arg1 := res.data(i).target;
+		res.data(i).argValues.arg2 := res.data(i).result;
 	end loop;
 	
 	return res;
