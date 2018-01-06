@@ -37,7 +37,7 @@ package ProcLogicExec is
 
 	function basicBranch(ins: InstructionState; linkAddress: Mword) return InstructionState;
 
-	function basicBranch2(ins: InstructionState; linkAddress: Mword; queueData: InstructionState; qs: std_logic
+	function basicBranch2(ins: InstructionState; queueData: InstructionState; qs: std_logic
 								) return InstructionState;
 
 
@@ -157,11 +157,11 @@ package body ProcLogicExec is
 
 
 
-	function basicBranch2(ins: InstructionState; linkAddress: Mword; queueData: InstructionState; qs: std_logic
+	function basicBranch2(ins: InstructionState; queueData: InstructionState; qs: std_logic
 									) return InstructionState is
 		variable res: InstructionState := ins;
 		variable branchTaken: std_logic := '0';
-		variable storedTarget, storedReturn: Mword := (others => '0');
+		variable storedTarget, storedReturn, trueTarget: Mword := (others => '0');
 		variable targetEqual: std_logic := '0';
 	begin		
 		res.operation := (General, Unknown);
@@ -177,27 +177,46 @@ package body ProcLogicExec is
 		-- storedTarget := res.target; 
 		-- storedReturn := res.result;
 		-- targetEqual := [if storedTarget = reg then '1' else '0'];
-		
-		if ins.classInfo.branchCond = '1' then
-			branchTaken := resolveBranchCondition(ins.argValues, ins.constantArgs);
-			if res.controlInfo.hasBranch = '1' and branchTaken = '0' then
-				res.controlInfo.hasBranch := '0';
-				--res.controlInfo.newReturn := '1';
-				res.controlInfo.hasReturn := '1';						
-				res.controlInfo.newEvent := '1';
-				--res.controlInfo.hasEvent := '1';						
-			elsif res.controlInfo.hasBranch = '0' and branchTaken = '1' then				
-				res.controlInfo.hasReturn := '0';
-				res.controlInfo.newBranch := '1';
-				res.controlInfo.hasBranch := '1';						
-				res.controlInfo.newEvent := '1';
-				--res.controlInfo.hasEvent := '1';					
-			end if;
-		end if;	
 
-		res.target := ins.argValues.arg1;
+		branchTaken := resolveBranchCondition(ins.argValues, ins.constantArgs);
+
+		if res.controlInfo.hasBranch = '1' and branchTaken = '0' then
+			res.controlInfo.hasBranch := '0';
+			--res.controlInfo.newReturn := '1';
+			res.controlInfo.hasReturn := '1';						
+			res.controlInfo.newEvent := '1';
+			--res.controlInfo.hasEvent := '1';
+				trueTarget := queueData.argValues.arg2;
+		elsif res.controlInfo.hasBranch = '0' and branchTaken = '1' then				
+			res.controlInfo.hasReturn := '0';
+			res.controlInfo.newBranch := '1';
+			res.controlInfo.hasBranch := '1';						
+			res.controlInfo.newEvent := '1';
+			--res.controlInfo.hasEvent := '1';
+			if ins.constantArgs.immSel = '0' then -- if branch reg			
+				trueTarget := ins.argValues.arg1;
+			else
+				trueTarget := queueData.argValues.arg1;
+			end if;
+		elsif res.controlInfo.hasBranch = '0' and branchTaken = '0' then
+			
+			trueTarget := queueData.argValues.arg2;
+		else -- taken -> taken
+			if ins.constantArgs.immSel = '0' then -- if branch reg
+				if queueData.argValues.arg1 /= ins.argValues.arg1 then
+					res.controlInfo.newEvent := '1';	-- Need to correct the target!				
+				end if;
+				trueTarget := ins.argValues.arg1; -- reg destination
+			else
+				trueTarget := queueData.argValues.arg1;				
+			end if;
+		end if;
+
+		res.target := --ins.argValues.arg1;
+							trueTarget;
 		-- Return address
-		res.result := linkAddress;
+		res.result := --linkAddress;
+							queueData.argValues.arg2; -- Link address
 							
 		return res;
 	end function;

@@ -160,7 +160,7 @@ begin
 ------------------------------------------------
 -- Branch
 		branchData <=  basicBranch2(setInstructionTarget(inputD.ins, inputD.ins.constantArgs.imm),
-											inputD.ins.result, branchQueueSelectedOut, branchQueueSelectedSending);					
+											 branchQueueSelectedOut, branchQueueSelectedSending);					
 		
 		inputDataD <= makeSDM((0 => (inputD.full, branchData)));
 		
@@ -188,7 +188,7 @@ begin
 
 		storeTargetDataSig <= --setInsResult(dataD0, dataD0.target);
 										dataD0;
-		storeTargetWrSig <= execSendingD and isIndirectBranchOrReturn(dataD0);
+		storeTargetWrSig <= execSendingD;-- and isIndirectBranchOrReturn(dataD0);
 
 			BRANCH_QUEUE: entity work.MemoryUnit(Behavioral)
 			generic map(
