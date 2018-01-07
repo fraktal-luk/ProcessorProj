@@ -275,7 +275,8 @@ begin
 			newDecodedWithTargets.data(i) <=
 				setInsResult(setInstructionTarget(newDecoded.data(i), targets(i)), links(i));
 
-			targets(i) <= addMwordFaster(newDecoded.data(i).basicInfo.ip, newDecoded.data(i).constantArgs.imm);		
+			targets(i) <= addMwordFaster(newDecoded.data(i).basicInfo.ip, newDecoded.data(i).--constantArgs.imm);
+																														target);
 			links(i) <= addMwordBasic(newDecoded.data(i).basicInfo.ip, getAddressIncrement(newDecoded.data(i)));			
 		end generate;	
 

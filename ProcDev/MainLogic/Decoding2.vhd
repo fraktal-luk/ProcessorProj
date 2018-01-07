@@ -78,6 +78,7 @@ package Decoding2 is
 			leftImm: 		word;
 			hasImm: 			std_logic;
 			imm: 				word;
+			target: 			word;
 		end record;		
 
 				type OpFieldStructW is record
@@ -91,6 +92,7 @@ package Decoding2 is
 					leftImm: 		word;
 					hasImm: 			std_logic;
 					imm: 				word;
+					target:			word;
 				end record;	
 
 
@@ -358,26 +360,46 @@ package body Decoding2 is
 			
 			-- Handle imm value (and leftImm)		
 			res.imm := iw;
-			case fmt.immSize is
-				when none =>
-					res.hasImm := '0';
-					res.imm := (others => '0');
-				when imm10 =>
-					res.hasImm := '1';
-					res.imm(31 downto 10) := (others => iw(9) and fmt.immSign);	
-				when imm16 =>
-					res.hasImm := '1';		
-					res.imm(31 downto 16) := (others => iw(15) and fmt.immSign);
-				when imm21 =>
-					res.hasImm := '1';	
-					res.imm(31 downto 21) := (others => iw(20) and fmt.immSign);
-				when imm26 =>
-					res.hasImm := '1';	
-					res.imm(31 downto 26) := (others => iw(25) and fmt.immSign);					
-				when others =>
-					report "bad imm format specification" severity error;
-			end case;
+			res.target := iw;
 			
+			if fmt.immSize = none then
+				res.hasImm := '0';
+			else
+				res.hasImm := '1';
+			end if;
+			
+			if fmt.immSize = imm10 then
+				res.imm(31 downto 10) := (others => iw(9) and fmt.immSign);
+			else
+				res.imm(31 downto 16) := (others => iw(15) and fmt.immSign);
+			end if;
+
+			if fmt.immSize = imm26 then
+				res.target(31 downto 26) := (others => iw(25) and fmt.immSign);
+			else
+				res.target(31 downto 21) := (others => iw(20) and fmt.immSign);
+			end if;
+			
+--			case fmt.immSize is
+--				when none =>
+--					--res.hasImm := '0';
+--					res.imm := (others => '0');
+--				when imm10 =>
+--					--res.hasImm := '1';
+--					res.imm(31 downto 10) := (others => iw(9) and fmt.immSign);	
+--				when imm16 =>
+--					--res.hasImm := '1';		
+--					res.imm(31 downto 16) := (others => iw(15) and fmt.immSign);
+--				when imm21 =>
+--					--res.hasImm := '1';	
+--					res.imm(31 downto 21) := (others => iw(20) and fmt.immSign);
+--				when imm26 =>
+--					--res.hasImm := '1';	
+--					res.imm(31 downto 26) := (others => iw(25) and fmt.immSign);					
+--				when others =>
+--					report "bad imm format specification" severity error;
+--			end case;
+
 			if fmt.hasLeftImm = '1' then
 				res.hasLeftImm := '1';
 				iw := tab(leftImm);

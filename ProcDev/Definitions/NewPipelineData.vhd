@@ -93,7 +93,7 @@ package NewPipelineData is
 	subtype PhysName is std_logic_vector(PHYS_NAME_SIZE-1 downto 0);
 	type PhysNameArray is array(natural range <>) of PhysName;
 
-	constant ENABLE_INT_OVERFLOW: boolean := false;
+	constant ENABLE_INT_OVERFLOW: boolean := false or true;
 
 	constant PROCESSOR_ID: Mword := X"001100aa";
 

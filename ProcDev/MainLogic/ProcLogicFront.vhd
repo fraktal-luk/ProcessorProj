@@ -178,7 +178,8 @@ begin
 		
 			res.controlInfo.squashed := '0';
 		
-		res.target := (others => '0');		
+		res.target := --(others => '0');
+							ofs.target;
 	return res;
 end function;
 
