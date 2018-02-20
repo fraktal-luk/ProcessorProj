@@ -61,6 +61,7 @@ entity SubunitHbuffer is
 		execCausing: in InstructionState;
 
 		stageDataIn: in InstructionState;
+		stageDataInMulti: StageDataMulti;
 		acceptingOut: out std_logic;
 		sendingOut: out std_logic;
 		stageDataOut: out StageDataMulti
@@ -135,10 +136,12 @@ begin
 
 			TMP_offset <= getFetchOffset(stageDataIn.basicInfo.ip);
 
-	nHIn <= i2slv(FETCH_BLOCK_SIZE - (slv2u(stageDataIn.basicInfo.ip(ALIGN_BITS-1 downto 1))),
-					  SMALL_NUMBER_SIZE);
+	nHIn <= --i2slv(FETCH_BLOCK_SIZE - (slv2u(stageDataIn.basicInfo.ip(ALIGN_BITS-1 downto 1))),
+			  --		  SMALL_NUMBER_SIZE);				
+					i2slv(2 * countOnes(stageDataInMulti.fullMask), SMALL_NUMBER_SIZE);
+						-- TODO: change to 2 * bit count from EarlyBranchMulti 
 
-	hbufferDataANew <= getAnnotatedHwords(stageDataIn, fetchBlock);					
+	hbufferDataANew <= getAnnotatedHwords(stageDataIn, stageDataInMulti, fetchBlock);					
 
 		-- TODO: handle possibility of partial killing by partialKillMask?
 		livingMask <= fullMask when execEventSignal = '0' else (others => '0');

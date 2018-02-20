@@ -275,6 +275,7 @@ begin
 		prevSending => earlyBranchSending and not fetchStall,
 		nextAccepting => acceptingOut0,
 		stageDataIn => hbufferDataIn,
+		stageDataInMulti => earlyBranchMultiDataOut,
 		fetchBlock => fetchBlockBP,
 		
 		acceptingOut => acceptingOutHbuffer,
