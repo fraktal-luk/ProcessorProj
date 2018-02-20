@@ -79,7 +79,7 @@ end UnitFront;
 architecture Behavioral of UnitFront is
 	signal resetSig, enSig: std_logic := '0';							
 		
-	signal stage0Events: StageMultiEventInfo;	-- from later stages
+	signal stage0Events, stage0MultiEvents: StageMultiEventInfo;	-- from later stages
 
 	-- Interfaces between stages:														
 	signal stageDataOutFetch: InstructionState := DEFAULT_DATA_PC;
@@ -101,13 +101,15 @@ architecture Behavioral of UnitFront is
 		signal stageDataOutFetchFinal:  InstructionState := DEFAULT_DATA_PC;
 		signal sendingOutFetchFinal: std_logic := '0';
 		
-		signal acceptingForFetchFirst, earlyBranchAccepting, earlyBranchSending: std_logic := '0';
+		signal acceptingForFetchFirst, earlyBranchAccepting, earlyBranchSending, earlyBranchMultiSending
+							: std_logic := '0';
 		
 		signal hbufferDataIn, stallCausing: InstructionState := DEFAULT_INSTRUCTION_STATE;
 	
 		signal killAll, frontKill, stallEventSig: std_logic := '0';
 	
 		signal earlyBranchDataIn, earlyBranchDataOut: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
+		signal earlyBranchMultiDataIn, earlyBranchMultiDataOut: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
 	
 		signal sendingToEarlyBranch, stallAtFetchLast, fetchStall: std_logic := '0'; 
 		signal pcSendingDelayed0, pcSendingDelayed1, pcSendingDelayedFinal: std_logic := '0';
@@ -210,8 +212,7 @@ begin
 			earlyBranchDataIn.data(0) <= getFrontEvent(stageDataOutFetchFinal,
 															pcSendingDelayedFinal, ivalidFinal, '1',
 															fetchBlockFinal);
-			earlyBranchdataIn.fullMask(0) <= --pcSendingDelayedFinal;
-														sendingOutFetchFinal;
+			earlyBranchdataIn.fullMask(0) <= sendingOutFetchFinal;
 			
 			sendingToEarlyBranch <= sendingOutFetchFinal;
 											
@@ -233,7 +234,32 @@ begin
 					lockCommand => '0',
 
 					stageEventsOut => stage0Events
-			);	
+			);
+			
+			
+			earlyBranchMultiDataIn <= getEarlyBranchMultiDataIn(stageDataOutFetchFinal,
+																				pcSendingDelayedFinal, ivalidFinal, '1',
+																				fetchBlockFinal);
+			
+			SUBUNIT_EARLY_BRANCH_MULTI: entity work.GenericStageMulti(Behavioral)
+			port map(
+					clk => clk, reset => resetSig, en => enSig,
+							
+					prevSending => sendingToEarlyBranch,	
+					nextAccepting => '1',--acceptingOutHbuffer,
+					stageDataIn => earlyBranchMultiDataIn,
+					
+					acceptingOut => earlyBranchAccepting,
+					sendingOut => earlyBranchMultiSending,
+					stageDataOut => earlyBranchMultiDataOut,
+					
+					execEventSignal => killAll, -- CAREFUL: not killing on stall, because is sent to void
+					lateEventSignal => killAll,
+					execCausing => DEFAULT_INSTRUCTION_STATE,
+					lockCommand => '0',
+
+					stageEventsOut => stage0MultiEvents
+			);
 	
 			stallEventSig <= fetchStall;
 			stallCausing <= setInstructionTarget(earlyBranchDataOut.data(0),

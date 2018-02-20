@@ -57,6 +57,15 @@ function getFrontEvent(ins: InstructionState; receiving: std_logic; valid: std_l
 							  hbuffAccepting: std_logic; fetchBlock: HwordArray(0 to FETCH_BLOCK_SIZE-1))
 return InstructionState;
 
+function getFrontEventMulti(ins: InstructionState; receiving: std_logic; valid: std_logic;
+							  hbuffAccepting: std_logic; fetchBlock: HwordArray(0 to FETCH_BLOCK_SIZE-1))
+return StageDataMulti;
+
+
+function getEarlyBranchMultiDataIn(ins: InstructionState; receiving: std_logic; valid: std_logic;
+							  hbuffAccepting: std_logic; fetchBlock: HwordArray(0 to FETCH_BLOCK_SIZE-1))
+return StageDataMulti;
+
 end ProcLogicFront;
 
 
@@ -343,6 +352,120 @@ begin
 			res.target := tempTarget;
 		end if;
 	end if;
+	
+	return res;
+end function;
+
+
+function getFrontEventMulti(ins: InstructionState; receiving: std_logic; valid: std_logic;
+							  hbuffAccepting: std_logic; fetchBlock: HwordArray(0 to FETCH_BLOCK_SIZE-1))
+return StageDataMulti is
+	variable res0: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
+	variable res: InstructionState := ins;
+	variable tempOffset, baseIP, tempTarget: Mword := (others => '0');
+	variable targets: MwordArray(0 to PIPE_WIDTH-1) := (others => (others => '0'));
+	variable fullOut, full, branchIns, predictedTaken: std_logic_vector(0 to PIPE_WIDTH-1) := (others => '0');
+	variable nSkippedIns: integer := 0;
+begin
+	if valid = '0' then
+		res.controlInfo.squashed := '1';
+	end if;
+
+	-- receiving, valid, accepting	-> good
+	-- receiving, valid, not accepting -> refetch
+	-- receiving, invalid, accepting -> error, will cause exception, but handled later, from decode on
+	-- receiving, invalid, not accepting -> refetch??
+
+	
+	-- Check if it's a branch
+	-- TODO: (should be done in predecode when loading to cache)
+	-- CAREFUL: Only without hword instructions now!
+		-- TMP
+			-- Find which are before the start of fetch address
+			nSkippedIns := slv2u(ins.basicInfo.ip(ALIGN_BITS-1 downto 0))/4; -- CORRECT?
+			for i in 0 to PIPE_WIDTH-1 loop
+				if i >= nSkippedIns then
+					full(i) := '1';
+				end if;
+			end loop;
+			
+	if (receiving and valid and hbuffAccepting) = '1' then
+		for i in 0 to PIPE_WIDTH-1 loop
+			-- Is normal branch instruction?
+			if 	fetchBlock(2*i)(15 downto 10) = opcode2slv(jl) 
+				or fetchBlock(2*i)(15 downto 10) = opcode2slv(jz) 
+				or fetchBlock(2*i)(15 downto 10) = opcode2slv(jnz)
+			then
+				branchIns(i) := '1';
+				predictedTaken(i) := fetchBlock(2*i)(4);
+				tempOffset := (others => fetchBlock(2*i)(4));
+				tempOffset(20 downto 0) := fetchBlock(2*i)(4 downto 0) & fetchBlock(2*i + 1);
+				baseIP := res.basicInfo.ip(MWORD_SIZE-1 downto ALIGN_BITS) & i2slv(i*4, ALIGN_BITS); -- ??
+				tempTarget := addMwordFaster(baseIP, tempOffset);
+				targets(i) := tempTarget;			-- Long branch instruction?
+			elsif fetchBlock(2*i)(15 downto 10) = opcode2slv(j)
+			then
+				branchIns(i) := '1';
+				predictedTaken(i) := '1'; -- Long jump is unconditional (no space for register encoding!)
+				tempOffset := (others => fetchBlock(2*i)(9));
+				tempOffset(25 downto 0) := fetchBlock(2*i)(9 downto 0) & fetchBlock(2*i + 1);
+				baseIP := res.basicInfo.ip(MWORD_SIZE-1 downto ALIGN_BITS) & i2slv(i*4, ALIGN_BITS); -- ??
+				tempTarget := addMwordFaster(baseIP, tempOffset);
+				targets(i) := tempTarget;
+			end if;
+			
+		end loop;
+		
+		-- Find if any branch predicted
+		for i in 0 to PIPE_WIDTH-1 loop
+			fullOut(i) := full(i);
+			if full(i) = '1' and branchIns(i) = '1' and predictedTaken(i) = '1' then
+				res.controlInfo.newEvent := '1';
+				res.controlInfo.hasBranch := '1';
+				res.target := targets(i);
+				exit;
+			end if;
+		end loop;
+	end if;
+	
+	res0.data(0) := res;
+	res0.fullMask := fullOut;
+	return res0;
+
+--		
+--	
+--		if 	fetchBlock(0)(15 downto 10) = opcode2slv(jl) 
+--			or fetchBlock(0)(15 downto 10) = opcode2slv(jz) 
+--			or fetchBlock(0)(15 downto 10) = opcode2slv(jnz)
+--		then
+--			--report "branch fetched!";
+--			if fetchBlock(0)(4) = '1' then
+--				res.controlInfo.newEvent := '1';
+--				res.controlInfo.hasBranch := '1';			
+--			end if;
+--			
+--			tempOffset := (others => fetchBlock(0)(4));
+--			tempOffset(20 downto 0) := fetchBlock(0)(4 downto 0) & fetchBlock(1);
+--			tempTarget := addMwordFaster(res.basicInfo.ip, tempOffset);
+--			res.target := tempTarget;
+--		elsif fetchBlock(0)(15 downto 10) = opcode2slv(j)
+--		then
+--			--report "long branch fetched";
+--			tempOffset := "000000" & fetchBlock(0)(9 downto 0) & fetchBlock(1);
+--			tempTarget := addMwordFaster(res.basicInfo.ip, tempOffset);
+--			res.target := tempTarget;
+--		end if;
+--	end if;
+--	
+--	return res;
+end function;
+
+
+function getEarlyBranchMultiDataIn(ins: InstructionState; receiving: std_logic; valid: std_logic;
+							  hbuffAccepting: std_logic; fetchBlock: HwordArray(0 to FETCH_BLOCK_SIZE-1))
+return StageDataMulti is
+	variable res: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
+begin
 	
 	return res;
 end function;
