@@ -66,6 +66,8 @@ function getEarlyBranchMultiDataIn(ins: InstructionState; receiving: std_logic; 
 							  hbuffAccepting: std_logic; fetchBlock: HwordArray(0 to FETCH_BLOCK_SIZE-1))
 return StageDataMulti;
 
+function countFullNonSkipped(insVec: StageDataMulti) return integer;
+
 end ProcLogicFront;
 
 
@@ -394,8 +396,11 @@ begin
 			nSkippedIns := slv2u(ins.basicInfo.ip(ALIGN_BITS-1 downto 0))/4; -- CORRECT?
 			--	report integer'image(slv2u(ins.basicInfo.ip)) &  "; " & integer'image(nSkippedIns) & " skipped";
 			for i in 0 to PIPE_WIDTH-1 loop
+				full(i) := '1'; -- CAREFUL! For skipping using 'skipped' flag, not clearing 'full' 
 				if i >= nSkippedIns then
 					full(i) := '1';
+				else
+					res0.data(i).controlInfo.skipped := '1';
 				end if;
 			end loop;
 			
@@ -452,6 +457,17 @@ return StageDataMulti is
 begin
 	res := getFrontEventMulti(ins, receiving, valid, hbuffAccepting, fetchBlock);
 	
+	return res;
+end function;
+
+function countFullNonSkipped(insVec: StageDataMulti) return integer is 
+	variable res: integer := 0;
+begin
+	for i in 0 to PIPE_WIDTH-1 loop
+		if insVec.fullMask(i) = '1' and insVec.data(i).controlInfo.skipped = '0' then
+			res := res + 1;
+		end if;
+	end loop;
 	return res;
 end function;
 

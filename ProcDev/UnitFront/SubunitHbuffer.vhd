@@ -138,7 +138,7 @@ begin
 
 	nHIn <= --i2slv(FETCH_BLOCK_SIZE - (slv2u(stageDataIn.basicInfo.ip(ALIGN_BITS-1 downto 1))),
 			  --		  SMALL_NUMBER_SIZE);				
-					i2slv(2 * countOnes(stageDataInMulti.fullMask), SMALL_NUMBER_SIZE);
+					i2slv(2 * countFullNonSkipped(stageDataInMulti), SMALL_NUMBER_SIZE);
 						-- TODO: change to 2 * bit count from EarlyBranchMulti 
 
 	hbufferDataANew <= getAnnotatedHwords(stageDataIn, stageDataInMulti, fetchBlock);					

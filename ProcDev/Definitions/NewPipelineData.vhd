@@ -25,7 +25,7 @@ package NewPipelineData is
 	-- Configuration defs 
 	constant MW: natural := 4; -- Max pipe width  
 
-	constant LOG2_PIPE_WIDTH: natural := 0 + 1; -- + 2; -- Must match the width!
+	constant LOG2_PIPE_WIDTH: natural := 0 + 0; -- + 2; -- Must match the width!
 	constant PIPE_WIDTH: positive := 2**LOG2_PIPE_WIDTH; -- + 1 + 2; 
 	constant ALIGN_BITS: natural := LOG2_PIPE_WIDTH + 2;
 
@@ -139,6 +139,7 @@ end record;
 
 type InstructionControlInfo is record
 		squashed: std_logic;
+		skipped: std_logic;
 	completed: std_logic;
 		completed2: std_logic;
 	-- Momentary data:
@@ -321,6 +322,7 @@ function defaultControlInfo return InstructionControlInfo is
 begin
 	return InstructionControlInfo'(
 													squashed => '0',
+													skipped => '0',
 												completed => '0',
 													completed2 => '0',
 												newEvent => '0',
