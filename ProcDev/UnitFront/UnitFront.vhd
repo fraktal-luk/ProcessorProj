@@ -241,7 +241,7 @@ begin
 																				pcSendingDelayedFinal, ivalidFinal, '1',
 																				fetchBlockFinal);
 			
-			SUBUNIT_EARLY_BRANCH_MULTI: entity work.GenericStageMulti(Behavioral)
+			SUBUNIT_EARLY_BRANCH_MULTI: entity work.GenericStageMulti(Behavioral2)
 			port map(
 					clk => clk, reset => resetSig, en => enSig,
 							

@@ -383,6 +383,7 @@ begin
 		-- TMP
 			-- Find which are before the start of fetch address
 			nSkippedIns := slv2u(ins.basicInfo.ip(ALIGN_BITS-1 downto 0))/4; -- CORRECT?
+				report integer'image(slv2u(ins.basicInfo.ip)) &  "; " & integer'image(nSkippedIns) & " skipped";
 			for i in 0 to PIPE_WIDTH-1 loop
 				if i >= nSkippedIns then
 					full(i) := '1';
@@ -431,33 +432,6 @@ begin
 	res0.data(0) := res;
 	res0.fullMask := fullOut;
 	return res0;
-
---		
---	
---		if 	fetchBlock(0)(15 downto 10) = opcode2slv(jl) 
---			or fetchBlock(0)(15 downto 10) = opcode2slv(jz) 
---			or fetchBlock(0)(15 downto 10) = opcode2slv(jnz)
---		then
---			--report "branch fetched!";
---			if fetchBlock(0)(4) = '1' then
---				res.controlInfo.newEvent := '1';
---				res.controlInfo.hasBranch := '1';			
---			end if;
---			
---			tempOffset := (others => fetchBlock(0)(4));
---			tempOffset(20 downto 0) := fetchBlock(0)(4 downto 0) & fetchBlock(1);
---			tempTarget := addMwordFaster(res.basicInfo.ip, tempOffset);
---			res.target := tempTarget;
---		elsif fetchBlock(0)(15 downto 10) = opcode2slv(j)
---		then
---			--report "long branch fetched";
---			tempOffset := "000000" & fetchBlock(0)(9 downto 0) & fetchBlock(1);
---			tempTarget := addMwordFaster(res.basicInfo.ip, tempOffset);
---			res.target := tempTarget;
---		end if;
---	end if;
---	
---	return res;
 end function;
 
 
@@ -466,6 +440,7 @@ function getEarlyBranchMultiDataIn(ins: InstructionState; receiving: std_logic; 
 return StageDataMulti is
 	variable res: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
 begin
+	res := getFrontEventMulti(ins, receiving, valid, hbuffAccepting, fetchBlock);
 	
 	return res;
 end function;
