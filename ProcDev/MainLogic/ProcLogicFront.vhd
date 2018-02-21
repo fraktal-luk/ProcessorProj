@@ -46,7 +46,7 @@ return HbuffOutData;
 
 function getFetchOffset(ip: Mword) return SmallNumber;
 
-function getAnnotatedHwords(fetchIns: InstructionState;
+function getAnnotatedHwords(fetchIns: InstructionState; fetchInsMulti: StageDataMulti;
 									 fetchBlock: HwordArray)
 return InstructionStateArray;
 
@@ -56,6 +56,19 @@ function stageMultiEvents(sd: StageDataMulti; isNew: std_logic) return StageMult
 function getFrontEvent(ins: InstructionState; receiving: std_logic; valid: std_logic;
 							  hbuffAccepting: std_logic; fetchBlock: HwordArray(0 to FETCH_BLOCK_SIZE-1))
 return InstructionState;
+
+function getFrontEventMulti(ins: InstructionState; receiving: std_logic; valid: std_logic;
+							  hbuffAccepting: std_logic; fetchBlock: HwordArray(0 to FETCH_BLOCK_SIZE-1))
+return StageDataMulti;
+
+
+function getEarlyBranchMultiDataIn(ins: InstructionState; receiving: std_logic; valid: std_logic;
+							  hbuffAccepting: std_logic; fetchBlock: HwordArray(0 to FETCH_BLOCK_SIZE-1))
+return StageDataMulti;
+
+function countFullNonSkipped(insVec: StageDataMulti) return integer;
+
+function findEarlyTakenJump(ins: InstructionState; insVec: StageDataMulti) return InstructionState;
 
 end ProcLogicFront;
 
@@ -173,7 +186,7 @@ begin
 		end if;
 		
 		if res.controlInfo.squashed = '1' then	-- CAREFUL: ivalid was '0'
-			report "Trying to decode invalid locaiton" severity error;
+			report "Trying to decode invalid location" severity error;
 		end if;
 		
 			res.controlInfo.squashed := '0';
@@ -215,12 +228,14 @@ begin
 			res.data(i).bits := content(j).bits(15 downto 0) & content(j+1).bits(15 downto 0);			
 			res.data(i).basicInfo := content(j).basicInfo;
 				res.data(i).controlInfo.squashed := content(j).controlInfo.squashed;			
+				res.data(i).controlInfo.hasBranch := content(j).controlInfo.hasBranch;
 			j := j + 1;
 		elsif (fullMask(j) and fullMask(j+1)) = '1' then
 			res.fullMask(i) := '1';
 			res.data(i).bits := content(j).bits(15 downto 0) & content(j+1).bits(15 downto 0);
 			res.data(i).basicInfo := content(j).basicInfo;
-				res.data(i).controlInfo.squashed := content(j).controlInfo.squashed;			
+				res.data(i).controlInfo.squashed := content(j).controlInfo.squashed;
+				res.data(i).controlInfo.hasBranch := content(j).controlInfo.hasBranch;
 			j := j + 2;
 		else
 			nOut := i;
@@ -242,7 +257,7 @@ end function;
 		end function;
 
 
-function getAnnotatedHwords(fetchIns: InstructionState; 
+function getAnnotatedHwords(fetchIns: InstructionState; fetchInsMulti: StageDataMulti;
 									 fetchBlock: HwordArray)
 return InstructionStateArray is
 	variable res: InstructionStateArray(0 to 2*PIPE_WIDTH-1) := (others => DEFAULT_ANNOTATED_HWORD);
@@ -261,6 +276,13 @@ begin
 		res(i).classInfo.short := '0'; -- TEMP!
 			res(i).controlInfo.squashed := fetchIns.controlInfo.squashed; -- CAREFUL: guarding from wrong reading 
 	end loop;
+	
+		for i in 0 to PIPE_WIDTH-1 loop
+			--res(2*i).controlInfo.newEvent := fetchInsMulti.data(i).controlInfo.newEvent;
+			res(2*i).controlInfo.hasBranch := fetchInsMulti.data(i).controlInfo.hasBranch;
+			res(2*i).target := fetchInsMulti.data(i).target;
+		end loop;
+	
 	return res;
 end function;
 
@@ -346,5 +368,127 @@ begin
 	
 	return res;
 end function;
+
+
+function getFrontEventMulti(ins: InstructionState; receiving: std_logic; valid: std_logic;
+							  hbuffAccepting: std_logic; fetchBlock: HwordArray(0 to FETCH_BLOCK_SIZE-1))
+return StageDataMulti is
+	variable res0: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
+	variable res: InstructionState := ins;
+	variable tempOffset, baseIP, tempTarget: Mword := (others => '0');
+	variable targets: MwordArray(0 to PIPE_WIDTH-1) := (others => (others => '0'));
+	variable fullOut, full, branchIns, predictedTaken: std_logic_vector(0 to PIPE_WIDTH-1) := (others => '0');
+	variable nSkippedIns: integer := 0;
+begin
+	if valid = '0' then
+		res.controlInfo.squashed := '1';
+	end if;
+
+	-- receiving, valid, accepting	-> good
+	-- receiving, valid, not accepting -> refetch
+	-- receiving, invalid, accepting -> error, will cause exception, but handled later, from decode on
+	-- receiving, invalid, not accepting -> refetch??
+
+	
+	-- Check if it's a branch
+	-- TODO: (should be done in predecode when loading to cache)
+	-- CAREFUL: Only without hword instructions now!
+		-- TMP
+			-- Find which are before the start of fetch address
+			nSkippedIns := slv2u(ins.basicInfo.ip(ALIGN_BITS-1 downto 0))/4; -- CORRECT?
+			--	report integer'image(slv2u(ins.basicInfo.ip)) &  "; " & integer'image(nSkippedIns) & " skipped";
+			for i in 0 to PIPE_WIDTH-1 loop
+				full(i) := '1'; -- CAREFUL! For skipping using 'skipped' flag, not clearing 'full' 
+				if i >= nSkippedIns then
+					full(i) := '1';
+				else
+					res0.data(i).controlInfo.skipped := '1';
+				end if;
+			end loop;
+			
+	if (receiving and valid and hbuffAccepting) = '1' then
+		for i in 0 to PIPE_WIDTH-1 loop
+			-- Is normal branch instruction?
+			if 	fetchBlock(2*i)(15 downto 10) = opcode2slv(jl) 
+				or fetchBlock(2*i)(15 downto 10) = opcode2slv(jz) 
+				or fetchBlock(2*i)(15 downto 10) = opcode2slv(jnz)
+			then
+				branchIns(i) := '1';
+				predictedTaken(i) := fetchBlock(2*i)(4);
+				tempOffset := (others => fetchBlock(2*i)(4));
+				tempOffset(20 downto 0) := fetchBlock(2*i)(4 downto 0) & fetchBlock(2*i + 1);
+				baseIP := res.basicInfo.ip(MWORD_SIZE-1 downto ALIGN_BITS) & i2slv(i*4, ALIGN_BITS); -- ??
+				tempTarget := addMwordFaster(baseIP, tempOffset);
+				targets(i) := tempTarget;			-- Long branch instruction?
+			elsif fetchBlock(2*i)(15 downto 10) = opcode2slv(j)
+			then
+				branchIns(i) := '1';
+				predictedTaken(i) := '1'; -- Long jump is unconditional (no space for register encoding!)
+				tempOffset := (others => fetchBlock(2*i)(9));
+				tempOffset(25 downto 0) := fetchBlock(2*i)(9 downto 0) & fetchBlock(2*i + 1);
+				baseIP := res.basicInfo.ip(MWORD_SIZE-1 downto ALIGN_BITS) & i2slv(i*4, ALIGN_BITS); -- ??
+				tempTarget := addMwordFaster(baseIP, tempOffset);
+				targets(i) := tempTarget;
+			end if;
+			
+		end loop;
+		
+		-- Find if any branch predicted
+		for i in 0 to PIPE_WIDTH-1 loop
+			fullOut(i) := full(i);
+			res0.data(i).bits := fetchBlock(2*i) & fetchBlock(2*i+1);
+			if full(i) = '1' and branchIns(i) = '1' and predictedTaken(i) = '1' then
+				res0.data(i).controlInfo.newEvent := '1';
+				res0.data(i).controlInfo.hasBranch := '1';
+				res0.data(i).target := targets(i);
+				exit;
+			end if;
+		end loop;
+	end if;
+	
+	--res0.data(0) := res;
+	res0.fullMask := fullOut;
+	return res0;
+end function;
+
+
+function getEarlyBranchMultiDataIn(ins: InstructionState; receiving: std_logic; valid: std_logic;
+							  hbuffAccepting: std_logic; fetchBlock: HwordArray(0 to FETCH_BLOCK_SIZE-1))
+return StageDataMulti is
+	variable res: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
+begin
+	res := getFrontEventMulti(ins, receiving, valid, hbuffAccepting, fetchBlock);
+	
+	return res;
+end function;
+
+function countFullNonSkipped(insVec: StageDataMulti) return integer is 
+	variable res: integer := 0;
+begin
+	for i in 0 to PIPE_WIDTH-1 loop
+		if insVec.fullMask(i) = '1' and insVec.data(i).controlInfo.skipped = '0' then
+			res := res + 1;
+		end if;
+	end loop;
+	return res;
+end function;
+
+function findEarlyTakenJump(ins: InstructionState; insVec: StageDataMulti) return InstructionState is
+	variable res: InstructionState := ins;
+begin
+	for i in 0 to PIPE_WIDTH-1 loop
+		if 		insVec.fullMask(i) = '1' and insVec.data(i).controlInfo.skipped = '0'
+			and 	insVec.data(i).controlInfo.newEvent = '1'
+		then
+			res.controlInfo.newEvent := '1';
+			res.controlInfo.hasBranch := '1';
+			res.target  := insVec.data(i).target;
+			exit;
+		end if;
+	end loop;
+	
+	return res;
+end function;
+
 
 end ProcLogicFront;

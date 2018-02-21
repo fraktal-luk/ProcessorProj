@@ -138,6 +138,70 @@ begin
 end Behavioral;
 
 
+
+architecture Behavioral2 of GenericStageMulti is
+	signal flowDrive: FlowDriveSimple := (others=>'0');
+	signal flowResponse, flowResponse_C: FlowResponseSimple := (others=>'0');		
+	signal stageData, stageDataLiving, stageDataNext, stageDataNew:
+														StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
+	signal partialKillMask: std_logic_vector(0 to PIPE_WIDTH-1) := (others => '0');	
+	signal stageEvents: StageMultiEventInfo;
+	
+		signal contentState, contentStateNext: ContentStateSimple := DEFAULT_CS_SIMPLE;
+begin
+	stageDataNew <= stageDataIn;										
+	stageDataNext <= stageMultiNext(stageDataLiving, stageDataNew,
+								flowResponse.living, flowResponse.sending, flowDrive.prevSending);			
+	stageDataLiving <= stageMultiHandleKill(stageData, flowDrive.kill, partialKillMask);
+
+
+		contentStateNext <= nextContentState(contentState, flowDrive, reset, en);
+		flowResponse_C <= getResponse(contentState, flowDrive);
+
+	PIPE_CLOCKED: process(clk) 	
+	begin
+		if rising_edge(clk) then
+			contentState <= contentStateNext;
+		
+			if reset = '1' then
+				
+			elsif en = '1' then	
+				stageData <= stageDataNext;
+				
+
+				logMulti(stageData.data, stageData.fullMask, stageDataLiving.fullMask, flowResponse);
+				checkMulti(stageData, stageDataNext, flowDrive, flowResponse);				
+			end if;
+		end if;
+	end process;
+
+	SIMPLE_SLOT_LOGIC: SimplePipeLogic port map(
+		clk => clk, reset => reset, en => en,
+		flowDrive => flowDrive,
+		flowResponse => flowResponse
+	);
+	
+		stageEvents <= stageMultiEvents(stageData, flowResponse.isNew);								
+		partialKillMask <= stageEvents.partialKillMask;
+	
+	flowDrive.prevSending <= --prevSending;
+										isNonzero(stageDataIn.fullMask); -- CAREFUL: The difference from Behavioral
+	flowDrive.nextAccepting <= nextAccepting;
+	flowDrive.kill <= execEventSignal or lateEventSignal;
+	flowDrive.lockAccept <= lockCommand;
+
+	acceptingOut <= flowResponse.accepting;		
+	sendingOut <= flowResponse.sending;
+	--stageDataOut <= stageDataLiving; -- TODO: clear temp ctrl info?
+		stageDataOut.data <= stageDataLiving.data;
+		stageDataOut.fullMask <= stageDataLiving.fullMask when flowResponse.sending = '1'
+								 else (others => '0');
+								 
+	stageEventsOut <= stageEvents;
+end Behavioral2;
+
+
+
 architecture Renaming of GenericStageMulti is
 	signal flowDrive: FlowDriveSimple := (others=>'0');
 	signal flowResponse: FlowResponseSimple := (others=>'0');		

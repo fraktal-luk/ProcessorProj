@@ -139,6 +139,7 @@ end record;
 
 type InstructionControlInfo is record
 		squashed: std_logic;
+		skipped: std_logic;
 	completed: std_logic;
 		completed2: std_logic;
 	-- Momentary data:
@@ -321,6 +322,7 @@ function defaultControlInfo return InstructionControlInfo is
 begin
 	return InstructionControlInfo'(
 													squashed => '0',
+													skipped => '0',
 												completed => '0',
 													completed2 => '0',
 												newEvent => '0',

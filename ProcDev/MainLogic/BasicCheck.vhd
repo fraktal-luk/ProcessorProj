@@ -272,7 +272,7 @@ begin
 	
 	nFull:= countOnes(stageData.fullMask);
 	if flowResponse.full = '1' then
-		assert countOnes(stageData.fullMask(0 to nFull-1)) = nFull; -- check continuity of mask?
+		assert countOnes(stageData.fullMask(0 to nFull-1)) = nFull report "myr"; -- check continuity of mask?
 	end if;
 	-- pragma synthesis on	
 end procedure;
