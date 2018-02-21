@@ -209,9 +209,10 @@ begin
 	
 	hbufferDataIn <= checkIvalid(earlyBranchDataOut.data(0), '1');
 	
-			earlyBranchDataIn.data(0) <= getFrontEvent(stageDataOutFetchFinal,
-															pcSendingDelayedFinal, ivalidFinal, '1',
-															fetchBlockFinal);
+			earlyBranchDataIn.data(0) <= --getFrontEvent(stageDataOutFetchFinal,
+													--		pcSendingDelayedFinal, ivalidFinal, '1',
+													--		fetchBlockFinal);
+													findEarlyTakenJump(stageDataOutFetchFinal, earlyBranchMultiDataIn);		
 			earlyBranchdataIn.fullMask(0) <= sendingOutFetchFinal;
 			
 			sendingToEarlyBranch <= sendingOutFetchFinal;

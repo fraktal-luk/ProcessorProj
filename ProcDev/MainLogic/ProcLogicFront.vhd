@@ -68,6 +68,8 @@ return StageDataMulti;
 
 function countFullNonSkipped(insVec: StageDataMulti) return integer;
 
+function findEarlyTakenJump(ins: InstructionState; insVec: StageDataMulti) return InstructionState;
+
 end ProcLogicFront;
 
 
@@ -470,5 +472,23 @@ begin
 	end loop;
 	return res;
 end function;
+
+function findEarlyTakenJump(ins: InstructionState; insVec: StageDataMulti) return InstructionState is
+	variable res: InstructionState := ins;
+begin
+	for i in 0 to PIPE_WIDTH-1 loop
+		if 		insVec.fullMask(i) = '1' and insVec.data(i).controlInfo.skipped = '0'
+			and 	insVec.data(i).controlInfo.newEvent = '1'
+		then
+			res.controlInfo.newEvent := '1';
+			res.controlInfo.hasBranch := '1';
+			res.target  := insVec.data(i).target;
+			exit;
+		end if;
+	end loop;
+	
+	return res;
+end function;
+
 
 end ProcLogicFront;
