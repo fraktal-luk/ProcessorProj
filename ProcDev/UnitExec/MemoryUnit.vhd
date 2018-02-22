@@ -91,36 +91,30 @@ end MemoryUnit;
 
 
 architecture Behavioral of MemoryUnit is
-	constant zeroMask: std_logic_vector(0 to PIPE_WIDTH-1) := (others => '0');
-
 	signal sendingSQ: std_logic := '0';							
 
-	signal content, contentNext, contentUpdated:
-					InstructionSlotArray(0 to QUEUE_SIZE-1) := (others => DEFAULT_INSTRUCTION_SLOT);
-	signal contentData, contentDataNext,  TMP_content, TMP_contentNext: InstructionStateArray(0 to QUEUE_SIZE-1)
+	signal TMP_content, TMP_contentNext: InstructionStateArray(0 to QUEUE_SIZE-1)
 																			:= (others => DEFAULT_INSTRUCTION_STATE);
-	signal fullMask, livingMask, killMask, contentMaskNext, matchingA, matchingD,
-				TMP_mask, TMP_ckEnForInput, TMP_sendingMask, TMP_killMask, TMP_livingMask,
-				TMP_maskNext,	TMP_maskA, TMP_maskD
+	signal TMP_mask, TMP_ckEnForInput, TMP_sendingMask, TMP_killMask, TMP_livingMask,
+			 TMP_maskNext,	TMP_maskA, TMP_maskD
 								: std_logic_vector(0 to QUEUE_SIZE-1) := (others => '0'); 
 	signal sqOutData, TMP_frontW, TMP_preFrontW, TMP_sendingData: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
 
 	signal bufferDrive: FlowDriveBuffer := (killAll => '0', lockAccept => '0', lockSend => '0',
-																others=>(others=>'0'));
+																													others=>(others=>'0'));
 	signal bufferResponse: FlowResponseBuffer := (others=>(others=>'0'));
 	
-		signal qs0, qs1: TMP_queueState := TMP_defaultQueueState;
-		signal contentView, contentNextView:
+	signal qs0, qs1: TMP_queueState := TMP_defaultQueueState;
+	signal contentView, contentNextView:
 					InstructionStateArray(0 to QUEUE_SIZE-1) := (others => DEFAULT_INSTRUCTION_STATE);
-		signal maskView, liveMaskView, maskNextView: std_logic_vector(0 to QUEUE_SIZE-1) := (others => '0');
+	signal maskView, liveMaskView, maskNextView: std_logic_vector(0 to QUEUE_SIZE-1) := (others => '0');
 		
-		signal inputIndices: SmallNumberArray(0 to QUEUE_SIZE-1) := (others => (others => '0'));
+	signal inputIndices: SmallNumberArray(0 to QUEUE_SIZE-1) := (others => (others => '0'));
 
-		signal cmpMask, matchedSlot: std_logic_vector(0 to QUEUE_SIZE-1) := (others => '0');
-		
-		signal selectedData: InstructionState := DEFAULT_INSTRUCTION_STATE;
-		signal selectedSendingSig: std_logic := '0';
-		signal selectedDataOutputSig: InstructionSlot := DEFAULT_INSTRUCTION_SLOT;
+	signal cmpMask, matchedSlot: std_logic_vector(0 to QUEUE_SIZE-1) := (others => '0');
+
+	signal selectedDataSlot: InstructionSlot := DEFAULT_INSTRUCTION_SLOT;
+	signal selectedDataOutputSig: InstructionSlot := DEFAULT_INSTRUCTION_SLOT;
 begin				
 	qs1 <= TMP_change(qs0, bufferDrive.nextAccepting, bufferDrive.prevSending,
 							TMP_mask, TMP_killMask, lateEventSignal or execEventSignal, TMP_maskNext);
@@ -160,8 +154,6 @@ begin
 			
 	sendingSQ <= isNonzero(sqOutData.fullMask);
 	dataOutV <= sqOutData;
-	contentData <= extractData(content);
-
 
 		cmpMask <= compareAddress(TMP_content, TMP_mask, compareAddressInput.ins);
 		-- TEMP selection of hit checking mechanism 
@@ -169,13 +161,11 @@ begin
 																										when MODE = store
 					else	findOldestMatch(TMP_content, cmpMask, qs0.pStart, compareAddressInput.ins)
 																										when MODE = load
-					else  --findMatchingGroupTag(TMP_content, compareAddressDataIn) and TMP_mask
-							findMatching(makeSlotArray(TMP_content, TMP_mask), compareAddressInput.ins)
+					else  findMatching(makeSlotArray(TMP_content, TMP_mask), compareAddressInput.ins)
 																										when MODE = branch
 					else	(others => '0');
-		selectedSendingSig <= isNonzero(matchedSlot) and compareAddressInput.full;
-		selectedData <= chooseIns(TMP_content, matchedSlot);
-	
+
+	selectedDataSlot <= (isNonzero(matchedSlot) and compareAddressInput.full, chooseIns(TMP_content, matchedSlot));
 	
 	process (clk)
 	begin
@@ -184,7 +174,7 @@ begin
 			TMP_mask <= TMP_maskNext;	
 			TMP_content <= TMP_contentNext;
 			
-			selectedDataOutputSig <= (selectedSendingSig, selectedData);
+			selectedDataOutputSig <= selectedDataSlot;--(selectedSendingSig, selectedData);
 			
 			logBuffer(contentView, maskView, liveMaskView, bufferResponse);					
 			
@@ -193,7 +183,7 @@ begin
 			checkBuffer(contentView, maskView, contentNextView, maskNextView, bufferDrive, bufferResponse);
 			
 				reportWriting(storeAddressInput, storeValueInput, MODE);
-				reportForwarding(compareAddressInput, (selectedSendingSig, selectedData), MODE);
+				reportForwarding(compareAddressInput, selectedDataSlot, MODE);
 		end if;
 	end process;
 			
@@ -218,6 +208,6 @@ begin
 	sendingSQOut <= sendingSQ;
 
 	selectedDataOutput <= selectedDataOutputSig when ACCESS_REG
-						 else (selectedSendingSig, selectedData);
+						 else  selectedDataSlot;
 end Behavioral;
 
