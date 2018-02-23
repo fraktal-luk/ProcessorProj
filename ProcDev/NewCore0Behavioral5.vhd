@@ -222,6 +222,8 @@ begin
 				sbAccepting => sbAccepting,--: in std_logic;	-- INPUT
 				commitAccepting => commitAccepting,--: in std_logic; -- INPUT
 
+					sbSending => sbSending,
+
 				dataOutBQV => dataOutBQV,
 				dataOutSQ => dataOutSQ,
 				readyRegFlags => readyRegFlags,

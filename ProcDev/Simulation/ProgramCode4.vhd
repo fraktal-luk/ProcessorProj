@@ -321,13 +321,13 @@ package ProgramCode4 is
 			411 => insCLEAR(r1),
 			412 => insSET(r2, 22),
 			413 => insSET(r3, 33),
-			414 => insLOAD(r1, r0, 4*64), -- Should be 0
-			415 => insSTORE(r2, r0, 4*65 - 4),
-			416 => insLOAD(r5, r0, 4*65 - 4), -- Should be forwarded as 22
-			417 => insSTORE(r3, r0, 4*66 - 8),
-			418 => insLOAD(r6, r0, 4*66 - 8), -- Should be forwarded as 33
-			419 => insSTORE(r1, r0, 4*64),
-			420 => insLOAD(r7, r0, 4*64), -- Should be forwarded as 0
+			414 => insLOAD(r1, r0, 4*48), -- Should be 0
+			415 => insSTORE(r2, r0, 4*49 - 4),
+			416 => insLOAD(r5, r0, 4*49 - 4), -- Should be forwarded as 22
+			417 => insSTORE(r3, r0, 4*50 - 8),
+			418 => insLOAD(r6, r0, 4*50 - 8), -- Should be forwarded as 33
+			419 => insSTORE(r1, r0, 4*48),
+			420 => insLOAD(r7, r0, 4*48), -- Should be forwarded as 0
 			
 			421 => ins655H(subI, r5, r5, 22),
 			422 => ins65J(jnz, r5, 4*(1023 - 422)),

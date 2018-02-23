@@ -72,7 +72,7 @@ entity UnitExec is
 			
 			groupCtrNext: in SmallNumber;
 			groupCtrInc: in SmallNumber;
-			
+				
 		outputA: out InstructionSlot;
 		outputB: out InstructionSlot;
 		outputD: out InstructionSlot;

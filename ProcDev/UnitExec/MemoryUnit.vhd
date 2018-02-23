@@ -96,16 +96,19 @@ architecture Behavioral of MemoryUnit is
 	signal TMP_content, TMP_contentNext: InstructionStateArray(0 to QUEUE_SIZE-1)
 																			:= (others => DEFAULT_INSTRUCTION_STATE);
 	signal TMP_mask, TMP_ckEnForInput, TMP_sendingMask, TMP_killMask, TMP_livingMask,
-			 TMP_maskNext,	TMP_maskA, TMP_maskD
+			 TMP_maskNext,	TMP_maskA, TMP_maskD,	committedMask, committedMaskNext, drainingMask, fullOrCommMask
 								: std_logic_vector(0 to QUEUE_SIZE-1) := (others => '0'); 
-	signal sqOutData, TMP_frontW, TMP_preFrontW, TMP_sendingData: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
+	signal sqOutData, TMP_frontW, TMP_preFrontW, TMP_sendingData, TMP_preCommittedW: StageDataMulti 
+																				:= DEFAULT_STAGE_DATA_MULTI;
 
 	signal bufferDrive: FlowDriveBuffer := (killAll => '0', lockAccept => '0', lockSend => '0',
 																													others=>(others=>'0'));
 	signal bufferResponse: FlowResponseBuffer := (others=>(others=>'0'));
 	
 	signal qs0, qs1: TMP_queueState := TMP_defaultQueueState;
-	signal contentView, contentNextView:
+		signal qs0c, qs1c: TMP_queueState := TMP_defaultQueueState;
+
+	signal contentView, contentNextView, TMP_sqView:
 					InstructionStateArray(0 to QUEUE_SIZE-1) := (others => DEFAULT_INSTRUCTION_STATE);
 	signal maskView, liveMaskView, maskNextView: std_logic_vector(0 to QUEUE_SIZE-1) := (others => '0');
 		
@@ -115,7 +118,14 @@ architecture Behavioral of MemoryUnit is
 
 	signal selectedDataSlot: InstructionSlot := DEFAULT_INSTRUCTION_SLOT;
 	signal selectedDataOutputSig: InstructionSlot := DEFAULT_INSTRUCTION_SLOT;
+		signal TMP_num: SmallNumber := (others => '0');
 begin				
+			TMP_num(0) <= nextAccepting;
+			qs1c <= TMP_change(qs0c,  TMP_num, bufferDrive.nextAccepting,
+									committedMask, TMP_killMask, '0', committedMaskNext); -- Never killed!
+			drainingMask <= getQueueSendingMask(qs0c, QUEUE_SIZE, TMP_num);
+			
+
 	qs1 <= TMP_change(qs0, bufferDrive.nextAccepting, bufferDrive.prevSending,
 							TMP_mask, TMP_killMask, lateEventSignal or execEventSignal, TMP_maskNext);
 			
@@ -138,26 +148,32 @@ begin
 	TMP_maskA <= findMatching(makeSlotArray(TMP_content, TMP_mask), storeAddressInput.ins);
 	TMP_maskD <= findMatching(makeSlotArray(TMP_content, TMP_mask), storeValueInput.ins);
 
+			committedMaskNext <= (committedMask or TMP_sendingMask) and not drainingMask;
+
 	-- View
 	contentView <= normalizeInsArray(qs0, TMP_content);
 	maskView <= normalizeMask(qs0, TMP_mask);
 	liveMaskView <= normalizeMask(qs0, TMP_livingMask);
 	contentNextView <= normalizeInsArray(qs1, TMP_contentNext);
 	maskNextView <= normalizeMask(qs1, TMP_maskNext);
+	
+			TMP_sqView <= normalizeInsArray(qs0c, TMP_content);
 	------
 
 	TMP_frontW <= getQueueFrontWindow(qs0, TMP_content, TMP_mask);
 	TMP_preFrontW <= getQueuePreFrontWindow(qs0, TMP_content, TMP_mask);
 	TMP_sendingData <= findCommittingSQ(TMP_frontW.data, TMP_frontW.fullMask, groupCtrInc, committing);
-		
-	sqOutData <= TMP_sendingData;
-			
-	sendingSQ <= isNonzero(sqOutData.fullMask);
-	dataOutV <= sqOutData;
 
-		cmpMask <= compareAddress(TMP_content, TMP_mask, compareAddressInput.ins);
+			fullOrCommMask <= TMP_mask or committedMask;
+			TMP_preCommittedW <= getQueuePreFrontWindow(qs0c, TMP_content, fullOrCommMask); -- CAREFUL!
+
+	sqOutData <= TMP_sendingData;
+
+		cmpMask <=	compareAddress(TMP_content, fullOrCommMask, compareAddressInput.ins) when MODE = store
+				else	compareAddress(TMP_content, TMP_mask, compareAddressInput.ins);
 		-- TEMP selection of hit checking mechanism 
-		matchedSlot <= findNewestMatch(TMP_content, cmpMask, qs0.pStart, compareAddressInput.ins)
+		matchedSlot <= --findNewestMatch(TMP_content, cmpMask, qs0.pStart, compareAddressInput.ins)
+							findNewestMatch(TMP_content, cmpMask, qs0c.pStart, compareAddressInput.ins)
 																										when MODE = store
 					else	findOldestMatch(TMP_content, cmpMask, qs0.pStart, compareAddressInput.ins)
 																										when MODE = load
@@ -173,6 +189,8 @@ begin
 			qs0 <= qs1;
 			TMP_mask <= TMP_maskNext;	
 			TMP_content <= TMP_contentNext;
+				committedMask <= committedMaskNext;
+				qs0c <= qs1c;
 			
 			selectedDataOutputSig <= selectedDataSlot;--(selectedSendingSig, selectedData);
 			
@@ -202,8 +220,13 @@ begin
 	bufferDrive.prevSending <= num2flow(countOnes(dataIn.fullMask)) when prevSending = '1' else (others => '0');
 	bufferDrive.kill <= num2flow(countOnes(TMP_killMask));
 	bufferDrive.nextAccepting <= num2flow(countOnes(sqOutData.fullMask));
-					
-	acceptingOut <= not TMP_preFrontW.fullMask(0);
+
+
+	sendingSQ <= isNonzero(sqOutData.fullMask);
+	dataOutV <= sqOutData;
+	
+	acceptingOut <= 		not TMP_preCommittedW.fullMask(0) when MODe = store -- CAREFUL!
+						else	not TMP_preFrontW.fullMask(0);
 	
 	sendingSQOut <= sendingSQ;
 

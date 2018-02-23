@@ -81,6 +81,8 @@ entity OutOfOrderBox is
 			sbAccepting: in std_logic;	-- INPUT
 			commitAccepting: in std_logic; -- INPUT
 
+				sbSending: in std_logic;
+
 			dataOutBQV: out StageDataMulti; -- OUTPUT
 			dataOutSQ: out StageDataMulti; -- OUTPUT			  
 			
@@ -313,6 +315,8 @@ begin
 						
 						sbAcceptingIn => sbAccepting,
 						dataOutSQ => dataOutSQ,
+
+							sbSending => sbSending,
 											
 					lateEventSignal => lateEventSignal,	
 					execOrIntEventSignalIn => execEventSignal,
@@ -323,7 +327,7 @@ begin
 
 		execOutputs1 <= (0 => outputA, 1 => outputB, 2 => outputC, others => DEFAULT_INSTRUCTION_SLOT);
 		execOutputs2 <= (		2 => outputE, 3 => outputD, others => DEFAULT_INSTRUCTION_SLOT); -- (-,-,E,D)! 
-		execOutputsPre <= (0 => ('0', outputOpPreB), --1 => ('0', outputOpPreC),
+		execOutputsPre <= (1 => ('0', outputOpPreB), --1 => ('0', outputOpPreC),
 																				others => DEFAULT_INSTRUCTION_SLOT);
 			COMMIT_QUEUE: entity work.TestCQPart0(Implem)
 			generic map(

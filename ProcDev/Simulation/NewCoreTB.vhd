@@ -248,9 +248,9 @@ BEGIN
 				memWriteDone <= dwrite;
 				memWriteValue <= dout;
 				memWriteAddress <= doutadr;
-				if memWriteDone = '1' then
-					dataMem(slv2u(memWriteAddress(MWORD_SIZE-1 downto 2))) -- CAREFUL: pseudo-byte addressing
-											<= memWriteValue;
+				if dwrite = '1' then--memWriteDone = '1' then
+					dataMem(slv2u(doutadr(MWORD_SIZE-1 downto 2))) -- CAREFUL: pseudo-byte addressing
+											<= dout;
 				end if;
 				
 			end if;

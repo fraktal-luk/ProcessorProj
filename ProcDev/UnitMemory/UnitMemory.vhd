@@ -83,6 +83,8 @@ entity UnitMemory is
 		sbAcceptingIn: in std_logic;
 		dataOutSQ: out StageDataMulti;
 
+			sbSending: in std_logic;
+
 		lateEventSignal: in std_logic;	
 		execOrIntEventSignalIn: in std_logic;
 		execCausing: in InstructionState
@@ -268,7 +270,7 @@ begin
 				execEventSignal => eventSignal,
 				execCausing => execCausing,
 				
-				nextAccepting => '1',
+				nextAccepting => sbSending,--'1',
 				
 				sendingSQOut => open,
 					dataOutV => dataOutSQV
