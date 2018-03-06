@@ -12,6 +12,7 @@ use IEEE.STD_LOGIC_1164.all;
 
 use work.ProcBasicDefs.all;
 use work.Helpers.all;
+use work.ProcHelpers.all;
 
 use work.ProcInstructionsNew.all;
 use work.NewPipelineData.all;

@@ -44,6 +44,9 @@ function prepareForBranch(insVec: StageDataMulti) return StageDataMulti;
 function prepareForAlu(insVec: StageDataMulti; bl: std_logic_vector) return StageDataMulti;
 function prepareForStoreData(insVec: StageDataMulti) return StageDataMulti;
 
+-- Description: arg1 := target
+function trgForBQ(insVec: StageDataMulti) return StageDataMulti;
+
 end ProcLogicRouting;
 
 
@@ -314,6 +317,17 @@ begin
 			res.data(i).controlInfo.completed := '0';
 			res.data(i).controlInfo.completed2 := '0';
 	end loop;
+	return res;
+end function;
+
+function trgForBQ(insVec: StageDataMulti) return StageDataMulti is
+	variable res: StageDataMulti := insVec;
+begin
+	for i in 0 to PIPE_WIDTH-1 loop
+		res.data(i).argValues.arg1 := res.data(i).target;
+		res.data(i).argValues.arg2 := res.data(i).result;
+	end loop;
+	
 	return res;
 end function;
 

@@ -31,6 +31,7 @@ use IEEE.STD_LOGIC_1164.ALL;
 
 use work.ProcBasicDefs.all;
 use work.Helpers.all;
+use work.ProcHelpers.all;
 
 use work.ProcInstructionsNew.all;
 
