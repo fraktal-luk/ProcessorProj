@@ -32,8 +32,7 @@ function findForALU(iv: InstructionStateArray) return std_logic_vector;
 
 function findBranchLink(insv: StageDataMulti) return std_logic_vector;
 
-function whichBranchLink(insv: StageDataMulti) return std_logic_vector;
-function setBranchLink(insv: StageDataMulti) return StageDataMulti;
+--function setBranchLink(insv: StageDataMulti) return StageDataMulti;
 
 function findStores(insv: StageDataMulti) return std_logic_vector;
 function findLoads(insv: StageDataMulti) return std_logic_vector;
@@ -41,7 +40,6 @@ function findLoads(insv: StageDataMulti) return std_logic_vector;
 
 function prepareForAGU(insVec: StageDataMulti) return StageDataMulti;
 function prepareForBranch(insVec: StageDataMulti) return StageDataMulti;
-function prepareForAlu(insVec: StageDataMulti; bl: std_logic_vector) return StageDataMulti;
 function prepareForStoreData(insVec: StageDataMulti) return StageDataMulti;
 
 -- Description: arg1 := target
@@ -192,27 +190,17 @@ begin
 end function;
 
 
-function whichBranchLink(insv: StageDataMulti) return std_logic_vector is
-	variable res: std_logic_vector(0 to PIPE_WIDTH-1) := (others => '0');
-begin
-	for i in 0 to PIPE_WIDTH-1 loop
-		res(i) := insv.data(i).classInfo.branchLink;
-	end loop;
-	
-	return res;
-end function;
-
-function setBranchLink(insv: StageDataMulti) return StageDataMulti is
-	variable res: StageDataMulti := insv;
-	variable bl: std_logic_vector(0 to PIPE_WIDTH-1) := (others => '0');
-begin
-	bl := findBranchLink(insv);
-	for i in 0 to PIPE_WIDTH-1 loop
-		res.data(i).classInfo.branchLink := bl(i);
-	end loop;
-	
-	return res;
-end function;
+--function setBranchLink(insv: StageDataMulti) return StageDataMulti is
+--	variable res: StageDataMulti := insv;
+--	variable bl: std_logic_vector(0 to PIPE_WIDTH-1) := (others => '0');
+--begin
+--	bl := findBranchLink(insv);
+--	for i in 0 to PIPE_WIDTH-1 loop
+--		res.data(i).classInfo.branchLink := bl(i);
+--	end loop;
+--	
+--	return res;
+--end function;
 
 
 function findStores(insv: StageDataMulti) return std_logic_vector is
@@ -278,29 +266,6 @@ begin
 	return res;
 end function;
 
-function prepareForAlu(insVec: StageDataMulti; bl: std_logic_vector) return StageDataMulti is
-	variable res: StageDataMulti := insVec;
-begin
-	for i in 0 to PIPE_WIDTH-1 loop
-		--if 	 res.data(i).operation = (Jump, jump) and isNonzero(res.data(i).virtualDestArgs.d0) = '1'
-		--	and res.data(i).virtualDestArgs.sel(0) = '1'
---		if bl(i) = '1'
---		then
---			--		assert bl(i) = '1' report "ttttt";
---		
---			res.data(i).operation := (Alu, arithAdd);
---		
---			res.data(i).physicalArgs.s0 := (others => '0');
---			res.data(i).argValues.zero(0) := '1';
---			res.data(i).argValues.missing(0) := '0';
---			
---			res.data(i).constantArgs.imm := res.data(i).result;
---		--else	
---			--		assert bl(i) = '0' report "rrrrrrrrrr";
---		end if;
-	end loop;
-	return res;
-end function;
 
 function prepareForStoreData(insVec: StageDataMulti) return StageDataMulti is
 	variable res: StageDataMulti := insVec;

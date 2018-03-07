@@ -42,16 +42,13 @@ function renameRegs2(insVec: StageDataMulti; takeVec, destMask: std_logic_vector
 								psVec, pdVec: PhysNameArray) 		
 return StageDataMulti;
 
+
 function setArgStatus(insVec: StageDataMulti)--; readyRegFlagsVirtualNext: std_logic_vector) 
 return StageDataMulti;
-
-	
 
 
 
 function getStableDestsParallel(insVec: StageDataMulti; pdVec: PhysNameArray) return PhysNameArray;
-
-function baptizeGroup(insVec: StageDataMulti; newGroupTag: SmallNumber) return StageDataMulti;
 
 function baptizeAll(insVec: StageDataMulti; numberTags: SmallNumberArray;
 						  newGroupTag: SmallNumber; gprTags: SmallNumberArray)
@@ -64,9 +61,10 @@ function getSysRegWriteSel(sd: StageDataMulti) return slv5;
 -- CAREFUL: this seems not used and would choose the last value in group
 function getSysRegWriteValue(sd: StageDataMulti) return Mword;
 
+-- Clears non-effective 'full' bits in group (after exception or specia)
 function TMP_handleSpecial(sd: StageDataMulti) return StageDataMulti;
 
-function findWhichTakeReg(sd: StageDataMulti) return std_logic_vector;
+function findWhichTakeReg(sd: StageDataMulti) return std_logic_vector; -- USELESS? just fullMask
 function findWhichPutReg(sd: StageDataMulti) return std_logic_vector;
 
 
@@ -227,16 +225,6 @@ begin
 		end loop;			
 	end loop;
 
-	return res;
-end function;
-
-
-function baptizeGroup(insVec: StageDataMulti; newGroupTag: SmallNumber) return StageDataMulti is
-	variable res: StageDataMulti := insVec;
-begin
-	for i in 0 to PIPE_WIDTH-1 loop
-		res.data(i).groupTag := newGroupTag or i2slv(i, SMALL_NUMBER_SIZE);
-	end loop;
 	return res;
 end function;
 

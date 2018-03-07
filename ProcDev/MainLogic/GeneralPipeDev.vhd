@@ -52,6 +52,7 @@ type StageDataCommitQueue is record
 	data: InstructionStateArray(0 to CQ_SIZE-1);
 end record;
 
+-- FORWARDING NETWORK
 type ForwardingInfo is record
 	writtenTags: PhysNameArray(0 to PIPE_WIDTH-1);
 	resultTags: PhysNameArray(0 to N_RES_TAGS-1);
@@ -65,6 +66,7 @@ constant DEFAULT_FORWARDING_INFO: ForwardingInfo := (
 	nextResultTags => (others => (others => '0')),
 	resultValues => (others => (others => '0'))
 );
+
 
 type StageMultiEventInfo is record
 	eventOccured: std_logic;
@@ -171,6 +173,7 @@ function getSendingFromCQ(livingMask: std_logic_vector) return std_logic_vector;
 function killByTag(before, ei, int: std_logic) return std_logic;
 	
 -- FORWARDING NETWORK ------------
+-- UNUSED
 function getWrittenTags(lastCommitted: StageDataMulti) return PhysNameArray; -- DEPREC
 
 function getResultTags(execOutputs: InstructionSlotArray;

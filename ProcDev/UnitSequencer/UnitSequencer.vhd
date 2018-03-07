@@ -56,8 +56,8 @@ entity UnitSequencer is
 		en: in std_logic;
 		
 		-- Icache interface (in parallel with front pipe)
-		iadr: out Mword;	-- Probably can be extracted from pcDataLiving
-		iadrvalid: out std_logic; -- Seems redundant - equal to pcSending
+		iadr: out Mword;	-- REDUNDANT: Probably can be extracted from pcDataLiving
+		iadrvalid: out std_logic; -- REDUNDANT - equal to pcSending
 		
 		-- System reg interface
 		sysRegReadSel: in slv5;
@@ -122,7 +122,7 @@ entity UnitSequencer is
 			newPhysDestPointerIn: in SmallNumber;
 			newPhysSourcesIn: in PhysNameArray(0 to 3*PIPE_WIDTH-1);
 		
-		start: in std_logic	
+		start: in std_logic	-- TODO: change to reset interrupt
 	);
 end UnitSequencer;
 
@@ -157,9 +157,7 @@ architecture Behavioral of UnitSequencer is
 	signal newPhysDestPointer: SmallNumber := (others => '0');
 
 	signal newPhysSources: PhysNameArray(0 to 3*PIPE_WIDTH-1) := (others=>(others=>'0'));							
-	signal newGprTags: SmallNumberArray(0 to PIPE_WIDTH-1) := (others=>(others=>'0'));	
 
-	signal newNumberTags: SmallNumberArray(0 to PIPE_WIDTH-1) := (others=>(others=>'0'));
 	signal renameCtr, renameCtrNext, commitCtr, commitCtrNext: SmallNumber := (others => '1');
 	signal renameGroupCtr, renameGroupCtrNext, commitGroupCtr, commitGroupCtrNext: SmallNumber :=
 																						INITIAL_GROUP_TAG;
@@ -207,7 +205,7 @@ begin
 	pcNext <= addMwordBasic(pcBase, PC_INC);
 
 	stageDataToPC <= newPCData(
-									stageDataOutPC,
+									stageDataOutPC, -- UNUSED? What content is useful here?
 									TMP_phase2,
 									eiEvents.causing,
 									execEventSignal, execCausing,
@@ -245,13 +243,14 @@ begin
 			lockCommand => '0'		
 		);			
 		
-		newSysLevel <= currentStateSig(15 downto 8) when PROPAGATE_MODE else (others => '0');
-		newIntLevel <= currentStateSig(7 downto 0) when PROPAGATE_MODE else (others => '0');
-		
-		stageDataOutPC.basicInfo <=
-						  (ip => tmpPcOut.data(0).basicInfo.ip,
-							systemLevel => newSysLevel,
-							intLevel => newIntLevel);
+		--newSysLevel <= (others => '0');
+		--newIntLevel <= (others => '0');
+
+		stageDataOutPC.basicInfo.ip <= tmpPcOut.data(0).basicInfo.ip;		
+--		stageDataOutPC.basicInfo <=
+--						  (ip => tmpPcOut.data(0).basicInfo.ip,
+--							systemLevel => (others => '0'),
+--							intLevel => (others => '0'));
 	end block;
 
 
@@ -345,38 +344,88 @@ begin
 	-- Rename stage
 	RENAMING: block
 		-- INPUT: newPhysSources, newPhysDests
-		signal stageDataRenameIn, stageDataRenameInLinked: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;		
-		signal reserveSelSig, takeVec: std_logic_vector(0 to PIPE_WIDTH-1) := (others => '0' );
-		signal nToTake: integer := 0;
+		signal stageDataRenameIn, stageDataRenameIn_C: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;		
+		--signal reserveSelSig, takeVec: std_logic_vector(0 to PIPE_WIDTH-1) := (others => '0' );
+		--signal nToTake: integer := 0;
+		--	signal newGprTags: SmallNumberArray(0 to PIPE_WIDTH-1) := (others=>(others=>'0'));	
+		--	signal newNumberTags: SmallNumberArray(0 to PIPE_WIDTH-1) := (others=>(others=>'0'));
+		
+		function genNewNumberTags(renameCtr: SmallNumber) return SmallNumberArray is
+			variable res: SmallNumberArray(0 to PIPE_WIDTH-1) := (others => (others => '0'));
+		begin
+			for i in  0 to PIPE_WIDTH-1 loop
+				res(i) := i2slv(slv2u(renameCtr) + i + 1, SMALL_NUMBER_SIZE);
+			end loop;
+			return res;
+		end function;
+		
+		function genNewGprTags(newPhysDestPointer: SmallNumber; nToTake: integer) return SmallNumberArray is
+			variable res: SmallNumberArray(0 to PIPE_WIDTH-1) := (others => (others => '0'));
+		begin
+			for i in  0 to PIPE_WIDTH-1 loop
+				if FREE_LIST_COARSE_REWIND = '1' then
+					res(i) := i2slv((slv2u(newPhysDestPointer) + nToTake) mod FREE_LIST_SIZE, SMALL_NUMBER_SIZE);
+				else
+					res(i) := i2slv((slv2u(newPhysDestPointer) + i + 1) mod FREE_LIST_SIZE, SMALL_NUMBER_SIZE);
+				end if;
+			end loop;
+			return res;
+		end function;
+		
+		function renameGroup(insVec: StageDataMulti;
+									newPhysSources: PhysNameArray;
+									newPhysDests: PhysNameArray;
+									renameCtr: SmallNumber;
+									renameGroupCtrNext: SmallNumber;
+									newPhysDestPointer: SmallNumber
+									) return StageDataMulti is
+			variable res: StageDataMulti := insVec;
+			variable reserveSelSig, takeVec: std_logic_vector(0 to PIPE_WIDTH-1) := (others => '0' );
+			variable nToTake: integer := 0;
+			variable newGprTags: SmallNumberArray(0 to PIPE_WIDTH-1) := (others=>(others=>'0'));	
+			variable newNumberTags: SmallNumberArray(0 to PIPE_WIDTH-1) := (others=>(others=>'0'));
+		begin
+			reserveSelSig := getDestMask(insVec); -- Just full and having a destination?
+			takeVec := findWhichTakeReg(insVec); -- REG ALLOC
+			nToTake := countOnes(takeVec);
+		
+			newNumberTags := genNewNumberTags(renameCtr);
+			newGprTags := genNewGprTags(newPhysDestPointer, nToTake);			
+			
+			res := baptizeAll(res, newNumberTags, renameGroupCtrNext, newGprTags);
+			res := renameRegs2(res, takeVec, reserveSelSig, newPhysSources, newPhysDests);
+			res := setArgStatus(res);
+			res := TMP_handleSpecial(res);
+			
+			return res;
+		end function;
+		
+				signal ch0: std_logic := '0';
 	begin
 		-- CAREFUL, TODO: selection of changes in rename table and free list movement.
 		--						Taking from list is performed in RegisterFreeList, must have the same mask!
-		reserveSelSig <= getDestMask(frontDataLastLiving); 
-		takeVec <= findWhichTakeReg(frontDataLastLiving); -- REG ALLOC
-
-			nToTake <= countOnes(takeVec);
-
-		GEN_TAGS: for i in 0 to PIPE_WIDTH-1 generate	
-			newNumberTags(i) <= i2slv(slv2u(renameCtr) + i + 1, SMALL_NUMBER_SIZE);										
-			newGprTags(i) <= 
-									i2slv((slv2u(newPhysDestPointer) + nToTake) mod FREE_LIST_SIZE, SMALL_NUMBER_SIZE)
-										when FREE_LIST_COARSE_REWIND = '1'
-							else	i2slv((slv2u(newPhysDestPointer) + i + 1) mod FREE_LIST_SIZE, SMALL_NUMBER_SIZE);
-		end generate;
+--		reserveSelSig <= getDestMask(frontDataLastLiving); -- Just full and having a destination?
+--		takeVec <= findWhichTakeReg(frontDataLastLiving); -- REG ALLOC
+--		nToTake <= countOnes(takeVec);
 	
-		stageDataRenameIn <= 
-			TMP_handleSpecial(
-				setArgStatus(
-					baptizeAll(
-						renameRegs2(
-							frontDataLastLiving, takeVec, reserveSelSig, newPhysSources, newPhysDests
-						),
-						newNumberTags, renameGroupCtrNext, newGprTags
-					)
-				)	
-			);
+--		newNumberTags <= genNewNumberTags(renameCtr);
+--		newGprTags <= genNewGprTags(newPhysDestPointer, nToTake);
 	
-		stageDataRenameInLinked <= work.ProcLogicRouting.setBranchLink(stageDataRenameIn);
+--		stageDataRenameIn <= 
+--			TMP_handleSpecial( -- Clears 'full' for ineffective instructions, reduces to getEffectiveMask?
+--				setArgStatus(
+--					baptizeAll( -- Assigns numbers
+--						renameRegs2(
+--							frontDataLastLiving, takeVec, reserveSelSig, newPhysSources, newPhysDests
+--						),
+--						newNumberTags, renameGroupCtrNext, newGprTags
+--					)
+--				)	
+--			);
+	
+		stageDataRenameIn <= renameGroup(frontDataLastLiving, newPhysSources, newPhysDests, renameCtr,
+															renameGroupCtrNext, newPhysDestPointer);
+		--		ch0 <= '1' when stageDataRenameIn = stageDataRenameIn_C else '0';
 	
 		SUBUNIT_RENAME: entity work.GenericStageMulti(Renaming)
 		port map(
@@ -384,7 +433,7 @@ begin
 			
 			-- Interface with front
 			prevSending => frontLastSending,	
-			stageDataIn => stageDataRenameInLinked, --readyRegFlagsV),
+			stageDataIn => stageDataRenameIn, --readyRegFlagsV),
 			acceptingOut => acceptingOutRename,
 			
 			-- Interface with IQ
