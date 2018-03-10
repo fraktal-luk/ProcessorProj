@@ -71,8 +71,12 @@ entity UnitFront is
 		frontEventSignal: out std_logic;
 		frontCausing: out InstructionState;
 		
+		execCausing: in InstructionState;
+		lateCausing: in InstructionState;
+		
 		execEventSignal: in std_logic;
-		lateEventSignal: in std_logic		
+		lateEventSignal: in std_logic;
+		lateEventSetPC: in std_logic		
 	);
 end UnitFront;
 
@@ -114,7 +118,10 @@ architecture Behavioral of UnitFront is
 	
 		signal sendingToEarlyBranch, stallAtFetchLast, fetchStall: std_logic := '0'; 
 		signal pcSendingDelayed0, pcSendingDelayed1, pcSendingDelayedFinal: std_logic := '0';
-	
+		
+		signal frontCausingSig: InstructionState := DEFAULT_INSTRUCTION_STATE;
+		signal predictedAddress: Mword := (others => '0');
+		
 	constant HAS_RESET_FRONT: std_logic := '0';
 	constant HAS_EN_FRONT: std_logic := '0';	
 begin	 
@@ -208,7 +215,7 @@ begin
 	
 	acceptingForFetchFirst <= acceptingOutFetch1;
 	
-	hbufferDataIn <= checkIvalid(earlyBranchDataOut.data(0), '1');
+	hbufferDataIn <=  setInstructionIP( checkIvalid(earlyBranchDataOut.data(0), '1'),  predictedAddress);
 	
 			earlyBranchDataIn.data(0) <= --getFrontEvent(stageDataOutFetchFinal,
 													--		pcSendingDelayedFinal, ivalidFinal, '1',
@@ -239,7 +246,8 @@ begin
 			);
 			
 			
-			earlyBranchMultiDataIn <= getEarlyBranchMultiDataIn(stageDataOutFetchFinal,
+			earlyBranchMultiDataIn <= getEarlyBranchMultiDataIn(predictedAddress,
+																				stageDataOutFetchFinal,
 																				pcSendingDelayedFinal, ivalidFinal, '1',
 																				fetchBlockFinal);
 			
@@ -268,6 +276,21 @@ begin
 															 earlyBranchDataOut.data(0).basicInfo.ip);
 			frontKill <= stage0Events.eventOccured or fetchStall;
 			fetchStall <= earlyBranchSending and not acceptingOutHbuffer;
+	
+		SAVE_PRED_TARGET: process(clk)
+		begin
+			if rising_edge(clk) then
+				if lateEventSetPC = '1' then				
+					predictedAddress <= lateCausing.target;
+				elsif execEventSignal = '1' then
+					predictedAddress <= execCausing.target;
+				elsif (stallEventSig or stage0Events.eventOccured) = '1' then -- CAREFUL: must equal frontEventSignal
+					predictedAddress <= frontCausingSig.target; -- ?
+				elsif earlyBranchSending = '1' then
+					predictedAddress <= earlyBranchDataOut.data(0).target; -- ??
+				end if;
+			end if;
+		end process;
 	
 	-- Hword buffer		
 	SUBUNIT_HBUFFER: entity work.SubunitHbuffer(Implem)
@@ -341,6 +364,7 @@ begin
 	frontAccepting <= acceptingOutFetch;
 	
 		frontEventSignal <= stallEventSig or stage0Events.eventOccured;
-		frontCausing <= stallCausing when stallEventSig = '1' else stage0Events.causing;
+		frontCausingSig <= stallCausing when stallEventSig = '1' else stage0Events.causing;
+		frontCausing <= frontCausingSig;
 end Behavioral;
 

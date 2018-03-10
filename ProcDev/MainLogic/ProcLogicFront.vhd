@@ -58,12 +58,14 @@ function getFrontEvent(ins: InstructionState; receiving: std_logic; valid: std_l
 							  hbuffAccepting: std_logic; fetchBlock: HwordArray(0 to FETCH_BLOCK_SIZE-1))
 return InstructionState;
 
-function getFrontEventMulti(ins: InstructionState; receiving: std_logic; valid: std_logic;
+function getFrontEventMulti(predictedAddress: Mword;
+							  ins: InstructionState; receiving: std_logic; valid: std_logic;
 							  hbuffAccepting: std_logic; fetchBlock: HwordArray(0 to FETCH_BLOCK_SIZE-1))
 return StageDataMulti;
 
 
-function getEarlyBranchMultiDataIn(ins: InstructionState; receiving: std_logic; valid: std_logic;
+function getEarlyBranchMultiDataIn(predictedAddress: Mword;
+							  ins: InstructionState; receiving: std_logic; valid: std_logic;
 							  hbuffAccepting: std_logic; fetchBlock: HwordArray(0 to FETCH_BLOCK_SIZE-1))
 return StageDataMulti;
 
@@ -371,7 +373,8 @@ begin
 end function;
 
 
-function getFrontEventMulti(ins: InstructionState; receiving: std_logic; valid: std_logic;
+function getFrontEventMulti(predictedAddress: Mword;
+							  ins: InstructionState; receiving: std_logic; valid: std_logic;
 							  hbuffAccepting: std_logic; fetchBlock: HwordArray(0 to FETCH_BLOCK_SIZE-1))
 return StageDataMulti is
 	variable res0: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
@@ -396,7 +399,9 @@ begin
 	-- CAREFUL: Only without hword instructions now!
 		-- TMP
 			-- Find which are before the start of fetch address
-			nSkippedIns := slv2u(ins.basicInfo.ip(ALIGN_BITS-1 downto 0))/4; -- CORRECT?
+			--nSkippedIns := slv2u(ins.basicInfo.ip(ALIGN_BITS-1 downto 0))/4; -- CORRECT?
+			nSkippedIns := slv2u(predictedAddress(ALIGN_BITS-1 downto 0))/4; -- CORRECT?								
+			
 			--	report integer'image(slv2u(ins.basicInfo.ip)) &  "; " & integer'image(nSkippedIns) & " skipped";
 			for i in 0 to PIPE_WIDTH-1 loop
 				full(i) := '1'; -- CAREFUL! For skipping using 'skipped' flag, not clearing 'full' 
@@ -439,6 +444,17 @@ begin
 			fullOut(i) := full(i);
 			res0.data(i).bits := fetchBlock(2*i) & fetchBlock(2*i+1);
 			if full(i) = '1' and branchIns(i) = '1' and predictedTaken(i) = '1' then
+				-- TODO: Here check if the next line from line predictor agress with the target predicted now.
+				--			If so, don't cause the event but set invalidation mask that next line will use.
+				if targets(i)(MWORD_SIZE-1 downto ALIGN_BITS) = ins.target(MWORD_SIZE-1 downto ALIGN_BITS) then
+					report "Branch address agrees with line predictor";
+					report "Offset: " &  integer'image(slv2u(targets(i)(ALIGN_BITS-1 downto 0)));
+				else
+					-- Raise event
+				end if;
+				
+				-- skipValue(ALIGN_BITS-1 downto 0) := targets(i)(ALIGN_BITS-1 downto 0);
+				
 				res0.data(i).controlInfo.newEvent := '1';
 				res0.data(i).controlInfo.hasBranch := '1';
 				res0.data(i).target := targets(i);
@@ -453,12 +469,13 @@ begin
 end function;
 
 
-function getEarlyBranchMultiDataIn(ins: InstructionState; receiving: std_logic; valid: std_logic;
+function getEarlyBranchMultiDataIn(predictedAddress: Mword;
+							  ins: InstructionState; receiving: std_logic; valid: std_logic;
 							  hbuffAccepting: std_logic; fetchBlock: HwordArray(0 to FETCH_BLOCK_SIZE-1))
 return StageDataMulti is
 	variable res: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
 begin
-	res := getFrontEventMulti(ins, receiving, valid, hbuffAccepting, fetchBlock);
+	res := getFrontEventMulti(predictedAddress, ins, receiving, valid, hbuffAccepting, fetchBlock);
 	
 	return res;
 end function;

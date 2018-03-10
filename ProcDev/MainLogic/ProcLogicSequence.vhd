@@ -52,7 +52,7 @@ function getLatePCData(commitEvent: std_logic; commitCausing: InstructionState;
 								linkExc, linkInt, stateExc, stateInt: Mword)
 return InstructionState;
 
-function newPCData(content: InstructionState;
+function newPCData(--content: InstructionState;
 						  commitEvent: std_logic; commitCausing: InstructionState;
 						  execEvent: std_logic; execCausing: InstructionState;	
 						  frontEvent: std_logic; frontCausing: InstructionState;
@@ -188,13 +188,13 @@ begin
 end function;
 
 
-function newPCData(content: InstructionState;
+function newPCData(--content: InstructionState;
 						  commitEvent: std_logic; commitCausing: InstructionState;
 						  execEvent: std_logic; execCausing: InstructionState;	
 						  frontEvent: std_logic; frontCausing: InstructionState;
 						  pcNext: Mword)
 return InstructionState is
-	variable res: InstructionState := content;
+	variable res: InstructionState := DEFAULT_INSTRUCTION_STATE;--content;
 	variable newPC: Mword := (others=>'0');
 begin
 	if commitEvent = '1' then -- when from exec or front

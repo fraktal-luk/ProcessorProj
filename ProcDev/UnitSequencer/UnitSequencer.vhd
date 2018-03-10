@@ -74,6 +74,8 @@ entity UnitSequencer is
 		execOrIntEventSignalOut: out std_logic;
 		execOrIntCausingOut: out InstructionState;	
 			lateEventOut: out std_logic;
+			lateEventSetPC: out std_logic;
+			lateCausing : out InstructionState;
 		
 		-- Interface PC <-> front pipe
 		frontAccepting: in std_logic;
@@ -177,7 +179,20 @@ architecture Behavioral of UnitSequencer is
 	signal TMP_phase0, TMP_phase2: std_logic := '0';
 				
 	constant HAS_RESET_SEQ: std_logic := '0';
-	constant HAS_EN_SEQ: std_logic := '0';			
+	constant HAS_EN_SEQ: std_logic := '0';
+
+	function getNextPC(pc: Mword; jumpPC: Mword; jump: std_logic) return Mword is
+		variable res, pcBase: Mword := (others => '0'); 
+	begin
+		pcBase := pc and i2slv(-PIPE_WIDTH*4, MWORD_SIZE); -- Clearing low bits
+		if jump = '1' then
+			res := jumpPC;
+		else
+			res := addMwordBasic(pcBase, PC_INC);
+		end if;
+		return res;
+	end function;
+	
 begin	 
 	resetSig <= reset and HAS_RESET_SEQ;
 	enSig <= en or not HAS_EN_SEQ;
@@ -194,18 +209,21 @@ begin
 													);
 
 			lateEventOut <= TMP_phase0;
+			lateEventSetPC <= TMP_phase2;
 		execOrIntEventSignal <= execEventSignal or TMP_phase0;
 		execOrIntCausing <= eiEvents.causing when TMP_phase0 = '1' else execCausing;
+		lateCausing <= eiEvents.causing;
 
 		execOrIntEventSignalOut <= execOrIntEventSignal;	-- $MODULE_OUT
 		execOrIntCausingOut <= execOrIntCausing; -- $MODULE_OUT
 	end block;
 
 	pcBase <= stageDataOutPC.basicInfo.ip and i2slv(-PIPE_WIDTH*4, MWORD_SIZE); -- Clearing low bits
-	pcNext <= addMwordBasic(pcBase, PC_INC);
+	pcNext <= --addMwordBasic(pcBase, PC_INC);
+					getNextPC(stageDataOutPC.basicInfo.ip, (others => '0'), '0');
 
 	stageDataToPC <= newPCData(
-									stageDataOutPC, -- UNUSED? What content is useful here?
+									--stageDataOutPC, -- UNUSED? What content is useful here?
 									TMP_phase2,
 									eiEvents.causing,
 									execEventSignal, execCausing,
@@ -242,15 +260,10 @@ begin
 			execCausing => DEFAULT_INSTRUCTION_STATE,
 			lockCommand => '0'		
 		);			
-		
-		--newSysLevel <= (others => '0');
-		--newIntLevel <= (others => '0');
 
-		stageDataOutPC.basicInfo.ip <= tmpPcOut.data(0).basicInfo.ip;		
---		stageDataOutPC.basicInfo <=
---						  (ip => tmpPcOut.data(0).basicInfo.ip,
---							systemLevel => (others => '0'),
---							intLevel => (others => '0'));
+--		stageDataOutPC <= tmpPcOut.data(0);		
+		stageDataOutPC.basicInfo.ip <= tmpPcOut.data(0).basicInfo.ip;
+			stageDataOutPC.target <= pcNext; -- CAREFUL: Attaching next address from line predictor. Correct?
 	end block;
 
 
@@ -345,11 +358,7 @@ begin
 	RENAMING: block
 		-- INPUT: newPhysSources, newPhysDests
 		signal stageDataRenameIn, stageDataRenameIn_C: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;		
-		--signal reserveSelSig, takeVec: std_logic_vector(0 to PIPE_WIDTH-1) := (others => '0' );
-		--signal nToTake: integer := 0;
-		--	signal newGprTags: SmallNumberArray(0 to PIPE_WIDTH-1) := (others=>(others=>'0'));	
-		--	signal newNumberTags: SmallNumberArray(0 to PIPE_WIDTH-1) := (others=>(others=>'0'));
-		
+
 		function genNewNumberTags(renameCtr: SmallNumber) return SmallNumberArray is
 			variable res: SmallNumberArray(0 to PIPE_WIDTH-1) := (others => (others => '0'));
 		begin
@@ -402,30 +411,8 @@ begin
 		
 				signal ch0: std_logic := '0';
 	begin
-		-- CAREFUL, TODO: selection of changes in rename table and free list movement.
-		--						Taking from list is performed in RegisterFreeList, must have the same mask!
---		reserveSelSig <= getDestMask(frontDataLastLiving); -- Just full and having a destination?
---		takeVec <= findWhichTakeReg(frontDataLastLiving); -- REG ALLOC
---		nToTake <= countOnes(takeVec);
-	
---		newNumberTags <= genNewNumberTags(renameCtr);
---		newGprTags <= genNewGprTags(newPhysDestPointer, nToTake);
-	
---		stageDataRenameIn <= 
---			TMP_handleSpecial( -- Clears 'full' for ineffective instructions, reduces to getEffectiveMask?
---				setArgStatus(
---					baptizeAll( -- Assigns numbers
---						renameRegs2(
---							frontDataLastLiving, takeVec, reserveSelSig, newPhysSources, newPhysDests
---						),
---						newNumberTags, renameGroupCtrNext, newGprTags
---					)
---				)	
---			);
-	
 		stageDataRenameIn <= renameGroup(frontDataLastLiving, newPhysSources, newPhysDests, renameCtr,
 															renameGroupCtrNext, newPhysDestPointer);
-		--		ch0 <= '1' when stageDataRenameIn = stageDataRenameIn_C else '0';
 	
 		SUBUNIT_RENAME: entity work.GenericStageMulti(Renaming)
 		port map(

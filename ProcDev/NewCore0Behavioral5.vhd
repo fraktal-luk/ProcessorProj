@@ -30,8 +30,8 @@ architecture Behavioral5 of NewCore0 is
 	signal memLoadAllow, memLoadReady: std_logic := '0';  -- OUTPUT, INPUT
 
 	-- evt
-	signal execEventSignal, lateEventSignal: std_logic := '0';	-- OUTPUT/SIG, INPUT 	
-	signal execCausing: InstructionState := defaultInstructionState; -- OUTPUT/SIG
+	signal execEventSignal, lateEventSignal, lateEventSetPC: std_logic := '0';	-- OUTPUT/SIG, INPUT 	
+	signal execCausing, lateCausing: InstructionState := defaultInstructionState; -- OUTPUT/SIG
 
 	-- Hidden to some degree, but may be useful for sth
 	signal commitGroupCtrSig, commitGroupCtrNextSig: SmallNumber := (others => '0'); -- INPUT
@@ -114,6 +114,8 @@ begin
 		execOrIntEventSignalOut => execOrIntEventSignal,
 		execOrIntCausingOut => execOrIntCausing,
 		lateEventOut => lateEventSignal,
+		lateEventSetPC => lateEventSetPC,
+		lateCausing => lateCausing,
 		-- Data from front pipe interface		
 		renameAccepting => renameAccepting, -- to frontend
 		frontLastSending => frontLastSending,
@@ -170,8 +172,12 @@ begin
 		frontEventSignal => frontEventSignal,
 		frontCausing => frontCausing,
 		
+		execCausing => execCausing,
+		lateCausing => lateCausing,
+		
 		execEventSignal => execEventSignal,
-		lateEventSignal => lateEventSignal		
+		lateEventSignal => lateEventSignal,
+		lateEventSetPC => lateEventSetPC
 	);
 
 	--------------------------------
