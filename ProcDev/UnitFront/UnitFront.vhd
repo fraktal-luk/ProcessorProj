@@ -122,6 +122,7 @@ architecture Behavioral of UnitFront is
 		signal frontCausingSig: InstructionState := DEFAULT_INSTRUCTION_STATE;
 		signal predictedAddress: Mword := (others => '0');
 		
+		signal ch0: std_logic := '0'; 
 	constant HAS_RESET_FRONT: std_logic := '0';
 	constant HAS_EN_FRONT: std_logic := '0';	
 begin	 
@@ -215,13 +216,18 @@ begin
 	
 	acceptingForFetchFirst <= acceptingOutFetch1;
 	
-	hbufferDataIn <=  setInstructionIP( checkIvalid(earlyBranchDataOut.data(0), '1'),  predictedAddress);
-	
+	hbufferDataIn <=  --setInstructionIP( 
+								checkIvalid(earlyBranchDataOut.data(0), '1');--,  predictedAddress);
+
 			earlyBranchDataIn.data(0) <= --getFrontEvent(stageDataOutFetchFinal,
 													--		pcSendingDelayedFinal, ivalidFinal, '1',
 													--		fetchBlockFinal);
-													findEarlyTakenJump(stageDataOutFetchFinal, earlyBranchMultiDataIn);		
-			earlyBranchdataIn.fullMask(0) <= sendingOutFetchFinal;
+												setInstructionIP(
+													findEarlyTakenJump(stageDataOutFetchFinal, earlyBranchMultiDataIn)
+													,predictedAddress
+												);
+												--;
+			earlyBranchDataIn.fullMask(0) <= sendingOutFetchFinal;
 			
 			sendingToEarlyBranch <= sendingOutFetchFinal;
 											
@@ -245,6 +251,8 @@ begin
 					stageEventsOut => stage0Events
 			);
 			
+			
+			ch0 <= '1' when stageDataOutFetchFinal.basicInfo.ip = predictedAddress else '0';
 			
 			earlyBranchMultiDataIn <= getEarlyBranchMultiDataIn(predictedAddress,
 																				stageDataOutFetchFinal,
@@ -286,8 +294,8 @@ begin
 					predictedAddress <= execCausing.target;
 				elsif (stallEventSig or stage0Events.eventOccured) = '1' then -- CAREFUL: must equal frontEventSignal
 					predictedAddress <= frontCausingSig.target; -- ?
-				elsif earlyBranchSending = '1' then
-					predictedAddress <= earlyBranchDataOut.data(0).target; -- ??
+				elsif sendingToEarlyBranch = '1' then
+					predictedAddress <= earlyBranchDataIn.data(0).target; -- ??
 				end if;
 			end if;
 		end process;
