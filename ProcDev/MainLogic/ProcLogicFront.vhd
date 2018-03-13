@@ -414,7 +414,10 @@ begin
 			
 	if (receiving and valid and hbuffAccepting) = '1' then
 		for i in 0 to PIPE_WIDTH-1 loop
-			-- Is normal branch instruction?
+			if res0.data(i).controlInfo.skipped = '1' then
+				next;
+			end if;
+		
 			if 	fetchBlock(2*i)(15 downto 10) = opcode2slv(jl) 
 				or fetchBlock(2*i)(15 downto 10) = opcode2slv(jz) 
 				or fetchBlock(2*i)(15 downto 10) = opcode2slv(jnz)
@@ -425,6 +428,9 @@ begin
 				tempOffset(20 downto 0) := fetchBlock(2*i)(4 downto 0) & fetchBlock(2*i + 1);
 				baseIP := res.basicInfo.ip(MWORD_SIZE-1 downto ALIGN_BITS) & i2slv(i*4, ALIGN_BITS); -- ??
 				tempTarget := addMwordFaster(baseIP, tempOffset);
+				
+				--	report "Jump: " & integer'image(slv2u(baseIP)) & " " & integer'image(slv2u(tempTarget));
+				
 				targets(i) := tempTarget;			-- Long branch instruction?
 			elsif fetchBlock(2*i)(15 downto 10) = opcode2slv(j)
 			then
@@ -447,8 +453,9 @@ begin
 				-- TODO: Here check if the next line from line predictor agress with the target predicted now.
 				--			If so, don't cause the event but set invalidation mask that next line will use.
 				if targets(i)(MWORD_SIZE-1 downto ALIGN_BITS) = ins.target(MWORD_SIZE-1 downto ALIGN_BITS) then
-					report "Branch address agrees with line predictor";
-					report "Offset: " &  integer'image(slv2u(targets(i)(ALIGN_BITS-1 downto 0)));
+					--report "Branch address agrees with line predictor";
+					--report "Base: " & integer'image(slv2u(targets(i)(MWORD_SIZE-1 downto ALIGN_BITS))*2**ALIGN_BITS);
+					--report "Offset: " &  integer'image(slv2u(targets(i)(ALIGN_BITS-1 downto 0)));
 				else
 					-- Raise event
 				end if;
@@ -501,6 +508,8 @@ begin
 			res.controlInfo.newEvent := '1';
 			res.controlInfo.hasBranch := '1';
 			res.target  := insVec.data(i).target;
+			
+			--	report "early jump: " & integer'image(slv2u(res.target));
 			exit;
 		end if;
 	end loop;
