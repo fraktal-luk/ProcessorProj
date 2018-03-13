@@ -214,6 +214,7 @@ function setInsResult(ins: InstructionState; result: Mword) return InstructionSt
 	function isStore(ins: InstructionState) return std_logic;
 	function isSysRegWrite(ins: InstructionState) return std_logic;
 
+function getAddressIncrement(ins: InstructionState) return Mword;
 
 	type SLVA is array (integer range <>) of std_logic_vector(0 to PIPE_WIDTH-1);
 
@@ -1145,5 +1146,15 @@ end function;
 		end if;
 	end function;
 
+function getAddressIncrement(ins: InstructionState) return Mword is
+	variable res: Mword := (others => '0');
+begin
+	if ins.classInfo.short = '1' then
+		res(1) := '1'; -- 2
+	else
+		res(2) := '1'; -- 4
+	end if;
+	return res;
+end function;
 
 end GeneralPipeDev;

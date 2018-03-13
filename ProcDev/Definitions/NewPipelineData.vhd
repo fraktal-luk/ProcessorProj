@@ -34,8 +34,6 @@ package NewPipelineData is
 	
 	constant HBUFFER_SIZE: natural := PIPE_WIDTH * 4;
 	
-	--constant PROPAGATE_MODE: boolean := false;--true; -- Int/exc level marked in instruction throughout pipeline
-	
 	constant EARLY_TARGET_ENABLE: boolean := true; -- Calc branch targets in front pipe
 	constant USE_LINE_PREDICTOR: boolean := true;
 	

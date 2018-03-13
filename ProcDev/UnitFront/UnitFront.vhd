@@ -121,6 +121,8 @@ architecture Behavioral of UnitFront is
 		
 		signal frontCausingSig: InstructionState := DEFAULT_INSTRUCTION_STATE;
 		signal predictedAddress: Mword := (others => '0');
+
+		signal newDecoded, stageDataDecodeNew, stageDataDecodeOut: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
 		
 		signal ch0: std_logic := '0'; 
 	constant HAS_RESET_FRONT: std_logic := '0';
@@ -215,18 +217,11 @@ begin
 	sendingOutFetchFinal <= sendingOutFetch1;
 	
 	acceptingForFetchFirst <= acceptingOutFetch1;
-	
-	hbufferDataIn <=  --setInstructionIP( 
-								checkIvalid(earlyBranchDataOut.data(0), '1');--,  predictedAddress);
 
-			earlyBranchDataIn.data(0) <= --getFrontEvent(stageDataOutFetchFinal,
-													--		pcSendingDelayedFinal, ivalidFinal, '1',
-													--		fetchBlockFinal);
-												setInstructionIP(
+			earlyBranchDataIn.data(0) <= setInstructionIP(
 													findEarlyTakenJump(stageDataOutFetchFinal, earlyBranchMultiDataIn)
 													,predictedAddress
 												);
-												--;
 			earlyBranchDataIn.fullMask(0) <= sendingOutFetchFinal;
 			
 			sendingToEarlyBranch <= sendingOutFetchFinal;
@@ -252,7 +247,7 @@ begin
 			);
 			
 			
-			ch0 <= '1' when stageDataOutFetchFinal.basicInfo.ip = predictedAddress else '0';
+			--ch0 <= '1' when stageDataOutFetchFinal.basicInfo.ip = predictedAddress else '0';
 			
 			earlyBranchMultiDataIn <= getEarlyBranchMultiDataIn(predictedAddress,
 																				stageDataOutFetchFinal,
@@ -279,11 +274,10 @@ begin
 					stageEventsOut => stage0MultiEvents
 			);
 	
-			stallEventSig <= fetchStall;
-			stallCausing <= setInstructionTarget(earlyBranchDataOut.data(0),
-															 earlyBranchDataOut.data(0).basicInfo.ip);
-			frontKill <= stage0Events.eventOccured or fetchStall;
-			fetchStall <= earlyBranchSending and not acceptingOutHbuffer;
+		stallEventSig <= fetchStall;
+		stallCausing <= setInstructionTarget(earlyBranchDataOut.data(0), earlyBranchDataOut.data(0).basicInfo.ip);
+		frontKill <= stage0Events.eventOccured or fetchStall;
+		fetchStall <= earlyBranchSending and not acceptingOutHbuffer;
 	
 		SAVE_PRED_TARGET: process(clk)
 		begin
@@ -300,7 +294,9 @@ begin
 			end if;
 		end process;
 	
-	-- Hword buffer		
+	-- Hword buffer
+	hbufferDataIn <= earlyBranchDataOut.data(0);
+	
 	SUBUNIT_HBUFFER: entity work.SubunitHbuffer(Implem)
 	port map(
 		clk => clk, reset => resetSig, en => enSig,
@@ -319,29 +315,11 @@ begin
 		execCausing => DEFAULT_INSTRUCTION_STATE		
 	);		
 	
-	
-	-- Decode stage				
-	STAGE_DECODE: block
-		signal newDecoded, newDecodedWithTargets, stageDataDecodeNew, stageDataDecodeOut: StageDataMulti
-				:= DEFAULT_STAGE_DATA_MULTI;
-		signal targets, links: MwordArray(0 to PIPE_WIDTH-1) := (others => (others => '0'));				
-	begin	
+
+	-- Decode stage
 		newDecoded <= decodeMulti(stageDataOutHbuffer);
-
-		newDecodedWithTargets.fullMask <= newDecoded.fullMask;
-		
-		CALC_TARGETS: for i in 0 to PIPE_WIDTH-1 generate
-		begin	
-			newDecodedWithTargets.data(i) <=
-				setInsResult(setInstructionTarget(newDecoded.data(i), targets(i)), links(i));
-
-			targets(i) <= addMwordFaster(newDecoded.data(i).basicInfo.ip, newDecoded.data(i).--constantArgs.imm);
-																														target);
-			links(i) <= addMwordBasic(newDecoded.data(i).basicInfo.ip, getAddressIncrement(newDecoded.data(i)));			
-		end generate;	
-
-		stageDataDecodeNew <= newDecodedWithTargets when EARLY_TARGET_ENABLE
-								else newDecoded;	
+		stageDataDecodeNew <= fillTargetsAndLinks(newDecoded);
+								
 		SUBUNIT_DECODE: entity work.GenericStageMulti(Behavioral)
 			port map(
 			clk => clk, reset => resetSig, en => enSig,
@@ -360,13 +338,10 @@ begin
 			lockCommand => '0',
 			-- to event part
 			stageEventsOut => open--stage0Events
-		);	
-		
-		stageDataOut0 <= clearTempControlInfoMulti(stageDataDecodeOut);
-	end block;	
+		);		
 		
 	-- from later stages
-	dataLastLiving <= stageDataOut0;
+	dataLastLiving <= clearTempControlInfoMulti(stageDataDecodeOut);
 	lastSending <= sendingOut0;
 	
 	frontAccepting <= acceptingOutFetch;

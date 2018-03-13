@@ -42,6 +42,8 @@ function decodeInstruction(inputState: InstructionState) return InstructionState
 
 function decodeMulti(sd: StageDataMulti) return StageDataMulti;
 
+function fillTargetsAndLinks(insVec: StageDataMulti) return StageDataMulti;
+
 function newFromHbuffer(content: InstructionStateArray; fullMask: std_logic_vector)
 return HbuffOutData;
 
@@ -54,9 +56,9 @@ return InstructionStateArray;
 
 function stageMultiEvents(sd: StageDataMulti; isNew: std_logic) return StageMultiEventInfo;
 
-function getFrontEvent(ins: InstructionState; receiving: std_logic; valid: std_logic;
-							  hbuffAccepting: std_logic; fetchBlock: HwordArray(0 to FETCH_BLOCK_SIZE-1))
-return InstructionState;
+--function getFrontEvent(ins: InstructionState; receiving: std_logic; valid: std_logic;
+--							  hbuffAccepting: std_logic; fetchBlock: HwordArray(0 to FETCH_BLOCK_SIZE-1))
+--return InstructionState;
 
 function getFrontEventMulti(predictedAddress: Mword;
 							  ins: InstructionState; receiving: std_logic; valid: std_logic;
@@ -159,16 +161,6 @@ begin
 	
 	res.classInfo := getInstructionClassInfo(res);	
 
---				-- TEMP: code for predicting every regular jump (even "branch never"!) as taken
---				if ((res.classInfo.branchAlways or res.classInfo.branchCond)
---					and not res.classInfo.branchReg)	= '1' and BRANCH_AT_DECODE then
---					res.controlInfo.newEvent := '1';
---					--res.controlInfo.hasEvent := '1';
---					res.controlInfo.newBranch := '1';
---					res.controlInfo.hasBranch := '1';					
---				end if;
-
-
 				if res.operation.unit = System and
 						(	res.operation.func = sysRetI or res.operation.func = sysRetE
 						or res.operation.func = sysSync or res.operation.func = sysReplay
@@ -181,9 +173,7 @@ begin
 						res.classInfo.secCluster := '0';
 				end if;	
 	
-		if --res.classInfo.undef = '1' then
-				res.operation.func = sysUndef 
-		then
+		if res.operation.func = sysUndef then
 			res.controlInfo.hasException := '1';
 			res.controlInfo.exceptionCode := i2slv(ExceptionType'pos(undefinedInstruction), SMALL_NUMBER_SIZE);
 		end if;
@@ -192,10 +182,8 @@ begin
 			report "Trying to decode invalid location" severity error;
 		end if;
 		
-			res.controlInfo.squashed := '0';
-		
-		res.target := --(others => '0');
-							ofs.target;
+		res.controlInfo.squashed := '0';
+		res.target := ofs.target;
 	return res;
 end function;
 
@@ -209,6 +197,22 @@ begin
 	return res;
 end function;
 
+function fillTargetsAndLinks(insVec: StageDataMulti) return StageDataMulti is
+	variable res: StageDataMulti := insVec;
+	variable target, link: Mword := (others => '0');
+begin
+	if not EARLY_TARGET_ENABLE then
+		return res;
+	end if;
+
+	for i in 0 to PIPE_WIDTH-1 loop
+		target := addMwordFaster(insVec.data(i).basicInfo.ip, insVec.data(i).target);
+		link := addMwordBasic(insVec.data(i).basicInfo.ip, getAddressIncrement(insVec.data(i)));
+		res.data(i).target := target;
+		res.data(i).result := link;
+	end loop;
+	return res;
+end function;
 
 
 function newFromHbuffer(content: InstructionStateArray; fullMask: std_logic_vector)
@@ -221,7 +225,7 @@ begin
 	for i in 0 to PIPE_WIDTH-1 loop
 		res.data(i).bits := content(i).bits(15 downto 0) & content(i+1).bits(15 downto 0);		
 		res.data(i).basicInfo := content(i).basicInfo;
-			res.data(i).controlInfo.squashed := content(i).controlInfo.squashed;
+		res.data(i).controlInfo.squashed := content(i).controlInfo.squashed;
 	end loop;
 
 	for i in 0 to PIPE_WIDTH-1 loop
@@ -252,6 +256,7 @@ begin
 	return ret;
 end function;
 
+		-- TODO: used once, refactor
 		function getFetchOffset(ip: Mword) return SmallNumber is
 			variable res: SmallNumber := (others => '0');
 		begin
@@ -322,56 +327,53 @@ begin
 	return res;
 end function;
 
-function getFrontEvent(ins: InstructionState; receiving: std_logic; valid: std_logic;
-							  hbuffAccepting: std_logic; fetchBlock: HwordArray(0 to FETCH_BLOCK_SIZE-1))
-return InstructionState is
-	variable res: InstructionState := ins;
-	variable tempOffset, tempTarget: Mword := (others => '0');
-begin
-	if valid = '0' then
-		res.controlInfo.squashed := '1';
-	end if;
-
-	-- receiving, valid, accepting	-> good
-	-- receiving, valid, not accepting -> refetch
-	-- receiving, invalid, accepting -> error, will cause exception, but handled later, from decode on
-	-- receiving, invalid, not accepting -> refetch??
---return res;
-	if false and (receiving and not hbuffAccepting) = '1' then -- When need to refetch
-		res.target := res.basicInfo.ip;
-	
-
-	end if;
-	
-	-- Check if it's a branch
-	-- TODO: (should be done in predecode when loading to cache)
-	-- CAREFUL: Only without hword instructions now!
-		-- TMP
-	if (receiving and valid and hbuffAccepting) = '1' then
-		if 	fetchBlock(0)(15 downto 10) = opcode2slv(jl) 
-			or fetchBlock(0)(15 downto 10) = opcode2slv(jz) 
-			or fetchBlock(0)(15 downto 10) = opcode2slv(jnz)
-		then
-			--report "branch fetched!";
-			
-				--res.controlInfo.newEvent := '1';
-				--res.controlInfo.hasBranch := '1';			
-			
-			tempOffset := "00000000000" & fetchBlock(0)(4 downto 0) & fetchBlock(1);
-			tempTarget := addMwordFaster(res.basicInfo.ip, tempOffset);
-			res.target := tempTarget;
-		elsif fetchBlock(0)(15 downto 10) = opcode2slv(j)
-		then
-			--report "long branch fetched";
-			tempOffset := "000000" & fetchBlock(0)(9 downto 0) & fetchBlock(1);
-			tempTarget := addMwordFaster(res.basicInfo.ip, tempOffset);
-			res.target := tempTarget;
-		end if;
-	end if;
-	
-	return res;
-end function;
-
+--function getFrontEvent(ins: InstructionState; receiving: std_logic; valid: std_logic;
+--							  hbuffAccepting: std_logic; fetchBlock: HwordArray(0 to FETCH_BLOCK_SIZE-1))
+--return InstructionState is
+--	variable res: InstructionState := ins;
+--	variable tempOffset, tempTarget: Mword := (others => '0');
+--begin
+--	if valid = '0' then
+--		res.controlInfo.squashed := '1';
+--	end if;
+--
+--	-- receiving, valid, accepting	-> good
+--	-- receiving, valid, not accepting -> refetch
+--	-- receiving, invalid, accepting -> error, will cause exception, but handled later, from decode on
+--	-- receiving, invalid, not accepting -> refetch??
+--
+--	if false and (receiving and not hbuffAccepting) = '1' then -- When need to refetch
+--		res.target := res.basicInfo.ip;
+--	end if;
+--	
+--	-- Check if it's a branch
+--	-- TODO: (should be done in predecode when loading to cache)
+--	-- CAREFUL: Only without hword instructions now!
+--		-- TMP
+--	if (receiving and valid and hbuffAccepting) = '1' then
+--		if 	fetchBlock(0)(15 downto 10) = opcode2slv(jl) 
+--			or fetchBlock(0)(15 downto 10) = opcode2slv(jz) 
+--			or fetchBlock(0)(15 downto 10) = opcode2slv(jnz)
+--		then
+--			--report "branch fetched!";
+--			
+--				--res.controlInfo.newEvent := '1';
+--				--res.controlInfo.hasBranch := '1';			
+--			
+--			tempOffset := "00000000000" & fetchBlock(0)(4 downto 0) & fetchBlock(1);
+--			tempTarget := addMwordFaster(res.basicInfo.ip, tempOffset);
+--			res.target := tempTarget;
+--		elsif fetchBlock(0)(15 downto 10) = opcode2slv(j)
+--		then
+--			--report "long branch fetched";
+--			tempOffset := "000000" & fetchBlock(0)(9 downto 0) & fetchBlock(1);
+--			tempTarget := addMwordFaster(res.basicInfo.ip, tempOffset);
+--			res.target := tempTarget;
+--		end if;
+--	end if;
+--	
+--	return res;
+--end function;
 
 function getFrontEventMulti(predictedAddress: Mword;
 							  ins: InstructionState; receiving: std_logic; valid: std_logic;

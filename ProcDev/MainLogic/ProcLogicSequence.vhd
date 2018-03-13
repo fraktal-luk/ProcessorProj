@@ -81,9 +81,8 @@ return InstructionState;
 function setLateTargetAndLink(ins: InstructionState; target: Mword; link: Mword; phase1: std_logic)
 return InstructionState;
 
-function getAddressIncrement(ins: InstructionState) return Mword;
 
-function checkIvalid(ins: InstructionState; ivalid: std_logic) return InstructionState;
+--function checkIvalid(ins: InstructionState; ivalid: std_logic) return InstructionState;
 
 function makeInterruptCause(targetIns: InstructionState; intSignal, start: std_logic)
 return InstructionState;
@@ -340,23 +339,12 @@ begin
 	return res;
 end function;
 
-function getAddressIncrement(ins: InstructionState) return Mword is
-	variable res: Mword := (others => '0');
-begin
-	if ins.classInfo.short = '1' then
-		res(1) := '1'; -- 2
-	else
-		res(2) := '1'; -- 4
-	end if;
-	return res;
-end function;
-
-function checkIvalid(ins: InstructionState; ivalid: std_logic) return InstructionState is
-	variable res: InstructionState := ins;
-begin
-	res.controlInfo.squashed := not ivalid; -- CAREFUL: here we'll use 'squashed', must be cleared before ROB 
-	return res;
-end function;
+--function checkIvalid(ins: InstructionState; ivalid: std_logic) return InstructionState is
+--	variable res: InstructionState := ins;
+--begin
+--	res.controlInfo.squashed := not ivalid; -- CAREFUL: here we'll use 'squashed', must be cleared before ROB 
+--	return res;
+--end function;
 
 function makeInterruptCause(targetIns: InstructionState; intSignal, start: std_logic)
 return InstructionState is
