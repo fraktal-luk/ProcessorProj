@@ -36,8 +36,6 @@ constant DEFAULT_HBUFF_OUT: HbuffOutData := (sd => DEFAULT_STAGE_DATA_MULTI, nOu
 
 function getInstructionClassInfo(ins: InstructionState) return InstructionClassInfo;
 
-function instructionFromWord(w: word) return InstructionState;
-
 function decodeInstruction(inputState: InstructionState) return InstructionState;
 
 function decodeMulti(sd: StageDataMulti) return StageDataMulti;
@@ -53,12 +51,7 @@ function getAnnotatedHwords(fetchIns: InstructionState; fetchInsMulti: StageData
 									 fetchBlock: HwordArray)
 return InstructionStateArray;
 
-
 function stageMultiEvents(sd: StageDataMulti; isNew: std_logic) return StageMultiEventInfo;
-
---function getFrontEvent(ins: InstructionState; receiving: std_logic; valid: std_logic;
---							  hbuffAccepting: std_logic; fetchBlock: HwordArray(0 to FETCH_BLOCK_SIZE-1))
---return InstructionState;
 
 function getFrontEventMulti(predictedAddress: Mword;
 							  ins: InstructionState; receiving: std_logic; valid: std_logic;
@@ -137,14 +130,6 @@ begin
 			end if;
 				
 	return ci;
-end function;
-
-
-function instructionFromWord(w: word) return InstructionState is
-	variable res: InstructionState := defaultInstructionState;
-begin
-	res.bits := w;
-	return res;
 end function;
 
 function decodeInstruction(inputState: InstructionState) return InstructionState is
@@ -327,153 +312,84 @@ begin
 	return res;
 end function;
 
---function getFrontEvent(ins: InstructionState; receiving: std_logic; valid: std_logic;
---							  hbuffAccepting: std_logic; fetchBlock: HwordArray(0 to FETCH_BLOCK_SIZE-1))
---return InstructionState is
---	variable res: InstructionState := ins;
---	variable tempOffset, tempTarget: Mword := (others => '0');
---begin
---	if valid = '0' then
---		res.controlInfo.squashed := '1';
---	end if;
---
---	-- receiving, valid, accepting	-> good
---	-- receiving, valid, not accepting -> refetch
---	-- receiving, invalid, accepting -> error, will cause exception, but handled later, from decode on
---	-- receiving, invalid, not accepting -> refetch??
---
---	if false and (receiving and not hbuffAccepting) = '1' then -- When need to refetch
---		res.target := res.basicInfo.ip;
---	end if;
---	
---	-- Check if it's a branch
---	-- TODO: (should be done in predecode when loading to cache)
---	-- CAREFUL: Only without hword instructions now!
---		-- TMP
---	if (receiving and valid and hbuffAccepting) = '1' then
---		if 	fetchBlock(0)(15 downto 10) = opcode2slv(jl) 
---			or fetchBlock(0)(15 downto 10) = opcode2slv(jz) 
---			or fetchBlock(0)(15 downto 10) = opcode2slv(jnz)
---		then
---			--report "branch fetched!";
---			
---				--res.controlInfo.newEvent := '1';
---				--res.controlInfo.hasBranch := '1';			
---			
---			tempOffset := "00000000000" & fetchBlock(0)(4 downto 0) & fetchBlock(1);
---			tempTarget := addMwordFaster(res.basicInfo.ip, tempOffset);
---			res.target := tempTarget;
---		elsif fetchBlock(0)(15 downto 10) = opcode2slv(j)
---		then
---			--report "long branch fetched";
---			tempOffset := "000000" & fetchBlock(0)(9 downto 0) & fetchBlock(1);
---			tempTarget := addMwordFaster(res.basicInfo.ip, tempOffset);
---			res.target := tempTarget;
---		end if;
---	end if;
---	
---	return res;
---end function;
 
 function getFrontEventMulti(predictedAddress: Mword;
 							  ins: InstructionState; receiving: std_logic; valid: std_logic;
 							  hbuffAccepting: std_logic; fetchBlock: HwordArray(0 to FETCH_BLOCK_SIZE-1))
 return StageDataMulti is
-	variable res0: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
-	variable res: InstructionState := ins;
-	variable tempOffset, baseIP, tempTarget: Mword := (others => '0');
+	variable res: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
+	variable tempOffset, thisIP, tempTarget: Mword := (others => '0');
 	variable targets: MwordArray(0 to PIPE_WIDTH-1) := (others => (others => '0'));
 	variable fullOut, full, branchIns, predictedTaken: std_logic_vector(0 to PIPE_WIDTH-1) := (others => '0');
 	variable nSkippedIns: integer := 0;
 begin
-	if valid = '0' then
-		res.controlInfo.squashed := '1';
-	end if;
-
 	-- receiving, valid, accepting	-> good
 	-- receiving, valid, not accepting -> refetch
 	-- receiving, invalid, accepting -> error, will cause exception, but handled later, from decode on
 	-- receiving, invalid, not accepting -> refetch??
-
 	
-	-- Check if it's a branch
-	-- TODO: (should be done in predecode when loading to cache)
 	-- CAREFUL: Only without hword instructions now!
-		-- TMP
-			-- Find which are before the start of fetch address
-			--nSkippedIns := slv2u(ins.basicInfo.ip(ALIGN_BITS-1 downto 0))/4; -- CORRECT?
-			nSkippedIns := slv2u(predictedAddress(ALIGN_BITS-1 downto 0))/4; -- CORRECT?								
+	-- Find which are before the start of fetch address
+	nSkippedIns := slv2u(predictedAddress(ALIGN_BITS-1 downto 0))/4;								
 			
-			--	report integer'image(slv2u(ins.basicInfo.ip)) &  "; " & integer'image(nSkippedIns) & " skipped";
-			for i in 0 to PIPE_WIDTH-1 loop
-				full(i) := '1'; -- CAREFUL! For skipping using 'skipped' flag, not clearing 'full' 
-				if i >= nSkippedIns then
-					full(i) := '1';
-				else
-					res0.data(i).controlInfo.skipped := '1';
-				end if;
-			end loop;
-			
+	for i in 0 to PIPE_WIDTH-1 loop
+		full(i) := '1'; -- For skipping we use 'skipped' flag, not clearing 'full' 
+		if i < nSkippedIns then
+			res.data(i).controlInfo.skipped := '1';
+		end if;
+	end loop;
+
 	if (receiving and valid and hbuffAccepting) = '1' then
+		-- Calculate target for each instruction, even if it's to be skipped
 		for i in 0 to PIPE_WIDTH-1 loop
-			if res0.data(i).controlInfo.skipped = '1' then
-				next;
-			end if;
+			thisIP := ins.basicInfo.ip(MWORD_SIZE-1 downto ALIGN_BITS) & i2slv(i*4, ALIGN_BITS);
 		
 			if 	fetchBlock(2*i)(15 downto 10) = opcode2slv(jl) 
 				or fetchBlock(2*i)(15 downto 10) = opcode2slv(jz) 
 				or fetchBlock(2*i)(15 downto 10) = opcode2slv(jnz)
 			then
 				branchIns(i) := '1';
-				predictedTaken(i) := fetchBlock(2*i)(4);
+				predictedTaken(i) := fetchBlock(2*i)(4);		-- CAREFUL, TODO: temporary predicted taken iff backwards
 				tempOffset := (others => fetchBlock(2*i)(4));
 				tempOffset(20 downto 0) := fetchBlock(2*i)(4 downto 0) & fetchBlock(2*i + 1);
-				baseIP := res.basicInfo.ip(MWORD_SIZE-1 downto ALIGN_BITS) & i2slv(i*4, ALIGN_BITS); -- ??
-				tempTarget := addMwordFaster(baseIP, tempOffset);
-				
-				--	report "Jump: " & integer'image(slv2u(baseIP)) & " " & integer'image(slv2u(tempTarget));
-				
-				targets(i) := tempTarget;			-- Long branch instruction?
-			elsif fetchBlock(2*i)(15 downto 10) = opcode2slv(j)
+			elsif fetchBlock(2*i)(15 downto 10) = opcode2slv(j) -- Long jump instruction
 			then
 				branchIns(i) := '1';
 				predictedTaken(i) := '1'; -- Long jump is unconditional (no space for register encoding!)
 				tempOffset := (others => fetchBlock(2*i)(9));
 				tempOffset(25 downto 0) := fetchBlock(2*i)(9 downto 0) & fetchBlock(2*i + 1);
-				baseIP := res.basicInfo.ip(MWORD_SIZE-1 downto ALIGN_BITS) & i2slv(i*4, ALIGN_BITS); -- ??
-				tempTarget := addMwordFaster(baseIP, tempOffset);
-				targets(i) := tempTarget;
 			end if;
+			targets(i) := addMwordFaster(thisIP, tempOffset);
 			
+			-- Now applying the skip!
+			if res.data(i).controlInfo.skipped = '1' then
+				branchIns(i) := '0';
+			end if;			
 		end loop;
 		
 		-- Find if any branch predicted
 		for i in 0 to PIPE_WIDTH-1 loop
 			fullOut(i) := full(i);
-			res0.data(i).bits := fetchBlock(2*i) & fetchBlock(2*i+1);
+			res.data(i).bits := fetchBlock(2*i) & fetchBlock(2*i+1);
 			if full(i) = '1' and branchIns(i) = '1' and predictedTaken(i) = '1' then
-				-- TODO: Here check if the next line from line predictor agress with the target predicted now.
-				--			If so, don't cause the event but set invalidation mask that next line will use.
-				if targets(i)(MWORD_SIZE-1 downto ALIGN_BITS) = ins.target(MWORD_SIZE-1 downto ALIGN_BITS) then
-					--report "Branch address agrees with line predictor";
-					--report "Base: " & integer'image(slv2u(targets(i)(MWORD_SIZE-1 downto ALIGN_BITS))*2**ALIGN_BITS);
-					--report "Offset: " &  integer'image(slv2u(targets(i)(ALIGN_BITS-1 downto 0)));
-					
-					-- CAREFUL: Remeber that it actually is treated asa branch, otherwise would be done 
+				-- Here check if the next line from line predictor agress with the target predicted now.
+				--	If so, don't cause the event but set invalidation mask that next line will use.
+				if targets(i)(MWORD_SIZE-1 downto ALIGN_BITS) = ins.target(MWORD_SIZE-1 downto ALIGN_BITS) then					
+					-- CAREFUL: Remeber that it actually is treated as a branch, otherwise would be done 
 					--				again at Exec!
-					res0.data(i).controlInfo.hasBranch := '1';
+					res.data(i).controlInfo.hasBranch := '1';
 				else
 					-- Raise event
-					res0.data(i).controlInfo.newEvent := '1';
-					res0.data(i).controlInfo.hasBranch := '1';
-					res0.data(i).target := targets(i);
+					res.data(i).controlInfo.newEvent := '1';
+					res.data(i).controlInfo.hasBranch := '1';
+					res.data(i).target := targets(i);
 				end if;
 				
 				-- CAREFUL: When not using line predictor, branches predicted taken must always be done here 
 				if not USE_LINE_PREDICTOR then
-					res0.data(i).controlInfo.newEvent := '1';
-					res0.data(i).controlInfo.hasBranch := '1';
-					res0.data(i).target := targets(i);
+					res.data(i).controlInfo.newEvent := '1';
+					res.data(i).controlInfo.hasBranch := '1';
+					res.data(i).target := targets(i);
 				end if;
 
 				exit;
@@ -481,9 +397,8 @@ begin
 		end loop;
 	end if;
 	
-	--res0.data(0) := res;
-	res0.fullMask := fullOut;
-	return res0;
+	res.fullMask := fullOut;
+	return res;
 end function;
 
 
@@ -518,9 +433,7 @@ begin
 		then
 			res.controlInfo.newEvent := '1';
 			res.controlInfo.hasBranch := '1';
-			res.target  := insVec.data(i).target;
-			
-			--	report "early jump: " & integer'image(slv2u(res.target));
+			res.target  := insVec.data(i).target;			
 			exit;
 		end if;
 	end loop;
