@@ -37,6 +37,7 @@ package NewPipelineData is
 	--constant PROPAGATE_MODE: boolean := false;--true; -- Int/exc level marked in instruction throughout pipeline
 	
 	constant EARLY_TARGET_ENABLE: boolean := true; -- Calc branch targets in front pipe
+	constant USE_LINE_PREDICTOR: boolean := true;
 	
 	constant CQ_SINGLE_OUTPUT: boolean := (LOG2_PIPE_WIDTH = 0);
 	constant CQ_THREE_OUTPUTS: boolean := not CQ_SINGLE_OUTPUT;

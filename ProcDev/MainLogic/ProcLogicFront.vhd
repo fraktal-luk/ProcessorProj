@@ -456,15 +456,24 @@ begin
 					--report "Branch address agrees with line predictor";
 					--report "Base: " & integer'image(slv2u(targets(i)(MWORD_SIZE-1 downto ALIGN_BITS))*2**ALIGN_BITS);
 					--report "Offset: " &  integer'image(slv2u(targets(i)(ALIGN_BITS-1 downto 0)));
+					
+					-- CAREFUL: Remeber that it actually is treated asa branch, otherwise would be done 
+					--				again at Exec!
+					res0.data(i).controlInfo.hasBranch := '1';
 				else
 					-- Raise event
+					res0.data(i).controlInfo.newEvent := '1';
+					res0.data(i).controlInfo.hasBranch := '1';
+					res0.data(i).target := targets(i);
 				end if;
 				
-				-- skipValue(ALIGN_BITS-1 downto 0) := targets(i)(ALIGN_BITS-1 downto 0);
-				
-				res0.data(i).controlInfo.newEvent := '1';
-				res0.data(i).controlInfo.hasBranch := '1';
-				res0.data(i).target := targets(i);
+				-- CAREFUL: When not using line predictor, branches predicted taken must always be done here 
+				if not USE_LINE_PREDICTOR then
+					res0.data(i).controlInfo.newEvent := '1';
+					res0.data(i).controlInfo.hasBranch := '1';
+					res0.data(i).target := targets(i);
+				end if;
+
 				exit;
 			end if;
 		end loop;
