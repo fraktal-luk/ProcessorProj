@@ -103,18 +103,18 @@ begin
 				ci.secCluster := '0';
 			end if;
 
-			ci.branchAlways := '0';
+			--ci.branchAlways := '0';
 			ci.branchCond := '0';
 
 			if 	 	(ins.operation.func = jump and ins.constantArgs.c1 = COND_NONE) then
-				ci.branchAlways := '1';
+				--ci.branchAlways := '1';
 			elsif (ins.operation.func = jump and ins.constantArgs.c1 /= COND_NONE) then 
 				ci.branchCond := '1';	
 			end if;
 			
 			-- Branch to register
 			if ins.operation.func = jump and ins.constantArgs.immSel = '0' then
-				ci.branchReg := '1';
+				--ci.branchReg := '1';
 			end if;
 			
 			if  ins.operation.unit = System then
@@ -122,11 +122,11 @@ begin
 			end if;
 			
 			if  (ins.operation.func = sysMTC) then
-				ci.mtc := '1';
+			--	ci.mtc := '1';
 			end if;
 
 			if (ins.operation.func = sysMFC) then
-				ci.mfc := '1';
+			--	ci.mfc := '1';
 			end if;
 				
 	return ci;

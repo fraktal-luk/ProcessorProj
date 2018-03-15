@@ -136,8 +136,8 @@ architecture Behavioral of UnitSequencer is
 
 	signal stageDataToPC, stageDataOutPC: InstructionState := DEFAULT_INSTRUCTION_STATE;
 	signal sendingToPC, sendingOutPC, acceptingOutPC: std_logic := '0';
-		
-	--signal generalEvents: GeneralEventInfo := DEFAULT_GENERAL_EVENT_INFO;
+
+	signal tmpPcIn, tmpPcOut: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
 
 	signal excLinkInfo, intLinkInfo: InstructionBasicInfo := defaultBasicInfo;
 	signal excInfoUpdate, intInfoUpdate: std_logic := '0';
@@ -148,16 +148,13 @@ architecture Behavioral of UnitSequencer is
 	signal execOrIntEventSignal: std_logic := '0';
 	signal execOrIntCausing, interruptCause: InstructionState := defaultInstructionState;
 
+	signal stageDataRenameIn: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;		
+
 	signal stageDataOutRename: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
 	signal sendingOutRename, acceptingOutRename: std_logic:= '0';
 
 	signal sendingToCommit, sendingOutCommit, acceptingOutCommit: std_logic := '0';
 	signal stageDataToCommit, stageDataOutCommit: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;						
-
-	--signal newPhysDests: PhysNameArray(0 to PIPE_WIDTH-1) := (others=>(others=>'0'));
-	--signal newPhysDestPointer: SmallNumber := (others => '0');
-
-	--signal newPhysSources: PhysNameArray(0 to 3*PIPE_WIDTH-1) := (others=>(others=>'0'));							
 
 	signal renameCtr, renameCtrNext, commitCtr, commitCtrNext: SmallNumber := (others => '1');
 	signal renameGroupCtr, renameGroupCtrNext, commitGroupCtr, commitGroupCtrNext: SmallNumber :=
@@ -190,17 +187,8 @@ begin
 
 	EVENTS: block
 	begin	
---		generalEvents <= NEW_generalEvents( stageDataOutPC,
---														TMP_phase0, eiEvents.causing,
---														execEventSignal, execCausing,
---														frontEventSignal, frontCausing,
---														pcNext
---													);
 			gE_killPC <= TMP_phase0;
 			gE_eventOccurred <= TMP_phase0 or execEventSignal or frontEventSignal;
-
---				ch0 <= '1' when gE_killPC = generalEvents.killPC else '0';
---				ch1 <= '1' when gE_eventOccurred = generalEvents.eventOccured else '0';
 
 			lateEventOut <= TMP_phase0;
 			lateEventSetPC <= TMP_phase2;
@@ -228,13 +216,8 @@ begin
 										or (TMP_phase2 and not isHalt(eiEvents.causing)));
 										-- CAREFUL: Because of the above, PC is not updated in phase2 of halt instruction,
 										--				so the PC of a halted logical processor is not defined.
-	PC_STAGE: block
-		signal tmpPcIn, tmpPcOut: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
-		--signal newSysLevel, newIntLevel: SmallNumber := (others => '0');
-	begin		
-		tmpPcIn.fullMask(0) <= sendingToPC;
-		tmpPcIn.data(0) <= stageDataToPC;
-		-- tmpPcIn <= makeSDM(0 => (sendingToPC, stageDataToPC));
+
+		tmpPcIn <= makeSDM((0 => (sendingToPC, stageDataToPC)));
 
 		SUBUNIT_PC: entity work.GenericStageMulti(Behavioral) port map(
 			clk => clk, reset => resetSig, en => enSig,
@@ -254,11 +237,8 @@ begin
 			lockCommand => '0'		
 		);			
 
---		stageDataOutPC <= tmpPcOut.data(0);		
 		stageDataOutPC.basicInfo.ip <= tmpPcOut.data(0).basicInfo.ip;
-			stageDataOutPC.target <= pcNext; -- CAREFUL: Attaching next address from line predictor. Correct?
-	end block;
-
+		stageDataOutPC.target <= pcNext; -- CAREFUL: Attaching next address from line predictor. Correct?
 
 	-- TODO: signals for updating sys regs can be moved to sys reg block
 	excInfoUpdate <= eiEvents.causing.controlInfo.phase1 and eiEvents.causing.controlInfo.hasException;
@@ -348,11 +328,6 @@ begin
 	pcSending <= sendingOutPC;	
 
 	-- Rename stage
-	RENAMING: block
-		-- INPUT: newPhysSources, newPhysDests
-		signal stageDataRenameIn, stageDataRenameIn_C: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;		
-		--		signal ch0: std_logic := '0';
-	begin
 		stageDataRenameIn <= renameGroup(frontDataLastLiving, newPhysSourcesIn, newPhysDestsIn, renameCtr,
 															renameGroupCtrNext, newPhysDestPointerIn);
 	
@@ -376,7 +351,7 @@ begin
 			execCausing => execOrIntCausing,
 			lockCommand => renameLockState		
 		);
-	end block;
+--	end block;
 
 	COMMON_STATE: block
 	begin
@@ -493,14 +468,8 @@ begin
 
 	commitGroupCtrIncOut <= commitGroupCtrInc;
 
-		--newPhysDests <= newPhysDestsIn;
-		--newPhysDestPointer <= newPhysDestPointerIn;
-		--newPhysSources <= newPhysSourcesIn;
-
 		renameLockEndOut <= renameLockEnd;
-
 		commitAccepting <= '1';
-
 		committedSending <= sendingOutCommit;
 		committedDataOut <= stageDataOutCommit;
 end Behavioral;

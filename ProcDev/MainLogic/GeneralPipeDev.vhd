@@ -1005,7 +1005,7 @@ begin
 	res.controlInfo.newEvent := '0';
 	--res.controlInfo.newInterrupt := '0';
 	--res.controlInfo.newException := '0';
-	res.controlInfo.newBranch := '0';
+	--res.controlInfo.newBranch := '0';
 	--res.controlInfo.newReturn := '0';
 	return res;
 end function;

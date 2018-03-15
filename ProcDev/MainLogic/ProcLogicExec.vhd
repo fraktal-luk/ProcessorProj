@@ -144,7 +144,7 @@ package body ProcLogicExec is
 				--res.controlInfo.hasEvent := '1';						
 			elsif res.controlInfo.hasBranch = '0' and branchTaken = '1' then				
 				res.controlInfo.hasReturn := '0';
-				res.controlInfo.newBranch := '1';
+				--res.controlInfo.newBranch := '1';
 				res.controlInfo.hasBranch := '1';						
 				res.controlInfo.newEvent := '1';
 				--res.controlInfo.hasEvent := '1';					
@@ -192,7 +192,7 @@ package body ProcLogicExec is
 				trueTarget := queueData.argValues.arg2;
 		elsif res.controlInfo.hasBranch = '0' and branchTaken = '1' then				
 			res.controlInfo.hasReturn := '0';
-			res.controlInfo.newBranch := '1';
+			--res.controlInfo.newBranch := '1';
 			res.controlInfo.hasBranch := '1';						
 			res.controlInfo.newEvent := '1';
 			--res.controlInfo.hasEvent := '1';

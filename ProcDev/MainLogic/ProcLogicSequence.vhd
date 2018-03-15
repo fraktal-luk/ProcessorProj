@@ -23,15 +23,6 @@ use work.GeneralPipeDev.all;
 
 package ProcLogicSequence is
 
---type GeneralEventInfo is record
---	eventOccured: std_logic;
---		killPC: std_logic;
---	causing: InstructionState;
---end record;
-
---constant DEFAULT_GENERAL_EVENT_INFO: GeneralEventInfo := (eventOccured => '0', killPC => '0',
---																			 causing => DEFAULT_INS_STATE);
-
 	function getNextPC(pc: Mword; jumpPC: Mword; jump: std_logic) return Mword;
 
 		-- group:  revTag = causing.groupTag and i2slv(-PIPE_WIDTH, SMALL_NUMBER_SIZE), mask = all ones
@@ -54,19 +45,11 @@ function getLatePCData(commitEvent: std_logic; commitCausing: InstructionState;
 								linkExc, linkInt, stateExc, stateInt: Mword)
 return InstructionState;
 
-function newPCData(--content: InstructionState;
-						  commitEvent: std_logic; commitCausing: InstructionState;
+function newPCData( commitEvent: std_logic; commitCausing: InstructionState;
 						  execEvent: std_logic; execCausing: InstructionState;	
 						  frontEvent: std_logic; frontCausing: InstructionState;
 						  pcNext: Mword)
 return InstructionState;
-
---	function NEW_generalEvents(pcData: InstructionState;
---										commitEvent: std_logic; commitCausing: InstructionState;
---										execEvent: std_logic; execCausing: InstructionState;	
---										frontEvent: std_logic; frontCausing: InstructionState;
---										pcNext: Mword)
---	return GeneralEventInfo;
 
 -- BACK ROUTING
 -- Unifies content of ROB slot with BQ, others queues etc. to restore full state needed at Commit
@@ -82,9 +65,6 @@ return InstructionState;
 
 function setLateTargetAndLink(ins: InstructionState; target: Mword; link: Mword; phase1: std_logic)
 return InstructionState;
-
-
---function checkIvalid(ins: InstructionState; ivalid: std_logic) return InstructionState;
 
 function makeInterruptCause(targetIns: InstructionState; intSignal, start: std_logic)
 return InstructionState;
@@ -166,10 +146,7 @@ function getLatePCData(commitEvent: std_logic; commitCausing: InstructionState;
 return InstructionState is
 	variable res: InstructionState := DEFAULT_INSTRUCTION_STATE;-- content;
 	variable newPC: Mword := (others=>'0');
-begin
---		if commitCausing.controlInfo.hasReset = '1' then -- TEMP!
---			res.basicInfo.ip := (others => '0');
---			res.basicInfo.intLevel := "00000001";		
+begin	
 		if commitCausing.controlInfo.hasInterrupt = '1' then
 			if commitCausing.controlInfo.hasReset = '1' then
 				res.basicInfo.ip := (others => '0'); -- TEMP!			
@@ -208,8 +185,7 @@ begin
 end function;
 
 
-function newPCData(--content: InstructionState;
-						  commitEvent: std_logic; commitCausing: InstructionState;
+function newPCData( commitEvent: std_logic; commitCausing: InstructionState;
 						  execEvent: std_logic; execCausing: InstructionState;	
 						  frontEvent: std_logic; frontCausing: InstructionState;
 						  pcNext: Mword)
@@ -230,37 +206,6 @@ begin
 
 	return res;
 end function;
-
---	function NEW_generalEvents(pcData: InstructionState;
---										commitEvent: std_logic; commitCausing: InstructionState;
---										execEvent: std_logic; execCausing: InstructionState;	
---										frontEvent: std_logic; frontCausing: InstructionState;
---										pcNext: Mword)
---	return GeneralEventInfo is
---		variable res: GeneralEventInfo := DEFAULT_GENERAL_EVENT_INFO;
---	begin
---		--res.affectedVec := (others => '0');
---		res.eventOccured := '1';
---			res.killPC := '0';
---			
---		res.causing := frontCausing;
---	
---		if commitEvent = '1' then 
---			res.killPC := '1';
---			res.causing := commitCausing;
---			--res.affectedVec(0 to 4) := (others => '1');
---		elsif execEvent = '1' then
---			res.causing := execCausing;
---			--res.affectedVec(0 to 4) := (others => '1');
---		elsif frontEvent = '1' then
---			res.causing := frontCausing;
---			--res.affectedVec(0 to 3) := (others => '1');
---		else
---			res.eventOccured := '0';
---		end if;
---		
---		return res;
---	end function;
 
 -- Unifies content of ROB slot with BQ, others queues etc. to restore full state needed at Commit
 function recreateGroup(insVec: StageDataMulti; bqGroup: StageDataMulti;
@@ -291,7 +236,6 @@ begin
 		if insVec.data(i).controlInfo.hasBranch = '1' then
 			null;
 		else
-			--targets(i) := i2slv(slv2u(prevAdr) + slv2u(getAddressIncrement(insVec.data(i))), MWORD_SIZE);
 			targets(i) := addMwordBasic(prevTrg, getAddressIncrement(insVec.data(i)));
 		end if;
 		res.data(i).basicInfo.ip := prevTrg; -- ??
@@ -332,7 +276,6 @@ begin
 		
 	if phase1 = '1' then
 		res.result := res.target;
-		--res.target := causing.target;
 	end if;
 	
 	if phase2 = '1' then
@@ -359,13 +302,6 @@ begin
 	
 	return res;
 end function;
-
---function checkIvalid(ins: InstructionState; ivalid: std_logic) return InstructionState is
---	variable res: InstructionState := ins;
---begin
---	res.controlInfo.squashed := not ivalid; -- CAREFUL: here we'll use 'squashed', must be cleared before ROB 
---	return res;
---end function;
 
 function makeInterruptCause(targetIns: InstructionState; intSignal, start: std_logic)
 return InstructionState is

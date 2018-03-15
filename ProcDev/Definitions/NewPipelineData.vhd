@@ -144,7 +144,7 @@ type InstructionControlInfo is record
 		completed2: std_logic;
 	-- Momentary data:
 	newEvent: std_logic; -- True if any new event appears
-	newBranch: std_logic;
+	--newBranch: std_logic;
 	-- Persistent data:
 		hasReset: std_logic;
 	hasInterrupt: std_logic;
@@ -160,12 +160,12 @@ type InstructionClassInfo is record
 	short: std_logic;
 		mainCluster: std_logic;
 		secCluster: std_logic;
-	branchAlways: std_logic; -- either taken or not (only constant branches are known at decoding)
+	--branchAlways: std_logic; -- either taken or not (only constant branches are known at decoding)
 	branchCond: std_logic;
-	branchReg: std_logic;
-		branchLink: std_logic;
-		mtc: std_logic;
-		mfc: std_logic;
+	--branchReg: std_logic;
+	--	branchLink: std_logic;
+	--	mtc: std_logic;
+	--	mfc: std_logic;
 end record;
 
 type InstructionConstantArgs is record
@@ -329,7 +329,7 @@ begin
 												hasInterrupt => '0',
 													hasReset => '0',
 												hasException => '0',
-												newBranch => '0',
+												--newBranch => '0',
 												hasBranch => '0',
 												hasReturn => '0',												
 													specialAction => '0',
@@ -345,12 +345,12 @@ begin
 	return InstructionClassInfo'( short => '0',
 												mainCluster => '0',
 												secCluster => '0',
-											branchAlways => '0',
-											branchCond => '0',
-											branchReg => '0',
-												branchLink => '0',
-												mtc => '0',
-												mfc => '0'
+											--branchAlways => '0',
+											branchCond => '0'
+											--branchReg => '0'
+											--	branchLink => '0',
+											--	mtc => '0',
+											--	mfc => '0'
 											);	
 end function;
 

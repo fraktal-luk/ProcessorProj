@@ -30,10 +30,6 @@ function routeToIQ2(sd: StageDataMulti; srcVec: std_logic_vector) return StageDa
 
 function findForALU(iv: InstructionStateArray) return std_logic_vector;
 
-function findBranchLink(insv: StageDataMulti) return std_logic_vector;
-
---function setBranchLink(insv: StageDataMulti) return StageDataMulti;
-
 function findStores(insv: StageDataMulti) return std_logic_vector;
 function findLoads(insv: StageDataMulti) return std_logic_vector;
 
@@ -174,34 +170,6 @@ begin
 	end loop;
 	return res;
 end function;
-
-function findBranchLink(insv: StageDataMulti) return std_logic_vector is
-	variable res: std_logic_vector(0 to PIPE_WIDTH-1) := (others => '0');
-begin
-	for i in 0 to PIPE_WIDTH-1 loop
-		if 	 insv.data(i).operation = (Jump, jump)
-			and isNonzero(insv.data(i).virtualDestArgs.d0) = '1'
-			and insv.data(i).virtualDestArgs.sel(0) = '1'
-		then
-			res(i) := '1';
-		end if;
-	end loop;
-	return res;
-end function;
-
-
---function setBranchLink(insv: StageDataMulti) return StageDataMulti is
---	variable res: StageDataMulti := insv;
---	variable bl: std_logic_vector(0 to PIPE_WIDTH-1) := (others => '0');
---begin
---	bl := findBranchLink(insv);
---	for i in 0 to PIPE_WIDTH-1 loop
---		res.data(i).classInfo.branchLink := bl(i);
---	end loop;
---	
---	return res;
---end function;
-
 
 function findStores(insv: StageDataMulti) return std_logic_vector is
 	variable res: std_logic_vector(0 to PIPE_WIDTH-1) := (others => '0');
