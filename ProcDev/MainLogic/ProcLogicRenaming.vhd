@@ -50,6 +50,18 @@ return StageDataMulti;
 
 function getStableDestsParallel(insVec: StageDataMulti; pdVec: PhysNameArray) return PhysNameArray;
 
+		function genNewNumberTags(renameCtr: SmallNumber) return SmallNumberArray;
+		
+		function genNewGprTags(newPhysDestPointer: SmallNumber; nToTake: integer) return SmallNumberArray;
+		
+		function renameGroup(insVec: StageDataMulti;
+									newPhysSources: PhysNameArray;
+									newPhysDests: PhysNameArray;
+									renameCtr: SmallNumber;
+									renameGroupCtrNext: SmallNumber;
+									newPhysDestPointer: SmallNumber
+									) return StageDataMulti;
+
 function baptizeAll(insVec: StageDataMulti; numberTags: SmallNumberArray;
 						  newGroupTag: SmallNumber; gprTags: SmallNumberArray)
 return StageDataMulti;
@@ -91,6 +103,57 @@ begin
 	return res;
 end function;
 
+
+
+		function genNewNumberTags(renameCtr: SmallNumber) return SmallNumberArray is
+			variable res: SmallNumberArray(0 to PIPE_WIDTH-1) := (others => (others => '0'));
+		begin
+			for i in  0 to PIPE_WIDTH-1 loop
+				res(i) := i2slv(slv2u(renameCtr) + i + 1, SMALL_NUMBER_SIZE);
+			end loop;
+			return res;
+		end function;
+		
+		function genNewGprTags(newPhysDestPointer: SmallNumber; nToTake: integer) return SmallNumberArray is
+			variable res: SmallNumberArray(0 to PIPE_WIDTH-1) := (others => (others => '0'));
+		begin
+			for i in  0 to PIPE_WIDTH-1 loop
+				if FREE_LIST_COARSE_REWIND = '1' then
+					res(i) := i2slv((slv2u(newPhysDestPointer) + nToTake) mod FREE_LIST_SIZE, SMALL_NUMBER_SIZE);
+				else
+					res(i) := i2slv((slv2u(newPhysDestPointer) + i + 1) mod FREE_LIST_SIZE, SMALL_NUMBER_SIZE);
+				end if;
+			end loop;
+			return res;
+		end function;
+		
+		function renameGroup(insVec: StageDataMulti;
+									newPhysSources: PhysNameArray;
+									newPhysDests: PhysNameArray;
+									renameCtr: SmallNumber;
+									renameGroupCtrNext: SmallNumber;
+									newPhysDestPointer: SmallNumber
+									) return StageDataMulti is
+			variable res: StageDataMulti := insVec;
+			variable reserveSelSig, takeVec: std_logic_vector(0 to PIPE_WIDTH-1) := (others => '0' );
+			variable nToTake: integer := 0;
+			variable newGprTags: SmallNumberArray(0 to PIPE_WIDTH-1) := (others=>(others=>'0'));	
+			variable newNumberTags: SmallNumberArray(0 to PIPE_WIDTH-1) := (others=>(others=>'0'));
+		begin
+			reserveSelSig := getDestMask(insVec); -- Just full and having a destination?
+			takeVec := findWhichTakeReg(insVec); -- REG ALLOC
+			nToTake := countOnes(takeVec);
+		
+			newNumberTags := genNewNumberTags(renameCtr);
+			newGprTags := genNewGprTags(newPhysDestPointer, nToTake);			
+			
+			res := baptizeAll(res, newNumberTags, renameGroupCtrNext, newGprTags);
+			res := renameRegs2(res, takeVec, reserveSelSig, newPhysSources, newPhysDests);
+			res := setArgStatus(res);
+			res := TMP_handleSpecial(res);
+			
+			return res;
+		end function;
 
 function baptizeVec(sd: StageDataMulti; tags: SmallNumberArray) 
 return StageDataMulti is

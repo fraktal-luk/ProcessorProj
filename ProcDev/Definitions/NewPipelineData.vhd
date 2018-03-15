@@ -28,6 +28,7 @@ package NewPipelineData is
 	constant LOG2_PIPE_WIDTH: natural := 0 + 0; -- + 2; -- Must match the width!
 	constant PIPE_WIDTH: positive := 2**LOG2_PIPE_WIDTH; -- + 1 + 2; 
 	constant ALIGN_BITS: natural := LOG2_PIPE_WIDTH + 2;
+	constant PC_INC: Mword := (ALIGN_BITS => '1', others => '0');	
 
 	constant FETCH_BLOCK_SIZE: natural := PIPE_WIDTH * 2;
 	constant FETCH_DELAYED: boolean := false; -- Additional fetch stage for slower caches

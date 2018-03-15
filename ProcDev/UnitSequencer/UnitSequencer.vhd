@@ -132,13 +132,12 @@ end UnitSequencer;
 architecture Behavioral of UnitSequencer is
 	signal resetSig, enSig: std_logic := '0';							
 
-	constant PC_INC: Mword := (ALIGN_BITS => '1', others => '0');	
 	signal pcBase, pcNext: Mword := (others => '0');
 
 	signal stageDataToPC, stageDataOutPC: InstructionState := DEFAULT_INSTRUCTION_STATE;
 	signal sendingToPC, sendingOutPC, acceptingOutPC: std_logic := '0';
 		
-	signal generalEvents: GeneralEventInfo := DEFAULT_GENERAL_EVENT_INFO;
+	--signal generalEvents: GeneralEventInfo := DEFAULT_GENERAL_EVENT_INFO;
 
 	signal excLinkInfo, intLinkInfo: InstructionBasicInfo := defaultBasicInfo;
 	signal excInfoUpdate, intInfoUpdate: std_logic := '0';
@@ -155,10 +154,10 @@ architecture Behavioral of UnitSequencer is
 	signal sendingToCommit, sendingOutCommit, acceptingOutCommit: std_logic := '0';
 	signal stageDataToCommit, stageDataOutCommit: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;						
 
-	signal newPhysDests: PhysNameArray(0 to PIPE_WIDTH-1) := (others=>(others=>'0'));
-	signal newPhysDestPointer: SmallNumber := (others => '0');
+	--signal newPhysDests: PhysNameArray(0 to PIPE_WIDTH-1) := (others=>(others=>'0'));
+	--signal newPhysDestPointer: SmallNumber := (others => '0');
 
-	signal newPhysSources: PhysNameArray(0 to 3*PIPE_WIDTH-1) := (others=>(others=>'0'));							
+	--signal newPhysSources: PhysNameArray(0 to 3*PIPE_WIDTH-1) := (others=>(others=>'0'));							
 
 	signal renameCtr, renameCtrNext, commitCtr, commitCtrNext: SmallNumber := (others => '1');
 	signal renameGroupCtr, renameGroupCtrNext, commitGroupCtr, commitGroupCtrNext: SmallNumber :=
@@ -177,22 +176,11 @@ architecture Behavioral of UnitSequencer is
 							
 	signal TMP_targetIns: InstructionState := DEFAULT_INSTRUCTION_STATE;		
 	signal TMP_phase0, TMP_phase2: std_logic := '0';
-				
+			
+	signal gE_eventOccurred, gE_killPC, ch0, ch1: std_logic := '0';
+	
 	constant HAS_RESET_SEQ: std_logic := '0';
 	constant HAS_EN_SEQ: std_logic := '0';
-
-	function getNextPC(pc: Mword; jumpPC: Mword; jump: std_logic) return Mword is
-		variable res, pcBase: Mword := (others => '0'); 
-	begin
-		pcBase := pc and i2slv(-PIPE_WIDTH*4, MWORD_SIZE); -- Clearing low bits
-		if jump = '1' then
-			res := jumpPC;
-		else
-			res := addMwordBasic(pcBase, PC_INC);
-		end if;
-		return res;
-	end function;
-	
 begin	 
 	resetSig <= reset and HAS_RESET_SEQ;
 	enSig <= en or not HAS_EN_SEQ;
@@ -202,15 +190,21 @@ begin
 
 	EVENTS: block
 	begin	
-		generalEvents <= NEW_generalEvents( stageDataOutPC, TMP_phase0, eiEvents.causing,
-														execEventSignal, execCausing,
-														frontEventSignal, frontCausing,
-														pcNext
-													);
+--		generalEvents <= NEW_generalEvents( stageDataOutPC,
+--														TMP_phase0, eiEvents.causing,
+--														execEventSignal, execCausing,
+--														frontEventSignal, frontCausing,
+--														pcNext
+--													);
+			gE_killPC <= TMP_phase0;
+			gE_eventOccurred <= TMP_phase0 or execEventSignal or frontEventSignal;
+
+--				ch0 <= '1' when gE_killPC = generalEvents.killPC else '0';
+--				ch1 <= '1' when gE_eventOccurred = generalEvents.eventOccured else '0';
 
 			lateEventOut <= TMP_phase0;
 			lateEventSetPC <= TMP_phase2;
-		execOrIntEventSignal <= execEventSignal or TMP_phase0;
+		execOrIntEventSignal <= TMP_phase0 or execEventSignal;
 		execOrIntCausing <= eiEvents.causing when TMP_phase0 = '1' else execCausing;
 		lateCausing <= eiEvents.causing;
 
@@ -219,29 +213,25 @@ begin
 	end block;
 
 	pcBase <= stageDataOutPC.basicInfo.ip and i2slv(-PIPE_WIDTH*4, MWORD_SIZE); -- Clearing low bits
-	pcNext <= --addMwordBasic(pcBase, PC_INC);
-					getNextPC(stageDataOutPC.basicInfo.ip, (others => '0'), '0');
+	pcNext <= getNextPC(stageDataOutPC.basicInfo.ip, (others => '0'), '0');
 
-	stageDataToPC <= newPCData(
-									--stageDataOutPC, -- UNUSED? What content is useful here?
-									TMP_phase2,
-									eiEvents.causing,
-									execEventSignal, execCausing,
-									frontEventSignal, frontCausing,
-									pcNext
-								);
+	stageDataToPC <= newPCData(TMP_phase2, eiEvents.causing,
+										execEventSignal, execCausing,
+										frontEventSignal, frontCausing,
+										pcNext);
 
 	-- CAREFUL: prevSending normally means that 'full' bit inside will be set, but
 	--				when en = '0' this won't happen.
 	--				To be fully correct, prevSending should not be '1' when receiving prevented.			
 	sendingToPC <= acceptingOutPC and 
-					  (sendingOutPC or (generalEvents.eventOccured and not generalEvents.killPC) or TMP_phase2);
+					  (sendingOutPC or (gE_eventOccurred and not gE_killPC) or TMP_phase2);
 	PC_STAGE: block
 		signal tmpPcIn, tmpPcOut: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
-		signal newSysLevel, newIntLevel: SmallNumber := (others => '0');
+		--signal newSysLevel, newIntLevel: SmallNumber := (others => '0');
 	begin		
 		tmpPcIn.fullMask(0) <= sendingToPC;
 		tmpPcIn.data(0) <= stageDataToPC;
+		-- tmpPcIn <= makeSDM(0 => (sendingToPC, stageDataToPC));
 
 		SUBUNIT_PC: entity work.GenericStageMulti(Behavioral) port map(
 			clk => clk, reset => resetSig, en => enSig,
@@ -255,7 +245,7 @@ begin
 			sendingOut => sendingOutPC,
 			stageDataOut => tmpPcOut,
 			
-			execEventSignal => generalEvents.eventOccured,
+			execEventSignal => gE_eventOccurred,
 			lateEventSignal => TMP_phase0,
 			execCausing => DEFAULT_INSTRUCTION_STATE,
 			lockCommand => '0'		
@@ -345,7 +335,7 @@ begin
 		
 		TMP_targetIns <= getLatePCData('1', eiEvents.causing,
 													linkRegExc, linkRegInt,
-													savedStateExc, savedStateInt); -- Here, becaue needs sys regs
+													savedStateExc, savedStateInt); -- Here, because needs sys regs
 	end block;
 
 	iadr <= pcBase; -- Clearing low bits				
@@ -358,61 +348,10 @@ begin
 	RENAMING: block
 		-- INPUT: newPhysSources, newPhysDests
 		signal stageDataRenameIn, stageDataRenameIn_C: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;		
-
-		function genNewNumberTags(renameCtr: SmallNumber) return SmallNumberArray is
-			variable res: SmallNumberArray(0 to PIPE_WIDTH-1) := (others => (others => '0'));
-		begin
-			for i in  0 to PIPE_WIDTH-1 loop
-				res(i) := i2slv(slv2u(renameCtr) + i + 1, SMALL_NUMBER_SIZE);
-			end loop;
-			return res;
-		end function;
-		
-		function genNewGprTags(newPhysDestPointer: SmallNumber; nToTake: integer) return SmallNumberArray is
-			variable res: SmallNumberArray(0 to PIPE_WIDTH-1) := (others => (others => '0'));
-		begin
-			for i in  0 to PIPE_WIDTH-1 loop
-				if FREE_LIST_COARSE_REWIND = '1' then
-					res(i) := i2slv((slv2u(newPhysDestPointer) + nToTake) mod FREE_LIST_SIZE, SMALL_NUMBER_SIZE);
-				else
-					res(i) := i2slv((slv2u(newPhysDestPointer) + i + 1) mod FREE_LIST_SIZE, SMALL_NUMBER_SIZE);
-				end if;
-			end loop;
-			return res;
-		end function;
-		
-		function renameGroup(insVec: StageDataMulti;
-									newPhysSources: PhysNameArray;
-									newPhysDests: PhysNameArray;
-									renameCtr: SmallNumber;
-									renameGroupCtrNext: SmallNumber;
-									newPhysDestPointer: SmallNumber
-									) return StageDataMulti is
-			variable res: StageDataMulti := insVec;
-			variable reserveSelSig, takeVec: std_logic_vector(0 to PIPE_WIDTH-1) := (others => '0' );
-			variable nToTake: integer := 0;
-			variable newGprTags: SmallNumberArray(0 to PIPE_WIDTH-1) := (others=>(others=>'0'));	
-			variable newNumberTags: SmallNumberArray(0 to PIPE_WIDTH-1) := (others=>(others=>'0'));
-		begin
-			reserveSelSig := getDestMask(insVec); -- Just full and having a destination?
-			takeVec := findWhichTakeReg(insVec); -- REG ALLOC
-			nToTake := countOnes(takeVec);
-		
-			newNumberTags := genNewNumberTags(renameCtr);
-			newGprTags := genNewGprTags(newPhysDestPointer, nToTake);			
-			
-			res := baptizeAll(res, newNumberTags, renameGroupCtrNext, newGprTags);
-			res := renameRegs2(res, takeVec, reserveSelSig, newPhysSources, newPhysDests);
-			res := setArgStatus(res);
-			res := TMP_handleSpecial(res);
-			
-			return res;
-		end function;
-		
-				signal ch0: std_logic := '0';
+		--		signal ch0: std_logic := '0';
 	begin
-		stageDataRenameIn <= renameGroup(frontDataLastLiving, newPhysSources, newPhysDests, renameCtr,
-															renameGroupCtrNext, newPhysDestPointer);
+		stageDataRenameIn <= renameGroup(frontDataLastLiving, newPhysSourcesIn, newPhysDestsIn, renameCtr,
+															renameGroupCtrNext, newPhysDestPointerIn);
 	
 		SUBUNIT_RENAME: entity work.GenericStageMulti(Renaming)
 		port map(
@@ -446,7 +385,6 @@ begin
 		commitGroupCtrNext <= nextCtr(commitGroupCtr, '0', (others => '0'), sendingToCommit, ALL_FULL);
 		commitCtrNext <= nextCtr(commitCtr, '0', (others => '0'), sendingToCommit, effectiveMask);
 
-		-- TODO: use nextCtr?
 		commitGroupCtrInc <= i2slv(slv2u(commitGroupCtr) + PIPE_WIDTH, SMALL_NUMBER_SIZE);
 
 		-- Re-allow renaming when everything from rename/exec is committed - reg map will be well defined now
@@ -515,10 +453,9 @@ begin
 		--			The 'target' field will be used to update return address for exc/int
 		stageDataToCommit <= recreateGroup(robDataLiving, dataFromBQV, dataFromLastEffective.data(0).target);
 		insToLastEffective <= getLastEffective(stageDataToCommit);	
+		dataToLastEffective <= makeSDM((0 => (sendingToCommit, insToLastEffective)));
 
 		interruptCause <= makeInterruptCause(TMP_targetIns, intSignal, start);
-
-		dataToLastEffective <= makeSDM((0 => (sendingToCommit, insToLastEffective)));
 
 			LAST_EFFECTIVE_SLOT: entity work.GenericStageMulti(LastEffective)
 			port map(
@@ -553,9 +490,9 @@ begin
 
 	commitGroupCtrIncOut <= commitGroupCtrInc;
 
-		newPhysDests <= newPhysDestsIn;
-		newPhysDestPointer <= newPhysDestPointerIn;
-		newPhysSources <= newPhysSourcesIn;
+		--newPhysDests <= newPhysDestsIn;
+		--newPhysDestPointer <= newPhysDestPointerIn;
+		--newPhysSources <= newPhysSourcesIn;
 
 		renameLockEndOut <= renameLockEnd;
 

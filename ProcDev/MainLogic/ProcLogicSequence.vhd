@@ -23,14 +23,16 @@ use work.GeneralPipeDev.all;
 
 package ProcLogicSequence is
 
-type GeneralEventInfo is record
-	eventOccured: std_logic;
-		killPC: std_logic;
-	causing: InstructionState;
-end record;
+--type GeneralEventInfo is record
+--	eventOccured: std_logic;
+--		killPC: std_logic;
+--	causing: InstructionState;
+--end record;
 
-constant DEFAULT_GENERAL_EVENT_INFO: GeneralEventInfo := (eventOccured => '0', killPC => '0',
-																			 causing => DEFAULT_INS_STATE);
+--constant DEFAULT_GENERAL_EVENT_INFO: GeneralEventInfo := (eventOccured => '0', killPC => '0',
+--																			 causing => DEFAULT_INS_STATE);
+
+	function getNextPC(pc: Mword; jumpPC: Mword; jump: std_logic) return Mword;
 
 		-- group:  revTag = causing.groupTag and i2slv(-PIPE_WIDTH, SMALL_NUMBER_SIZE), mask = all ones
 		-- sequential: revTag = causing.numberTag, mask = new group's fullMask		
@@ -59,12 +61,12 @@ function newPCData(--content: InstructionState;
 						  pcNext: Mword)
 return InstructionState;
 
-	function NEW_generalEvents(pcData: InstructionState;
-										commitEvent: std_logic; commitCausing: InstructionState;
-										execEvent: std_logic; execCausing: InstructionState;	
-										frontEvent: std_logic; frontCausing: InstructionState;
-										pcNext: Mword)
-	return GeneralEventInfo;
+--	function NEW_generalEvents(pcData: InstructionState;
+--										commitEvent: std_logic; commitCausing: InstructionState;
+--										execEvent: std_logic; execCausing: InstructionState;	
+--										frontEvent: std_logic; frontCausing: InstructionState;
+--										pcNext: Mword)
+--	return GeneralEventInfo;
 
 -- BACK ROUTING
 -- Unifies content of ROB slot with BQ, others queues etc. to restore full state needed at Commit
@@ -92,6 +94,19 @@ end ProcLogicSequence;
 
 
 package body ProcLogicSequence is
+
+	function getNextPC(pc: Mword; jumpPC: Mword; jump: std_logic) return Mword is
+		variable res, pcBase: Mword := (others => '0'); 
+	begin
+		pcBase := pc and i2slv(-PIPE_WIDTH*4, MWORD_SIZE); -- Clearing low bits
+		if jump = '1' then
+			res := jumpPC;
+		else
+			res := addMwordBasic(pcBase, PC_INC);
+		end if;
+		return res;
+	end function;
+	
 		-- group:  revTag = causing.groupTag and i2slv(-PIPE_WIDTH, SMALL_NUMBER_SIZE), mask = all ones
 		-- sequential: revTag = causing.numberTag, mask = new group's fullMask		
 		function nextCtr(ctr: SmallNumber; rewind: std_logic; revTag: SmallNumber;
@@ -203,43 +218,43 @@ begin
 	elsif frontEvent = '1' then
 		--	report "front event!";
 		res.basicInfo.ip := frontCausing.target;	
-	else	-- Increment by the width of fetch group
+	else	-- Go to the next line
 		res.basicInfo.ip := pcNext;
 	end if;	
 
 	return res;
 end function;
 
-	function NEW_generalEvents(pcData: InstructionState;
-										commitEvent: std_logic; commitCausing: InstructionState;
-										execEvent: std_logic; execCausing: InstructionState;	
-										frontEvent: std_logic; frontCausing: InstructionState;
-										pcNext: Mword)
-	return GeneralEventInfo is
-		variable res: GeneralEventInfo := DEFAULT_GENERAL_EVENT_INFO;
-	begin
-		--res.affectedVec := (others => '0');
-		res.eventOccured := '1';
-			res.killPC := '0';
-			
-		res.causing := frontCausing;
-	
-		if commitEvent = '1' then 
-			res.killPC := '1';
-			res.causing := commitCausing;
-			--res.affectedVec(0 to 4) := (others => '1');
-		elsif execEvent = '1' then
-			res.causing := execCausing;
-			--res.affectedVec(0 to 4) := (others => '1');
-		elsif frontEvent = '1' then
-			res.causing := frontCausing;
-			--res.affectedVec(0 to 3) := (others => '1');
-		else
-			res.eventOccured := '0';
-		end if;
-		
-		return res;
-	end function;
+--	function NEW_generalEvents(pcData: InstructionState;
+--										commitEvent: std_logic; commitCausing: InstructionState;
+--										execEvent: std_logic; execCausing: InstructionState;	
+--										frontEvent: std_logic; frontCausing: InstructionState;
+--										pcNext: Mword)
+--	return GeneralEventInfo is
+--		variable res: GeneralEventInfo := DEFAULT_GENERAL_EVENT_INFO;
+--	begin
+--		--res.affectedVec := (others => '0');
+--		res.eventOccured := '1';
+--			res.killPC := '0';
+--			
+--		res.causing := frontCausing;
+--	
+--		if commitEvent = '1' then 
+--			res.killPC := '1';
+--			res.causing := commitCausing;
+--			--res.affectedVec(0 to 4) := (others => '1');
+--		elsif execEvent = '1' then
+--			res.causing := execCausing;
+--			--res.affectedVec(0 to 4) := (others => '1');
+--		elsif frontEvent = '1' then
+--			res.causing := frontCausing;
+--			--res.affectedVec(0 to 3) := (others => '1');
+--		else
+--			res.eventOccured := '0';
+--		end if;
+--		
+--		return res;
+--	end function;
 
 -- Unifies content of ROB slot with BQ, others queues etc. to restore full state needed at Commit
 function recreateGroup(insVec: StageDataMulti; bqGroup: StageDataMulti;
