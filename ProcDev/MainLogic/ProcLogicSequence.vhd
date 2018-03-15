@@ -165,11 +165,15 @@ return InstructionState is
 	variable res: InstructionState := DEFAULT_INSTRUCTION_STATE;-- content;
 	variable newPC: Mword := (others=>'0');
 begin
-		if commitCausing.controlInfo.hasReset = '1' then -- TEMP!
-			res.basicInfo.ip := (others => '0');
-			res.basicInfo.intLevel := "00000000";				
-		elsif commitCausing.controlInfo.hasInterrupt = '1' then
-			res.basicInfo.ip := INT_BASE; -- TEMP!
+--		if commitCausing.controlInfo.hasReset = '1' then -- TEMP!
+--			res.basicInfo.ip := (others => '0');
+--			res.basicInfo.intLevel := "00000001";		
+		if commitCausing.controlInfo.hasInterrupt = '1' then
+			if commitCausing.controlInfo.hasReset = '1' then
+				res.basicInfo.ip := (others => '0'); -- TEMP!			
+			else
+				res.basicInfo.ip := INT_BASE; -- TEMP!
+			end if;
 			res.basicInfo.intLevel := "00000001";		
 		elsif commitCausing.controlInfo.hasException = '1' then
 			-- TODO, FIX: exceptionCode sliced - shift left by ALIGN_BITS? or leave just base address
@@ -365,7 +369,7 @@ function makeInterruptCause(targetIns: InstructionState; intSignal, start: std_l
 return InstructionState is
 	variable res: InstructionState := DEFAULT_INSTRUCTION_STATE;
 begin
-	res.controlInfo.hasInterrupt := intSignal;
+	res.controlInfo.hasInterrupt := intSignal or start;
 	res.controlInfo.hasReset := start;
 	res.target := targetIns.basicInfo.ip;	
 	return res;

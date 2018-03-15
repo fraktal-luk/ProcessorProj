@@ -43,7 +43,8 @@ package ProgramCode4 is
 					--	ins655H(addI, r2, r0, 10000),
 			1 => insNOP, --
 					--	ins655H(addI, r3, r0, 200),
-			2 => insNOP,
+			2 => --insNOP,
+					ins65J(jl, r31, 4*(430-2)),
 					--	ins655655(ext0, r31, r2, mulu, r3, 0),
 					--ins655655(ext2, 0, 0, halt, 0, 0),
 			3 => insNOP,			
@@ -335,6 +336,13 @@ package ProgramCode4 is
 			424 => ins65J(jnz, r6, 4*(1023 - 424)),
 			425 => ins65J(jnz, r7, 4*(1023 - 425)),
 			426 => insRET,
+			
+			-- Lower privilege to 0
+			-- @1720
+			430 => insNOP,									 -- Int: 3 link, 5 saved state
+			431 => ins6556X(ext2, r0, 0, mtc, 5),	 -- lower the privilege
+			432 => ins6556X(ext2, r31, 0, mtc, 3),	 -- write return address to ILR
+			433 => ins655655(ext2, 0, 0, retI, 0, 0),
 			
 			-- Error handler
 			-- @4000
