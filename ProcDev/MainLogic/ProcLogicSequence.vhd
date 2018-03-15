@@ -89,6 +89,8 @@ return InstructionState;
 function makeInterruptCause(targetIns: InstructionState; intSignal, start: std_logic)
 return InstructionState;
 
+function isHalt(ins: InstructionState) return std_logic;
+
 end ProcLogicSequence;
 
 
@@ -374,5 +376,14 @@ begin
 	res.target := targetIns.basicInfo.ip;	
 	return res;
 end function;
+
+	function isHalt(ins: InstructionState) return std_logic is
+	begin
+		if ins.operation.func = sysHalt then
+			return '1';
+		else
+			return '0';
+		end if;
+	end function;
 
 end ProcLogicSequence;

@@ -224,7 +224,10 @@ begin
 	--				when en = '0' this won't happen.
 	--				To be fully correct, prevSending should not be '1' when receiving prevented.			
 	sendingToPC <= acceptingOutPC and 
-					  (sendingOutPC or (gE_eventOccurred and not gE_killPC) or TMP_phase2);
+					  (sendingOutPC or (gE_eventOccurred and not gE_killPC)
+										or (TMP_phase2 and not isHalt(eiEvents.causing)));
+										-- CAREFUL: Because of the above, PC is not updated in phase2 of halt instruction,
+										--				so the PC of a halted logical processor is not defined.
 	PC_STAGE: block
 		signal tmpPcIn, tmpPcOut: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
 		--signal newSysLevel, newIntLevel: SmallNumber := (others => '0');
