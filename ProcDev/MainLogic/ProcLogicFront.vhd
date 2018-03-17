@@ -98,35 +98,15 @@ begin
 				end if;
 
 			if ins.operation.func = sysUndef then
-				--ci.undef := '1';
 				ci.mainCluster := '0';
 				ci.secCluster := '0';
 			end if;
 
-			--ci.branchAlways := '0';
 			ci.branchCond := '0';
-
 			if 	 	(ins.operation.func = jump and ins.constantArgs.c1 = COND_NONE) then
-				--ci.branchAlways := '1';
+				null;
 			elsif (ins.operation.func = jump and ins.constantArgs.c1 /= COND_NONE) then 
 				ci.branchCond := '1';	
-			end if;
-			
-			-- Branch to register
-			if ins.operation.func = jump and ins.constantArgs.immSel = '0' then
-				--ci.branchReg := '1';
-			end if;
-			
-			if  ins.operation.unit = System then
-				--ci.system := '1';
-			end if;
-			
-			if  (ins.operation.func = sysMTC) then
-			--	ci.mtc := '1';
-			end if;
-
-			if (ins.operation.func = sysMFC) then
-			--	ci.mfc := '1';
 			end if;
 				
 	return ci;
@@ -135,14 +115,32 @@ end function;
 function decodeInstruction(inputState: InstructionState) return InstructionState is
 	variable res: InstructionState := inputState;
 	variable ofs: OpFieldStruct;
+	variable tmpVirtualArgs: InstructionVirtualArgs;
+	variable tmpVirtualDestArgs: InstructionVirtualDestArgs;
 begin
 	ofs := getOpFields(inputState.bits);
 	ofsInfo(ofs,
 					res.operation,
 					res.classInfo,
 					res.constantArgs,
-					res.virtualArgs,
-					res.virtualDestArgs);
+					tmpVirtualArgs,--res.virtualArgs,
+					tmpVirtualDestArgs);--res.virtualDestArgs);
+			
+			res.virtualArgs := tmpVirtualArgs;
+			res.virtualDestArgs := tmpVirtualDestArgs;
+	
+		res.virtualArgSpec.intDestSel := tmpVirtualDestArgs.sel(0);
+		res.virtualArgSpec.floatDestSel := '0';
+		res.virtualArgSpec.dest := (others => '0');		
+		res.virtualArgSpec.dest(4 downto 0) := tmpVirtualDestArgs.d0;
+		res.virtualArgSpec.intArgSel := tmpVirtualArgs.sel;
+		res.virtualArgSpec.floatArgSel := (others => '0');
+		res.virtualArgSpec.args(0) := (others => '0');
+		res.virtualArgSpec.args(0)(4 downto 0) := tmpVirtualArgs.s0;
+		res.virtualArgSpec.args(1) := (others => '0');		
+		res.virtualArgSpec.args(1)(4 downto 0) := tmpVirtualArgs.s1;
+		res.virtualArgSpec.args(2) := (others => '0');
+		res.virtualArgSpec.args(2)(4 downto 0) := tmpVirtualArgs.s2;
 	
 	res.classInfo := getInstructionClassInfo(res);	
 

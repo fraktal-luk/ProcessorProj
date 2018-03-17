@@ -29,16 +29,6 @@ return std_logic_vector;
 function extractReadyRegBitsV(bits: std_logic_vector; data: InstructionStateArray)
 return std_logic_vector;
 
--- UNUSED
-function clearEmptyResultTags(insVec: InstructionStateArray; fullMask: std_logic_vector)
-return InstructionStateArray;
-
--- For partition into different clusters: int, FP, mem
-function isolateArgSubset(ins: InstructionState; destSel: std_logic; srcSel: std_logic_vector(0 to 2))
-return InstructionState;
-
-
-
 end TEMP_DEV;
 
 
@@ -64,28 +54,6 @@ begin
 		res(3*i + 1) := bits(slv2u(data(i).virtualArgs.s1));
 		res(3*i + 2) := bits(slv2u(data(i).virtualArgs.s2));					
 	end loop;		
-	return res;
-end function;
-
-function clearEmptyResultTags(insVec: InstructionStateArray; fullMask: std_logic_vector)
-return InstructionStateArray is
-	variable res: InstructionStateArray(0 to insVec'length-1) := insVec;
-begin
-	for i in 0 to PIPE_WIDTH-1 loop
-		if fullMask(i) = '0' then
-			res(i).physicalDestArgs.d0 := (others => '0');
-		end if;
-	end loop;
-	return res;
-end function;
-
-
-function isolateArgSubset(ins: InstructionState; destSel: std_logic; srcSel: std_logic_vector(0 to 2))
-return InstructionState is
-	variable res: InstructionState := ins;
-begin
-	res.virtualDestArgs.sel(0) := res.virtualDestArgs.sel(0) and destSel;
-	res.virtualArgs.sel := res.virtualArgs.sel and srcSel;	
 	return res;
 end function;
 

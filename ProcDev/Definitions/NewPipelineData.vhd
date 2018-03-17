@@ -192,6 +192,26 @@ type InstructionPhysicalDestArgs is record
 	d0: PhysName;
 end record;
 
+
+		type InstructionArgSpec is record
+			intDestSel: std_logic;
+			floatDestSel: std_logic;
+			dest: SmallNumber;
+			intArgSel: std_logic_vector(0 to 2);
+			floatArgSel: std_logic_vector(0 to 2);
+			args: SmallNumberArray(0 to 2);
+		end record;
+
+		type InstructionTags is record
+			fetchCtr: word;	-- Ctr is never reset!
+			decodeCtr: InsTag; -- Ctr is never reset!
+			renameSeq: InsTag;
+			renameGroup: InsTag;
+			intPointer: SmallNumber;
+			floatPointer: SmallNumber;
+		end record;
+		
+
 type InstructionArgValues is record
 	newInQueue: std_logic;
 	immediate: std_logic;
@@ -221,6 +241,8 @@ type InstructionState is record
 	virtualDestArgs: InstructionVirtualDestArgs;
 	physicalArgs: InstructionPhysicalArgs;
 	physicalDestArgs: InstructionPhysicalDestArgs;
+		virtualArgSpec: InstructionArgSpec;
+		physicalArgSpec: InstructionArgSpec;
 	numberTag: SmallNumber;
 	gprTag: SmallNumber;
 	groupTag: SmallNumber;
