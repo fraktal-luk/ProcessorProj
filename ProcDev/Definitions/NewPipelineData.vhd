@@ -237,8 +237,8 @@ type InstructionState is record
 	operation: BinomialOp;
 	classInfo: InstructionClassInfo;
 	constantArgs: InstructionConstantArgs;
-	virtualArgs: InstructionVirtualArgs;
-	virtualDestArgs: InstructionVirtualDestArgs;
+	--virtualArgs: InstructionVirtualArgs;
+	--virtualDestArgs: InstructionVirtualDestArgs;
 	physicalArgs: InstructionPhysicalArgs;
 	physicalDestArgs: InstructionPhysicalDestArgs;
 		virtualArgSpec: InstructionArgSpec;
@@ -280,6 +280,15 @@ constant DEFAULT_PHYSICAL_ARGS: InstructionPhysicalArgs := defaultPhysicalArgs;
 constant DEFAULT_PHYSICAL_DEST_ARGS: InstructionPhysicalDestArgs := defaultPhysicalDestArgs;
 constant DEFAULT_ARG_VALUES: InstructionArgValues := defaultArgValues;
 
+constant DEFAULT_ARG_SPEC: InstructionArgSpec := InstructionArgSpec'(
+			intDestSel => '0',
+			floatDestSel => '0',
+			dest => (others => '0'),
+			intArgSel => (others => '0'),
+			floatArgSel => (others => '0'),
+			args => ((others => '0'), (others => '0'), (others => '0'))
+			);
+			
 constant DEFAULT_INSTRUCTION_STATE: InstructionState := defaultInstructionState;
 constant DEFAULT_INS_STATE: InstructionState := defaultInstructionState;
 	
@@ -421,10 +430,12 @@ begin
 	--res.operation := BinomialOp'(unknown, unknown);
 	res.classInfo := defaultClassInfo;
 	res.constantArgs := defaultConstantArgs;
-	res.virtualArgs := defaultVirtualArgs;
-	res.virtualDestArgs := defaultVirtualDestArgs;
+	--res.virtualArgs := defaultVirtualArgs;
+	--res.virtualDestArgs := defaultVirtualDestArgs;
 	res.physicalArgs := defaultPhysicalArgs;
 	res.physicalDestArgs := defaultPhysicalDestArgs;
+		res.virtualArgSpec := DEFAULT_ARG_SPEC;
+		res.physicalArgSpec := DEFAULT_ARG_SPEC;
 	res.numberTag := (others => '0'); -- '1');
 	res.gprTag := (others => '0'); -- '1');
 	res.groupTag := (others => '0');

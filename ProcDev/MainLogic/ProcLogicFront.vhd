@@ -86,8 +86,9 @@ begin
 				
 				if ins.operation.unit = Jump then
 					ci.secCluster := '1';
+					-- TODO: remove this distinction because no longer used!
 					-- For branch with link main cluster for destination write
-					if isNonzero(ins.virtualDestArgs.d0) = '0' then
+					if isNonzero(ins.virtualArgSpec.dest(4 downto 0)) = '0' then						
 						ci.mainCluster := '0';
 					end if;
 				elsif ins.operation = (System, sysMtc) then
@@ -126,8 +127,8 @@ begin
 					tmpVirtualArgs,--res.virtualArgs,
 					tmpVirtualDestArgs);--res.virtualDestArgs);
 			
-			res.virtualArgs := tmpVirtualArgs;
-			res.virtualDestArgs := tmpVirtualDestArgs;
+			--res.virtualArgs := tmpVirtualArgs;
+			--res.virtualDestArgs := tmpVirtualDestArgs;
 	
 		res.virtualArgSpec.intDestSel := tmpVirtualDestArgs.sel(0);
 		res.virtualArgSpec.floatDestSel := '0';

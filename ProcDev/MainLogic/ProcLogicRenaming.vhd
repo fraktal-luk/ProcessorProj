@@ -90,7 +90,8 @@ begin
 					and not getExceptionMask(sd)			-- if exception, doesn't write
 					and not findOverriddenDests(sd);
 	for i in 0 to PIPE_WIDTH-1 loop
-		res.index(i) := sd.data(i).virtualDestArgs.d0;
+		res.index(i) := sd.data(i).--virtualDestArgs.d0;
+											virtualArgSpec.dest(4 downto 0);
 		res.value(i) := newPhys(i);
 	end loop;
 	return res;
@@ -178,7 +179,7 @@ begin
 	
 	for i in insVec.fullMask'range loop	
 		-- Set physical sources
-		res.data(i).physicalArgs.sel := res.data(i).virtualArgs.sel;
+		res.data(i).physicalArgs.sel := res.data(i).virtualArgSpec.intArgSel;
 		res.data(i).physicalArgs.s0 := psVec(3*i+0);	
 		res.data(i).physicalArgs.s1 := psVec(3*i+1);			
 		res.data(i).physicalArgs.s2 := psVec(3*i+2);							
@@ -186,20 +187,23 @@ begin
 		for j in insVec.fullMask'range loop	
 			-- Is s0 equal to prev instruction's dest?				
 			if j = i then exit; end if;				
-			if insVec.data(i).virtualArgs.s0 = insVec.data(j).virtualDestArgs.d0
-				and isNonzero(insVec.data(i).virtualArgs.s0) = '1' -- CAREFUL: don't copy dummy dest for r0
+			if insVec.data(i).virtualArgSpec.args(0)(4 downto 0) = insVec.data(j).--virtualDestArgs.d0
+																				virtualArgSpec.dest(4 downto 0)
+				and isNonzero(insVec.data(i).virtualArgSpec.args(0)(4 downto 0)) = '1' -- CAREFUL: don't copy dummy dest for r0
 			then
 				res.data(i).physicalArgs.s0 := res.data(j).physicalDestArgs.d0;
 			end if;		
-			if 	 insVec.data(i).virtualArgs.s1 = insVec.data(j).virtualDestArgs.d0
-				and isNonzero(insVec.data(i).virtualArgs.s1) = '1' -- CAREFUL: don't copy dummy dest for r0
+			if 	 insVec.data(i).virtualArgSpec.args(1)(4 downto 0) = insVec.data(j).--virtualDestArgs.d0
+																					virtualArgSpec.dest(4 downto 0)
+				and isNonzero(insVec.data(i).virtualArgSpec.args(1)(4 downto 0)) = '1' -- CAREFUL: don't copy dummy dest for r0
 			then	
 				res.data(i).physicalArgs.s1 := res.data(j).physicalDestArgs.d0;						
 			end if;	
-			if 	 insVec.data(i).virtualArgs.s2 = insVec.data(j).virtualDestArgs.d0 
-				and isNonzero(insVec.data(i).virtualArgs.s2) = '1' -- CAREFUL: don't copy dummy dest for r0
+			if 	 insVec.data(i).virtualArgSpec.args(2)(4 downto 0) = insVec.data(j).--virtualDestArgs.d0
+																					virtualArgSpec.dest(4 downto 0)
+				and isNonzero(insVec.data(i).virtualArgSpec.args(2)(4 downto 0)) = '1' -- CAREFUL: don't copy dummy dest for r0
 			then
-				res.data(i).physicalArgs.s2 := res.data(j).physicalDestArgs.d0;						
+				res.data(i).physicalArgs.s2 := res.data(j).physicalDestArgs.d0;
 			end if;						
 		end loop;
 		
@@ -215,15 +219,15 @@ return StageDataMulti is
 begin
 	for i in insVec.fullMask'range loop	
 		-- Set state markers: "zero" bit		
-		if isNonzero(res.data(i).virtualArgs.s0) = '0' then
+		if isNonzero(res.data(i).virtualArgSpec.args(0)(4 downto 0)) = '0' then
 			res.data(i).argValues.zero(0) := '1';
 		end if;
 		
-		if isNonzero(res.data(i).virtualArgs.s1) = '0' then
+		if isNonzero(res.data(i).virtualArgSpec.args(1)(4 downto 0)) = '0' then
 			res.data(i).argValues.zero(1) := '1';
 		end if;
 
-		if isNonzero(res.data(i).virtualArgs.s2) = '0' then
+		if isNonzero(res.data(i).virtualArgSpec.args(2)(4 downto 0)) = '0' then
 			res.data(i).argValues.zero(2) := '1';
 		end if;		
 			
@@ -249,6 +253,7 @@ begin
 end function;
 
 
+-- TODO: explain this
 -- CAREFUL: if use bypassing (>> usage in top module), don't exclude overridden dests 
 --				from selection in RegisterFreeList!
 function getStableDestsParallel(insVec: StageDataMulti; pdVec: PhysNameArray) return PhysNameArray is
@@ -260,8 +265,8 @@ begin
 		for j in insVec.fullMask'range loop	
 			-- Is s0 equal to prev instruction's dest?				
 			if j = i then exit; end if;				
-			if insVec.data(i).virtualDestArgs.d0 = insVec.data(j).virtualDestArgs.d0
-				and isNonzero(insVec.data(i).virtualDestArgs.d0) = '1' -- CAREFUL: don't copy dummy dest for r0
+			if insVec.data(i).virtualArgSpec.dest(4 downto 0) = insVec.data(j).virtualArgSpec.dest(4 downto 0)		
+				and isNonzero(insVec.data(i).virtualArgSpec.dest(4 downto 0)) = '1' -- CAREFUL: don't copy dummy dest for r0
 			then
 				res(i) := insVec.data(j).physicalDestArgs.d0;
 			end if;		

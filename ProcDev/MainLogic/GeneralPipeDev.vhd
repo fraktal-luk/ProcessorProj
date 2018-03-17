@@ -594,9 +594,9 @@ function getVirtualArgs(insVec: StageDataMulti) return RegNameArray is
 	variable res: RegNameArray(0 to 3*insVec.fullMask'length-1) := (others=>(others=>'0'));
 begin
 	for i in insVec.fullMask'range loop
-		res(3*i+0) := insVec.data(i).virtualArgs.s0;
-		res(3*i+1) := insVec.data(i).virtualArgs.s1;
-		res(3*i+2) := insVec.data(i).virtualArgs.s2;
+		res(3*i+0) := insVec.data(i).virtualArgSpec.args(0)(4 downto 0);
+		res(3*i+1) := insVec.data(i).virtualArgSpec.args(1)(4 downto 0);
+		res(3*i+2) := insVec.data(i).virtualArgSpec.args(2)(4 downto 0);
 	end loop;
 	return res;
 end function;
@@ -616,7 +616,7 @@ function getVirtualDests(insVec: StageDataMulti) return RegNameArray is
 	variable res: RegNameArray(0 to insVec.fullMask'length-1) := (others=>(others=>'0'));
 begin
 	for i in insVec.fullMask'range loop
-		res(i) := insVec.data(i).virtualDestArgs.d0;
+		res(i) := insVec.data(i).virtualArgSpec.dest(4 downto 0);
 	end loop;
 	return res;
 end function;		
@@ -636,8 +636,8 @@ function getDestMask(insVec: StageDataMulti) return std_logic_vector is
 begin
 	for i in insVec.fullMask'range loop
 		res(i) := insVec.fullMask(i) 
-				and insVec.data(i).virtualDestArgs.sel(0) 
-				and isNonzero(insVec.data(i).virtualDestArgs.d0);
+				and insVec.data(i).virtualArgSpec.intDestSel				
+				and isNonzero(insVec.data(i).virtualArgSpec.dest(4 downto 0));
 	end loop;			
 	return res;
 end function;
@@ -651,7 +651,8 @@ begin
 	for i in insVec.fullMask'range loop
 		for j in insVec.fullMask'range loop
 			if 		j > i and insVec.fullMask(j) = '1' and em(j) = '0' -- CAREFUL: if exception, doesn't write
-				and insVec.data(i).virtualDestArgs.d0 = insVec.data(j).virtualDestArgs.d0 then
+				and insVec.data(i).virtualArgSpec.dest(4 downto 0) = insVec.data(j).virtualArgSpec.dest(4 downto 0)
+			then				
 				res(i) := '1';
 			end if;
 		end loop;
@@ -923,8 +924,7 @@ begin
 		end if;
 		
 		-- TEMP: also clear unneeded data for all instructions
-		res.data(i).virtualArgs := defaultVirtualArgs;
-		--	res.data(i).virtualDestArgs := defaultVirtualDestArgs;
+		--res.data(i).virtualArgs := defaultVirtualArgs;
 		res.data(i).constantArgs := defaultConstantArgs; -- c0 needed for sysMtc if not using temp reg in Exec
 		res.data(i).argValues := defaultArgValues;
 		res.data(i).basicInfo := defaultBasicInfo;
@@ -979,8 +979,7 @@ begin
 		end if;
 		
 		-- TEMP: also clear unneeded data for all instructions
-		res.data(i).virtualArgs := defaultVirtualArgs;
-		--	res.data(i).virtualDestArgs := defaultVirtualDestArgs;
+		--res.data(i).virtualArgs := defaultVirtualArgs;
 		res.data(i).constantArgs := defaultConstantArgs; -- c0 needed for sysMtc if not using temp reg in Exec
 		res.data(i).argValues := defaultArgValues;
 		res.data(i).basicInfo := defaultBasicInfo;

@@ -35,7 +35,6 @@ function findLoads(insv: StageDataMulti) return std_logic_vector;
 
 
 function prepareForAGU(insVec: StageDataMulti) return StageDataMulti;
-function prepareForBranch(insVec: StageDataMulti) return StageDataMulti;
 function prepareForStoreData(insVec: StageDataMulti) return StageDataMulti;
 
 -- Description: arg1 := target
@@ -203,33 +202,14 @@ function prepareForAGU(insVec: StageDataMulti) return StageDataMulti is
 	variable res: StageDataMulti := insVec;
 begin
 	for i in 0 to PIPE_WIDTH-1 loop
-		res.data(i).virtualArgs.sel(2) := '0';
+		--res.data(i).virtualArgs.sel(2) := '0';
 		res.data(i).physicalArgs.sel(2) := '0';
 		res.data(i).argValues.missing(2) := '0';
 		
+		res.data(i).virtualArgSpec.intArgSel(2) := '0';
+		
 			res.data(i).controlInfo.completed := '0';
 			res.data(i).controlInfo.completed2 := '0';
-	end loop;
-	return res;
-end function;
-
-function prepareForBranch(insVec: StageDataMulti) return StageDataMulti is
-	variable res: StageDataMulti := insVec;
-begin
-	for i in 0 to PIPE_WIDTH-1 loop
-		if res.data(i).operation /= (System, sysMfc) then
-			res.data(i).virtualDestArgs.sel := (others => '0');		
-			res.data(i).virtualDestArgs.d0 := (others => '0');
-			res.data(i).physicalDestArgs.sel := (others => '0');			
-			res.data(i).physicalDestArgs.d0 := (others => '0');
-		end if;
-		
-		if insVec.data(i).controlInfo.hasBranch = '1' then
-			res.data(i).constantArgs.imm := res.data(i).result;			
-		else
-			res.data(i).constantArgs.imm := res.data(i).target;
-		end if;
-		
 	end loop;
 	return res;
 end function;
@@ -239,13 +219,16 @@ function prepareForStoreData(insVec: StageDataMulti) return StageDataMulti is
 	variable res: StageDataMulti := insVec;
 begin
 	for i in 0 to PIPE_WIDTH-1 loop
-		res.data(i).virtualArgs.sel(0) := '0';
-		res.data(i).virtualArgs.sel(1) := '0';		
+		--res.data(i).virtualArgs.sel(0) := '0';
+		--res.data(i).virtualArgs.sel(1) := '0';		
 		res.data(i).physicalArgs.sel(0) := '0';
 		res.data(i).physicalArgs.sel(1) := '0';		
 		res.data(i).constantArgs.immSel := '0';
-		res.data(i).virtualDestArgs.sel(0) := '0';
+		--res.data(i).virtualDestArgs.sel(0) := '0';
 		res.data(i).physicalDestArgs.sel(0) := '0';
+
+			res.data(i).virtualArgSpec.intArgSel := (others => '0');		
+			res.data(i).virtualArgSpec.intDestSel := '0';			
 		
 			res.data(i).controlInfo.completed := '0';
 			res.data(i).controlInfo.completed2 := '0';
