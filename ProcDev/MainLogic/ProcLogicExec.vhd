@@ -25,7 +25,7 @@ use work.GeneralPipeDev.all;
 
 package ProcLogicExec is
 
-	-- DUMMY: This performs some siple operation to obtain a result
+	-- DUMMY: This performs some simple operation to obtain a result
 	function passArg0(ins: InstructionState) return InstructionState;
 	function passArg1(ins: InstructionState) return InstructionState;
 	function execLogicOr(ins: InstructionState) return InstructionState;
@@ -282,6 +282,7 @@ package body ProcLogicExec is
 	
 	
 		shTemp(4 downto 0) := c0; -- CAREFUL, TODO: handle the issue of 1-32 vs 0-31	
+			shTemp(5 downto 0) := arg1(5 downto 0);
 		if ins.operation.func = logicShl then
 			shNum := subSN(shNum, shTemp);
 		else

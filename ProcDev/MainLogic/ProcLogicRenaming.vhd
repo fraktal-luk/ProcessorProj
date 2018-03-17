@@ -66,13 +66,6 @@ function baptizeAll(insVec: StageDataMulti; numberTags: SmallNumberArray;
 						  newGroupTag: SmallNumber; gprTags: SmallNumberArray)
 return StageDataMulti;
 
-
-function getSysRegWriteAllow(sd: StageDataMulti; effective: std_logic_vector) return std_logic;
--- CAREFUL: this seems not used and would choose the last value in group
-function getSysRegWriteSel(sd: StageDataMulti) return slv5;
--- CAREFUL: this seems not used and would choose the last value in group
-function getSysRegWriteValue(sd: StageDataMulti) return Mword;
-
 -- Clears non-effective 'full' bits in group (after exception or specia)
 function TMP_handleSpecial(sd: StageDataMulti) return StageDataMulti;
 
@@ -251,21 +244,8 @@ begin
 			res.data(i).controlInfo.completed2 := not res.data(i).classInfo.secCluster;
 				
 	end loop;	
-	
-	
+
 	return res; -- CAREFUL: this must be removed if using virtual ready map
-	
---		-- Virtual ready table
---		for i in 0 to PIPE_WIDTH-1 loop
---			res.data(i).argValues.missing(0) := res.data(i).argValues.missing(0) 
---					and not readyRegFlagsVirtualNext(3*i + 0);
---			res.data(i).argValues.missing(1) := res.data(i).argValues.missing(1)
---					and not readyRegFlagsVirtualNext(3*i + 1);
---			res.data(i).argValues.missing(2) := res.data(i).argValues.missing(2)
---					and not readyRegFlagsVirtualNext(3*i + 2);
---		end loop;	
-	
-	return res;
 end function;
 
 
@@ -305,45 +285,6 @@ begin
 	return res;
 end function;
 
-	
-	function getSysRegWriteAllow(sd: StageDataMulti; effective: std_logic_vector) return std_logic is
-	begin
-		for i in sd.fullMask'range loop
-			if 	--sd.fullMask(i) = '1'
-					effective(i) = '1'
-				and sd.data(i).operation.unit = System
-				and sd.data(i).operation.func = sysMtc
-				and sd.data(i).controlInfo.hasException = '0' -- Don't allow if instruction had exception!
-			then
-				return '1';
-			end if;
-		end loop;
-		return '0';
-	end function;
-
-	-- CAREFUL: this seems not used and would choose the last value in group
-	function getSysRegWriteSel(sd: StageDataMulti) return slv5 is
-		variable res: slv5 := (others => '0');
-	begin
-		for i in sd.fullMask'range loop
-			if sd.fullMask(i) = '1' then
-				res := sd.data(i).constantArgs.c0;
-			end if;
-		end loop;
-		return res;
-	end function;
-
-	-- CAREFUL: this seems not used and would choose the last value in group
-	function getSysRegWriteValue(sd: StageDataMulti) return Mword is
-		variable res: Mword := (others => '0');
-	begin
-		for i in sd.fullMask'range loop
-			if sd.fullMask(i) = '1' then
-				res := sd.data(i).result;
-			end if;
-		end loop;
-		return res;
-	end function;
 
 function TMP_handleSpecial(sd: StageDataMulti) return StageDataMulti is
 	variable res: StageDataMulti := sd;

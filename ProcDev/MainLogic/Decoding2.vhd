@@ -183,6 +183,9 @@ package Decoding2 is
 			constant fmtShiftC: ArgFormatStruct :=		
 					((d0=>qa, d1=>none, s0=>qb, s1=>none, s2=>none, c0=>qc, c1=>none), none, '0', '0', '0',
 							(others => Int));					
+			constant fmtShiftImm: ArgFormatStruct :=		
+					((d0=>qa, d1=>none, s0=>qb, s1=>none, s2=>none, c0=>none, c1=>none), imm10, '0', '0', '0',
+							(others => Int));
 			
 			constant fmtNoArgs: ArgFormatStruct :=		
 					((others=>none), none, '0', '0', '0',
@@ -215,9 +218,9 @@ package Decoding2 is
 				10=> (ext0, muls, Mac, mulS, fmtReg3),
 				11=> (ext0, mulu, Mac, mulU, fmtReg3),
 
-				12 => (ext0, shlC,  Alu,  logicShl,	fmtShiftC),
-				13 => (ext0, shrlC, Alu,  logicShrl,fmtShiftC),
-				14 => (ext0, shraC, Alu,  arithShra,fmtShiftC), 
+				12 => (ext0, shlC,  Alu,  logicShl,	fmtShiftImm),
+				13 => (ext0, shrlC, Alu,  logicShrl,fmtShiftImm),
+				14 => (ext0, shraC, Alu,  arithShra,fmtShiftImm), 
 
 				15=> (ext2, mfc,	System, sysMFC, fmtMFC_TEMP),
 				16=> (ext2, mtc, 	System, sysMTC, fmtMTC_TEMP),		
