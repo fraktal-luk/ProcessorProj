@@ -82,15 +82,15 @@ package NewPipelineData is
 	constant N_NEXT_RES_TAGS: natural := 2; 
 	------
 
-	-- TODO: move config info to general config file included in higher level definition files
-	constant N_PHYSICAL_REGS: natural := 64;  -- CAREFUL: not more than 2**PHYS_NAME_SIZE!
+	-- TODO: move config info to general config file included in higher level definition files?
+	constant PHYS_REG_BITS: natural := 6 + LOG2_PIPE_WIDTH;
+	constant N_PHYSICAL_REGS: natural := 64 * PIPE_WIDTH;
 	constant N_PHYS: natural := N_PHYSICAL_REGS;
 	
 	constant FREE_LIST_SIZE: natural := N_PHYS; -- CAREFUL: must be enough for N_PHYS-32
 	constant FREE_LIST_COARSE_REWIND: std_logic := '0';
 	
-	constant PHYS_NAME_SIZE: integer := 6; -- CAREFUL: 2**PHYS_NAME_SIZE must be not less than n_PHYS!
-	subtype PhysName is SmallNumber;--std_logic_vector(PHYS_NAME_SIZE-1 downto 0);
+	subtype PhysName is SmallNumber;
 	type PhysNameArray is array(natural range <>) of PhysName;
 
 	constant ENABLE_INT_OVERFLOW: boolean := false or true;

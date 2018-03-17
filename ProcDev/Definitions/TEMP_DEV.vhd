@@ -39,9 +39,9 @@ function extractReadyRegBits(bits: std_logic_vector; data: InstructionStateArray
 	variable res: std_logic_vector(0 to 3*data'length-1) := (others => '0'); -- 31) := (others=>'0');
 begin
 	for i in 0 to data'length-1 loop
-		res(3*i + 0) := bits(slv2u(data(i).physicalArgSpec.args(0)));
-		res(3*i + 1) := bits(slv2u(data(i).physicalArgSpec.args(1)));
-		res(3*i + 2) := bits(slv2u(data(i).physicalArgSpec.args(2)));					
+		res(3*i + 0) := bits(slv2u(data(i).physicalArgSpec.args(0)(PHYS_REG_BITS-1 downto 0)));
+		res(3*i + 1) := bits(slv2u(data(i).physicalArgSpec.args(1)(PHYS_REG_BITS-1 downto 0)));
+		res(3*i + 2) := bits(slv2u(data(i).physicalArgSpec.args(2)(PHYS_REG_BITS-1 downto 0)));
 	end loop;		
 	return res;
 end function;		
