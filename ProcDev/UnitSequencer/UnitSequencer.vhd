@@ -141,9 +141,6 @@ architecture Behavioral of UnitSequencer is
 
 	signal excLinkInfo, intLinkInfo: InstructionBasicInfo := defaultBasicInfo;
 	signal excInfoUpdate, intInfoUpdate: std_logic := '0';
-		
-	signal sysRegWriteAllow: std_logic := '0';
-	signal currentStateSig: Mword := (others => '0');
 
 	signal execOrIntEventSignal: std_logic := '0';
 	signal execOrIntCausing, interruptCause: InstructionState := defaultInstructionState;
@@ -252,43 +249,28 @@ begin
 		signal sysRegArray: MwordArray(0 to 31) := (0 => PROCESSOR_ID, others => (others => '0'));	
 
 		alias currentState is sysRegArray(1);
-		
 		alias linkRegExc is sysRegArray(2);
 		alias linkRegInt is sysRegArray(3);
-		
 		alias savedStateExc is sysRegArray(4);
 		alias savedStateInt is sysRegArray(5);
-
-		signal srWriteSel: slv5 := (others => '0');
-		signal srWriteVal: Mword := (others => '0');
 	begin
-		sysRegWriteAllow <= sysStoreAllow;									
-		srWriteSel <= sysStoreAddress;
-		srWriteVal <= sysStoreValue;
-	
 		CLOCKED: process(clk)
 		begin					
 			if rising_edge(clk) then
 				-- Reading sys regs
 				sysRegReadValue <= sysRegArray(slv2u(sysRegReadSel));			
-			
-				-- CAREFUL: writing to currentState BEFORE normal sys reg write gives priority to the latter;
-				--				otherwise explicit setting of currentState wouldn't work.
-				--				So maybe other sys regs should have it done the same way, not conversely? 
-				--				In any case, the requirement is that younger instructions must take effect later
-				--				and override earlier content.
 
 				-- Write from system write instruction
-				if sysRegWriteAllow = '1' then
-					sysRegArray(slv2u(srWriteSel)) <= srWriteVal;
+				if sysStoreAllow = '1' then
+					sysRegArray(slv2u(sysStoreAddress)) <= sysStoreValue;
 				end if;
 
 				-- Writing specialized fields on events
 				if eiEvents.causing.controlInfo.phase1 = '1' then
 					currentState <= X"0000" & TMP_targetIns.basicInfo.systemLevel & TMP_targetIns.basicInfo.intLevel;
+					currentState(15 downto 10) <= (others => '0');
+					currentState(7 downto 2) <= (others => '0');
 				end if;
-				
-				currentState <= currentState and X"FFFF0303";
 				
 				-- NOTE: writing to link registers after sys reg writing gives priority to the former,
 				--			but committing a sysMtc shouldn't happen in parallel with any control event
@@ -314,7 +296,7 @@ begin
 			end if;	
 		end process;
 		
-		currentStateSig <= currentState;
+--		currentStateSig <= currentState;
 		
 		TMP_targetIns <= getLatePCData('1', eiEvents.causing,
 													linkRegExc, linkRegInt,

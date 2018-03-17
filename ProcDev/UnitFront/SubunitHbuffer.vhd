@@ -104,17 +104,11 @@ architecture Implem of SubunitHbuffer is
 		
 		signal TMP_offset: SmallNumber := (others => '0');
 begin
-
 				TMP_killMask <= getKillMask(TMP_stageData, TMP_mask, execCausing, '0', execEventSignal);
-				--ta <= hbufferDrive.nextAccepting;
-				--tb <= hbufferDrive.prevSending;
-				--qs1 <= TMP_change_Shifting(qs0, ta, tb, TMP_mask, TMP_killMask, execEventSignal);
 				qs1 <= TMP_change_Shifting(
 									qs0, hbufferDrive.nextAccepting, hbufferDrive.prevSending,
 										TMP_mask, TMP_killMask, execEventSignal);
-										
-									--getQueueIndicesForInput_Shifting(qs0, TMP_mask, 2*PIPE_WIDTH,
-									--												hbufferDrive.nextAccepting);
+
 				inputIndices <= getQueueIndicesForInput_ShiftingHbuff(
 										qs0, HBUFFER_SIZE, hbufferDrive.nextAccepting, 2*PIPE_WIDTH, TMP_offset);																					
 				TMP_ckEnForInput <= getEnableForInput_Shifting(
@@ -136,14 +130,10 @@ begin
 
 			TMP_offset <= getFetchOffset(stageDataIn.basicInfo.ip);
 
-	nHIn <= --i2slv(FETCH_BLOCK_SIZE - (slv2u(stageDataIn.basicInfo.ip(ALIGN_BITS-1 downto 1))),
-			  --		  SMALL_NUMBER_SIZE);				
-					i2slv(2 * countFullNonSkipped(stageDataInMulti), SMALL_NUMBER_SIZE);
-						-- TODO: change to 2 * bit count from EarlyBranchMulti 
+	nHIn <= i2slv(2 * countFullNonSkipped(stageDataInMulti), SMALL_NUMBER_SIZE);
 
 	hbufferDataANew <= getAnnotatedHwords(stageDataIn, stageDataInMulti, fetchBlock);					
 
-		-- TODO: handle possibility of partial killing by partialKillMask?
 		livingMask <= fullMask when execEventSignal = '0' else (others => '0');
 		
 	hbuffOut <= newFromHbuffer(hbufferDataA, livingMask);
@@ -194,7 +184,6 @@ begin
 
 	hbufferDrive.kill <=	num2flow(countOnes(fullMask and partialKillMaskHbuffer));
 
-	--stageDataOut <= hbuffOut.sd;
 		stageDataOut.data <= hbuffOut.sd.data;
 		stageDataOut.fullMask <= hbuffOut.sd.fullMask when isNonzero(sendingSig) = '1'
 								  else (others => '0');

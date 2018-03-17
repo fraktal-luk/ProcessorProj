@@ -123,7 +123,7 @@ package Decoding2 is
 					((others=>none), none, '0','0','0',
 							(others => Int));
 
-				-- TEMP: experimental new formar
+				-- TEMP: experimental new format
 				constant formatImm: ArgFormatNew := 
 					((qa, Int), 	(qb, Int), (qc, none), (qd, none),
 						(none, none), (none, none),	'1', '0', imm16);
@@ -179,10 +179,7 @@ package Decoding2 is
 			constant fmtJumpRNZ: ArgFormatStruct := 
 					((d0=>qa, d1=>none, s0=>qb, s1=>qc, s2=>none, c0=>none, c1=> one), none, '0', '0', '0',
 							(others => Int));	
-					
-			constant fmtShiftC: ArgFormatStruct :=		
-					((d0=>qa, d1=>none, s0=>qb, s1=>none, s2=>none, c0=>qc, c1=>none), none, '0', '0', '0',
-							(others => Int));					
+				
 			constant fmtShiftImm: ArgFormatStruct :=		
 					((d0=>qa, d1=>none, s0=>qb, s1=>none, s2=>none, c0=>none, c1=>none), imm10, '0', '0', '0',
 							(others => Int));
@@ -191,12 +188,8 @@ package Decoding2 is
 					((others=>none), none, '0', '0', '0',
 							(others => Int));			
 			
-				constant fmtMFC_TEMP: ArgFormatStruct := 
-																		fmtLoadImm;
-					--((d0=>qa, c1=>qd, others=>none), none, '0','0','0');
-				constant fmtMTC_TEMP: ArgFormatStruct := 
-																		fmtStoreImm;
-					--((s0=>qb, c0=>qc, others=>none), none, '0','0','0');			
+				constant fmtMFC_TEMP: ArgFormatStruct := fmtLoadImm;
+				constant fmtMTC_TEMP: ArgFormatStruct := fmtStoreImm;
 		
 		constant undefInsDef: InsDefNewW := (opcode2slv(ext2), opcont2slv(ext2, undef),
 																				System, sysUndef, fmtUndef);

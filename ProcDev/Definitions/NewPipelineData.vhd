@@ -142,10 +142,7 @@ type InstructionControlInfo is record
 		skipped: std_logic;
 	completed: std_logic;
 		completed2: std_logic;
-	-- Momentary data:
 	newEvent: std_logic; -- True if any new event appears
-	--newBranch: std_logic;
-	-- Persistent data:
 		hasReset: std_logic;
 	hasInterrupt: std_logic;
 	hasException: std_logic;
@@ -160,13 +157,9 @@ type InstructionClassInfo is record
 	short: std_logic;
 		mainCluster: std_logic;
 		secCluster: std_logic;
-	--branchAlways: std_logic; -- either taken or not (only constant branches are known at decoding)
 	branchCond: std_logic;
-	--branchReg: std_logic;
-	--	branchLink: std_logic;
-	--	mtc: std_logic;
-	--	mfc: std_logic;
 end record;
+
 
 type InstructionConstantArgs is record
 	immSel: std_logic;
@@ -329,7 +322,6 @@ begin
 												hasInterrupt => '0',
 													hasReset => '0',
 												hasException => '0',
-												--newBranch => '0',
 												hasBranch => '0',
 												hasReturn => '0',												
 													specialAction => '0',
@@ -343,14 +335,9 @@ end function;
 function defaultClassInfo return InstructionClassInfo is
 begin
 	return InstructionClassInfo'( short => '0',
-												mainCluster => '0',
-												secCluster => '0',
-											--branchAlways => '0',
+											mainCluster => '0',
+											secCluster => '0',
 											branchCond => '0'
-											--branchReg => '0'
-											--	branchLink => '0',
-											--	mtc => '0',
-											--	mfc => '0'
 											);	
 end function;
 
@@ -388,8 +375,8 @@ begin
 			  readyBefore => (others=>'0'),
 			  readyNow => (others=>'0'),
 			  readyNext => (others=>'0'),
-					locs => (others => (others => '0')),
-					nextLocs => (others => (others => '0')),
+			  locs => (others => (others => '0')),
+			  nextLocs => (others => (others => '0')),
 			  missing => (others=>'0'),
 			  arg0 => (others=>'0'),
 			  arg1 => (others=>'0'),
