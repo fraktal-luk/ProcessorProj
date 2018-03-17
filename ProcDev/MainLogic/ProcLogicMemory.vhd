@@ -316,8 +316,8 @@ end function;
 						res(i).constantArgs := DEFAULT_CONSTANT_ARGS;
 						--res(i).virtualArgs := DEFAULT_VIRTUAL_ARGS;
 						--res(i).virtualDestArgs := DEFAULT_VIRTUAL_DEST_ARGS;
-						res(i).physicalArgs := DEFAULT_PHYSICAL_ARGS;
-						res(i).physicalDestArgs := DEFAULT_PHYSICAL_DEST_ARGS;
+						--res(i).physicalArgs := DEFAULT_PHYSICAL_ARGS;
+						--res(i).physicalDestArgs := DEFAULT_PHYSICAL_DEST_ARGS;
 						
 						res(i).numberTag := (others => '0');
 						res(i).gprTag := (others => '0');

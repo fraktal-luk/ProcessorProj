@@ -249,7 +249,7 @@ begin
 	for i in 0 to res.fullMask'length-1 loop
 		if res.fullMask(i) = '0' then
 			for j in 0 to PIPE_WIDTH-1 loop
-				res.data(i).data(j).physicalDestArgs.d0 := (others => '0');
+				res.data(i).data(j).physicalArgSpec.dest := (others => '0');
 			end loop;	
 		end if;	
 	end loop;

@@ -170,19 +170,19 @@ return StageDataMulti is
 begin
 	for i in insVec.fullMask'range loop
 		-- Set physical dest
-		res.data(i).physicalDestArgs.sel(0) := destMask(i);
+		res.data(i).physicalArgSpec.intDestSel := destMask(i);
 		if takeVec(i) = '1' then
-			res.data(i).physicalDestArgs.d0 := pdVec(k);
+			res.data(i).physicalArgSpec.dest := pdVec(k);
 			k := k + 1;
 		end if;
 	end loop;
 	
 	for i in insVec.fullMask'range loop	
 		-- Set physical sources
-		res.data(i).physicalArgs.sel := res.data(i).virtualArgSpec.intArgSel;
-		res.data(i).physicalArgs.s0 := psVec(3*i+0);	
-		res.data(i).physicalArgs.s1 := psVec(3*i+1);			
-		res.data(i).physicalArgs.s2 := psVec(3*i+2);							
+		res.data(i).physicalArgSpec.intArgSel := res.data(i).virtualArgSpec.intArgSel;
+		res.data(i).physicalArgSpec.args(0) := psVec(3*i+0);	
+		res.data(i).physicalArgSpec.args(1) := psVec(3*i+1);			
+		res.data(i).physicalArgSpec.args(2) := psVec(3*i+2);							
 		-- Correct physical sources for group dependencies
 		for j in insVec.fullMask'range loop	
 			-- Is s0 equal to prev instruction's dest?				
@@ -191,19 +191,19 @@ begin
 																				virtualArgSpec.dest(4 downto 0)
 				and isNonzero(insVec.data(i).virtualArgSpec.args(0)(4 downto 0)) = '1' -- CAREFUL: don't copy dummy dest for r0
 			then
-				res.data(i).physicalArgs.s0 := res.data(j).physicalDestArgs.d0;
+				res.data(i).physicalArgSpec.args(0) := res.data(j).physicalArgSpec.dest;
 			end if;		
 			if 	 insVec.data(i).virtualArgSpec.args(1)(4 downto 0) = insVec.data(j).--virtualDestArgs.d0
 																					virtualArgSpec.dest(4 downto 0)
 				and isNonzero(insVec.data(i).virtualArgSpec.args(1)(4 downto 0)) = '1' -- CAREFUL: don't copy dummy dest for r0
 			then	
-				res.data(i).physicalArgs.s1 := res.data(j).physicalDestArgs.d0;						
+				res.data(i).physicalArgSpec.args(1) := res.data(j).physicalArgSpec.dest;						
 			end if;	
 			if 	 insVec.data(i).virtualArgSpec.args(2)(4 downto 0) = insVec.data(j).--virtualDestArgs.d0
 																					virtualArgSpec.dest(4 downto 0)
 				and isNonzero(insVec.data(i).virtualArgSpec.args(2)(4 downto 0)) = '1' -- CAREFUL: don't copy dummy dest for r0
 			then
-				res.data(i).physicalArgs.s2 := res.data(j).physicalDestArgs.d0;
+				res.data(i).physicalArgSpec.args(2) := res.data(j).physicalArgSpec.dest;
 			end if;						
 		end loop;
 		
@@ -232,7 +232,7 @@ begin
 		end if;		
 			
 		-- Set 'missing' flags for non-const arguments
-		res.data(i).argValues.missing := res.data(i).physicalArgs.sel and not res.data(i).argValues.zero;
+		res.data(i).argValues.missing := res.data(i).physicalArgSpec.intArgSel and not res.data(i).argValues.zero;
 		
 		-- Handle possible immediate arg
 		if res.data(i).constantArgs.immSel = '1' then
@@ -268,7 +268,8 @@ begin
 			if insVec.data(i).virtualArgSpec.dest(4 downto 0) = insVec.data(j).virtualArgSpec.dest(4 downto 0)		
 				and isNonzero(insVec.data(i).virtualArgSpec.dest(4 downto 0)) = '1' -- CAREFUL: don't copy dummy dest for r0
 			then
-				res(i) := insVec.data(j).physicalDestArgs.d0;
+				res(i) := insVec.data(j).--physicalDestArgs.d0;
+												 physicalArgSpec.dest;
 			end if;		
 		end loop;			
 	end loop;

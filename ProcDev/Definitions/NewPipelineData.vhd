@@ -90,7 +90,7 @@ package NewPipelineData is
 	constant FREE_LIST_COARSE_REWIND: std_logic := '0';
 	
 	constant PHYS_NAME_SIZE: integer := 6; -- CAREFUL: 2**PHYS_NAME_SIZE must be not less than n_PHYS!
-	subtype PhysName is std_logic_vector(PHYS_NAME_SIZE-1 downto 0);
+	subtype PhysName is SmallNumber;--std_logic_vector(PHYS_NAME_SIZE-1 downto 0);
 	type PhysNameArray is array(natural range <>) of PhysName;
 
 	constant ENABLE_INT_OVERFLOW: boolean := false or true;
@@ -239,8 +239,8 @@ type InstructionState is record
 	constantArgs: InstructionConstantArgs;
 	--virtualArgs: InstructionVirtualArgs;
 	--virtualDestArgs: InstructionVirtualDestArgs;
-	physicalArgs: InstructionPhysicalArgs;
-	physicalDestArgs: InstructionPhysicalDestArgs;
+	--physicalArgs: InstructionPhysicalArgs;
+	--physicalDestArgs: InstructionPhysicalDestArgs;
 		virtualArgSpec: InstructionArgSpec;
 		physicalArgSpec: InstructionArgSpec;
 	numberTag: SmallNumber;
@@ -432,8 +432,8 @@ begin
 	res.constantArgs := defaultConstantArgs;
 	--res.virtualArgs := defaultVirtualArgs;
 	--res.virtualDestArgs := defaultVirtualDestArgs;
-	res.physicalArgs := defaultPhysicalArgs;
-	res.physicalDestArgs := defaultPhysicalDestArgs;
+	--res.physicalArgs := defaultPhysicalArgs;
+	--res.physicalDestArgs := defaultPhysicalDestArgs;
 		res.virtualArgSpec := DEFAULT_ARG_SPEC;
 		res.physicalArgSpec := DEFAULT_ARG_SPEC;
 	res.numberTag := (others => '0'); -- '1');

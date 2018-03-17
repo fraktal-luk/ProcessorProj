@@ -31,7 +31,7 @@ function updateDispatchArgs(ins: InstructionState; vals: MwordArray; regValues: 
 return InstructionState;
 
 
-function getForwardingStatusInfoD2(av: in InstructionArgValues; pa: in InstructionPhysicalArgs; 
+function getForwardingStatusInfoD2(av: in InstructionArgValues; pa: in InstructionArgSpec; 
 										tags0, tags1, tags2, 
 										nextTags, writtenTags: in PhysNameArray) return ArgStatusInfo;
 
@@ -324,7 +324,7 @@ begin
 end function;
 
 
-function getForwardingStatusInfoD2(av: in InstructionArgValues; pa: in InstructionPhysicalArgs; 
+function getForwardingStatusInfoD2(av: in InstructionArgValues; pa: in InstructionArgSpec; 
 										tags0, tags1, tags2, 
 										nextTags, writtenTags: in PhysNameArray) return ArgStatusInfo
 is		
@@ -336,36 +336,36 @@ begin
 	stored := not av.missing;	
 	
 	for i in writtenTags'length-1 downto 0 loop
-		if writtenTags(i) = pa.s0 then
+		if writtenTags(i) = pa.args(0) then
 			written(0) := '1';
 		end if;
 
-		if writtenTags(i) = pa.s1 then
+		if writtenTags(i) = pa.args(1) then
 			written(1) := '1';
 		end if;
 
-		if writtenTags(i) = pa.s2 then
+		if writtenTags(i) = pa.args(2) then
 			written(2) := '1';
 		end if;		
 	end loop;
 	
 	-- Find where tag agrees with s0
 	for i in tags0'length-1 downto 0 loop		
-		if tags0(i) = pa.s0 then
+		if tags0(i) = pa.args(0) then
 			ready(0) := '1';
 			locs(0) := i2slv(i, SMALL_NUMBER_SIZE);
 		end if;
 	end loop;
 		
 	for i in tags1'length-1 downto 0 loop				
-		if tags1(i) = pa.s1 then
+		if tags1(i) = pa.args(1) then
 			ready(1) := '1';
 			locs(1) := i2slv(i, SMALL_NUMBER_SIZE);
 		end if;
 	end loop;		
 		
 	for i in tags2'length-1 downto 0 loop				
-		if tags2(i) = pa.s2 then
+		if tags2(i) = pa.args(2) then
 			ready(2) := '1';
 			locs(2) := i2slv(i, SMALL_NUMBER_SIZE);
 		end if;
@@ -373,15 +373,15 @@ begin
 	
 	for i in nextTags'range loop
 	
-		if nextTags(i) = pa.s0 then
+		if nextTags(i) = pa.args(0) then
 			nextReady(0) := '1';
 			nextLocs(0) := i2slv(i, SMALL_NUMBER_SIZE);
 		end if;
-		if nextTags(i) = pa.s1 then
+		if nextTags(i) = pa.args(1) then
 			nextReady(1) := '1';
 			nextLocs(1) := i2slv(i, SMALL_NUMBER_SIZE);
 		end if;
-		if nextTags(i) = pa.s2 then
+		if nextTags(i) = pa.args(2) then
 			nextReady(2) := '1';
 			nextLocs(2) := i2slv(i, SMALL_NUMBER_SIZE);
 		end if;			
@@ -405,7 +405,7 @@ return ArgStatusInfoArray is
 	variable res: ArgStatusInfoArray(data'range);
 begin
 	for i in res'range loop
-		res(i) := getForwardingStatusInfoD2(data(i).argValues, data(i).physicalArgs,
+		res(i) := getForwardingStatusInfoD2(data(i).argValues, data(i).physicalArgSpec,
 														tags0, tags1, tags2,
 														nextTags, writtenTags);
 	end loop;
@@ -495,7 +495,8 @@ begin
 		
 	-- CAREFUL! When not dispatching, dispatch stage must signal no result, so clear it here
 	if sends = '0' then
-		dispatchDataNew.physicalDestArgs.d0 := (others => '0');
+		dispatchDataNew.--physicalDestArgs.d0 := (others => '0');
+							 physicalArgSpec.dest := (others => '0');
 	end if;
 	
 	if nAfterSending < 0 then

@@ -468,7 +468,8 @@ begin
 		-- CAREFUL: omitting this clearing would spare some logic, but clearing of result tag is needed!
 		--						Otherwise following instructions would read results form empty slots!
 		--res := defaultInstructionState;
-			res.physicalDestArgs.d0 := (others => '0'); -- CAREFUL: clear result tag!
+			--res.physicalDestArgs.d0 := (others => '0'); -- CAREFUL: clear result tag!
+			res.physicalArgSpec.dest := (others => '0');
 	else -- stall
 		if full = '1' then
 		--	res := content;
@@ -509,13 +510,15 @@ end function;
 
 			-- CAREFUL: clearing result tags for empty slots
 			for i in 0 to PIPE_WIDTH-1 loop
-				res.data(i).physicalDestArgs.d0 := (others => '0');
+				--res.data(i).physicalDestArgs.d0 := (others => '0');
+				res.data(i).physicalArgSpec.dest := (others => '0');
 			end loop;
 		else -- stall or killed (kill can be partial)
 			if full = '0' then
 				-- Do nothing
 				for i in 0 to PIPE_WIDTH-1 loop
-					res.data(i).physicalDestArgs.d0 := (others => '0');
+					--res.data(i).physicalDestArgs.d0 := (others => '0');
+					res.data(i).physicalArgSpec.dest := (others => '0');
 				end loop;
 			else
 				res := livingContent;
@@ -566,7 +569,8 @@ end function;
 		variable res: PhysNameArray(0 to ia'length-1) := (others => (others => '0'));
 	begin
 		for i in 0 to res'length-1 loop
-			res(i) := ia(i).physicalDestArgs.d0; 
+			--res(i) := ia(i).physicalDestArgs.d0;
+			res(i) := ia(i).physicalArgSpec.dest;			
 		end loop;
 		return res;
 	end function;
@@ -575,7 +579,8 @@ end function;
 		variable res: std_logic_vector(0 to ia'length-1) := (others => '0');
 	begin
 		for i in 0 to res'length-1 loop
-			res(i) := fm(i) and ia(i).physicalDestArgs.sel(0); 
+			res(i) := fm(i) and ia(i).--physicalDestArgs.sel(0);
+												physicalArgSpec.intDestSel;
 		end loop;
 		return res;
 	end function;
@@ -605,9 +610,9 @@ function getPhysicalArgs(insVec: StageDataMulti) return PhysNameArray is
 	variable res: PhysNameArray(0 to 3*insVec.fullMask'length-1) := (others=>(others=>'0'));
 begin
 	for i in insVec.fullMask'range loop
-		res(3*i+0) := insVec.data(i).physicalArgs.s0;
-		res(3*i+1) := insVec.data(i).physicalArgs.s1;
-		res(3*i+2) := insVec.data(i).physicalArgs.s2;
+		res(3*i+0) := insVec.data(i).physicalArgSpec.args(0);
+		res(3*i+1) := insVec.data(i).physicalArgSpec.args(1);
+		res(3*i+2) := insVec.data(i).physicalArgSpec.args(2);
 	end loop;
 	return res;
 end function;
@@ -625,7 +630,8 @@ function getPhysicalDests(insVec: StageDataMulti) return PhysNameArray is
 	variable res: PhysNameArray(0 to insVec.fullMask'length-1) := (others=>(others=>'0'));
 begin
 	for i in insVec.fullMask'range loop
-		res(i) := insVec.data(i).physicalDestArgs.d0;
+		res(i) := insVec.data(i).--physicalDestArgs.d0;
+											physicalArgSpec.dest;
 	end loop;
 	return res;
 end function;
@@ -665,7 +671,8 @@ function getPhysicalDestMask(insVec: StageDataMulti) return std_logic_vector is
 	variable res: std_logic_vector(insVec.fullMask'range) := (others=>'0');
 begin
 	for i in insVec.fullMask'range loop
-		res(i) := insVec.data(i).physicalDestArgs.sel(0);
+		res(i) := insVec.data(i).--physicalDestArgs.sel(0);
+											physicalArgSpec.intDestSel;
 	end loop;			
 	return res;
 end function;
@@ -684,7 +691,8 @@ function getWrittenTags(lastCommitted: StageDataMulti) return PhysNameArray is
 	variable writtenTags: PhysNameArray(0 to PIPE_WIDTH-1) := (others=>(others=>'0'));	
 begin	
 	for i in 0 to PIPE_WIDTH-1 loop -- Slots in writeback stage
-		writtenTags(i) := lastCommitted.data(i).physicalDestArgs.d0;
+		writtenTags(i) := lastCommitted.data(i).--physicalDestArgs.d0;
+																physicalArgSpec.dest;
 	end loop;	
 	return writtenTags;
 end function;
@@ -697,13 +705,17 @@ return PhysNameArray is
 begin
 	-- CAREFUL! Remember tht empty slots should have 0 as result tag, even though the rest of 
 	--				their state may remain invalid for simplicity!
-	resultTags(0) := execOutputs(0).ins.physicalDestArgs.d0;
-	resultTags(1) := execOutputs(1).ins.physicalDestArgs.d0;
-	resultTags(2) := execOutputs(2).ins.physicalDestArgs.d0;
-	
+	resultTags(0) := execOutputs(0).ins.--physicalDestArgs.d0;
+													physicalArgSpec.dest;
+	resultTags(1) := execOutputs(1).ins.--physicalDestArgs.d0;
+													physicalArgSpec.dest;													
+	resultTags(2) := execOutputs(2).ins.--physicalDestArgs.d0;
+													physicalArgSpec.dest;
+
 	-- CQ slots
 	for i in 0 to CQ_SIZE-1 loop 
-		resultTags(4-1 + i) := stageDataCQ(i).ins.physicalDestArgs.d0;  	
+		resultTags(4-1 + i) := stageDataCQ(i).ins.--physicalDestArgs.d0;
+																physicalArgSpec.dest;		
 	end loop;
 	return resultTags;
 end function;		
@@ -714,8 +726,10 @@ function getNextResultTags(execOutputsPre: InstructionSlotArray;
 return PhysNameArray is
 	variable nextResultTags: PhysNameArray(0 to N_NEXT_RES_TAGS-1) := (others=>(others=>'0'));
 begin
-	nextResultTags(0) := schedOutputArr(0).ins.physicalDestArgs.d0; -- sched stage for A	
-	nextResultTags(1) := execOutputsPre(1).ins.physicalDestArgs.d0;
+	nextResultTags(0) := schedOutputArr(0).ins.--physicalDestArgs.d0; -- sched stage for A
+															 physicalArgSpec.dest;
+	nextResultTags(1) := execOutputsPre(1).ins.--physicalDestArgs.d0;
+															 physicalArgSpec.dest;
 	--nextResultTags(2) := execPreEnds(2).physicalDestArgs.d0;
 	return nextResultTags;
 end function;
@@ -920,7 +934,8 @@ begin
 	-- CAREFUL! Clearing tags in empty slots, to avoid incorrect info about available results!
 	for i in 0 to res.fullMask'length-1 loop
 		if res.fullMask(i) = '0' then
-			res.data(i).physicalDestArgs.d0 := (others => '0');
+			res.data(i).--physicalDestArgs.d0 := (others => '0');
+							physicalArgSpec.dest := (others => '0');
 		end if;
 		
 		-- TEMP: also clear unneeded data for all instructions
@@ -975,7 +990,8 @@ begin
 	-- CAREFUL! Clearing tags in empty slots, to avoid incorrect info about available results!
 	for i in 0 to res.fullMask'length-1 loop
 		if res.fullMask(i) = '0' then
-			res.data(i).physicalDestArgs.d0 := (others => '0');
+			res.data(i).--physicalDestArgs.d0 := (others => '0');
+							physicalArgSpec.dest := (others => '0');
 		end if;
 		
 		-- TEMP: also clear unneeded data for all instructions
@@ -994,7 +1010,7 @@ end function;
 function getPhysicalSources(ins: InstructionState) return PhysNameArray is
 	variable res: PhysNameArray(0 to 2) := (others => (others => '0'));
 begin
-	res := (0 => ins.physicalArgs.s0, 1 => ins.physicalArgs.s1, 2 => ins.physicalArgs.s2);			
+	res := (0 => ins.physicalArgSpec.args(0), 1 => ins.physicalArgSpec.args(1), 2 => ins.physicalArgSpec.args(2));			
 	return res;
 end function;
 
