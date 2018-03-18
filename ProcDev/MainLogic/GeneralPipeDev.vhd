@@ -35,7 +35,7 @@ function alignAddress(adr: std_logic_vector) return std_logic_vector;
 function clearLowBits(vec: std_logic_vector; n: integer) return std_logic_vector;
 function getLowBits(vec: std_logic_vector; n: integer) return std_logic_vector;
 
-constant INITIAL_GROUP_TAG: SmallNumber := (others => '0');
+constant INITIAL_GROUP_TAG: InsTag := (others => '0');
 
 constant INITIAL_PC: Mword := i2slv(-PIPE_WIDTH*4, MWORD_SIZE);
 
@@ -1121,7 +1121,7 @@ return std_logic_vector is
 	variable diff: SmallNumber := (others => '0');
 begin
 	for i in 0 to fullMask'length-1 loop
-		diff := subSN(causing.tags.renameIndex, content(i).tags.renameIndex); 
+		--diff := subSN(causing.tags.renameIndex, content(i).tags.renameIndex); 
 																	-- High bit of diff carries the info "tag is before"
 		res(i) := killByTag(--diff(SMALL_NUMBER_SIZE-1),-- 
 									CMP_tagBefore(causing.tags.renameIndex, content(i).tags.renameIndex),

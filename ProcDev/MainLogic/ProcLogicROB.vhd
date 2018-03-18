@@ -106,13 +106,13 @@ end function;
 		end function;
 
 
-		function calcGroupSelectCircular(selTag, refTag: SmallNumber) return std_logic_vector is
+		function calcGroupSelectCircular(selTag, refTag: InsTag) return std_logic_vector is
 			variable res: std_logic_vector(0 to ROB_SIZE-1) := (others => '0');
 				constant MASK_NUM: SmallNumber := i2slv(ROB_SIZE-1, SMALL_NUMBER_SIZE);
 			variable vs, vr, ve: SmallNumber := (others => '0');
 		begin
-			vs(SMALL_NUMBER_SIZE-1-LOG2_PIPE_WIDTH downto 0) := selTag(SMALL_NUMBER_SIZE-1 downto LOG2_PIPE_WIDTH);
-			vr(SMALL_NUMBER_SIZE-1-LOG2_PIPE_WIDTH downto 0) := refTag(SMALL_NUMBER_SIZE-1 downto LOG2_PIPE_WIDTH);
+			vs(TAG_SIZE-1-LOG2_PIPE_WIDTH downto 0) := selTag(TAG_SIZE-1 downto LOG2_PIPE_WIDTH);
+			vr(TAG_SIZE-1-LOG2_PIPE_WIDTH downto 0) := refTag(TAG_SIZE-1 downto LOG2_PIPE_WIDTH);
 
 				vs := vs and MASK_NUM;
 				vr := vr and MASK_NUM;
@@ -374,7 +374,7 @@ return StageDataROB is
 	
 		variable groupSelect: std_logic_vector(0 to ROB_SIZE-1) := (others => '0');
 		variable TMP_found: boolean := false;
-			variable refTag1: SmallNumber := (others => '0'); -- CAREFUL: must be -1 + tag of slot 0 
+			variable refTag1: InsTag := (others => '0'); -- CAREFUL: must be -1 + tag of slot 0 
 begin
 	ihr := getTagHighSN(refTag);
 	for i in 0 to execEnds'length-1 loop

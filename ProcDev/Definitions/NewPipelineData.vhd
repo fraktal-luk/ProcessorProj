@@ -121,12 +121,13 @@ type ExecFunc is (unknown,
 						);	
 
 
-constant TAG_SIZE: integer := 8;
+constant TAG_SIZE: integer := 8;--7 + LOG2_PIPE_WIDTH;
 -- CAREFUL, TEMP: to change to enable more than 8 bits
-subtype InsTag is SmallNumber;--std_logic_vector(TAG_SIZE-1 downto 0);
+subtype InsTag is --SmallNumber;--
+						std_logic_vector(TAG_SIZE-1 downto 0);
 type InsTagArray is array (integer range <>) of InsTag;
 
-		
+
 type BinomialOp is record
 	unit: ExecUnit;
 	func: ExecFunc;

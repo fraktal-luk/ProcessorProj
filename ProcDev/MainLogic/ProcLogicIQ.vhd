@@ -552,7 +552,7 @@ begin
 
 	-- 
 	if res.argValues.newInQueue = '1' then
-		tmp8 := res.tags.renameIndex and i2slv(PIPE_WIDTH-1, SMALL_NUMBER_SIZE);
+		tmp8 := getTagLowSN(res.tags.renameIndex);-- and i2slv(PIPE_WIDTH-1, SMALL_NUMBER_SIZE);
 		rrf := readyRegFlags(3*slv2u(tmp8) to 3*slv2u(tmp8) + 2);
 		res.argValues.missing := res.argValues.missing and not rrf;
 	end if;
@@ -585,7 +585,7 @@ begin
 	-- CAREFUL! Which reg ready flags are for this instruction?
 	--				Use groupTag, because it identifies the slot in previous superscalar stage
 	if res.argValues.newInQueue = '1' then
-		tmp8 := res.tags.renameIndex and i2slv(PIPE_WIDTH-1, SMALL_NUMBER_SIZE);
+		tmp8 := getTagLowSN(res.tags.renameIndex);-- and i2slv(PIPE_WIDTH-1, SMALL_NUMBER_SIZE);
 		rrf := readyRegFlags(3*slv2u(tmp8) to 3*slv2u(tmp8) + 2);
 		res.argValues.missing := res.argValues.missing and not rrf;
 	end if;

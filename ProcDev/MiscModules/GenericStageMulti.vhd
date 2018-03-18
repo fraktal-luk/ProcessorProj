@@ -291,12 +291,12 @@ begin
 	
 	KILLER: block
 		signal before: std_logic;
-		signal a, b: std_logic_vector(7 downto 0);
-		signal c: SmallNumber := (others => '0');
+		--signal a, b: std_logic_vector(7 downto 0);
+		--signal c: SmallNumber := (others => '0');
 	begin
-		a <= execCausing.tags.renameIndex;
-		b <= stageData.data(0).tags.renameIndex;
-		c <= subSN(a, b);
+		--a <= execCausing.tags.renameIndex;
+		--b <= stageData.data(0).tags.renameIndex;
+		--c <= subSN(a, b);
 		before <= --c(7);
 					 CMP_tagBefore(execCausing.tags.renameIndex, stageData.data(0).tags.renameIndex);
 		flowDrive.kill <= killByTag(before, execEventSignal,
