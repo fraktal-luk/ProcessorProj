@@ -384,7 +384,7 @@ end function;
 		variable res: std_logic_vector(0 to LEN-1) := (others => '0');
 		variable sn, sn0, ih: SmallNumber := (others => '0');
 	begin
-		ih := getTagHighSN(causing.groupTag);
+		ih := getTagHighSN(causing.tags.renameIndex);
 			ih := subSN(ih, qs.pStart);
 			ih := ih and MASK_NUM; -- We must cut it to effective index size, because it must be 
 										  -- inside the range of ROB indices
@@ -455,7 +455,7 @@ begin
 			-- CAREFUL: write only those fields that have to be written:
 			--				groupTag, operation, completed = 0, completed2 = 0
 			-- res(i) := newContent(slv2u(tmpSN));
-			res(i).groupTag := newContent(slv2u(tmpSN)).groupTag;
+			res(i).tags.renameIndex := newContent(slv2u(tmpSN)).tags.renameIndex;
 			res(i).operation := newContent(slv2u(tmpSN)).operation;
 			
 			if keepInputContent then

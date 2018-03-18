@@ -203,7 +203,7 @@ begin
 								else  (others => '0');
 	
 		numKilled <= getNumKilled(flowResponse.full,
-												execEnds2(3).groupTag,
+												execEnds2(3).tags.renameIndex,
 												commitGroupCtr, execEventSignal);
 	
 	flowDrive.kill <= numKilled;							

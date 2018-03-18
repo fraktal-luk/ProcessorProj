@@ -35,9 +35,6 @@ constant DEFAULT_REGISTER_MAP_REQUEST: RegisterMapRequest :=
 function getRegMapRequest(sd: StageDataMulti; newPhys: PhysNameArray) return RegisterMapRequest;
 
 
-function baptizeVec(sd: StageDataMulti; tags: SmallNumberArray) 
-return StageDataMulti;
-
 function renameRegs2(insVec: StageDataMulti; takeVec, destMask: std_logic_vector;
 								psVec, pdVec: PhysNameArray) 		
 return StageDataMulti;
@@ -148,18 +145,6 @@ end function;
 			
 			return res;
 		end function;
-
-function baptizeVec(sd: StageDataMulti; tags: SmallNumberArray) 
-return StageDataMulti is
-	variable res: StageDataMulti := sd;
-begin
-	for i in res.data'range loop
-		if true or res.fullMask(i) = '1' then
-			res.data(i).numberTag := tags(i);
-		end if;
-	end loop;
-	return res;
-end function;
 
 
 function renameRegs2(insVec: StageDataMulti; takeVec, destMask: std_logic_vector;
@@ -284,9 +269,9 @@ return StageDataMulti is
 	variable res: StageDataMulti := insVec;
 begin
 	for i in 0 to PIPE_WIDTH-1 loop
-		res.data(i).groupTag := newGroupTag or i2slv(i, SMALL_NUMBER_SIZE);
-		res.data(i).numberTag := numberTags(i);
-		res.data(i).gprTag := gprTags(i); -- ???		
+		res.data(i).tags.renameIndex := newGroupTag or i2slv(i, SMALL_NUMBER_SIZE);
+		res.data(i).tags.renameSeq := numberTags(i);
+		res.data(i).tags.intPointer := gprTags(i);
 	end loop;
 	return res;
 end function;

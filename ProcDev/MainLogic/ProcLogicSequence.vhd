@@ -227,7 +227,7 @@ begin
 	-- Take branch targets to correct places
 	for i in 0 to PIPE_WIDTH-1 loop
 		if bqGroup.fullMask(i) = '1' then
-			ind := slv2u(getTagLow(bqGroup.data(i).groupTag));
+			ind := slv2u(getTagLow(bqGroup.data(i).tags.renameIndex));
 			targets(ind) := bqGroup.data(i).argValues.arg1;
 		end if;
 	end loop;

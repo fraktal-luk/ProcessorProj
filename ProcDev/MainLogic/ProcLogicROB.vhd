@@ -331,8 +331,8 @@ return StageDataROB is
 begin
 	ihr := getTagHighSN(refTag);
 	for i in 0 to execEnds'length-1 loop
-		il := getTagLowSN(execEnds(i).groupTag);
-		groupSelect := calcGroupSelect(execEnds(i).groupTag, refTag);			
+		il := getTagLowSN(execEnds(i).tags.renameIndex);
+		groupSelect := calcGroupSelect(execEnds(i).tags.renameIndex, refTag);			
 		for j in 0 to ROB_SIZE-1 loop
 			if groupSelect(j) = '1' and execReady(i) = '1' then	
 				for k in 0 to PIPE_WIDTH-1 loop
@@ -352,8 +352,8 @@ begin
 
 	-- CAREFUL: setting completed2
 	for i in 0 to execEnds2'length-1 loop
-		il := getTagLowSN(execEnds2(i).groupTag);
-		groupSelect := calcGroupSelect(execEnds2(i).groupTag, refTag);				
+		il := getTagLowSN(execEnds2(i).tags.renameIndex);
+		groupSelect := calcGroupSelect(execEnds2(i).tags.renameIndex, refTag);				
 		for j in 0 to ROB_SIZE-1 loop
 			if groupSelect(j) = '1' and execReady2(i) = '1' then
 				-----
@@ -444,8 +444,8 @@ return StageDataROB is
 begin
 	ihr := getTagHighSN(refTag);
 	for i in 0 to execEnds'length-1 loop
-		il := getTagLowSN(execEnds(i).groupTag);
-		groupSelect := calcGroupSelectCircular(execEnds(i).groupTag, refTag1);			
+		il := getTagLowSN(execEnds(i).tags.renameIndex);
+		groupSelect := calcGroupSelectCircular(execEnds(i).tags.renameIndex, refTag1);			
 		for j in 0 to ROB_SIZE-1 loop
 			if groupSelect(j) = '1' and execReady(i) = '1' then	
 				for k in 0 to PIPE_WIDTH-1 loop
@@ -465,8 +465,8 @@ begin
 
 	-- CAREFUL: setting completed2
 	for i in 0 to execEnds2'length-1 loop
-		il := getTagLowSN(execEnds2(i).groupTag);
-		groupSelect := calcGroupSelectCircular(execEnds2(i).groupTag, refTag1);				
+		il := getTagLowSN(execEnds2(i).tags.renameIndex);
+		groupSelect := calcGroupSelectCircular(execEnds2(i).tags.renameIndex, refTag1);				
 		for j in 0 to ROB_SIZE-1 loop
 			if groupSelect(j) = '1' and execReady2(i) = '1' then
 				-----
@@ -584,7 +584,7 @@ begin
 				end if;
 				
 				write(fline, 
-								 integer'image(slv2u(sd.data(i).data(j).groupTag))
+								 integer'image(slv2u(sd.data(i).data(j).tags.renameIndex))
 					  & "@" & integer'image(slv2u(sd.data(i).data(j).basicInfo.ip)));
 				write(fline, ", ");
 			end if;
@@ -659,7 +659,7 @@ begin
 			if sdn.data(i).fullMask(j) = '0' then
 				exit;
 			end if;	
-			assert sd.data(i).data(j).groupTag = sd.data(i).data(j).groupTag report "koho";
+			assert sd.data(i).data(j).tags.renameIndex = sd.data(i).data(j).tags.renameIndex report "koho";
 			assert sd.data(i).data(j).basicInfo.ip = sd.data(i).data(j).basicInfo.ip report "jor";
 		end loop;
 	end loop;

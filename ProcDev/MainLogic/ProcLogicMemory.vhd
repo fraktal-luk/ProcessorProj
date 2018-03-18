@@ -125,7 +125,7 @@ end function;
 			-- From qs we must check which are older than ins
 			--indices := getQueueIndicesFrom(LEN, pStart);
 			--rawIndices := getQueueIndicesFrom(LEN, (others => '0'));
-			older := TMP_cmpTagsBefore(content, ins.groupTag);
+			older := TMP_cmpTagsBefore(content, ins.tags.renameIndex);
 			before := setToOnes(older, slv2u(pStart));
 			-- Use priority enc. to find last in the older ones. But they may be divided:
 			--		V  1 1 1 0 0 0 0 1 1 1 and cmp  V
@@ -164,7 +164,7 @@ end function;
 			-- From qs we must check which are newer than ins
 			--indices := getQueueIndicesFrom(LEN, pStart);
 			--rawIndices := getQueueIndicesFrom(LEN, (others => '0'));
-			newer := TMP_cmpTagsAfter(content, ins.groupTag);
+			newer := TMP_cmpTagsAfter(content, ins.tags.renameIndex);
 			areAtOrAfter := not setToOnes(newer, slv2u(pStart));
 			-- Use priority enc. to find first in the newer ones. But they may be divided:
 			--		V  1 1 1 0 0 0 0 1 1 1 and cmp  V
@@ -217,7 +217,7 @@ end function;
 						begin
 							res.data := content(0 to PIPE_WIDTH-1);
 							for i in 0 to PIPE_WIDTH-1 loop
-								if (content(i).groupTag(SMALL_NUMBER_SIZE-1 downto LOG2_PIPE_WIDTH)
+								if (content(i).tags.renameIndex(SMALL_NUMBER_SIZE-1 downto LOG2_PIPE_WIDTH)
 									= committingTag(SMALL_NUMBER_SIZE-1 downto LOG2_PIPE_WIDTH))
 									and (livingMask(i) = '1') and (send = '1')
 								then	
@@ -319,8 +319,8 @@ end function;
 						--res(i).physicalArgs := DEFAULT_PHYSICAL_ARGS;
 						--res(i).physicalDestArgs := DEFAULT_PHYSICAL_DEST_ARGS;
 						
-						res(i).numberTag := (others => '0');
-						res(i).gprTag := (others => '0');
+						res(i).tags.renameSeq := (others => '0');
+						res(i).tags.intPointer := (others => '0');
 						
 							sv := res(i).argValues.arg2;
 							res(i).argValues := DEFAULT_ARG_VALUES;
@@ -328,9 +328,9 @@ end function;
 						res(i).target := (others => '0');
 						
 						if outMask(i) = '1' then									
-							res(i).groupTag := tempContent(i).groupTag;
+							res(i).tags.renameIndex := tempContent(i).tags.renameIndex;
 						else
-							res(i).groupTag := tempNewContent(i).groupTag;										
+							res(i).tags.renameIndex := tempNewContent(i).tags.renameIndex;										
 						end if;
 															
 						if (wrA and mA(i)) = '1' then
@@ -416,7 +416,7 @@ end function;
 		variable diff: SmallNumber := (others => '0');
 	begin
 		for i in 0 to res'length-1 loop
-			diff := subSN(content(i).groupTag, tag); -- If grTag < tag then diff(high) = '1'
+			diff := subSN(content(i).tags.renameIndex, tag); -- If grTag < tag then diff(high) = '1'
 			res(i) := diff(SMALL_NUMBER_SIZE-1);
 		end loop;
 		
@@ -429,7 +429,7 @@ end function;
 		variable diff: SmallNumber := (others => '0');
 	begin
 		for i in 0 to res'length-1 loop
-			diff := subSN(tag, content(i).groupTag); -- If grTag > tag then diff(high) = '1'
+			diff := subSN(tag, content(i).tags.renameIndex); -- If grTag > tag then diff(high) = '1'
 			res(i) := diff(SMALL_NUMBER_SIZE-1);
 		end loop;
 		

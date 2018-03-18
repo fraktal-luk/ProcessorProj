@@ -338,9 +338,9 @@ begin
 	COMMON_STATE: block
 	begin
 		renameGroupCtrNext <= nextCtr(renameGroupCtr, execOrIntEventSignal,
-												execOrIntCausing.groupTag and i2slv(-PIPE_WIDTH, SMALL_NUMBER_SIZE),
+												execOrIntCausing.tags.renameIndex and i2slv(-PIPE_WIDTH, SMALL_NUMBER_SIZE),
 												frontLastSending, ALL_FULL);
-		renameCtrNext <= nextCtr(renameCtr, execOrIntEventSignal, execOrIntCausing.numberTag,
+		renameCtrNext <= nextCtr(renameCtr, execOrIntEventSignal, execOrIntCausing.tags.renameSeq,
 										 frontLastSending, frontDataLastLiving.fullMask);
 		commitGroupCtrNext <= nextCtr(commitGroupCtr, '0', (others => '0'), sendingToCommit, ALL_FULL);
 		commitCtrNext <= nextCtr(commitCtr, '0', (others => '0'), sendingToCommit, effectiveMask);

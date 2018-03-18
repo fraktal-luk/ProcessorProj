@@ -435,7 +435,7 @@ return std_logic_vector is
 begin
 	-- Find where to put addressData
 	for i in 0 to content'length-1 loop							
-		if ins.groupTag = content(i).ins.groupTag and content(i).full = '1' then
+		if ins.tags.renameIndex = content(i).ins.tags.renameIndex and content(i).full = '1' then
 			res(i) := '1';
 		end if;
 	end loop;							
@@ -448,7 +448,7 @@ return std_logic_vector is
 	variable res: std_logic_vector(0 to arr'length-1) := (others => '0');
 begin
 	for i in 0 to arr'length-1 loop
-		if arr(i).groupTag = ins.groupTag then
+		if arr(i).tags.renameIndex = ins.tags.renameIndex then
 			res(i) := '1';
 		end if;
 	end loop;
@@ -1098,7 +1098,8 @@ return std_logic_vector is
 	variable diff: SmallNumber := (others => '0');
 begin
 	for i in 0 to fullMask'length-1 loop
-		diff := subSN(causing.groupTag, content(i).groupTag); -- High bit of diff carries the info "tag is before"
+		diff := subSN(causing.tags.renameIndex, content(i).tags.renameIndex); 
+																	-- High bit of diff carries the info "tag is before"
 		res(i) := killByTag(diff(SMALL_NUMBER_SIZE-1), execEventSig, lateEventSig) and fullMask(i);
 	end loop;
 	return res;

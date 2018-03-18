@@ -294,8 +294,8 @@ begin
 		signal a, b: std_logic_vector(7 downto 0);
 		signal c: SmallNumber := (others => '0');
 	begin
-		a <= execCausing.groupTag;
-		b <= stageData.data(0).groupTag;
+		a <= execCausing.tags.renameIndex;
+		b <= stageData.data(0).tags.renameIndex;
 		c <= subSN(a, b);
 		before <= c(7);
 		flowDrive.kill <= killByTag(before, execEventSignal,

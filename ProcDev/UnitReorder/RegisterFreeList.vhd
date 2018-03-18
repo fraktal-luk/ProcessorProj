@@ -53,7 +53,8 @@ entity RegisterFreeList is
 		en: in std_logic;
 		
 		rewind: in std_logic;
-		causingInstruction: in InstructionState;
+		causingInstruction: in InstructionState; -- DEPREC?
+		causingPointer: in SmallNumber;
 		
 		sendingToReserve: in std_logic;
 		takeAllow: in std_logic;
@@ -124,7 +125,7 @@ begin
 		freeListRewind <= rewind;
 		
 		
-		freeListWriteTag <= causingInstruction.gprTag;
+		freeListWriteTag <= causingPointer;--causingInstruction.tags.intPointer;
 		
 		IMPL: block
 			signal listContent: PhysNameArray(0 to FREE_LIST_SIZE-1) := initList;

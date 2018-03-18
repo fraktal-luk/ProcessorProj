@@ -313,6 +313,7 @@ begin
 					
 					rewind => execOrIntEventSignal,
 					causingInstruction => execOrIntCausing,
+					causingPointer => execOrIntCausing.tags.intPointer,
 					
 					sendingToReserve => frontLastSending, 
 					takeAllow => frontLastSending,	-- FROM SEQ

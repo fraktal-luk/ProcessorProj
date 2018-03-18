@@ -122,9 +122,11 @@ type ExecFunc is (unknown,
 
 
 constant TAG_SIZE: integer := 8;
-subtype InsTag is std_logic_vector(TAG_SIZE-1 downto 0);
+-- CAREFUL, TEMP: to change to enable more than 8 bits
+subtype InsTag is SmallNumber;--std_logic_vector(TAG_SIZE-1 downto 0);
+type InsTagArray is array (integer range <>) of InsTag;
 
-							
+		
 type BinomialOp is record
 	unit: ExecUnit;
 	func: ExecFunc;
@@ -206,7 +208,7 @@ end record;
 			fetchCtr: word;	-- Ctr is never reset!
 			decodeCtr: InsTag; -- Ctr is never reset!
 			renameSeq: InsTag;
-			renameGroup: InsTag;
+			renameIndex: InsTag;	-- group + group position
 			intPointer: SmallNumber;
 			floatPointer: SmallNumber;
 		end record;
@@ -234,18 +236,12 @@ type InstructionState is record
 	controlInfo: InstructionControlInfo;
 	basicInfo: InstructionBasicInfo;
 	bits: word; -- instruction word
+	tags: InstructionTags;
 	operation: BinomialOp;
 	classInfo: InstructionClassInfo;
 	constantArgs: InstructionConstantArgs;
-	--virtualArgs: InstructionVirtualArgs;
-	--virtualDestArgs: InstructionVirtualDestArgs;
-	--physicalArgs: InstructionPhysicalArgs;
-	--physicalDestArgs: InstructionPhysicalDestArgs;
-		virtualArgSpec: InstructionArgSpec;
-		physicalArgSpec: InstructionArgSpec;
-	numberTag: SmallNumber;
-	gprTag: SmallNumber;
-	groupTag: SmallNumber;
+	virtualArgSpec: InstructionArgSpec;
+	physicalArgSpec: InstructionArgSpec;
 	argValues: InstructionArgValues;
 	result: Mword;
 	target: Mword;
@@ -288,7 +284,16 @@ constant DEFAULT_ARG_SPEC: InstructionArgSpec := InstructionArgSpec'(
 			floatArgSel => (others => '0'),
 			args => ((others => '0'), (others => '0'), (others => '0'))
 			);
-			
+
+constant DEFAULT_INSTRUCTION_TAGS: InstructionTags := (
+			fetchCtr => (others => '0'),
+			decodeCtr => (others => '0'),
+			renameSeq => (others => '0'), 
+			renameIndex => (others => '0'),
+			intPointer => (others => '0'),
+			floatPointer => (others => '0')
+);
+
 constant DEFAULT_INSTRUCTION_STATE: InstructionState := defaultInstructionState;
 constant DEFAULT_INS_STATE: InstructionState := defaultInstructionState;
 	
@@ -427,6 +432,7 @@ begin
 	res.controlInfo := defaultControlInfo;
 	res.basicInfo := defaultBasicInfo;
 	res.bits := (others=>'0');
+		res.tags := DEFAULT_INSTRUCTION_TAGS;
 	--res.operation := BinomialOp'(unknown, unknown);
 	res.classInfo := defaultClassInfo;
 	res.constantArgs := defaultConstantArgs;
@@ -436,9 +442,9 @@ begin
 	--res.physicalDestArgs := defaultPhysicalDestArgs;
 		res.virtualArgSpec := DEFAULT_ARG_SPEC;
 		res.physicalArgSpec := DEFAULT_ARG_SPEC;
-	res.numberTag := (others => '0'); -- '1');
-	res.gprTag := (others => '0'); -- '1');
-	res.groupTag := (others => '0');
+	--res.numberTag := (others => '0'); -- '1');
+	--res.gprTag := (others => '0'); -- '1');
+	--res.groupTag := (others => '0');
 	res.argValues := defaultArgValues;
 	res.result := (others => '0');
 	res.target := (others => '0');
