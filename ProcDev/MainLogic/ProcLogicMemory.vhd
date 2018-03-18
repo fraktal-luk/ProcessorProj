@@ -43,7 +43,7 @@ return std_logic_vector;
 	return std_logic_vector;
 
 function findCommittingSQ(content: InstructionStateArray; livingMask: std_logic_vector;
-								  committingTag: SmallNumber; send: std_logic) return StageDataMulti;
+								  committingTag: InsTag; send: std_logic) return StageDataMulti;
 
 function getAddressCompleted(ins: InstructionState) return std_logic;
 function getDataCompleted(ins: InstructionState) return std_logic;
@@ -70,10 +70,10 @@ function lmMaskNext(livingMask: std_logic_vector;
 					  sendingVec: std_logic_vector;
 					  receiving: std_logic) return std_logic_vector;
 
-	function TMP_cmpTagsBefore(content: InstructionStateArray; tag: SmallNumber)
+	function TMP_cmpTagsBefore(content: InstructionStateArray; tag: InsTag)
 	return std_logic_vector;
 
-	function TMP_cmpTagsAfter(content: InstructionStateArray; tag: SmallNumber)
+	function TMP_cmpTagsAfter(content: InstructionStateArray; tag: InsTag)
 	return std_logic_vector;
 
 	function setLoadException(ins: InstructionState) return InstructionState;
@@ -212,13 +212,13 @@ end function;
 			end function;
 							
 					function findCommittingSQ(content: InstructionStateArray; livingMask: std_logic_vector;
-													  committingTag: SmallNumber; send: std_logic) return StageDataMulti is
+													  committingTag: InsTag; send: std_logic) return StageDataMulti is
 							variable res: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
 						begin
 							res.data := content(0 to PIPE_WIDTH-1);
 							for i in 0 to PIPE_WIDTH-1 loop
-								if (content(i).tags.renameIndex(SMALL_NUMBER_SIZE-1 downto LOG2_PIPE_WIDTH)
-									= committingTag(SMALL_NUMBER_SIZE-1 downto LOG2_PIPE_WIDTH))
+								if (content(i).tags.renameIndex(TAG_SIZE-1 downto LOG2_PIPE_WIDTH)
+									= committingTag(TAG_SIZE-1 downto LOG2_PIPE_WIDTH))
 									and (livingMask(i) = '1') and (send = '1')
 								then	
 									res.fullMask(i) := '1';
@@ -410,27 +410,33 @@ begin
 	return outMask;
 end function;
 
-	function TMP_cmpTagsBefore(content: InstructionStateArray; tag: SmallNumber)
+	function TMP_cmpTagsBefore(content: InstructionStateArray; tag: InsTag)
 	return std_logic_vector is
 		variable res: std_logic_vector(0 to content'length-1) := (others => '0');
 		variable diff: SmallNumber := (others => '0');
 	begin
 		for i in 0 to res'length-1 loop
-			diff := subSN(content(i).tags.renameIndex, tag); -- If grTag < tag then diff(high) = '1'
-			res(i) := diff(SMALL_NUMBER_SIZE-1);
+			res(i) := CMP_tagBefore(content(i).tags.renameIndex, tag); -- If grTag < tag then diff(high) = '1'
+			
+			--	diff := subSN(content(i).tags.renameIndex, tag); -- If grTag < tag then diff(high) = '1'
+			--	res(i) := diff(SMALL_NUMBER_SIZE-1);
+
 		end loop;
 		
 		return res;
 	end function;
 
-	function TMP_cmpTagsAfter(content: InstructionStateArray; tag: SmallNumber)
+	function TMP_cmpTagsAfter(content: InstructionStateArray; tag: InsTag)
 	return std_logic_vector is
 		variable res: std_logic_vector(0 to content'length-1) := (others => '0');
 		variable diff: SmallNumber := (others => '0');
 	begin
 		for i in 0 to res'length-1 loop
-			diff := subSN(tag, content(i).tags.renameIndex); -- If grTag > tag then diff(high) = '1'
-			res(i) := diff(SMALL_NUMBER_SIZE-1);
+			res(i) := CMP_tagBefore(tag, content(i).tags.renameIndex); -- If grTag > tag then diff(high) = '1'
+			
+         --              diff := subSN(tag, content(i).tags.renameIndex); -- If grTag > tag then diff(high) = '1'
+          --             res(i) := diff(SMALL_NUMBER_SIZE-1);
+
 		end loop;
 		
 		return res;

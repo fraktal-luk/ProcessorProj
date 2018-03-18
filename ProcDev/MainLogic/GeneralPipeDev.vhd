@@ -13,6 +13,7 @@ use IEEE.STD_LOGIC_1164.all;
 
 use work.ProcBasicDefs.all;
 use work.Helpers.all;
+use work.ProcHelpers.all;
 
 use work.ProcInstructionsNew.all;
 
@@ -26,8 +27,8 @@ package GeneralPipeDev is
 
 function getTagHigh(tag: std_logic_vector) return std_logic_vector;
 function getTagLow(tag: std_logic_vector) return std_logic_vector;
-function getTagHighSN(tag: SmallNumber) return SmallNumber;
-function getTagLowSN(tag: SmallNumber) return SmallNumber;	
+function getTagHighSN(tag: InsTag) return SmallNumber;
+function getTagLowSN(tag: InsTag) return SmallNumber;	
 function clearTagLow(tag: std_logic_vector) return std_logic_vector;	
 function clearTagHigh(tag: std_logic_vector) return std_logic_vector;	
 function alignAddress(adr: std_logic_vector) return std_logic_vector;
@@ -170,6 +171,28 @@ function getLastEffective(newContent: StageDataMulti) return InstructionState;
 
 function getSendingFromCQ(livingMask: std_logic_vector) return std_logic_vector;
 
+
+function CMP_tagBefore(tagA, tagB: InsTag) return std_logic is
+	variable wA, wB: word := (others => '0');
+	variable wC: std_logic_vector(32 downto 0) := (others => '0');
+begin
+	wA(TAG_SIZE-1 downto 0) := tagA;
+	wB(TAG_SIZE-1 downto 0) := tagB;
+	wB := not wB;
+	-- TODO: when going to 64 bit, this must be changed!
+	wC := addMwordFasterExt(wA, wB, '1');
+	wC(32 downto TAG_SIZE) := (others => '0');
+	return wC(TAG_SIZE-1);
+end function;
+
+function CMP_tagAfter(tagA, tagB: InsTag) return std_logic is
+	variable wA, wB, wC: word := (others => '0');
+begin
+	return CMP_tagBefore(tagB, tagA);
+end function;
+
+
+
 function killByTag(before, ei, int: std_logic) return std_logic;
 	
 -- FORWARDING NETWORK ------------
@@ -239,14 +262,14 @@ begin
 	return res;
 end function;
 
-function getTagHighSN(tag: SmallNumber) return SmallNumber is
+function getTagHighSN(tag: InsTag) return SmallNumber is
 	variable res: SmallNumber := (others => '0');
 begin
-	res(SMALL_NUMBER_SIZE-1-LOG2_PIPE_WIDTH downto 0) := tag(SMALL_NUMBER_SIZE-1 downto LOG2_PIPE_WIDTH);
+	res(TAG_SIZE-1-LOG2_PIPE_WIDTH downto 0) := tag(TAG_SIZE-1 downto LOG2_PIPE_WIDTH);
 	return res;
 end function;
 
-function getTagLowSN(tag: SmallNumber) return SmallNumber is
+function getTagLowSN(tag: InsTag) return SmallNumber is
 	variable res: SmallNumber := (others => '0');
 begin
 	res(LOG2_PIPE_WIDTH-1 downto 0) := tag(LOG2_PIPE_WIDTH-1 downto 0);
@@ -1100,7 +1123,9 @@ begin
 	for i in 0 to fullMask'length-1 loop
 		diff := subSN(causing.tags.renameIndex, content(i).tags.renameIndex); 
 																	-- High bit of diff carries the info "tag is before"
-		res(i) := killByTag(diff(SMALL_NUMBER_SIZE-1), execEventSig, lateEventSig) and fullMask(i);
+		res(i) := killByTag(--diff(SMALL_NUMBER_SIZE-1),-- 
+									CMP_tagBefore(causing.tags.renameIndex, content(i).tags.renameIndex),
+									execEventSig, lateEventSig) and fullMask(i);
 	end loop;
 	return res;
 end function;

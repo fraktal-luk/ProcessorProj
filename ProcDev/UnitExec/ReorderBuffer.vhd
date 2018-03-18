@@ -55,8 +55,8 @@ entity ReorderBuffer is
 		execEventSignal: in std_logic;
 		execCausing: in InstructionState; -- Redundant cause we have inputs from all Exec ends? 
 		
-		commitGroupCtr: in SmallNumber;
-		commitGroupCtrNext: in SmallNumber;
+		commitGroupCtr: in InsTag;
+		commitGroupCtrNext: in InsTag;
 
 		--execEnds: in InstructionStateArray(0 to 3);
 		--execReady: in std_logic_vector(0 to 3);

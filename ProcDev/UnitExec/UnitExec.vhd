@@ -70,8 +70,8 @@ entity UnitExec is
 			
 			committing: in std_logic;
 			
-			groupCtrNext: in SmallNumber;
-			groupCtrInc: in SmallNumber;
+			groupCtrNext: in InsTag; -- UNUSED?
+			groupCtrInc: in InsTag;
 				
 		outputA: out InstructionSlot;
 		outputB: out InstructionSlot;

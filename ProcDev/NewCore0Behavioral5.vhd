@@ -34,8 +34,8 @@ architecture Behavioral5 of NewCore0 is
 	signal execCausing, lateCausing: InstructionState := defaultInstructionState; -- OUTPUT/SIG
 
 	-- Hidden to some degree, but may be useful for sth
-	signal commitGroupCtrSig, commitGroupCtrNextSig: SmallNumber := (others => '0'); -- INPUT
-	signal commitGroupCtrIncSig: SmallNumber := (others => '0');	-- INPUT
+	signal commitGroupCtrSig, commitGroupCtrNextSig: InsTag := (others => '0'); -- INPUT
+	signal commitGroupCtrIncSig: InsTag := (others => '0');	-- INPUT
 												
 	-- ROB interface	
 	signal robSending: std_logic := '0';		-- OUTPUT

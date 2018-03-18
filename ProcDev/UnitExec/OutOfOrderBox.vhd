@@ -70,9 +70,9 @@ entity OutOfOrderBox is
 			 execCausingOut: out InstructionState;
 
 	-- Hidden to some degree, but may be useful for sth
-			commitGroupCtrSig: in SmallNumber;
-			commitGroupCtrNextSig: in SmallNumber; -- INPUT
-		   commitGroupCtrIncSig: in SmallNumber;	-- INPUT
+			commitGroupCtrSig: in InsTag;
+			commitGroupCtrNextSig: in InsTag; -- INPUT
+		   commitGroupCtrIncSig: in InsTag;	-- INPUT
 												
 	-- ROB interface	
 			robSendingOut: out std_logic;		-- OUTPUT

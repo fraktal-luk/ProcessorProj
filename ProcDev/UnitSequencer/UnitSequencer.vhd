@@ -110,10 +110,10 @@ entity UnitSequencer is
 			committing: out std_logic;
 		
 		-- Counter outputs
-		commitGroupCtrOut: out SmallNumber;
-		commitGroupCtrNextOut: out SmallNumber;
+		commitGroupCtrOut: out InsTag;
+		commitGroupCtrNextOut: out InsTag;
 		
-		commitGroupCtrIncOut: out SmallNumber;
+		commitGroupCtrIncOut: out InsTag;
 		
 			committedSending: out std_logic;
 			committedDataOut: out StageDataMulti;
@@ -153,10 +153,10 @@ architecture Behavioral of UnitSequencer is
 	signal sendingToCommit, sendingOutCommit, acceptingOutCommit: std_logic := '0';
 	signal stageDataToCommit, stageDataOutCommit: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;						
 
-	signal renameCtr, renameCtrNext, commitCtr, commitCtrNext: SmallNumber := (others => '1');
-	signal renameGroupCtr, renameGroupCtrNext, commitGroupCtr, commitGroupCtrNext: SmallNumber :=
+	signal renameCtr, renameCtrNext, commitCtr, commitCtrNext: InsTag := (others => '1');
+	signal renameGroupCtr, renameGroupCtrNext, commitGroupCtr, commitGroupCtrNext: InsTag :=
 																						INITIAL_GROUP_TAG;
-	signal commitGroupCtrInc: SmallNumber := (others => '0');
+	signal commitGroupCtrInc: InsTag := (others => '0');
 	
 	signal effectiveMask: std_logic_vector(0 to PIPE_WIDTH-1) := (others => '0');
 	
@@ -338,14 +338,14 @@ begin
 	COMMON_STATE: block
 	begin
 		renameGroupCtrNext <= nextCtr(renameGroupCtr, execOrIntEventSignal,
-												execOrIntCausing.tags.renameIndex and i2slv(-PIPE_WIDTH, SMALL_NUMBER_SIZE),
+												execOrIntCausing.tags.renameIndex and i2slv(-PIPE_WIDTH, TAG_SIZE),
 												frontLastSending, ALL_FULL);
 		renameCtrNext <= nextCtr(renameCtr, execOrIntEventSignal, execOrIntCausing.tags.renameSeq,
 										 frontLastSending, frontDataLastLiving.fullMask);
 		commitGroupCtrNext <= nextCtr(commitGroupCtr, '0', (others => '0'), sendingToCommit, ALL_FULL);
 		commitCtrNext <= nextCtr(commitCtr, '0', (others => '0'), sendingToCommit, effectiveMask);
 
-		commitGroupCtrInc <= i2slv(slv2u(commitGroupCtr) + PIPE_WIDTH, SMALL_NUMBER_SIZE);
+		commitGroupCtrInc <= i2slv(slv2u(commitGroupCtr) + PIPE_WIDTH, TAG_SIZE);
 
 		-- Re-allow renaming when everything from rename/exec is committed - reg map will be well defined now
 		renameLockRelease <= '1' when commitGroupCtr = renameGroupCtr else '0';

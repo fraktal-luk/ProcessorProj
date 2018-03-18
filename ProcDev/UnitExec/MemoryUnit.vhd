@@ -77,7 +77,7 @@ entity MemoryUnit is
 		selectedDataOutput: out InstructionSlot;
 
 		committing: in std_logic;
-		groupCtrInc: in SmallNumber;
+		groupCtrInc: in InsTag;
 
 		lateEventSignal: in std_logic;
 		execEventSignal: in std_logic;

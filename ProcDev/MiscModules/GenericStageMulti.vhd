@@ -297,7 +297,8 @@ begin
 		a <= execCausing.tags.renameIndex;
 		b <= stageData.data(0).tags.renameIndex;
 		c <= subSN(a, b);
-		before <= c(7);
+		before <= --c(7);
+					 CMP_tagBefore(execCausing.tags.renameIndex, stageData.data(0).tags.renameIndex);
 		flowDrive.kill <= killByTag(before, execEventSignal,
 										lateEventSignal);
 	end block;	

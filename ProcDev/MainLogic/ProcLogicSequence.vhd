@@ -27,9 +27,9 @@ package ProcLogicSequence is
 
 		-- group:  revTag = causing.groupTag and i2slv(-PIPE_WIDTH, SMALL_NUMBER_SIZE), mask = all ones
 		-- sequential: revTag = causing.numberTag, mask = new group's fullMask		
-		function nextCtr(ctr: SmallNumber; rewind: std_logic; revTag: SmallNumber;
+		function nextCtr(ctr: InsTag; rewind: std_logic; revTag: InsTag;
 									 allow: std_logic; mask: std_logic_vector) 
-		return SmallNumber;
+		return InsTag;
 		
 		constant ALL_FULL: std_logic_vector(0 to PIPE_WIDTH-1) := (others => '1');
 
@@ -91,14 +91,14 @@ package body ProcLogicSequence is
 	
 		-- group:  revTag = causing.groupTag and i2slv(-PIPE_WIDTH, SMALL_NUMBER_SIZE), mask = all ones
 		-- sequential: revTag = causing.numberTag, mask = new group's fullMask		
-		function nextCtr(ctr: SmallNumber; rewind: std_logic; revTag: SmallNumber;
+		function nextCtr(ctr: InsTag; rewind: std_logic; revTag: InsTag;
 									 allow: std_logic; mask: std_logic_vector) 
-		return SmallNumber is			
+		return InsTag is
 		begin
 			if rewind = '1' then
 				return revTag;
 			elsif allow = '1' then
-				return i2slv(slv2u(ctr) + countOnes(mask), SMALL_NUMBER_SIZE);
+				return i2slv(slv2u(ctr) + countOnes(mask), TAG_SIZE);
 			else
 				return ctr;
 			end if;
