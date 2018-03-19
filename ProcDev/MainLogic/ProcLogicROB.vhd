@@ -71,39 +71,42 @@ function getNumKilled(full: SmallNumber; tagCausing, tagRef: InsTag; evt: std_lo
 return SmallNumber is
 	variable res: SmallNumber := (others => '0');
 		variable num: SmallNumber := (others => '0');
+		constant MAX_TAG: InsTag := (others => '1');
+		constant MAX_TAG_HIGH: SmallNumber := getTagHighSN(MAX_TAG);
 begin
 	if evt = '1' then
 		num := addSN(full, getTagHighSN(tagRef));
 		num := subSN(num, getTagHighSN(tagCausing));
-		num(SMALL_NUMBER_SIZE-1 downto SMALL_NUMBER_SIZE-LOG2_PIPE_WIDTH) := (others => '0');
+		num := num and MAX_TAG_HIGH; -- CAREFUL: clear overflown bits
+		--num(SMALL_NUMBER_SIZE-1 downto SMALL_NUMBER_SIZE-LOG2_PIPE_WIDTH) := (others => '0');
 	end if;
 	res := num;		
 	return res;
 end function;
 
 
-		function calcGroupSelect(selTag, refTag: SmallNumber) return std_logic_vector is
-			variable res: std_logic_vector(0 to ROB_SIZE-1) := (others => '0');
-			
-			variable vs, vr, ve: SmallNumber := (others => '0');
-		begin
-			vs(SMALL_NUMBER_SIZE-1-LOG2_PIPE_WIDTH downto 0) := selTag(SMALL_NUMBER_SIZE-1 downto LOG2_PIPE_WIDTH);
-			vr(SMALL_NUMBER_SIZE-1-LOG2_PIPE_WIDTH downto 0) := refTag(SMALL_NUMBER_SIZE-1 downto LOG2_PIPE_WIDTH);
-
-			-- Formula:  indH - indRef - 1 = indH + (-1 - indRef) = indH + not indRef
-			ve := addSN(vs, not vr);
-			-- CAREFUL: This is to enable comparison in wrapping arithmetic 
-			ve(ve'high downto ve'high - LOG2_PIPE_WIDTH) := (others => '0');
-
-			for i in 0 to ROB_SIZE-1 loop
-				if i2slv(i, SMALL_NUMBER_SIZE) = ve then
-					res(i) := '1';
-					exit;
-				end if;
-			end loop;
-			
-			return res;
-		end function;
+--		function calcGroupSelect(selTag, refTag: SmallNumber) return std_logic_vector is
+--			variable res: std_logic_vector(0 to ROB_SIZE-1) := (others => '0');
+--			
+--			variable vs, vr, ve: SmallNumber := (others => '0');
+--		begin
+--			vs(SMALL_NUMBER_SIZE-1-LOG2_PIPE_WIDTH downto 0) := selTag(SMALL_NUMBER_SIZE-1 downto LOG2_PIPE_WIDTH);
+--			vr(SMALL_NUMBER_SIZE-1-LOG2_PIPE_WIDTH downto 0) := refTag(SMALL_NUMBER_SIZE-1 downto LOG2_PIPE_WIDTH);
+--
+--			-- Formula:  indH - indRef - 1 = indH + (-1 - indRef) = indH + not indRef
+--			ve := addSN(vs, not vr);
+--			-- CAREFUL: This is to enable comparison in wrapping arithmetic 
+--			ve(ve'high downto ve'high - LOG2_PIPE_WIDTH) := (others => '0');
+--
+--			for i in 0 to ROB_SIZE-1 loop
+--				if i2slv(i, SMALL_NUMBER_SIZE) = ve then
+--					res(i) := '1';
+--					exit;
+--				end if;
+--			end loop;
+--			
+--			return res;
+--		end function;
 
 
 		function calcGroupSelectCircular(selTag, refTag: InsTag) return std_logic_vector is
@@ -547,6 +550,7 @@ begin
 	nReceiving := integer(slv2u(flowDrive.prevSending));
 		
 	nFullNext := nLiving + nReceiving - nSending;
+
 	-- full, fullMask - agree?
 	assert countOnes(sd.fullMask) = nFull report "ywwwy";
 		assert countOnes(sd.fullMask(0 to nFull-1)) = nFull report "vgh"; -- checking continuity
