@@ -52,13 +52,6 @@ function stageROBNext_Circular(content: StageDataROB; fullMask: std_logic_vector
 return StageDataROB;
 
 
---function setCompleted(content: StageDataROB; refTag: SmallNumber;
---							execEnds: InstructionStateArray; execReady: std_logic_vector;
---							execEnds2: InstructionStateArray; execReady2: std_logic_vector;
---							killSignal: std_logic; fromCommitted: std_logic)							
---return StageDataROB;
-
-
 function setCompleted_Circular(content: StageDataROB; refTag: InsTag;
 							execEnds: InstructionStateArray; execReady: std_logic_vector;
 							execEnds2: InstructionStateArray; execReady2: std_logic_vector;
@@ -83,30 +76,6 @@ begin
 	res := num;		
 	return res;
 end function;
-
-
---		function calcGroupSelect(selTag, refTag: SmallNumber) return std_logic_vector is
---			variable res: std_logic_vector(0 to ROB_SIZE-1) := (others => '0');
---			
---			variable vs, vr, ve: SmallNumber := (others => '0');
---		begin
---			vs(SMALL_NUMBER_SIZE-1-LOG2_PIPE_WIDTH downto 0) := selTag(SMALL_NUMBER_SIZE-1 downto LOG2_PIPE_WIDTH);
---			vr(SMALL_NUMBER_SIZE-1-LOG2_PIPE_WIDTH downto 0) := refTag(SMALL_NUMBER_SIZE-1 downto LOG2_PIPE_WIDTH);
---
---			-- Formula:  indH - indRef - 1 = indH + (-1 - indRef) = indH + not indRef
---			ve := addSN(vs, not vr);
---			-- CAREFUL: This is to enable comparison in wrapping arithmetic 
---			ve(ve'high downto ve'high - LOG2_PIPE_WIDTH) := (others => '0');
---
---			for i in 0 to ROB_SIZE-1 loop
---				if i2slv(i, SMALL_NUMBER_SIZE) = ve then
---					res(i) := '1';
---					exit;
---				end if;
---			end loop;
---			
---			return res;
---		end function;
 
 
 		function calcGroupSelectCircular(selTag, refTag: InsTag) return std_logic_vector is
@@ -249,118 +218,6 @@ begin
 	
 	return res;		
 end function;
-
-
---function setCompleted(content: StageDataROB; refTag: SmallNumber;
---							execEnds: InstructionStateArray; execReady: std_logic_vector;
---							execEnds2: InstructionStateArray; execReady2: std_logic_vector;
---							killSignal: std_logic; fromCommitted: std_logic)							
---return StageDataROB is
---	variable res: StageDataROB := content;
---		variable ihr, il, ih, ind: SmallNumber := (others => '0');
---	constant CLEAR_EMPTY_SLOTS_ROB: boolean := false;	
---	variable matched, TMP_elem: boolean := false;
---	
---	variable TMP_s0, TMP_s1: SmallNumber := (others => '0');
---	
---		variable groupSelect: std_logic_vector(0 to ROB_SIZE-1) := (others => '0');
---		variable TMP_found: boolean := false;		
---begin
---	ihr := getTagHighSN(refTag);
---	for i in 0 to execEnds'length-1 loop
---		il := getTagLowSN(execEnds(i).tags.renameIndex);
---		groupSelect := calcGroupSelect(execEnds(i).tags.renameIndex, refTag);			
---		for j in 0 to ROB_SIZE-1 loop
---			if groupSelect(j) = '1' and execReady(i) = '1' then	
---				for k in 0 to PIPE_WIDTH-1 loop
---					TMP_s0 := i2slv(k, SMALL_NUMBER_SIZE);
---					if TMP_s0 = il then							
---						if execEnds(i).controlInfo.hasException = '1' then
---							TMP_elem := true;
---								res.data(j).data(k).controlInfo.newEvent := '1'; --- !!!
---							res.data(j).data(k).controlInfo.hasException := '1';
---						end if;
---						res.data(j).data(k).controlInfo.completed := '1';								
---					end if;													
---				end loop;
---			end if;	
---		end loop;
---	end loop;
---
---	-- CAREFUL: setting completed2
---	for i in 0 to execEnds2'length-1 loop
---		il := getTagLowSN(execEnds2(i).tags.renameIndex);
---		groupSelect := calcGroupSelect(execEnds2(i).tags.renameIndex, refTag);				
---		for j in 0 to ROB_SIZE-1 loop
---			if groupSelect(j) = '1' and execReady2(i) = '1' then
---				-----
---				for k in 0 to PIPE_WIDTH-1 loop
---					TMP_s0 := i2slv(k, SMALL_NUMBER_SIZE);
---					if TMP_s0 = il then							
---						if execEnds2(i).controlInfo.hasException = '1' then
---							TMP_elem := true;
---								res.data(j).data(k).controlInfo.newEvent := '1'; --- !!!
---							res.data(j).data(k).controlInfo.hasException := '1';
---						end if;
---							
---						if execEnds2(i).controlInfo.hasBranch = '1' then
---							TMP_elem := true;
---								res.data(j).data(k).controlInfo.newEvent := '1'; --- !!!
---							res.data(j).data(k).controlInfo.hasBranch := '1';
---						end if;
---						
---						res.data(j).data(k).controlInfo.completed2 := '1';								
---					end if;						
---				end loop;
---			end if;
---		end loop;	
---	end loop;
---
---	-- Propagate killed/squashed
---			for j in 0 to ROB_SIZE-1 loop
---				TMP_found := false;
---				for k in 0 to PIPE_WIDTH-1 loop
---					if TMP_found then
---						if res.data(j).fullMask(k) = '1' then
---							res.data(j).data(k).controlInfo.squashed := '1';
---						end if;
---						res.data(j).fullMask(k) := '0';
---					end if;				
---					if res.data(j).data(k).controlInfo.newEvent = '1' then
---						-- CAREFUL: kill subsequent ones when this has excpetion or new branch, but not a branch 
---						--				set in front pipe!
---						res.data(j).data(k).controlInfo.newEvent := '0'; -- CAREFUL: clear to leave blank for late evts
---						TMP_found := true;
---					end if;
---				end loop;
---			end loop;
---
---	if killSignal = '0' then
---		return res;
---	end if;
---
---	if fromCommitted = '1' then
---		matched := true;
---	end if;
---	
---	for i in 0 to ROB_SIZE-1 loop
---		-- For slots after the affected one
---		if matched then
---			res.fullMask(i) := '0';
---			if CLEAR_EMPTY_SLOTS_ROB then
---				res.data(i) := DEFAULT_STAGE_DATA_MULTI;
---			end if;				
---		end if;
---			
---		if groupSelect(i) = '1' then	
---			matched := true;
---		end if;
---				
---	end loop;
---	
---	return res;
---end function;
-
 
 
 function setCompleted_Circular(content: StageDataROB; refTag: InsTag;

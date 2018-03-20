@@ -88,7 +88,10 @@ entity OutOfOrderBox is
 			
 				readyRegFlags: in std_logic_vector(0 to 3*PIPE_WIDTH-1);		
 	
-				cqOutput: out InstructionSlotArray(0 to INTEGER_WRITE_WIDTH-1)
+				cqOutput: out InstructionSlotArray(0 to INTEGER_WRITE_WIDTH-1);
+				
+			sqCommittedOutput: out InstructionSlot;
+			sqCommittedEmpty: out std_logic
 			  );
 end OutOfOrderBox;
 
@@ -320,7 +323,10 @@ begin
 											
 					lateEventSignal => lateEventSignal,	
 					execOrIntEventSignalIn => execEventSignal,
-					execCausing => execCausing
+					execCausing => execCausing,
+					
+					sqCommittedOutput => sqCommittedOutput,
+					sqCommittedEmpty => sqCommittedEmpty
 				);
 
 				sysRegReadSel <= memLoadAddress(4 downto 0);

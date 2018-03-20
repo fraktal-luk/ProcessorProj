@@ -75,6 +75,9 @@ architecture Behavioral5 of NewCore0 is
 		signal memStoreAddress, memStoreValue: Mword := (others => '0');
 		signal memStoreAllow: std_logic := '0';
 			
+			signal sqCommittedOutput: InstructionSlot := DEFAULT_INSTRUCTION_SLOT;
+			signal sqCommittedEmpty: std_logic := '0';
+			
 	constant HAS_RESET: std_logic := '0';
 	constant HAS_EN: std_logic := '0';
 begin
@@ -225,7 +228,7 @@ begin
 				robSendingOut => robSending,
 				dataOutROB => dataOutROB,
 
-				sbAccepting => sbAccepting,--: in std_logic;	-- INPUT
+				sbAccepting => '1',--sbAccepting,--: in std_logic;	-- INPUT
 				commitAccepting => commitAccepting,--: in std_logic; -- INPUT
 
 					sbSending => sbSending,
@@ -233,7 +236,10 @@ begin
 				dataOutBQV => dataOutBQV,
 				dataOutSQ => dataOutSQ,
 				readyRegFlags => readyRegFlags,
-				cqOutput => cqOutput
+				cqOutput => cqOutput,
+				
+				sqCommittedOutput => sqCommittedOutput,
+				sqCommittedEmpty => sqCommittedEmpty
 		);
 
 			cqMaskOut <= extractFullMask(cqOutput);
@@ -335,30 +341,11 @@ begin
 
 					sbAccepting <= sbAcceptingV(0);
 
-					STORE_BUFFER: entity work.TestCQPart0(WriteBuffer)
-					generic map(
-						INPUT_WIDTH => PIPE_WIDTH,
-						QUEUE_SIZE => SB_SIZE,
-						OUTPUT_SIZE => 1
-					)
-					port map(
-						clk => clk, reset => reset, en => en,
-						
-						whichAcceptedCQ => sbAcceptingV,
-						input => makeSlotArray(dataOutSQ.data, dataOutSQ.fullMask),
-						
-						anySending => open,--sbSending,
-
-						cqOutput => sbOutputSig,
-						bufferOutput => sbBufferOutputSig,
-						
-						execEventSignal => '0',
-						execCausing => DEFAULT_INSTRUCTION_STATE
-					);
 				
-				sbSending <= sbOutputSig(0).full;
-			sbEmpty <= not sbBufferOutputSig(0).full;-- sbFullMask(0);
-			dataFromSB <= sbOutputSig(0).ins;--sbDataOut(0);
+				sbSending <= sqCommittedOutput.full;
+			sbEmpty <= sqCommittedEmpty;
+			dataFromSB <= sqCommittedOutput.ins;
+
 
 -----------------------------------------
 ----- Mem signals -----------------------

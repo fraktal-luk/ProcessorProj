@@ -87,7 +87,10 @@ entity UnitMemory is
 
 		lateEventSignal: in std_logic;	
 		execOrIntEventSignalIn: in std_logic;
-		execCausing: in InstructionState
+		execCausing: in InstructionState;
+		
+			sqCommittedOutput: out InstructionSlot;
+			sqCommittedEmpty: out std_logic
 	);
 end UnitMemory;
 
@@ -273,7 +276,10 @@ begin
 				nextAccepting => sbSending,--'1',
 				
 				sendingSQOut => open,
-					dataOutV => dataOutSQV
+					dataOutV => dataOutSQV,
+					
+					committedOutput => sqCommittedOutput,
+					committedEmpty => sqCommittedEmpty
 			);
 
 			MEM_LOAD_QUEUE: entity work.MemoryUnit(Behavioral)
@@ -304,7 +310,10 @@ begin
 				nextAccepting => '1',
 
 				sendingSQOut => open,
-					dataOutV => open
+					dataOutV => open,
+					
+					committedOutput => open,
+					committedEmpty => open
 			);
 
 			DELAYED_LOAD_QUEUE: entity work.MemoryUnit(LoadMissQueue)
@@ -334,7 +343,10 @@ begin
 				
 				nextAccepting => '1', -- TODO: when should it be allowed to send? Priorities!				
 				sendingSQOut => sendingFromDLQ,
-					dataOutV => stageDataMultiDLQ
+					dataOutV => stageDataMultiDLQ,
+					
+					committedOutput => open,
+					committedEmpty => open
 			);
 			
 			dataFromDLQ <= stageDataMultiDLQ.data(0);

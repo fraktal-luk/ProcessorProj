@@ -85,7 +85,10 @@ entity MemoryUnit is
 		
 		nextAccepting: in std_logic;		
 		sendingSQOut: out std_logic;
-		dataOutV: out StageDataMulti
+		dataOutV: out StageDataMulti;
+		
+			committedOutput: out InstructionSlot;
+			committedEmpty: out std_logic
 	);
 end MemoryUnit;
 
@@ -119,13 +122,26 @@ architecture Behavioral of MemoryUnit is
 	signal selectedDataSlot: InstructionSlot := DEFAULT_INSTRUCTION_SLOT;
 	signal selectedDataOutputSig: InstructionSlot := DEFAULT_INSTRUCTION_SLOT;
 		signal TMP_num: SmallNumber := (others => '0');
+		signal TMP_committedEmpty: std_logic := '0';
+		
+		signal TMP_commSending: std_logic := '0';
+		signal TMP_commSendData: InstructionState := DEFAULT_INSTRUCTION_STATE;
+		signal TMP_committedFrontW: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
 begin				
-			TMP_num(0) <= nextAccepting;
+			TMP_committedEmpty <= not isNonzero(qs0c.nFull);
+
+			TMP_num(0) <= not TMP_committedEmpty; -- nextAccepting;
 			qs1c <= TMP_change(qs0c,  TMP_num, bufferDrive.nextAccepting,
 									committedMask, TMP_killMask, '0', committedMaskNext); -- Never killed!
 			drainingMask <= getQueueSendingMask(qs0c, QUEUE_SIZE, TMP_num);
-			
 
+		TMP_committedFrontW <= getQueueFrontWindow(qs0c, TMP_content, committedMask);
+		TMP_commSending <=	TMP_committedFrontW.fullMask(0);
+		TMP_commSendData <=	TMP_committedFrontW.data(0);
+
+			committedOutput <= (TMP_commSending, TMP_commSendData);
+			committedEmpty <= TMP_committedEmpty;
+------------------------------
 	qs1 <= TMP_change(qs0, bufferDrive.nextAccepting, bufferDrive.prevSending,
 							TMP_mask, TMP_killMask, lateEventSignal or execEventSignal, TMP_maskNext);
 			

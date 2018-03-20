@@ -222,7 +222,10 @@ begin
 				nextAccepting => '1',
 				
 				sendingSQOut => open,
-					dataOutV => dataOutBQV
+					dataOutV => dataOutBQV,
+					
+					committedOutput => open,
+					committedEmpty => open
 			);
 
 			branchQueueSelectedSending <= bqSelectedOutput.full;
