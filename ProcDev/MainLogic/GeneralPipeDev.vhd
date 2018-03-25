@@ -239,6 +239,8 @@ function setInsResult(ins: InstructionState; result: Mword) return InstructionSt
 
 function getAddressIncrement(ins: InstructionState) return Mword;
 
+function stageMultiEvents(sd: StageDataMulti; isNew: std_logic) return StageMultiEventInfo;
+
 	type SLVA is array (integer range <>) of std_logic_vector(0 to PIPE_WIDTH-1);
 
 
@@ -1197,5 +1199,39 @@ begin
 	end if;
 	return res;
 end function;
+
+
+function stageMultiEvents(sd: StageDataMulti; isNew: std_logic) return StageMultiEventInfo is
+	variable res: StageMultiEventInfo := (eventOccured => '0', causing => defaultInstructionState,
+														partialKillMask => (others=>'0'));
+	variable t, tp: std_logic := '0';
+	variable eVec: std_logic_vector(0 to PIPE_WIDTH-1) := (others=>'0');
+begin
+	-- TODO: change default res.causing to the value "causing" input of the pipe stage?
+	res.causing := sd.data(PIPE_WIDTH-1);
+	if isNew = '0' then
+		return res;
+	end if;
+	
+	for i in sd.fullMask'reverse_range loop
+		-- Is there an event at this slot? 
+		t := sd.fullMask(i) and sd.data(i).controlInfo.newEvent;		
+		eVec(i) := t;
+		if t = '1' then
+			res.causing := sd.data(i);				
+		end if;
+	end loop;
+
+	for i in sd.fullMask'range loop
+		if tp = '1' then
+			res.partialKillMask(i) := '1';
+		end if;
+		tp := tp or eVec(i);			
+	end loop;
+	res.eventOccured := tp;
+	
+	return res;
+end function;
+
 
 end GeneralPipeDev;

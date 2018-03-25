@@ -333,6 +333,12 @@ architecture LastEffective of GenericStageMulti is
 		signal evtPhase0, evtPhase1, evtPhase2, evtWaiting: std_logic := '0';
 begin
 
+	stageDataNew <= stageDataIn;								
+	stageDataNext <= stageMultiNext(
+								sdLiving2,
+								stageDataNew,
+								flowResponse.living, flowResponse.sending, flowDrive.prevSending);
+
 	sdLiving2.fullMask <= stageDataLiving.fullMask;
 	sdLiving2.data(0)	<=	setLateTargetAndLink(
 									stageDataLiving.data(0),
@@ -340,13 +346,7 @@ begin
 									stageDataLiving.data(0).target,
 									evtPhase1
 								);
-
-
-	stageDataNew <= stageDataIn;								
-	stageDataNext <= stageMultiNext(
-								sdLiving2,
-								stageDataNew,
-								flowResponse.living, flowResponse.sending, flowDrive.prevSending);			
+								
 		stageDataLiving.fullMask <= stageData.fullMask;
 		stageDataLiving.data(0) <= setException2(
 								stageData.data(0),
@@ -356,29 +356,24 @@ begin
 	
 	PIPE_CLOCKED: process(clk) 	
 	begin
-		if rising_edge(clk) then
-			if reset = '1' then
-				
-			elsif en = '1' then	
-				stageData <= stageDataNext;
+		if rising_edge(clk) then	
+			stageData <= stageDataNext;
 
-				logMulti(stageData.data, stageData.fullMask, stageDataLiving.fullMask, flowResponse);
-				checkMulti(stageData, stageDataNext, flowDrive, flowResponse);
-				
-					if evtPhase0 = '1' and evtPhase1 = '0' then
-						evtWaiting <= '1';
-					elsif evtPhase1 = '1' then
-						evtWaiting <= '0';
-						--evtPhase1 <= '0';
-						evtPhase2 <= '1';
-					elsif evtPhase2 = '1' then
-						evtPhase2 <= '0';
-					end if;
-				
-				
-				if evtPhase0 = '1' and stageData.data(0).operation.func = sysError then
-					report "Error found!" severity error;
-				end if;
+			logMulti(stageData.data, stageData.fullMask, stageDataLiving.fullMask, flowResponse);
+			checkMulti(stageData, stageDataNext, flowDrive, flowResponse);
+			
+			if evtPhase0 = '1' and evtPhase1 = '0' then
+				evtWaiting <= '1';
+			elsif evtPhase1 = '1' then
+				evtWaiting <= '0';
+				--evtPhase1 <= '0';
+				evtPhase2 <= '1';
+			elsif evtPhase2 = '1' then
+				evtPhase2 <= '0';
+			end if;		
+			
+			if evtPhase0 = '1' and stageData.data(0).operation.func = sysError then
+				report "Error found!" severity error;
 			end if;
 		end if;
 	end process;

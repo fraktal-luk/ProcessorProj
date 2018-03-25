@@ -54,11 +54,7 @@ entity UnitSequencer is
 		clk: in std_logic;
 		reset: in std_logic;
 		en: in std_logic;
-		
-		-- Icache interface (in parallel with front pipe)
-		iadr: out Mword;	-- REDUNDANT: Probably can be extracted from pcDataLiving
-		iadrvalid: out std_logic; -- REDUNDANT - equal to pcSending
-		
+
 		-- System reg interface
 		sysRegReadSel: in slv5;
 		sysRegReadValue: out Mword;
@@ -132,7 +128,7 @@ end UnitSequencer;
 architecture Behavioral of UnitSequencer is
 	signal resetSig, enSig: std_logic := '0';							
 
-	signal pcBase, pcNext: Mword := (others => '0');
+	signal pcNext: Mword := (others => '0');
 
 	signal stageDataToPC, stageDataOutPC: InstructionState := DEFAULT_INSTRUCTION_STATE;
 	signal sendingToPC, sendingOutPC, acceptingOutPC: std_logic := '0';
@@ -160,7 +156,6 @@ architecture Behavioral of UnitSequencer is
 	
 	signal effectiveMask: std_logic_vector(0 to PIPE_WIDTH-1) := (others => '0');
 	
-	signal fetchLockRequest, fetchLockCommit, fetchLockState: std_logic := '0';
 	signal renameLockCommand, renameLockRelease, renameLockState, renameLockEnd: std_logic := '0';	
 				
 	signal dataToLastEffective, dataFromLastEffective: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;	
@@ -197,7 +192,6 @@ begin
 		execOrIntCausingOut <= execOrIntCausing; -- $MODULE_OUT
 	end block;
 
-	pcBase <= stageDataOutPC.basicInfo.ip and i2slv(-PIPE_WIDTH*4, MWORD_SIZE); -- Clearing low bits
 	pcNext <= getNextPC(stageDataOutPC.basicInfo.ip, (others => '0'), '0');
 
 	stageDataToPC <= newPCData(TMP_phase2, eiEvents.causing,
@@ -221,7 +215,7 @@ begin
 					
 			prevSending => sendingToPC,
 
-			nextAccepting => frontAccepting and not fetchLockState,
+			nextAccepting => '1', -- CAREFUL: front should always accet - if can't, there will be refetch not stall
 			stageDataIn => tmpPcIn,
 			
 			acceptingOut => acceptingOutPC,
@@ -295,17 +289,12 @@ begin
 				end loop;				
 			end if;	
 		end process;
-		
---		currentStateSig <= currentState;
-		
+				
 		TMP_targetIns <= getLatePCData('1', eiEvents.causing,
 													linkRegExc, linkRegInt,
 													savedStateExc, savedStateInt); -- Here, because needs sys regs
 	end block;
 
-	iadr <= pcBase; -- Clearing low bits				
-	iadrvalid <= sendingOutPC;
-	
 	pcDataLiving <= stageDataOutPC;
 	pcSending <= sendingOutPC;	
 

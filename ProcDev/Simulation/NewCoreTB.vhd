@@ -197,7 +197,8 @@ BEGIN
 	end process;
 
 	PROGRAM_MEM: process (clk)
-		constant PM_SIZE: natural := WordMem'length; --programMem'length; 	
+		constant PM_SIZE: natural := WordMem'length; --programMem'length; 
+		variable baseIP: Mword := (others => '0');
 	begin
 		if rising_edge(clk) then
 			if en = '1' then -- TEMP! It shouldn't exist here
@@ -211,9 +212,10 @@ BEGIN
 						--				it must remain in fetch buffer until it can be sent.
 						--				So we can't get new instruction bits when Fetch stalls, cause they'd destroy
 						--				stalled content in fetch buffer!
+						baseIP := iadr and i2slv(-PIPE_WIDTH*4, MWORD_SIZE); -- Clearing low bits
 						for i in 0 to PIPE_WIDTH-1 loop
 							iin(i) <= testProg1--Mem
-										(slv2u(iadr(10 downto 2)) + i); -- CAREFUL! 2 low bits unused (32b memory) 									
+										(slv2u(baseIP(10 downto 2)) + i); -- CAREFUL! 2 low bits unused (32b memory) 									
 						end loop;
 					end if;
 					

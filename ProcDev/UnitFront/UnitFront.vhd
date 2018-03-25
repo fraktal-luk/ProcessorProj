@@ -169,15 +169,13 @@ begin
 	FETCH_DELAY: process (clk)
 	begin
 		if rising_edge(clk) then
-			--if sendingOutFetch = '1' then
-				pcSendingDelayed0 <= pcSending;
-				pcSendingDelayed1 <= pcSendingDelayed0;
-				
-				ivalid1 <= ivalid;
-				fetchBlock1 <= fetchBlock;
+			pcSendingDelayed0 <= pcSending;
+			pcSendingDelayed1 <= pcSendingDelayed0;
+			
+			ivalid1 <= ivalid;
+			fetchBlock1 <= fetchBlock;
 
-				fetchBlockBP <= fetchBlockFinal;
-			--end if;
+			fetchBlockBP <= fetchBlockFinal;
 		end if;	
 	end process;				
 

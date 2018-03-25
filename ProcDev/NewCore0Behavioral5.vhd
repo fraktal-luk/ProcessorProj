@@ -95,10 +95,6 @@ begin
 			 sysStoreAddress => sysStoreAddress,
 			 sysStoreValue => sysStoreValue,
 
-		-- Icache interface
-		iadr => iadr,
-		iadrvalid => iadrvalid,		
-		
 		-- to front pipe
 		frontAccepting => acceptingOutFront,
 		pcDataLiving => pcDataSig,
@@ -156,6 +152,9 @@ begin
 		commitGroupCtrNextOut => commitGroupCtrNextSig,	
 		commitGroupCtrIncOut => commitGroupCtrIncSig
 	);
+		
+	iadr <= pcDataSig.basicInfo.ip;
+	iadrvalid <= pcSendingSig;
 		
 	FRONT_PART: entity work.UnitFront(Behavioral)
 	port map(
