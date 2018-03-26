@@ -233,8 +233,6 @@ begin
 	excInfoUpdate <= eiEvents.causing.controlInfo.phase1 and eiEvents.causing.controlInfo.hasException;
 	intInfoUpdate <= eiEvents.causing.controlInfo.phase1 and eiEvents.causing.controlInfo.hasInterrupt;
 	
-	excLinkInfo <= getLinkInfoNormal(eiEvents.causing);
-	intLinkInfo <= getLinkInfoSuper(eiEvents.causing);		
 	----------------------------------------------------------------------
 	
 	SYS_REGS: block
@@ -246,6 +244,11 @@ begin
 		alias savedStateExc is sysRegArray(4);
 		alias savedStateInt is sysRegArray(5);
 	begin
+		excLinkInfo <= getLinkInfo(dataFromLastEffective2.data(0), currentState);
+							--getLinkInfoNormal(eiEvents.causing);
+		intLinkInfo <= getLinkInfo(dataFromLastEffective2.data(0), currentState);
+							--getLinkInfoSuper(eiEvents.causing);	
+	
 		CLOCKED: process(clk)
 		begin					
 			if rising_edge(clk) then

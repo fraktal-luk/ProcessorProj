@@ -41,6 +41,9 @@ function getExceptionTarget(ins: InstructionState) return InstructionBasicInfo;
 function getLinkInfoSuper(ins: InstructionState) return InstructionBasicInfo;
 ----------------
 
+function getLinkInfo(ins: InstructionState; state: Mword) return InstructionBasicInfo;
+
+
 function getLatePCData(commitEvent: std_logic; commitCausing: InstructionState;
 								linkExc, linkInt, stateExc, stateInt: Mword)
 return InstructionState;
@@ -141,6 +144,17 @@ begin
 		return getLinkInfoNormal(ins);
 	end if;
 end function;
+
+
+function getLinkInfo(ins: InstructionState; state: Mword) return InstructionBasicInfo is
+	variable res: InstructionBasicInfo := DEFAULT_BASIC_INFO;--ins.basicInfo;
+begin
+	res.ip := ins.target;
+	res.intLevel := state(7 downto 0);
+	res.systemLevel := state(15 downto 8);
+	return res;
+end function;
+
 
 
 function getLatePCData(commitEvent: std_logic; commitCausing: InstructionState;
@@ -329,6 +343,10 @@ function setInterrupt3(ins: InstructionState; intSignal, start: std_logic) retur
 begin
 	res.controlInfo.hasInterrupt := intSignal or start;
 	res.controlInfo.hasReset := start;
+	-- CAREFUL: needed because updating link info must have either interrupt or exception
+	if res.controlInfo.hasInterrupt = '1' then
+		res.controlInfo.hasException := '0';
+	end if;
 	return res;
 end function;
 
