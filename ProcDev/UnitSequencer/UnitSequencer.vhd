@@ -139,7 +139,7 @@ architecture Behavioral of UnitSequencer is
 	signal excInfoUpdate, intInfoUpdate: std_logic := '0';
 
 	signal execOrIntEventSignal: std_logic := '0';
-	signal execOrIntCausing, interruptCause: InstructionState := defaultInstructionState;
+	signal execOrIntCausing: InstructionState := defaultInstructionState;
 
 	signal stageDataRenameIn: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
 	signal stageDataOutRename: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
@@ -160,33 +160,29 @@ architecture Behavioral of UnitSequencer is
 														StageDataMulti := DEFAULT_STAGE_DATA_MULTI;	
 	signal insToLastEffective: InstructionState := DEFAULT_INSTRUCTION_STATE;	
 
-	signal eiEvents, eiEvents2: StageMultiEventInfo;
+	signal eiEvents2: StageMultiEventInfo;
 							
-	signal TMP_targetIns, TMP_targetIns2: InstructionState := DEFAULT_INSTRUCTION_STATE;		
-	signal TMP_phase0, TMP_phase2: std_logic := '0';
+	signal TMP_targetIns2: InstructionState := DEFAULT_INSTRUCTION_STATE;		
 			
 	signal gE_eventOccurred, gE_killPC, ch0, ch1: std_logic := '0';
 
-				signal newEvt, evtPhase0, evtPhase1, evtPhase2, evtWaiting: std_logic := '0';
+	signal newEvt, evtPhase0, evtPhase1, evtPhase2, evtWaiting: std_logic := '0';
 
 	constant HAS_RESET_SEQ: std_logic := '0';
 	constant HAS_EN_SEQ: std_logic := '0';
 begin	 
 	resetSig <= reset and HAS_RESET_SEQ;
 	enSig <= en or not HAS_EN_SEQ;
-		
-	TMP_phase0 <= evtPhase0; --eiEvents.causing.controlInfo.phase0;
-	TMP_phase2 <= evtPhase2;--eiEvents.causing.controlInfo.phase2;
 
 	EVENTS: block
 	begin	
-			gE_killPC <= TMP_phase0;
-			gE_eventOccurred <= TMP_phase0 or execEventSignal or frontEventSignal;
+			gE_killPC <= evtPhase0;
+			gE_eventOccurred <= evtPhase0 or execEventSignal or frontEventSignal;
 
-			lateEventOut <= TMP_phase0;
-			lateEventSetPC <= TMP_phase2;
-		execOrIntEventSignal <= TMP_phase0 or execEventSignal;
-		execOrIntCausing <= eiEvents2.causing when TMP_phase0 = '1' else execCausing;
+			lateEventOut <= evtPhase0;
+			lateEventSetPC <= evtPhase2;
+		execOrIntEventSignal <= evtPhase0 or execEventSignal;
+		execOrIntCausing <= eiEvents2.causing when evtPhase0 = '1' else execCausing;
 		lateCausing <= eiEvents2.causing;
 
 		execOrIntEventSignalOut <= execOrIntEventSignal;	-- $MODULE_OUT
@@ -195,13 +191,13 @@ begin
 
 	pcNext <= getNextPC(stageDataOutPC.basicInfo.ip, (others => '0'), '0');
 
-	stageDataToPC <= newPCData(TMP_phase2, eiEvents2.causing,
+	stageDataToPC <= newPCData(evtPhase2, eiEvents2.causing,
 										execEventSignal, execCausing,
 										frontEventSignal, frontCausing,
 										pcNext);
 			
 	sendingToPC <= 
-			sendingOutPC or (gE_eventOccurred and not gE_killPC) or (TMP_phase2 and not isHalt(eiEvents2.causing));
+			sendingOutPC or (gE_eventOccurred and not gE_killPC) or (evtPhase2 and not isHalt(eiEvents2.causing));
 										-- CAREFUL: Because of the above, PC is not updated in phase2 of halt instruction,
 										--				so the PC of a halted logical processor is not defined.
 
@@ -221,7 +217,7 @@ begin
 			stageDataOut => tmpPcOut,
 			
 			execEventSignal => gE_eventOccurred,
-			lateEventSignal => TMP_phase0,
+			lateEventSignal => evtPhase0,
 			execCausing => DEFAULT_INSTRUCTION_STATE,
 			lockCommand => '0'		
 		);			
@@ -229,11 +225,8 @@ begin
 		stageDataOutPC.basicInfo.ip <= tmpPcOut.data(0).basicInfo.ip;
 		stageDataOutPC.target <= pcNext; -- CAREFUL: Attaching next address from line predictor. Correct?
 
-	-- TODO: signals for updating sys regs can be moved to sys reg block
-	excInfoUpdate <= evtPhase1 --eiEvents.causing.controlInfo.phase1 
-							and eiEvents2.causing.controlInfo.hasException;
-	intInfoUpdate <= evtPhase1 --eiEvents.causing.controlInfo.phase1
-							and eiEvents2.causing.controlInfo.hasInterrupt;
+	excInfoUpdate <= evtPhase1 and eiEvents2.causing.controlInfo.hasException;
+	intInfoUpdate <= evtPhase1 and eiEvents2.causing.controlInfo.hasInterrupt;
 	
 	----------------------------------------------------------------------
 	
@@ -247,9 +240,7 @@ begin
 		alias savedStateInt is sysRegArray(5);
 	begin
 		excLinkInfo <= getLinkInfo(dataFromLastEffective2.data(0), currentState);
-							--getLinkInfoNormal(eiEvents.causing);
 		intLinkInfo <= getLinkInfo(dataFromLastEffective2.data(0), currentState);
-							--getLinkInfoSuper(eiEvents.causing);	
 	
 		CLOCKED: process(clk)
 		begin					
@@ -292,10 +283,6 @@ begin
 				end loop;				
 			end if;	
 		end process;
-				
-		TMP_targetIns <= getLatePCData('1', eiEvents2.causing,
-													linkRegExc, linkRegInt,
-													savedStateExc, savedStateInt); -- Here, because needs sys regs
 
 		TMP_targetIns2 <= getLatePCData('1', -- CAREFUL: if interrupt, it must be confirmed at phase1 
 														--  			cause target address is generated at phase1.
@@ -332,7 +319,7 @@ begin
 			
 			-- Event interface
 			execEventSignal => execOrIntEventSignal,
-			lateEventSignal => TMP_phase0,		
+			lateEventSignal => evtPhase0,		
 			execCausing => execOrIntCausing,
 			lockCommand => renameLockState		
 		);
@@ -414,43 +401,11 @@ begin
 		--			When committing normal op -> increment by length of the op 
 		--			
 		--			The 'target' field will be used to update return address for exc/int
-		stageDataToCommit <= recreateGroup(robDataLiving, dataFromBQV, dataFromLastEffective.data(0).target);
+		stageDataToCommit <= recreateGroup(robDataLiving, dataFromBQV, dataFromLastEffective2.data(0).target);
 		insToLastEffective <= getLastEffective(stageDataToCommit);	
 		dataToLastEffective <= makeSDM((0 => (sendingToCommit, insToLastEffective)));
 
-		interruptCause <= makeInterruptCause(TMP_targetIns2, intSignal, start);
-
-			LAST_EFFECTIVE_SLOT: entity work.GenericStageMulti(LastEffective)
-			port map(
-				clk => clk, reset => resetSig, en => enSig,
-				
-				-- Interface with CQ
-				prevSending => sendingToCommit,
-				stageDataIn => dataToLastEffective,-- TMPpre_lastEffective,
-				acceptingOut => open, -- unused but don't remove
-				
-				-- Interface with hypothetical further stage
-				nextAccepting => '1',
-				sendingOut => open,
-				stageDataOut => dataFromLastEffective,--TMP_lastEffective,
-				
-				-- Event interface
-				execEventSignal => '0', -- CAREFUL: committed cannot be killed!
-				lateEventSignal => '0',	
-				execCausing => interruptCause,		
-
-				lockCommand => not sbEmpty,
-
-				stageEventsOut => open--
-										--eiEvents
-			);
-					eiEvents <= eiEvents2;
-
-				eiEvents2.causing <= setInterrupt3(dataFromLastEffective2.data(0), intSignal, start);
-
-
-				ch1 <= '1' when 
-							eiEvents.causing = eiEvents2.causing else '0';
+			eiEvents2.causing <= setInterrupt3(dataFromLastEffective2.data(0), intSignal, start);
 
 			dataToLastEffective2 <= dataToLastEffective when (evtPhase1) = '0' else NEW_eiCausing;
 
@@ -510,9 +465,7 @@ begin
 						end if;
 					end if;
 				end process;
-			end block;
-			
-			
+			end block;	
 			
 	renameAccepting <= acceptingOutRename;
 	renamedDataLiving <= stageDataOutRename;

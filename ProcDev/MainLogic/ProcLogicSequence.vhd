@@ -32,14 +32,14 @@ package ProcLogicSequence is
 		return InsTag;
 		
 		constant ALL_FULL: std_logic_vector(0 to PIPE_WIDTH-1) := (others => '1');
-
--- Jump target, increment if not jump 
-function getLinkInfoNormal(ins: InstructionState) return InstructionBasicInfo;
--- Handler address and system state
-function getExceptionTarget(ins: InstructionState) return InstructionBasicInfo;
--- Target, which may be exception handler call
-function getLinkInfoSuper(ins: InstructionState) return InstructionBasicInfo;
-----------------
+--
+---- Jump target, increment if not jump 
+--function getLinkInfoNormal(ins: InstructionState) return InstructionBasicInfo;
+---- Handler address and system state
+--function getExceptionTarget(ins: InstructionState) return InstructionBasicInfo;
+---- Target, which may be exception handler call
+--function getLinkInfoSuper(ins: InstructionState) return InstructionBasicInfo;
+------------------
 
 function getLinkInfo(ins: InstructionState; state: Mword) return InstructionBasicInfo;
 
@@ -58,19 +58,19 @@ return InstructionState;
 -- Unifies content of ROB slot with BQ, others queues etc. to restore full state needed at Commit
 function recreateGroup(insVec: StageDataMulti; bqGroup: StageDataMulti; prevTarget: Mword)
 return StageDataMulti;
-
-function setException2(ins, causing: InstructionState;
-							  intSignal, resetSignal, isNew, phase0, phase1, phase2: std_logic)
-return InstructionState;
-
-function setPhase(ins: InstructionState; phase0, phase1, phase2: std_logic)
-return InstructionState;
-
-function setLateTargetAndLink(ins: InstructionState; target: Mword; link: Mword; phase1: std_logic)
-return InstructionState;
-
-function makeInterruptCause(targetIns: InstructionState; intSignal, start: std_logic)
-return InstructionState;
+--
+--function setException2(ins, causing: InstructionState;
+--							  intSignal, resetSignal, isNew, phase0, phase1, phase2: std_logic)
+--return InstructionState;
+--
+--function setPhase(ins: InstructionState; phase0, phase1, phase2: std_logic)
+--return InstructionState;
+--
+--function setLateTargetAndLink(ins: InstructionState; target: Mword; link: Mword; phase1: std_logic)
+--return InstructionState;
+--
+--function makeInterruptCause(targetIns: InstructionState; intSignal, start: std_logic)
+--return InstructionState;
 
 function isHalt(ins: InstructionState) return std_logic;
 
@@ -110,42 +110,42 @@ package body ProcLogicSequence is
 				return ctr;
 			end if;
 		end function;
-
-function getLinkInfoNormal(ins: InstructionState) return InstructionBasicInfo is
-	variable res: InstructionBasicInfo := ins.basicInfo;
-begin
-	res.ip := ins.result;
-	return res;
-end function;
-
-
-function getExceptionTarget(ins: InstructionState) return InstructionBasicInfo is
-	variable res: InstructionBasicInfo := ins.basicInfo;
-begin
-	-- get handler adr and system level 
-	res.ip := --getHandlerAddress(ins);
-			-- TODO, FIX: exceptionCode sliced - shift left by ALIGN_BITS? or leave just base address
-		EXC_BASE(MWORD_SIZE-1 downto ins.controlInfo.exceptionCode'length)
-	& ins.controlInfo.exceptionCode(ins.controlInfo.exceptionCode'length-1 downto ALIGN_BITS)
-	& EXC_BASE(ALIGN_BITS-1 downto 0);		
-	
-	res.systemLevel := "00000001";	
-	return res;
-end function;
-
-
-function getLinkInfoSuper(ins: InstructionState) return InstructionBasicInfo is
-	variable res: InstructionBasicInfo := ins.basicInfo;
-begin
-	if ins.controlInfo.hasException = '1' then 
-		return getExceptionTarget(ins);
-	-- > NOTE, TODO: Interupt chaining can be implemented in a simple way: when another interrupt appears, 
-	--		jump to handler directly from currently running handler, but don't set ILR.
-	--		ILR will remain from the first interrupt in chain, just like in tail function call
-	else
-		return getLinkInfoNormal(ins);
-	end if;
-end function;
+--
+--function getLinkInfoNormal(ins: InstructionState) return InstructionBasicInfo is
+--	variable res: InstructionBasicInfo := ins.basicInfo;
+--begin
+--	res.ip := ins.result;
+--	return res;
+--end function;
+--
+--
+--function getExceptionTarget(ins: InstructionState) return InstructionBasicInfo is
+--	variable res: InstructionBasicInfo := ins.basicInfo;
+--begin
+--	-- get handler adr and system level 
+--	res.ip := --getHandlerAddress(ins);
+--			-- TODO, FIX: exceptionCode sliced - shift left by ALIGN_BITS? or leave just base address
+--		EXC_BASE(MWORD_SIZE-1 downto ins.controlInfo.exceptionCode'length)
+--	& ins.controlInfo.exceptionCode(ins.controlInfo.exceptionCode'length-1 downto ALIGN_BITS)
+--	& EXC_BASE(ALIGN_BITS-1 downto 0);		
+--	
+--	res.systemLevel := "00000001";	
+--	return res;
+--end function;
+--
+--
+--function getLinkInfoSuper(ins: InstructionState) return InstructionBasicInfo is
+--	variable res: InstructionBasicInfo := ins.basicInfo;
+--begin
+--	if ins.controlInfo.hasException = '1' then 
+--		return getExceptionTarget(ins);
+--	-- > NOTE, TODO: Interupt chaining can be implemented in a simple way: when another interrupt appears, 
+--	--		jump to handler directly from currently running handler, but don't set ILR.
+--	--		ILR will remain from the first interrupt in chain, just like in tail function call
+--	else
+--		return getLinkInfoNormal(ins);
+--	end if;
+--end function;
 
 
 function getLinkInfo(ins: InstructionState; state: Mword) return InstructionBasicInfo is
@@ -263,73 +263,73 @@ begin
 	
 	return res;
 end function;
+--
+--function setPhase(ins: InstructionState;
+--							 phase0, phase1, phase2: std_logic)
+--return InstructionState is
+--	variable res: InstructionState := ins;
+--begin	
+--	--res.controlInfo.phase0 := phase0;
+--	--res.controlInfo.phase1 := phase1;
+--	--res.controlInfo.phase2 := phase2;
+--	return res;
+--end function;
 
-function setPhase(ins: InstructionState;
-							 phase0, phase1, phase2: std_logic)
-return InstructionState is
-	variable res: InstructionState := ins;
-begin	
-	--res.controlInfo.phase0 := phase0;
-	--res.controlInfo.phase1 := phase1;
-	--res.controlInfo.phase2 := phase2;
-	return res;
-end function;
-
-
-function setException2(ins, causing: InstructionState;
-							  intSignal, resetSignal, isNew, phase0, phase1, phase2: std_logic)
-return InstructionState is
-	variable res: InstructionState := ins;
-begin
-	res.controlInfo.newEvent := ((res.controlInfo.hasException 
-											or res.controlInfo.specialAction
-											)
-											and isNew) 
-									or intSignal or resetSignal;
-
-	res.controlInfo.hasInterrupt := res.controlInfo.hasInterrupt or intSignal;
-	-- ^ Interrupts delayed by 1 cycle if exception being committed!
-	
-	res.controlInfo.hasReset := resetSignal;
-		
-	if phase1 = '1' then
-		res.result := res.target;
-	end if;
-	
-	if phase2 = '1' then
-		res.controlInfo.newEvent := '0';	
-			res.controlInfo.hasException := '0';
-			res.controlInfo.hasInterrupt := '0';
-			res.controlInfo.hasReset := '0';
-			--res.controlInfo.hasEvent := '0';	
-			res.controlInfo.specialAction := '0';			
-	end if;
-	
-	return res;
-end function;
-
-function setLateTargetAndLink(ins: InstructionState; target: Mword; link: Mword; phase1: std_logic)
-return InstructionState is
-	variable res: InstructionState := ins;
-begin
-
-	if phase1 = '1' then
-		res.result := link;
-		res.target := target;
-	end if;	
-	
-	return res;
-end function;
-
-function makeInterruptCause(targetIns: InstructionState; intSignal, start: std_logic)
-return InstructionState is
-	variable res: InstructionState := DEFAULT_INSTRUCTION_STATE;
-begin
-	res.controlInfo.hasInterrupt := intSignal or start;
-	res.controlInfo.hasReset := start;
-	res.target := targetIns.basicInfo.ip;	
-	return res;
-end function;
+--
+--function setException2(ins, causing: InstructionState;
+--							  intSignal, resetSignal, isNew, phase0, phase1, phase2: std_logic)
+--return InstructionState is
+--	variable res: InstructionState := ins;
+--begin
+--	res.controlInfo.newEvent := ((res.controlInfo.hasException 
+--											or res.controlInfo.specialAction
+--											)
+--											and isNew) 
+--									or intSignal or resetSignal;
+--
+--	res.controlInfo.hasInterrupt := res.controlInfo.hasInterrupt or intSignal;
+--	-- ^ Interrupts delayed by 1 cycle if exception being committed!
+--	
+--	res.controlInfo.hasReset := resetSignal;
+--		
+--	if phase1 = '1' then
+--		res.result := res.target;
+--	end if;
+--	
+--	if phase2 = '1' then
+--		res.controlInfo.newEvent := '0';	
+--			res.controlInfo.hasException := '0';
+--			res.controlInfo.hasInterrupt := '0';
+--			res.controlInfo.hasReset := '0';
+--			--res.controlInfo.hasEvent := '0';	
+--			res.controlInfo.specialAction := '0';			
+--	end if;
+--	
+--	return res;
+--end function;
+--
+--function setLateTargetAndLink(ins: InstructionState; target: Mword; link: Mword; phase1: std_logic)
+--return InstructionState is
+--	variable res: InstructionState := ins;
+--begin
+--
+--	if phase1 = '1' then
+--		res.result := link;
+--		res.target := target;
+--	end if;	
+--	
+--	return res;
+--end function;
+--
+--function makeInterruptCause(targetIns: InstructionState; intSignal, start: std_logic)
+--return InstructionState is
+--	variable res: InstructionState := DEFAULT_INSTRUCTION_STATE;
+--begin
+--	res.controlInfo.hasInterrupt := intSignal or start;
+--	res.controlInfo.hasReset := start;
+--	res.target := targetIns.basicInfo.ip;	
+--	return res;
+--end function;
 
 	function isHalt(ins: InstructionState) return std_logic is
 	begin
