@@ -71,6 +71,8 @@ return InstructionState;
 
 function isHalt(ins: InstructionState) return std_logic;
 
+function setInterrupt3(targetIns: InstructionState; intSignal, start: std_logic) return InstructionState;
+
 end ProcLogicSequence;
 
 
@@ -321,5 +323,13 @@ end function;
 			return '0';
 		end if;
 	end function;
+
+function setInterrupt3(ins: InstructionState; intSignal, start: std_logic) return InstructionState is
+	variable res: InstructionState := ins;
+begin
+	res.controlInfo.hasInterrupt := intSignal or start;
+	res.controlInfo.hasReset := start;
+	return res;
+end function;
 
 end ProcLogicSequence;

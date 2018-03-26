@@ -141,8 +141,7 @@ architecture Behavioral of UnitSequencer is
 	signal execOrIntEventSignal: std_logic := '0';
 	signal execOrIntCausing, interruptCause: InstructionState := defaultInstructionState;
 
-	signal stageDataRenameIn: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;		
-
+	signal stageDataRenameIn: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
 	signal stageDataOutRename: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
 	signal sendingOutRename, acceptingOutRename: std_logic:= '0';
 
@@ -150,24 +149,26 @@ architecture Behavioral of UnitSequencer is
 	signal stageDataToCommit, stageDataOutCommit: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;						
 
 	signal renameCtr, renameCtrNext, commitCtr, commitCtrNext: InsTag := (others => '1');
-	signal renameGroupCtr, renameGroupCtrNext, commitGroupCtr, commitGroupCtrNext: InsTag :=
-																						INITIAL_GROUP_TAG;
+	signal renameGroupCtr, renameGroupCtrNext, commitGroupCtr, commitGroupCtrNext: InsTag := INITIAL_GROUP_TAG;
 	signal commitGroupCtrInc: InsTag := (others => '0');
 	
 	signal effectiveMask: std_logic_vector(0 to PIPE_WIDTH-1) := (others => '0');
 	
 	signal renameLockCommand, renameLockRelease, renameLockState, renameLockEnd: std_logic := '0';	
 				
-	signal dataToLastEffective, dataFromLastEffective: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;	
+	signal dataToLastEffective, dataToLastEffective2, dataFromLastEffective, dataFromLastEffective2, NEW_eiCausing:
+														StageDataMulti := DEFAULT_STAGE_DATA_MULTI;	
 	signal insToLastEffective: InstructionState := DEFAULT_INSTRUCTION_STATE;	
 
-	signal eiEvents: StageMultiEventInfo;
+	signal eiEvents, eiEvents2: StageMultiEventInfo;
 							
-	signal TMP_targetIns: InstructionState := DEFAULT_INSTRUCTION_STATE;		
+	signal TMP_targetIns, TMP_targetIns2: InstructionState := DEFAULT_INSTRUCTION_STATE;		
 	signal TMP_phase0, TMP_phase2: std_logic := '0';
 			
 	signal gE_eventOccurred, gE_killPC, ch0, ch1: std_logic := '0';
-	
+
+				signal newEvt, evtPhase0, evtPhase1, evtPhase2, evtWaiting: std_logic := '0';
+
 	constant HAS_RESET_SEQ: std_logic := '0';
 	constant HAS_EN_SEQ: std_logic := '0';
 begin	 
@@ -198,13 +199,9 @@ begin
 										execEventSignal, execCausing,
 										frontEventSignal, frontCausing,
 										pcNext);
-
-	-- CAREFUL: prevSending normally means that 'full' bit inside will be set, but
-	--				when en = '0' this won't happen.
-	--				To be fully correct, prevSending should not be '1' when receiving prevented.			
-	sendingToPC <= acceptingOutPC and 
-					  (sendingOutPC or (gE_eventOccurred and not gE_killPC)
-										or (TMP_phase2 and not isHalt(eiEvents.causing)));
+			
+	sendingToPC <= 
+			sendingOutPC or (gE_eventOccurred and not gE_killPC) or (TMP_phase2 and not isHalt(eiEvents.causing));
 										-- CAREFUL: Because of the above, PC is not updated in phase2 of halt instruction,
 										--				so the PC of a halted logical processor is not defined.
 
@@ -216,6 +213,7 @@ begin
 			prevSending => sendingToPC,
 
 			nextAccepting => '1', -- CAREFUL: front should always accet - if can't, there will be refetch not stall
+										 --	  		 In multithreaded implementation it should be '1' for selected thread 
 			stageDataIn => tmpPcIn,
 			
 			acceptingOut => acceptingOutPC,
@@ -293,6 +291,15 @@ begin
 		TMP_targetIns <= getLatePCData('1', eiEvents.causing,
 													linkRegExc, linkRegInt,
 													savedStateExc, savedStateInt); -- Here, because needs sys regs
+
+		TMP_targetIns2 <= getLatePCData('1', 
+													setInterrupt3(dataFromLastEffective2.data(0), intSignal, start),
+													linkRegExc, linkRegInt,
+													savedStateExc, savedStateInt);
+
+			NEW_eiCausing.fullMask(0) <= '1';
+			NEW_eiCausing.data(0) <= setInstructionTarget(dataFromLastEffective2.data(0), 
+																		 TMP_targetIns2.basicInfo.ip);
 	end block;
 
 	pcDataLiving <= stageDataOutPC;
@@ -429,6 +436,69 @@ begin
 
 				stageEventsOut => eiEvents
 			);
+
+
+			dataToLastEffective2 <= dataToLastEffective when (evtPhase1) = '0' else NEW_eiCausing;
+
+			LAST_EFFECTIVE_SLOT_2: entity work.GenericStageMulti(Behavioral)
+			port map(
+				clk => clk, reset => resetSig, en => enSig,
+				
+				-- Interface with CQ
+				prevSending => sendingToCommit or evtPhase1,
+				stageDataIn => dataToLastEffective2,-- TMPpre_lastEffective,
+				acceptingOut => open, -- unused but don't remove
+				
+				-- Interface with hypothetical further stage
+				nextAccepting => '1',
+				sendingOut => open,
+				stageDataOut => dataFromLastEffective2,--TMP_lastEffective,
+				
+				-- Event interface
+				execEventSignal => '0', -- CAREFUL: committed cannot be killed!
+				lateEventSignal => '0',	
+				execCausing => DEFAULT_INSTRUCTION_STATE,--interruptCause,		
+
+				lockCommand => '0',
+
+				stageEventsOut => eiEvents2
+			);
+
+			EV_PHASES: block
+			begin
+				evtPhase0 <= newEvt or (intSignal or start);
+				evtPhase1 <= (evtPhase0 and sbEmpty)
+							or  (evtWaiting and sbEmpty);
+
+				process (clk)
+				begin
+					if rising_edge(clk) then
+						if (sendingToCommit and (intSignal or start)) = '1' then
+							report "Not allowed to interupt while committing!" severity error;
+						end if;
+					
+						newEvt <=
+									(sendingToCommit and
+								  (		dataToLastEffective2.data(0).controlInfo.hasException
+									or dataToLastEffective2.data(0).controlInfo.specialAction));
+						if newEvt = '1' then
+							newEvt <= '0';
+						end if;
+					
+						if evtPhase0 = '1' and evtPhase1 = '0' then
+							evtWaiting <= '1';
+						elsif evtPhase1 = '1' then
+							evtWaiting <= '0';
+							--evtPhase1 <= '0';
+							evtPhase2 <= '1';
+						elsif evtPhase2 = '1' then
+							evtPhase2 <= '0';
+						end if;
+					end if;
+				end process;
+			end block;
+			
+			
 			
 	renameAccepting <= acceptingOutRename;
 	renamedDataLiving <= stageDataOutRename;
@@ -439,9 +509,9 @@ begin
 
 	commitGroupCtrIncOut <= commitGroupCtrInc;
 
-		renameLockEndOut <= renameLockEnd;
-		commitAccepting <= '1';
-		committedSending <= sendingOutCommit;
-		committedDataOut <= stageDataOutCommit;
+	renameLockEndOut <= renameLockEnd;
+	commitAccepting <= '1';
+	committedSending <= sendingOutCommit;
+	committedDataOut <= stageDataOutCommit;
 end Behavioral;
 
