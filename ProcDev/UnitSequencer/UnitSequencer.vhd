@@ -175,8 +175,8 @@ begin
 	resetSig <= reset and HAS_RESET_SEQ;
 	enSig <= en or not HAS_EN_SEQ;
 		
-	TMP_phase0 <= eiEvents.causing.controlInfo.phase0;
-	TMP_phase2 <= eiEvents.causing.controlInfo.phase2;
+	TMP_phase0 <= evtPhase0; --eiEvents.causing.controlInfo.phase0;
+	TMP_phase2 <= evtPhase2;--eiEvents.causing.controlInfo.phase2;
 
 	EVENTS: block
 	begin	
@@ -186,8 +186,8 @@ begin
 			lateEventOut <= TMP_phase0;
 			lateEventSetPC <= TMP_phase2;
 		execOrIntEventSignal <= TMP_phase0 or execEventSignal;
-		execOrIntCausing <= eiEvents.causing when TMP_phase0 = '1' else execCausing;
-		lateCausing <= eiEvents.causing;
+		execOrIntCausing <= eiEvents2.causing when TMP_phase0 = '1' else execCausing;
+		lateCausing <= eiEvents2.causing;
 
 		execOrIntEventSignalOut <= execOrIntEventSignal;	-- $MODULE_OUT
 		execOrIntCausingOut <= execOrIntCausing; -- $MODULE_OUT
@@ -195,13 +195,13 @@ begin
 
 	pcNext <= getNextPC(stageDataOutPC.basicInfo.ip, (others => '0'), '0');
 
-	stageDataToPC <= newPCData(TMP_phase2, eiEvents.causing,
+	stageDataToPC <= newPCData(TMP_phase2, eiEvents2.causing,
 										execEventSignal, execCausing,
 										frontEventSignal, frontCausing,
 										pcNext);
 			
 	sendingToPC <= 
-			sendingOutPC or (gE_eventOccurred and not gE_killPC) or (TMP_phase2 and not isHalt(eiEvents.causing));
+			sendingOutPC or (gE_eventOccurred and not gE_killPC) or (TMP_phase2 and not isHalt(eiEvents2.causing));
 										-- CAREFUL: Because of the above, PC is not updated in phase2 of halt instruction,
 										--				so the PC of a halted logical processor is not defined.
 
@@ -230,8 +230,10 @@ begin
 		stageDataOutPC.target <= pcNext; -- CAREFUL: Attaching next address from line predictor. Correct?
 
 	-- TODO: signals for updating sys regs can be moved to sys reg block
-	excInfoUpdate <= eiEvents.causing.controlInfo.phase1 and eiEvents.causing.controlInfo.hasException;
-	intInfoUpdate <= eiEvents.causing.controlInfo.phase1 and eiEvents.causing.controlInfo.hasInterrupt;
+	excInfoUpdate <= evtPhase1 --eiEvents.causing.controlInfo.phase1 
+							and eiEvents2.causing.controlInfo.hasException;
+	intInfoUpdate <= evtPhase1 --eiEvents.causing.controlInfo.phase1
+							and eiEvents2.causing.controlInfo.hasInterrupt;
 	
 	----------------------------------------------------------------------
 	
@@ -261,8 +263,8 @@ begin
 				end if;
 
 				-- Writing specialized fields on events
-				if eiEvents.causing.controlInfo.phase1 = '1' then
-					currentState <= X"0000" & TMP_targetIns.basicInfo.systemLevel & TMP_targetIns.basicInfo.intLevel;
+				if evtPhase1 = '1' then --eiEvents.causing.controlInfo.phase1 = '1' then
+					currentState <= X"0000" & TMP_targetIns2.basicInfo.systemLevel & TMP_targetIns2.basicInfo.intLevel;
 					currentState(15 downto 10) <= (others => '0');
 					currentState(7 downto 2) <= (others => '0');
 				end if;
@@ -291,18 +293,20 @@ begin
 			end if;	
 		end process;
 				
-		TMP_targetIns <= getLatePCData('1', eiEvents.causing,
+		TMP_targetIns <= getLatePCData('1', eiEvents2.causing,
 													linkRegExc, linkRegInt,
 													savedStateExc, savedStateInt); -- Here, because needs sys regs
 
-		TMP_targetIns2 <= getLatePCData('1', 
+		TMP_targetIns2 <= getLatePCData('1', -- CAREFUL: if interrupt, it must be confirmed at phase1 
+														--  			cause target address is generated at phase1.
 													setInterrupt3(dataFromLastEffective2.data(0), intSignal, start),
 													linkRegExc, linkRegInt,
 													savedStateExc, savedStateInt);
 
 			NEW_eiCausing.fullMask(0) <= '1';
-			NEW_eiCausing.data(0) <= setInstructionTarget(dataFromLastEffective2.data(0), 
-																		 TMP_targetIns2.basicInfo.ip);
+			NEW_eiCausing.data(0) <= clearControlEvents(
+												setInstructionTarget(dataFromLastEffective2.data(0), 
+																		 TMP_targetIns2.basicInfo.ip));
 	end block;
 
 	pcDataLiving <= stageDataOutPC;
@@ -414,7 +418,7 @@ begin
 		insToLastEffective <= getLastEffective(stageDataToCommit);	
 		dataToLastEffective <= makeSDM((0 => (sendingToCommit, insToLastEffective)));
 
-		interruptCause <= makeInterruptCause(TMP_targetIns, intSignal, start);
+		interruptCause <= makeInterruptCause(TMP_targetIns2, intSignal, start);
 
 			LAST_EFFECTIVE_SLOT: entity work.GenericStageMulti(LastEffective)
 			port map(
@@ -437,9 +441,16 @@ begin
 
 				lockCommand => not sbEmpty,
 
-				stageEventsOut => eiEvents
+				stageEventsOut => open--
+										--eiEvents
 			);
+					eiEvents <= eiEvents2;
 
+				eiEvents2.causing <= setInterrupt3(dataFromLastEffective2.data(0), intSignal, start);
+
+
+				ch1 <= '1' when 
+							eiEvents.causing = eiEvents2.causing else '0';
 
 			dataToLastEffective2 <= dataToLastEffective when (evtPhase1) = '0' else NEW_eiCausing;
 
@@ -464,7 +475,7 @@ begin
 
 				lockCommand => '0',
 
-				stageEventsOut => eiEvents2
+				stageEventsOut => open--eiEvents2
 			);
 
 			EV_PHASES: block

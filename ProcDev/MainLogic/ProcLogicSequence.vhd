@@ -76,6 +76,8 @@ function isHalt(ins: InstructionState) return std_logic;
 
 function setInterrupt3(targetIns: InstructionState; intSignal, start: std_logic) return InstructionState;
 
+function clearControlEvents(ins: InstructionState) return InstructionState;
+
 end ProcLogicSequence;
 
 
@@ -267,9 +269,9 @@ function setPhase(ins: InstructionState;
 return InstructionState is
 	variable res: InstructionState := ins;
 begin	
-	res.controlInfo.phase0 := phase0;
-	res.controlInfo.phase1 := phase1;
-	res.controlInfo.phase2 := phase2;
+	--res.controlInfo.phase0 := phase0;
+	--res.controlInfo.phase1 := phase1;
+	--res.controlInfo.phase2 := phase2;
 	return res;
 end function;
 
@@ -347,6 +349,16 @@ begin
 	if res.controlInfo.hasInterrupt = '1' then
 		res.controlInfo.hasException := '0';
 	end if;
+	return res;
+end function;
+
+function clearControlEvents(ins: InstructionState) return InstructionState is
+	variable res: InstructionState := ins;
+begin
+	res.controlInfo.newEvent := '0';
+	res.controlInfo.hasInterrupt := '0';
+	res.controlInfo.hasException := '0';	
+	res.controlInfo.specialAction := '0';
 	return res;
 end function;
 
