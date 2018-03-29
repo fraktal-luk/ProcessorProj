@@ -317,7 +317,7 @@ begin
 					en => enSig,
 					
 					rewind => execOrIntEventSignal,
-					causingInstruction => execOrIntCausing,
+					--causingInstruction => execOrIntCausing,
 					causingPointer => execOrIntCausing.tags.intPointer,
 					
 					sendingToReserve => frontLastSending, 
