@@ -166,7 +166,8 @@ architecture Behavioral of UnitSequencer is
 			
 	signal gE_eventOccurred, gE_killPC, ch0, ch1: std_logic := '0';
 
-	signal newEvt, evtPhase0, evtPhase1, evtPhase2, evtWaiting: std_logic := '0';
+	signal committingEvt, newEvt, evtPhase0, evtPhase1, evtPhase2, evtWaiting: std_logic := '0';
+	signal intPhase0, intPhase1, intPhase2, intWaiting: std_logic := '0';
 
 	constant HAS_RESET_SEQ: std_logic := '0';
 	constant HAS_EN_SEQ: std_logic := '0';
@@ -284,6 +285,8 @@ begin
 			end if;	
 		end process;
 
+		
+		-- CAREFUL: this counts at phase1 --------------------------------------------------
 		TMP_targetIns2 <= getLatePCData('1', -- CAREFUL: if interrupt, it must be confirmed at phase1 
 														--  			cause target address is generated at phase1.
 													setInterrupt3(dataFromLastEffective2.data(0), intSignal, start),
@@ -294,6 +297,7 @@ begin
 			NEW_eiCausing.data(0) <= clearControlEvents(
 												setInstructionTarget(dataFromLastEffective2.data(0), 
 																		 TMP_targetIns2.basicInfo.ip));
+		-------------------------------------------------------------------------------------
 	end block;
 
 	pcDataLiving <= stageDataOutPC;
@@ -439,17 +443,22 @@ begin
 				evtPhase1 <= (evtPhase0 and sbEmpty)
 							or  (evtWaiting and sbEmpty);
 
+				committingEvt <= sendingToCommit and dataToLastEffective2.data(0).controlInfo.newEvent;
+				-- CAREFUL: when committingEvt, it is forbidden to indicate interrupt in next cycle! 
+
+				intPhase0 <= intSignal or start;
+				intPhase1 <= (intPhase0 and sbEmpty)
+							or	 (intWaiting and sbEmpty);
+
 				process (clk)
 				begin
 					if rising_edge(clk) then
-						if (sendingToCommit and (intSignal or start)) = '1' then
-							report "Not allowed to interupt while committing!" severity error;
+						if (newEvt and (intSignal or start)) = '1' then
+							report "Not allowed to interrupt while causing synchronous exception!" severity error;
 						end if;
-					
-						newEvt <=
-									(sendingToCommit and
-								  (		dataToLastEffective2.data(0).controlInfo.hasException
-									or dataToLastEffective2.data(0).controlInfo.specialAction));
+
+						newEvt <= committingEvt;
+
 						if newEvt = '1' then
 							newEvt <= '0';
 						end if;
@@ -458,10 +467,18 @@ begin
 							evtWaiting <= '1';
 						elsif evtPhase1 = '1' then
 							evtWaiting <= '0';
-							--evtPhase1 <= '0';
 							evtPhase2 <= '1';
 						elsif evtPhase2 = '1' then
 							evtPhase2 <= '0';
+						end if;
+						
+						if intPhase0 = '1' and intPhase1 = '0' then
+							intWaiting <= '1';
+						elsif intPhase1 = '1' then
+							intWaiting <= '0';
+							intPhase2 <= '1';
+						elsif intPhase2 = '1' then
+							intPhase2 <= '0';
 						end if;
 					end if;
 				end process;
