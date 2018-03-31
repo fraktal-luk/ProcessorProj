@@ -86,6 +86,7 @@ ARCHITECTURE behavior OF NewCoreTB4 IS
    signal iin : InsGroup := (others => (others => '0'));
    signal int0 : std_logic := '0';
    signal int1 : std_logic := '0';
+	signal int0a, int0b: std_logic := '0';
    signal iaux : std_logic_vector(31 downto 0) := (others => '0');
 
 			signal dread: std_logic;
@@ -151,9 +152,10 @@ BEGIN
 		wait for clk_period/2;
    end process;
  
-	--reset <= '1' after 65 ns, '0' after 75 ns; 
 	
 	en <= '1' after 105 ns;
+	
+	int0 <= int0a or int0b;
 	
    -- Stimulus process
    stim_proc: process
@@ -177,9 +179,9 @@ BEGIN
 							--	+ 20 ns;  -- 
 							--	+ 100 ns; -- after excpetion handler commits first instruction
 		wait until rising_edge(clk);
-		int0 <= '1';
+		int0a <= '1';
 		wait until rising_edge(clk);
-		int0 <= '0';
+		int0a <= '0';
 		wait;	
 		
 	end process;	
@@ -189,7 +191,16 @@ BEGIN
 	begin		
 		wait for 100 ns;
 		wait until rising_edge(clk);
+		int0b <= '1';
 		int1 <= '1';
+		wait until rising_edge(clk);
+		int0b <= '0';
+		wait until rising_edge(clk);
+		wait until rising_edge(clk);
+		wait until rising_edge(clk);
+		wait until rising_edge(clk);
+		wait until rising_edge(clk);
+		wait until rising_edge(clk);
 		wait until rising_edge(clk);
 		int1 <= '0';
 		wait;

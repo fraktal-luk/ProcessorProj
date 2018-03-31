@@ -289,7 +289,7 @@ begin
 		-- CAREFUL: this counts at phase1 --------------------------------------------------
 		TMP_targetIns2 <= getLatePCData('1', -- CAREFUL: if interrupt, it must be confirmed at phase1 
 														--  			cause target address is generated at phase1.
-													setInterrupt3(dataFromLastEffective2.data(0), intSignal, start),
+													setInterrupt3(dataFromLastEffective2.data(0), intPhase1, start),
 													linkRegExc, linkRegInt,
 													savedStateExc, savedStateInt);
 
@@ -409,7 +409,7 @@ begin
 		insToLastEffective <= getLastEffective(stageDataToCommit);	
 		dataToLastEffective <= makeSDM((0 => (sendingToCommit, insToLastEffective)));
 
-			eiEvents2.causing <= setInterrupt3(dataFromLastEffective2.data(0), intSignal, start);
+			eiEvents2.causing <= setInterrupt3(dataFromLastEffective2.data(0), intPhase1, start);
 
 			dataToLastEffective2 <= dataToLastEffective when (evtPhase1) = '0' else NEW_eiCausing;
 
@@ -439,21 +439,21 @@ begin
 
 			EV_PHASES: block
 			begin
-				evtPhase0 <= newEvt or (intSignal or start);
+				evtPhase0 <= newEvt or (intSignal);
 				evtPhase1 <= (evtPhase0 and sbEmpty)
 							or  (evtWaiting and sbEmpty);
 
 				committingEvt <= sendingToCommit and dataToLastEffective2.data(0).controlInfo.newEvent;
 				-- CAREFUL: when committingEvt, it is forbidden to indicate interrupt in next cycle! 
 
-				intPhase0 <= intSignal or start;
+				intPhase0 <= intSignal;
 				intPhase1 <= (intPhase0 and sbEmpty)
 							or	 (intWaiting and sbEmpty);
 
 				process (clk)
 				begin
 					if rising_edge(clk) then
-						if (newEvt and (intSignal or start)) = '1' then
+						if (newEvt and (intSignal)) = '1' then
 							report "Not allowed to interrupt while causing synchronous exception!" severity error;
 						end if;
 
