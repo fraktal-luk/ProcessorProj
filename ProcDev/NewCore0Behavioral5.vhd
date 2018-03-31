@@ -300,13 +300,7 @@ begin
 				LAST_COMMITTED_SYNCHRONOUS: process(clk) 	
 				begin
 					if rising_edge(clk) then
-						-- CAREFUL! When writing the same virtual reg multiple times, to get a vector to put on FreeList,
-						-- 			we either A) bypass phys dests to next instructions instead of reading stable map, 
-						--				or B) don't bypass but select to put the phys dests for all but the last writing op,
-						--				and that last one returns the stable map entry.
-						--				Option A means that below we substitute relevant phys names, and B means that
-						--				we don't, and handle overridden dests by seleciton bits in RegisterFreeList.
-						physStableDelayed <= work.ProcLogicRenaming.getStableDestsParallel(dataOutROB, physStable);					
+						physStableDelayed <= physStable;
 					end if;
 				end process;
 		

@@ -301,7 +301,7 @@ begin
 
 	-- Rename stage
 		stageDataRenameIn <= renameGroup(frontDataLastLiving, newPhysSourcesIn, newPhysDestsIn, renameCtr,
-															renameGroupCtrNext, newPhysDestPointerIn);
+															renameGroupCtrNext, newPhysDestPointerIn, '0'); -- TODO: dbtrap
 	
 		SUBUNIT_RENAME: entity work.GenericStageMulti(Renaming)
 		port map(

@@ -98,9 +98,6 @@ function removeFromQueue(content: InstructionSlotArray; index: integer) return I
 function chooseIns(content: InstructionStateArray; which: std_logic_vector)
 return InstructionState;
 
--- CAREFUL! This is not a general function, only a special type of compacting
-function compactData(data: InstructionStateArray; mask: std_logic_vector) return InstructionStateArray;
-function compactMask(data: InstructionStateArray; mask: std_logic_vector) return std_logic_vector;
 
 function findMatching(content: InstructionSlotArray; ins: InstructionState)
 return std_logic_vector;
@@ -792,6 +789,7 @@ end function;
 			-- If this one has an event, following ones don't count
 			if 	newContent.data(i).controlInfo.hasException = '1'
 				or newContent.data(i).controlInfo.specialAction = '1'	-- CAREFUL! This also breaks flow!
+				or newContent.data(i).controlInfo.dbtrap = '1'
 			then 
 				res.controlInfo.newEvent := '1'; -- Announce that event is to happen now!
 				exit;
@@ -816,6 +814,7 @@ end function;
 			-- If this one has an event, following ones don't count
 			if 	newContent.data(i).controlInfo.hasException = '1'
 				or newContent.data(i).controlInfo.specialAction = '1'
+				or newContent.data(i).controlInfo.dbtrap = '1'
 			then
 				exit;
 			end if;
@@ -828,65 +827,6 @@ end function;
 	begin
 		return (before and ei) or int;
 	end function;
-
-
-function compactData(data: InstructionStateArray; mask: std_logic_vector) return InstructionStateArray is
-	variable res: InstructionStateArray(0 to 3) := --data(0 to 3);
-														(data(1), data(2), data(0), data(3));
-	variable k: integer := 0;
-begin
-	res(k) := data(1);
-	if mask(1) = '1' then
-		k := k + 1;
-	end if;
-	
-	res(k) := data(2);
-	if mask(2) = '1' then
-		k := k + 1;
-	end if;
-
-	res(k) := data(0);	
-	if mask(0) = '1' then
-		k := k + 1;
-	end if;	
-
--- CAREFUL: not using the 4th one because branch has no register write				
---	res(k) := data(3);	
---	if mask(3) = '1' then
---		k := k + 1;
---	end if;
-	
-	return res;
-end function;
-
-
-function compactMask(data: InstructionStateArray; mask: std_logic_vector) return std_logic_vector is
-	variable res: std_logic_vector(0 to 3) := (others => '0');
-	variable k: integer := 0;
-begin
-	res(k) := mask(1);
-	if mask(1) = '1' then
-		k := k + 1;
-	end if;
-	
-	res(k) := mask(2);
-	if mask(2) = '1' then
-		k := k + 1;
-	end if;
-
-	res(k) := mask(0);	
-	if mask(0) = '1' then
-		k := k + 1;
-	end if;
-		
--- CAREFUL: not using the 4th one because branch has no register write		
---	res(k) := mask(3);	
---	if mask(3) = '1' then
---		k := k + 1;
---	end if;
-	
-	return res;
-end function;
 
 
 
