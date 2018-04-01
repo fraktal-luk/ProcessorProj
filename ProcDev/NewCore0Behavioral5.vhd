@@ -99,7 +99,9 @@ begin
 		frontAccepting => acceptingOutFront,
 		pcDataLiving => pcDataSig,
 		pcSending => pcSendingSig,
-
+		
+		intAllowOut => intallow,
+		intAckOut => intack,
 		-- Events in
 		intSignal => int0,
 		start => int1,		

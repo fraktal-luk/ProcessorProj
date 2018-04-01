@@ -120,6 +120,9 @@ entity UnitSequencer is
 			newPhysDestPointerIn: in SmallNumber;
 			newPhysSourcesIn: in PhysNameArray(0 to 3*PIPE_WIDTH-1);
 		
+		intAllowOut: out std_logic;
+		intAckOut: out std_logic;
+		
 		start: in std_logic	-- TODO: change to reset interrupt
 	);
 end UnitSequencer;
@@ -167,7 +170,7 @@ architecture Behavioral of UnitSequencer is
 	signal gE_eventOccurred, gE_killPC, ch0, ch1: std_logic := '0';
 
 	signal committingEvt, newEvt, evtPhase0, evtPhase1, evtPhase2, evtWaiting: std_logic := '0';
-	signal intPhase0, intPhase1, intPhase2, intWaiting: std_logic := '0';
+	signal intPhase0, intPhase1, intPhase2, intWaiting, addDbEvent, intAllow, intAck: std_logic := '0';
 
 	constant HAS_RESET_SEQ: std_logic := '0';
 	constant HAS_EN_SEQ: std_logic := '0';
@@ -445,11 +448,19 @@ begin
 
 				committingEvt <= sendingToCommit and dataToLastEffective2.data(0).controlInfo.newEvent;
 				-- CAREFUL: when committingEvt, it is forbidden to indicate interrupt in next cycle! 
+				
+				addDbEvent <= committingEvt and dataToLastEffective2.data(0).controlInfo.dbtrap;
+													-- Forces int controller to insert a DB interrupt and issue it ASAP 
 
 				intPhase0 <= intSignal;
-				intPhase1 <= (intPhase0 and sbEmpty)
+				intPhase1 <= (intPhase0 and sbEmpty)	-- TODO: intPhase1 serves as int ACK
 							or	 (intWaiting and sbEmpty);
-
+				
+				intAllow <= not (committingEvt or evtPhase0 or (evtWaiting and not evtPhase1));
+				--			int can be asserted by int controller in next cycle if intAllow = '1'
+				
+				intAck <= intPhase1;
+				
 				process (clk)
 				begin
 					if rising_edge(clk) then
@@ -483,7 +494,10 @@ begin
 					end if;
 				end process;
 			end block;	
-			
+	
+	intAllowOut <= intAllow;
+	intAckOut <= intAck;
+	
 	renameAccepting <= acceptingOutRename;
 	renamedDataLiving <= stageDataOutRename;
 	renamedSending <= sendingOutRename;

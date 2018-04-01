@@ -69,7 +69,9 @@ ARCHITECTURE behavior OF NewCoreTB4 IS
 			  dvalid: in std_logic;
            din : in  Mword;
            dout : out  Mword;			
-						
+			
+			intallow: out std_logic;
+			intack: out std_logic;
          int0 : IN  std_logic;
          int1 : IN  std_logic;
          iaux : IN  std_logic_vector(31 downto 0);
@@ -84,6 +86,7 @@ ARCHITECTURE behavior OF NewCoreTB4 IS
    signal en : std_logic := '0';
    signal ivalid : std_logic := '0';
    signal iin : InsGroup := (others => (others => '0'));
+	signal intallow, intack: std_logic := '0';
    signal int0 : std_logic := '0';
    signal int1 : std_logic := '0';
 	signal int0a, int0b: std_logic := '0';
@@ -136,7 +139,9 @@ BEGIN
 				dvalid => dvalid,
 				din => din,
 				dout => dout,			 
-			 			 
+			 
+			 intallow => intallow,
+			 intack => intack,
           int0 => int0,
           int1 => int1,
           iaux => iaux,
