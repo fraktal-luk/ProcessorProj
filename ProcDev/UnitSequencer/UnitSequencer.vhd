@@ -194,7 +194,7 @@ begin
 		execOrIntCausingOut <= execOrIntCausing; -- $MODULE_OUT
 	end block;
 
-	pcNext <= getNextPC(stageDataOutPC.basicInfo.ip, (others => '0'), '0');
+	pcNext <= getNextPC(stageDataOutPC.ip, (others => '0'), '0');
 
 	stageDataToPC <= newPCData(evtPhase2, eiEvents2.causing,
 										execEventSignal, execCausing,
@@ -227,7 +227,7 @@ begin
 			lockCommand => '0'		
 		);			
 
-		stageDataOutPC.basicInfo.ip <= tmpPcOut.data(0).basicInfo.ip;
+		stageDataOutPC.ip <= tmpPcOut.data(0).ip;
 		stageDataOutPC.target <= pcNext; -- CAREFUL: Attaching next address from line predictor. Correct?
 
 	excInfoUpdate <= evtPhase1 and (eiEvents2.causing.controlInfo.hasException
@@ -271,14 +271,14 @@ begin
 				--			but committing a sysMtc shouldn't happen in parallel with any control event
 				-- Writing exc status registers
 				if excInfoUpdate = '1' then
-					linkRegExc <= excLinkInfo.basicInfo.ip;
+					linkRegExc <= excLinkInfo.ip;
 					--savedStateExc <= X"0000" & excLinkInfo.systemLevel & excLinkInfo.intLevel;
 						savedStateExc <= excLinkInfo.result;
 				end if;
 				
 				-- Writing int status registers
 				if intInfoUpdate = '1' then
-					linkRegInt <= intLinkInfo.basicInfo.ip;
+					linkRegInt <= intLinkInfo.ip;
 					--savedStateInt <= X"0000" & intLinkInfo.systemLevel & intLinkInfo.intLevel;
 						savedStateInt <= intLinkInfo.result;
 				end if;
@@ -304,8 +304,7 @@ begin
 
 			NEW_eiCausing.fullMask(0) <= '1';
 			NEW_eiCausing.data(0) <= clearControlEvents(
-												setInstructionTarget(dataFromLastEffective2.data(0), 
-																		 TMP_targetIns2.basicInfo.ip));
+												setInstructionTarget(dataFromLastEffective2.data(0), TMP_targetIns2.ip));
 		-------------------------------------------------------------------------------------
 		dbtrapOn <= currentState(25);
 	end block;

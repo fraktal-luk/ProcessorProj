@@ -235,7 +235,8 @@ end record;
 
 type InstructionState is record
 	controlInfo: InstructionControlInfo;
-	basicInfo: InstructionBasicInfo;
+	--basicInfo: InstructionBasicInfo;
+		ip: Mword;
 	bits: word; -- instruction word
 	tags: InstructionTags;
 	operation: BinomialOp;
@@ -429,7 +430,8 @@ function defaultInstructionState return InstructionState is
 	variable res: InstructionState;
 begin 
 	res.controlInfo := defaultControlInfo;
-	res.basicInfo := defaultBasicInfo;
+	--res.basicInfo := defaultBasicInfo;
+		res.ip := (others => '0');
 	res.bits := (others=>'0');
 		res.tags := DEFAULT_INSTRUCTION_TAGS;
 	--res.operation := BinomialOp'(unknown, unknown);

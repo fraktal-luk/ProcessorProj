@@ -379,7 +379,7 @@ begin
 				
 				write(fline, 
 								 integer'image(slv2u(sd.data(i).data(j).tags.renameIndex))
-					  & "@" & integer'image(slv2u(sd.data(i).data(j).basicInfo.ip)));
+					  & "@" & integer'image(slv2u(sd.data(i).data(j).ip)));
 				write(fline, ", ");
 			end if;
 		end loop;
@@ -455,7 +455,7 @@ begin
 				exit;
 			end if;	
 			assert sd.data(i).data(j).tags.renameIndex = sd.data(i).data(j).tags.renameIndex report "koho";
-			assert sd.data(i).data(j).basicInfo.ip = sd.data(i).data(j).basicInfo.ip report "jor";
+			assert sd.data(i).data(j).ip = sd.data(i).data(j).ip report "jor";
 		end loop;
 	end loop;
 	

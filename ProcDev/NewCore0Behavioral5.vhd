@@ -155,7 +155,7 @@ begin
 		commitGroupCtrIncOut => commitGroupCtrIncSig
 	);
 		
-	iadr <= pcDataSig.basicInfo.ip;
+	iadr <= pcDataSig.ip;
 	iadrvalid <= pcSendingSig;
 		
 	FRONT_PART: entity work.UnitFront(Behavioral)

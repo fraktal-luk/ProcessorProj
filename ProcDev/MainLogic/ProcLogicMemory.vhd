@@ -304,7 +304,8 @@ end function;
 					outMask(0 to LEN-1) := tempMask(sh to sh + LEN-1); 
 					
 					for i in 0 to LEN-1 loop
-						res(i).basicInfo := DEFAULT_BASIC_INFO;
+						--res(i).basicInfo := DEFAULT_BASIC_INFO;
+							res(i).ip := (others => '0');
 							c1 := res(i).controlInfo.completed;
 							c2 := res(i).controlInfo.completed2;
 							res(i).controlInfo := DEFAULT_CONTROL_INFO;

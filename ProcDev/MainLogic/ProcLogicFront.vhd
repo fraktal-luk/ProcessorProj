@@ -188,8 +188,8 @@ begin
 	end if;
 
 	for i in 0 to PIPE_WIDTH-1 loop
-		target := addMwordFaster(insVec.data(i).basicInfo.ip, insVec.data(i).target);
-		link := addMwordBasic(insVec.data(i).basicInfo.ip, getAddressIncrement(insVec.data(i)));
+		target := addMwordFaster(insVec.data(i).ip, insVec.data(i).target);
+		link := addMwordBasic(insVec.data(i).ip, getAddressIncrement(insVec.data(i)));
 		res.data(i).target := target;
 		res.data(i).result := link;
 	end loop;
@@ -206,7 +206,8 @@ return HbuffOutData is
 begin
 	for i in 0 to PIPE_WIDTH-1 loop
 		res.data(i).bits := content(i).bits(15 downto 0) & content(i+1).bits(15 downto 0);		
-		res.data(i).basicInfo := content(i).basicInfo;
+		--res.data(i).basicInfo := content(i).basicInfo;
+			res.data(i).ip := content(i).ip;
 		res.data(i).controlInfo.squashed := content(i).controlInfo.squashed;
 	end loop;
 
@@ -215,14 +216,16 @@ begin
 		if (fullMask(j) and content(j).classInfo.short) = '1' then
 			res.fullMask(i) := '1';
 			res.data(i).bits := content(j).bits(15 downto 0) & content(j+1).bits(15 downto 0);			
-			res.data(i).basicInfo := content(j).basicInfo;
+			--res.data(i).basicInfo := content(j).basicInfo;
+				res.data(i).ip := content(j).ip;
 				res.data(i).controlInfo.squashed := content(j).controlInfo.squashed;			
 				res.data(i).controlInfo.hasBranch := content(j).controlInfo.hasBranch;
 			j := j + 1;
 		elsif (fullMask(j) and fullMask(j+1)) = '1' then
 			res.fullMask(i) := '1';
 			res.data(i).bits := content(j).bits(15 downto 0) & content(j+1).bits(15 downto 0);
-			res.data(i).basicInfo := content(j).basicInfo;
+			--res.data(i).basicInfo := content(j).basicInfo;
+				res.data(i).ip := content(j).ip;
 				res.data(i).controlInfo.squashed := content(j).controlInfo.squashed;
 				res.data(i).controlInfo.hasBranch := content(j).controlInfo.hasBranch;
 			j := j + 2;
@@ -252,17 +255,17 @@ function getAnnotatedHwords(fetchIns: InstructionState; fetchInsMulti: StageData
 return InstructionStateArray is
 	variable res: InstructionStateArray(0 to 2*PIPE_WIDTH-1) := (others => DEFAULT_ANNOTATED_HWORD);
 	variable	tempWord: word := (others => '0');
-	constant fetchBasicInfo: InstructionBasicInfo := fetchIns.basicInfo;
-	variable hwordBasicInfo: InstructionBasicInfo := fetchBasicInfo;	
+	--constant fetchBasicInfo: InstructionBasicInfo := fetchIns.basicInfo;
+	variable hwordBasicInfo: InstructionBasicInfo := DEFAULT_BASIC_INFO;--fetchBasicInfo;	
 begin
 	for i in 0 to 2*PIPE_WIDTH-1 loop
-		hwordBasicInfo.ip := fetchBasicInfo.ip(MWORD_SIZE-1 downto ALIGN_BITS) & i2slv(2*i, ALIGN_BITS);
-			hwordBasicInfo.intLevel(SMALL_NUMBER_SIZE-1 downto 2) := (others => '0');
-			hwordBasicInfo.systemLevel(SMALL_NUMBER_SIZE-1 downto 2) := (others => '0');
+		hwordBasicInfo.ip := fetchIns.ip(MWORD_SIZE-1 downto ALIGN_BITS) & i2slv(2*i, ALIGN_BITS);
+		--	hwordBasicInfo.intLevel(SMALL_NUMBER_SIZE-1 downto 2) := (others => '0');
+		--	hwordBasicInfo.systemLevel(SMALL_NUMBER_SIZE-1 downto 2) := (others => '0');
 		tempWord(15 downto 0) := fetchBlock(i);		
 
 		res(i).bits := tempWord;
-		res(i).basicInfo := hwordBasicInfo;
+		res(i).ip := hwordBasicInfo.ip;
 		res(i).classInfo.short := '0'; -- TEMP!
 			res(i).controlInfo.squashed := fetchIns.controlInfo.squashed; -- CAREFUL: guarding from wrong reading 
 	end loop;
@@ -306,7 +309,7 @@ begin
 	if (receiving and valid and hbuffAccepting) = '1' then
 		-- Calculate target for each instruction, even if it's to be skipped
 		for i in 0 to PIPE_WIDTH-1 loop
-			thisIP := ins.basicInfo.ip(MWORD_SIZE-1 downto ALIGN_BITS) & i2slv(i*4, ALIGN_BITS);
+			thisIP := ins.ip(MWORD_SIZE-1 downto ALIGN_BITS) & i2slv(i*4, ALIGN_BITS);
 		
 			if 	fetchBlock(2*i)(15 downto 10) = opcode2slv(jl) 
 				or fetchBlock(2*i)(15 downto 10) = opcode2slv(jz) 

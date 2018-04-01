@@ -273,7 +273,7 @@ begin
 			);
 	
 		stallEventSig <= fetchStall;
-		stallCausing <= setInstructionTarget(earlyBranchDataOut.data(0), earlyBranchDataOut.data(0).basicInfo.ip);
+		stallCausing <= setInstructionTarget(earlyBranchDataOut.data(0), earlyBranchDataOut.data(0).ip);
 		frontKill <= stage0Events.eventOccured or fetchStall;
 		fetchStall <= earlyBranchSending and not acceptingOutHbuffer;
 	

@@ -128,7 +128,7 @@ begin
 																		 TMP_ckEnForInput, inputIndices);
 
 
-			TMP_offset <= getFetchOffset(stageDataIn.basicInfo.ip);
+			TMP_offset <= getFetchOffset(stageDataIn.ip);
 
 	nHIn <= i2slv(2 * countFullNonSkipped(stageDataInMulti), SMALL_NUMBER_SIZE);
 

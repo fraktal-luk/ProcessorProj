@@ -907,7 +907,8 @@ begin
 		--res.data(i).virtualArgs := defaultVirtualArgs;
 		res.data(i).constantArgs := defaultConstantArgs; -- c0 needed for sysMtc if not using temp reg in Exec
 		res.data(i).argValues := defaultArgValues;
-		res.data(i).basicInfo := defaultBasicInfo;
+		--res.data(i).basicInfo := defaultBasicInfo;
+			res.data(i).ip := (others => '0');
 		res.data(i).bits := (others => '0');
 	end loop;
 	
@@ -963,7 +964,8 @@ begin
 		--res.data(i).virtualArgs := defaultVirtualArgs;
 		res.data(i).constantArgs := defaultConstantArgs; -- c0 needed for sysMtc if not using temp reg in Exec
 		res.data(i).argValues := defaultArgValues;
-		res.data(i).basicInfo := defaultBasicInfo;
+		--res.data(i).basicInfo := defaultBasicInfo;
+			res.data(i).ip := (others => '0');
 		res.data(i).bits := (others => '0');
 	end loop;
 	
@@ -1075,7 +1077,7 @@ end function;
 function setInstructionIP(ins: InstructionState; ip: Mword) return InstructionState is
 	variable res: InstructionState := ins;
 begin
-	res.basicInfo.ip := ip;
+	res.ip := ip;
 	return res;
 end function;
 

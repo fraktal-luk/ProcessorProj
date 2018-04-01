@@ -95,9 +95,9 @@ package body ProcLogicSequence is
 function getLinkInfo(ins: InstructionState; state: Mword) return InstructionState is
 	variable res: InstructionState := DEFAULT_INSTRUCTION_STATE;--ins.basicInfo;
 begin
-	res.basicInfo.ip := ins.target;
-	res.basicInfo.intLevel := state(7 downto 0);
-	res.basicInfo.systemLevel := state(15 downto 8);
+	res.ip := ins.target;
+	--res.basicInfo.intLevel := state(7 downto 0);
+	--res.basicInfo.systemLevel := state(15 downto 8);
 		res.result := state;
 	return res;
 end function;
@@ -112,17 +112,17 @@ return InstructionState is
 begin	
 		if commitCausing.controlInfo.hasInterrupt = '1' then
 			if commitCausing.controlInfo.hasReset = '1' then
-				res.basicInfo.ip := (others => '0'); -- TEMP!			
+				res.ip := (others => '0'); -- TEMP!			
 			else
-				res.basicInfo.ip := INT_BASE; -- TEMP!
+				res.ip := INT_BASE; -- TEMP!
 			end if;
 				res.result := currentState or X"00000001";
 				res.result := res.result and X"fdffffff"; -- Clear dbtrap
-			res.basicInfo.intLevel := "00000001";		
+			--res.basicInfo.intLevel := "00000001";		
 		elsif commitCausing.controlInfo.hasException = '1'
 			or commitCausing.controlInfo.dbtrap = '1' then
 			-- TODO, FIX: exceptionCode sliced - shift left by ALIGN_BITS? or leave just base address
-			res.basicInfo.ip := EXC_BASE(MWORD_SIZE-1 downto commitCausing.controlInfo.exceptionCode'length)
+			res.ip := EXC_BASE(MWORD_SIZE-1 downto commitCausing.controlInfo.exceptionCode'length)
 									& commitCausing.controlInfo.exceptionCode(
 													commitCausing.controlInfo.exceptionCode'length-1 downto ALIGN_BITS)
 									& EXC_BASE(ALIGN_BITS-1 downto 0);	
@@ -130,25 +130,25 @@ begin
 			-- TODO: if exception, it overrides dbtrap, but if only dbtrap, a specific vector address
 				res.result := currentState or X"00000100";
 				res.result := res.result and X"fdffffff";	-- Clear dbtrap
-			res.basicInfo.systemLevel := "00000001";
+			--res.basicInfo.systemLevel := "00000001";
 		elsif commitCausing.controlInfo.specialAction = '1' then
 					res.result := currentState;
 				if commitCausing.operation.func = sysSync then
-					res.basicInfo.ip := commitCausing.target;
+					res.ip := commitCausing.target;
 				elsif commitCausing.operation.func = sysReplay then
-					res.basicInfo.ip := commitCausing.basicInfo.ip;
+					res.ip := commitCausing.ip;
 				elsif commitCausing.operation.func = sysHalt then
-					res.basicInfo.ip := commitCausing.target; -- ???
+					res.ip := commitCausing.target; -- ???
 				elsif commitCausing.operation.func = sysRetI then
 						res.result := stateInt;
-					res.basicInfo.ip := linkInt;
-					res.basicInfo.systemLevel := stateInt(15 downto 8);
-					res.basicInfo.intLevel := stateInt(7 downto 0);
+					res.ip := linkInt;
+					--res.basicInfo.systemLevel := stateInt(15 downto 8);
+					--res.basicInfo.intLevel := stateInt(7 downto 0);
 				elsif commitCausing.operation.func = sysRetE then
 						res.result := stateExc;
-					res.basicInfo.ip := linkExc;
-					res.basicInfo.systemLevel := stateExc(15 downto 8);
-					res.basicInfo.intLevel := stateExc(7 downto 0); 
+					res.ip := linkExc;
+					--res.basicInfo.systemLevel := stateExc(15 downto 8);
+					--res.basicInfo.intLevel := stateExc(7 downto 0); 
 				end if;
 		end if;		
 	
@@ -165,14 +165,14 @@ return InstructionState is
 	variable newPC: Mword := (others=>'0');
 begin
 	if commitEvent = '1' then -- when from exec or front
-		res.basicInfo.ip := commitCausing.target;
+		res.ip := commitCausing.target;
 	elsif execEvent = '1' then		
-		res.basicInfo.ip := execCausing.target;
+		res.ip := execCausing.target;
 	elsif frontEvent = '1' then
 		--	report "front event!";
-		res.basicInfo.ip := frontCausing.target;	
+		res.ip := frontCausing.target;	
 	else	-- Go to the next line
-		res.basicInfo.ip := pcNext;
+		res.ip := pcNext;
 	end if;	
 
 	return res;
@@ -209,7 +209,7 @@ begin
 		else
 			targets(i) := addMwordBasic(prevTrg, getAddressIncrement(insVec.data(i)));
 		end if;
-		res.data(i).basicInfo.ip := prevTrg; -- ??
+		res.data(i).ip := prevTrg; -- ??
 		prevTrg := targets(i);
 		res.data(i).target := targets(i);
 	end loop;

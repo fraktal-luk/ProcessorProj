@@ -127,7 +127,7 @@ begin
 			write(fline,
 						  integer'image(slv2u(insArr(i).tags.renameIndex))
 				--& "/" & integer'image(slv2u(insArr(i).numberTag))
-				& "@" & integer'image(slv2u(insArr(i).basicInfo.ip)));
+				& "@" & integer'image(slv2u(insArr(i).ip)));
 		end if;
 		write(fline, ", ");
 		
@@ -236,7 +236,7 @@ begin
 	-- CHECK: does it make sense to examine this? Should other kinds of data be compared?
 	for i in 0 to nCommon-1 loop
 		assert commonPart1(i).tags.renameIndex = commonPart2(i).tags.renameIndex report "u";
-		assert commonPart1(i).basicInfo.ip = commonPart2(i).basicInfo.ip report "yio";
+		assert commonPart1(i).ip = commonPart2(i).ip report "yio";
 	end loop;
 	
 	-- pragma synthesis on	
@@ -328,7 +328,7 @@ begin
 			insSendingMatch := bufferData(i);
 			-- Check the op that is sent?
 			assert insSendingMatch.tags.renameIndex = insSending.tags.renameIndex report "byj";
-			assert insSendingMatch.basicInfo.ip = insSending.basicInfo.ip report "jjj";		
+			assert insSendingMatch.ip = insSending.ip report "jjj";		
 		end if;
 		
 		-- If we have visited all living instructions in old array, we break, because 
@@ -344,7 +344,7 @@ begin
 	-- CHECK: does it make sense to examine this? Should other kinds of data be compared?
 	for i in 0 to nCommon-1 loop
 		assert commonPart1(i).tags.renameIndex = commonPart2(i).tags.renameIndex report "jutrrrr";
-		assert commonPart1(i).basicInfo.ip = commonPart2(i).basicInfo.ip report "oiu";
+		assert commonPart1(i).ip = commonPart2(i).ip report "oiu";
 	end loop;
 	
 	-- pragma synthesis on	
