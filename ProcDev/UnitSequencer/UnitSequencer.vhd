@@ -138,7 +138,7 @@ architecture Behavioral of UnitSequencer is
 
 	signal tmpPcIn, tmpPcOut: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
 
-	signal excLinkInfo, intLinkInfo: InstructionBasicInfo := defaultBasicInfo;
+	signal excLinkInfo, intLinkInfo: InstructionState := DEFAULT_INSTRUCTION_STATE;
 	signal excInfoUpdate, intInfoUpdate: std_logic := '0';
 
 	signal execOrIntEventSignal: std_logic := '0';
@@ -171,6 +171,7 @@ architecture Behavioral of UnitSequencer is
 
 	signal committingEvt, newEvt, evtPhase0, evtPhase1, evtPhase2, evtWaiting: std_logic := '0';
 	signal intPhase0, intPhase1, intPhase2, intWaiting, addDbEvent, intAllow, intAck: std_logic := '0';
+	signal dbtrapOn: std_logic := '0';
 
 	constant HAS_RESET_SEQ: std_logic := '0';
 	constant HAS_EN_SEQ: std_logic := '0';
@@ -229,7 +230,8 @@ begin
 		stageDataOutPC.basicInfo.ip <= tmpPcOut.data(0).basicInfo.ip;
 		stageDataOutPC.target <= pcNext; -- CAREFUL: Attaching next address from line predictor. Correct?
 
-	excInfoUpdate <= evtPhase1 and eiEvents2.causing.controlInfo.hasException;
+	excInfoUpdate <= evtPhase1 and (eiEvents2.causing.controlInfo.hasException
+												or eiEvents2.causing.controlInfo.dbtrap);
 	intInfoUpdate <= evtPhase1 and eiEvents2.causing.controlInfo.hasInterrupt;
 	
 	----------------------------------------------------------------------
@@ -259,7 +261,8 @@ begin
 
 				-- Writing specialized fields on events
 				if evtPhase1 = '1' then --eiEvents.causing.controlInfo.phase1 = '1' then
-					currentState <= X"0000" & TMP_targetIns2.basicInfo.systemLevel & TMP_targetIns2.basicInfo.intLevel;
+					currentState <= --X"0000" & TMP_targetIns2.basicInfo.systemLevel & TMP_targetIns2.basicInfo.intLevel;
+											TMP_targetIns2.result;
 					currentState(15 downto 10) <= (others => '0');
 					currentState(7 downto 2) <= (others => '0');
 				end if;
@@ -268,14 +271,16 @@ begin
 				--			but committing a sysMtc shouldn't happen in parallel with any control event
 				-- Writing exc status registers
 				if excInfoUpdate = '1' then
-					linkRegExc <= excLinkInfo.ip;
-					savedStateExc <= X"0000" & excLinkInfo.systemLevel & excLinkInfo.intLevel;
+					linkRegExc <= excLinkInfo.basicInfo.ip;
+					--savedStateExc <= X"0000" & excLinkInfo.systemLevel & excLinkInfo.intLevel;
+						savedStateExc <= excLinkInfo.result;
 				end if;
 				
 				-- Writing int status registers
 				if intInfoUpdate = '1' then
-					linkRegInt <= intLinkInfo.ip;
-					savedStateInt <= X"0000" & intLinkInfo.systemLevel & intLinkInfo.intLevel;
+					linkRegInt <= intLinkInfo.basicInfo.ip;
+					--savedStateInt <= X"0000" & intLinkInfo.systemLevel & intLinkInfo.intLevel;
+						savedStateInt <= intLinkInfo.result;
 				end if;
 				
 				-- Enforcing content of read-only registers
@@ -293,6 +298,7 @@ begin
 		TMP_targetIns2 <= getLatePCData('1', -- CAREFUL: if interrupt, it must be confirmed at phase1 
 														--  			cause target address is generated at phase1.
 													setInterrupt3(dataFromLastEffective2.data(0), intPhase1, start),
+													currentState,
 													linkRegExc, linkRegInt,
 													savedStateExc, savedStateInt);
 
@@ -301,6 +307,7 @@ begin
 												setInstructionTarget(dataFromLastEffective2.data(0), 
 																		 TMP_targetIns2.basicInfo.ip));
 		-------------------------------------------------------------------------------------
+		dbtrapOn <= currentState(25);
 	end block;
 
 	pcDataLiving <= stageDataOutPC;
@@ -308,7 +315,7 @@ begin
 
 	-- Rename stage
 		stageDataRenameIn <= renameGroup(frontDataLastLiving, newPhysSourcesIn, newPhysDestsIn, renameCtr,
-															renameGroupCtrNext, newPhysDestPointerIn, '0'); -- TODO: dbtrap
+															renameGroupCtrNext, newPhysDestPointerIn, dbtrapOn);
 	
 		SUBUNIT_RENAME: entity work.GenericStageMulti(Renaming)
 		port map(
@@ -449,6 +456,7 @@ begin
 				committingEvt <= sendingToCommit and dataToLastEffective2.data(0).controlInfo.newEvent;
 				-- CAREFUL: when committingEvt, it is forbidden to indicate interrupt in next cycle! 
 				
+				-- CAREFUL: probably not used, because dbtrap will be a normal exc, overridden by "real" exceptions
 				addDbEvent <= committingEvt and dataToLastEffective2.data(0).controlInfo.dbtrap;
 													-- Forces int controller to insert a DB interrupt and issue it ASAP 
 

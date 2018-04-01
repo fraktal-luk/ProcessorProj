@@ -33,11 +33,11 @@ package ProcLogicSequence is
 		
 		constant ALL_FULL: std_logic_vector(0 to PIPE_WIDTH-1) := (others => '1');
 
-function getLinkInfo(ins: InstructionState; state: Mword) return InstructionBasicInfo;
+function getLinkInfo(ins: InstructionState; state: Mword) return InstructionState;
 
 
 function getLatePCData(commitEvent: std_logic; commitCausing: InstructionState;
-								linkExc, linkInt, stateExc, stateInt: Mword)
+								currentState, linkExc, linkInt, stateExc, stateInt: Mword)
 return InstructionState;
 
 function newPCData( commitEvent: std_logic; commitCausing: InstructionState;
@@ -92,19 +92,20 @@ package body ProcLogicSequence is
 		end function;
 
 
-function getLinkInfo(ins: InstructionState; state: Mword) return InstructionBasicInfo is
-	variable res: InstructionBasicInfo := DEFAULT_BASIC_INFO;--ins.basicInfo;
+function getLinkInfo(ins: InstructionState; state: Mword) return InstructionState is
+	variable res: InstructionState := DEFAULT_INSTRUCTION_STATE;--ins.basicInfo;
 begin
-	res.ip := ins.target;
-	res.intLevel := state(7 downto 0);
-	res.systemLevel := state(15 downto 8);
+	res.basicInfo.ip := ins.target;
+	res.basicInfo.intLevel := state(7 downto 0);
+	res.basicInfo.systemLevel := state(15 downto 8);
+		res.result := state;
 	return res;
 end function;
 
 
 
 function getLatePCData(commitEvent: std_logic; commitCausing: InstructionState;
-								linkExc, linkInt, stateExc, stateInt: Mword)
+								currentState, linkExc, linkInt, stateExc, stateInt: Mword)
 return InstructionState is
 	variable res: InstructionState := DEFAULT_INSTRUCTION_STATE;-- content;
 	variable newPC: Mword := (others=>'0');
@@ -115,17 +116,23 @@ begin
 			else
 				res.basicInfo.ip := INT_BASE; -- TEMP!
 			end if;
+				res.result := currentState or X"00000001";
+				res.result := res.result and X"fdffffff"; -- Clear dbtrap
 			res.basicInfo.intLevel := "00000001";		
-		elsif commitCausing.controlInfo.hasException = '1' then
+		elsif commitCausing.controlInfo.hasException = '1'
+			or commitCausing.controlInfo.dbtrap = '1' then
 			-- TODO, FIX: exceptionCode sliced - shift left by ALIGN_BITS? or leave just base address
 			res.basicInfo.ip := EXC_BASE(MWORD_SIZE-1 downto commitCausing.controlInfo.exceptionCode'length)
 									& commitCausing.controlInfo.exceptionCode(
 													commitCausing.controlInfo.exceptionCode'length-1 downto ALIGN_BITS)
 									& EXC_BASE(ALIGN_BITS-1 downto 0);	
 									--		INT_BASE;
+			-- TODO: if exception, it overrides dbtrap, but if only dbtrap, a specific vector address
+				res.result := currentState or X"00000100";
+				res.result := res.result and X"fdffffff";	-- Clear dbtrap
 			res.basicInfo.systemLevel := "00000001";
-			
 		elsif commitCausing.controlInfo.specialAction = '1' then
+					res.result := currentState;
 				if commitCausing.operation.func = sysSync then
 					res.basicInfo.ip := commitCausing.target;
 				elsif commitCausing.operation.func = sysReplay then
@@ -133,14 +140,16 @@ begin
 				elsif commitCausing.operation.func = sysHalt then
 					res.basicInfo.ip := commitCausing.target; -- ???
 				elsif commitCausing.operation.func = sysRetI then
+						res.result := stateInt;
 					res.basicInfo.ip := linkInt;
 					res.basicInfo.systemLevel := stateInt(15 downto 8);
 					res.basicInfo.intLevel := stateInt(7 downto 0);
 				elsif commitCausing.operation.func = sysRetE then
+						res.result := stateExc;
 					res.basicInfo.ip := linkExc;
 					res.basicInfo.systemLevel := stateExc(15 downto 8);
 					res.basicInfo.intLevel := stateExc(7 downto 0); 
-				end if;				
+				end if;
 		end if;		
 	
 	return res;

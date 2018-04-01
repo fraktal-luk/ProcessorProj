@@ -88,7 +88,7 @@ package ProgramCode4 is
 			65 => insNOP,
 			66 => ins6556X(ext2, r20, 0, mfc, 2), -- 2: ELR
 			67 => ins6556X(ext2, r21, 0, mfc, 4), -- 4: Exc saved state
-			68 => ins6556X(ext2, r21, 0, mtc, 1),   -- 1: current state
+			68 => insNOP,--ins6556X(ext2, r21, 0, mtc, 1),   -- 1: current state
 				69 => ins655655(ext2, 0, 0, sync, 0, 0),
 			70 => --ins655655(ext1, r0, r0, jzR, r20, 0),	-- Jump to saved link address
 					ins655655(ext2, 0, 0, retE, 0, 0), -- Proper return instruction
@@ -100,7 +100,7 @@ package ProgramCode4 is
 				130 => insNOP,
 			131 => ins6556X(ext2, r20, 0, mfc, 3), -- 3: ILR
 			132 => ins6556X(ext2, r21, 0, mfc, 5), -- 5: Int saved state
-			133 => ins6556X(ext2, r21, 0, mtc, 1),   -- 1: current state
+			133 => insNOP,--ins6556X(ext2, r21, 0, mtc, 1),   -- 1: current state
 				134 => ins655655(ext2, 0, 0, sync, 0, 0),			
 			135 => --ins655655(ext1, r0, r0, jzR, r20, 0),	-- Jump to saved link address
 					ins655655(ext2, 0, 0, retI, 0, 0), -- Proper return instruction
@@ -339,7 +339,11 @@ package ProgramCode4 is
 			
 			-- Lower privilege to 0
 			-- @1720
-			430 => insNOP,									 -- Int: 3 link, 5 saved state
+			430 => --insMOVE(r1, r0),
+					--	insSET(r1, 1),
+						insNOP,
+			--431 => ins6556X(ext0, r1, r1, shlC, 25),
+																-- Int: 3 link, 5 saved state
 			431 => ins6556X(ext2, r0, 0, mtc, 5),	 -- lower the privilege
 			432 => ins6556X(ext2, r31, 0, mtc, 3),	 -- write return address to ILR
 			433 => ins655655(ext2, 0, 0, retI, 0, 0),
