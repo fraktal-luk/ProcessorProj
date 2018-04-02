@@ -53,7 +53,6 @@ entity RegisterFreeList is
 		en: in std_logic;
 		
 		rewind: in std_logic;
-		--causingInstruction: in InstructionState; -- DEPREC?
 		causingPointer: in SmallNumber;
 		
 		sendingToReserve: in std_logic;

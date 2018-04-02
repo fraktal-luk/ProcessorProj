@@ -49,47 +49,9 @@ use work.ProcLogicMemory.all;
 
 use work.BasicCheck.all;
 
---entity LoadMissQueue is
---	generic(
---		QUEUE_SIZE: integer := 4;
---		CLEAR_COMPLETED: boolean := true
---	);
---	port(
---		clk: in std_logic;
---		reset: in std_logic;
---		en: in std_logic;
---
---		acceptingOut: out std_logic;
---		prevSending: in std_logic;
---		dataIn: in StageDataMulti;
---
---		storeAddressWr: in std_logic;
---		storeValueWr: in std_logic;
---
---		storeAddressDataIn: in InstructionState;
---		storeValueDataIn: in InstructionState;
---
---			compareAddressDataIn: in InstructionState;
---			compareAddressReady: in std_logic;
---
---			selectedDataOut: out InstructionState;
---			selectedSending: out std_logic;
---
---		committing: in std_logic;
---		groupCtrInc: in SmallNumber; -- CAREFUL: differs from MemoryUnit
---
---		lateEventSignal: in std_logic;
---		execEventSignal: in std_logic;
---		execCausing: in InstructionState;
---		
---		nextAccepting: in std_logic;	
---		sendingSQOut: out std_logic;
---			dataOutV: out StageDataMulti
---	);
---end LoadMissQueue;
 
 
-architecture LoadMissQueue of MemoryUnit is--LoadMissQueue is
+architecture LoadMissQueue of MemoryUnit is
 	constant zeroMask: std_logic_vector(0 to PIPE_WIDTH-1) := (others => '0');
 
 	signal wrAddress, wrData, sendingSQ: std_logic := '0';

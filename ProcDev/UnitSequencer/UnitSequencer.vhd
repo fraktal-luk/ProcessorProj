@@ -261,8 +261,7 @@ begin
 
 				-- Writing specialized fields on events
 				if evtPhase1 = '1' then --eiEvents.causing.controlInfo.phase1 = '1' then
-					currentState <= --X"0000" & TMP_targetIns2.basicInfo.systemLevel & TMP_targetIns2.basicInfo.intLevel;
-											TMP_targetIns2.result;
+					currentState <= TMP_targetIns2.result;
 					currentState(15 downto 10) <= (others => '0');
 					currentState(7 downto 2) <= (others => '0');
 				end if;

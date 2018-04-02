@@ -304,7 +304,6 @@ end function;
 					outMask(0 to LEN-1) := tempMask(sh to sh + LEN-1); 
 					
 					for i in 0 to LEN-1 loop
-						--res(i).basicInfo := DEFAULT_BASIC_INFO;
 							res(i).ip := (others => '0');
 							c1 := res(i).controlInfo.completed;
 							c2 := res(i).controlInfo.completed2;
@@ -315,10 +314,6 @@ end function;
 							res(i).operation := (Memory, store);
 						res(i).classInfo := DEFAULT_CLASS_INFO;
 						res(i).constantArgs := DEFAULT_CONSTANT_ARGS;
-						--res(i).virtualArgs := DEFAULT_VIRTUAL_ARGS;
-						--res(i).virtualDestArgs := DEFAULT_VIRTUAL_DEST_ARGS;
-						--res(i).physicalArgs := DEFAULT_PHYSICAL_ARGS;
-						--res(i).physicalDestArgs := DEFAULT_PHYSICAL_DEST_ARGS;
 						
 						res(i).tags.renameSeq := (others => '0');
 						res(i).tags.intPointer := (others => '0');
@@ -418,12 +413,7 @@ end function;
 	begin
 		for i in 0 to res'length-1 loop
 			res(i) := CMP_tagBefore(content(i).tags.renameIndex, tag); -- If grTag < tag then diff(high) = '1'
-			
-			--	diff := subSN(content(i).tags.renameIndex, tag); -- If grTag < tag then diff(high) = '1'
-			--	res(i) := diff(SMALL_NUMBER_SIZE-1);
-
 		end loop;
-		
 		return res;
 	end function;
 
@@ -434,12 +424,7 @@ end function;
 	begin
 		for i in 0 to res'length-1 loop
 			res(i) := CMP_tagBefore(tag, content(i).tags.renameIndex); -- If grTag > tag then diff(high) = '1'
-			
-         --              diff := subSN(tag, content(i).tags.renameIndex); -- If grTag > tag then diff(high) = '1'
-          --             res(i) := diff(SMALL_NUMBER_SIZE-1);
-
 		end loop;
-		
 		return res;
 	end function;
 

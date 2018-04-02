@@ -37,14 +37,7 @@ function getLowBits(vec: std_logic_vector; n: integer) return std_logic_vector;
 
 constant INITIAL_GROUP_TAG: InsTag := (others => '0');
 
-constant INITIAL_PC: Mword := i2slv(-PIPE_WIDTH*4, MWORD_SIZE);
-
-constant INITIAL_BASIC_INFO: InstructionBasicInfo := (ip => INITIAL_PC,
-																		systemLevel => (others => '0'),
-																		intLevel => (others => '0'));																		
-
 constant DEFAULT_DATA_PC: InstructionState := defaultInstructionState;
-
 constant DEFAULT_ANNOTATED_HWORD: InstructionState := defaultInstructionState;
 
 
@@ -899,16 +892,13 @@ begin
 	-- CAREFUL! Clearing tags in empty slots, to avoid incorrect info about available results!
 	for i in 0 to res.fullMask'length-1 loop
 		if res.fullMask(i) = '0' then
-			res.data(i).--physicalDestArgs.d0 := (others => '0');
-							physicalArgSpec.dest := (others => '0');
+			res.data(i).physicalArgSpec.dest := (others => '0');
 		end if;
 		
 		-- TEMP: also clear unneeded data for all instructions
-		--res.data(i).virtualArgs := defaultVirtualArgs;
 		res.data(i).constantArgs := defaultConstantArgs; -- c0 needed for sysMtc if not using temp reg in Exec
 		res.data(i).argValues := defaultArgValues;
-		--res.data(i).basicInfo := defaultBasicInfo;
-			res.data(i).ip := (others => '0');
+		res.data(i).ip := (others => '0');
 		res.data(i).bits := (others => '0');
 	end loop;
 	
@@ -956,16 +946,13 @@ begin
 	-- CAREFUL! Clearing tags in empty slots, to avoid incorrect info about available results!
 	for i in 0 to res.fullMask'length-1 loop
 		if res.fullMask(i) = '0' then
-			res.data(i).--physicalDestArgs.d0 := (others => '0');
-							physicalArgSpec.dest := (others => '0');
+			res.data(i).physicalArgSpec.dest := (others => '0');
 		end if;
 		
 		-- TEMP: also clear unneeded data for all instructions
-		--res.data(i).virtualArgs := defaultVirtualArgs;
 		res.data(i).constantArgs := defaultConstantArgs; -- c0 needed for sysMtc if not using temp reg in Exec
 		res.data(i).argValues := defaultArgValues;
-		--res.data(i).basicInfo := defaultBasicInfo;
-			res.data(i).ip := (others => '0');
+		res.data(i).ip := (others => '0');
 		res.data(i).bits := (others => '0');
 	end loop;
 	

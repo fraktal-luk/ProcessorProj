@@ -122,11 +122,8 @@ begin
 					res.operation,
 					res.classInfo,
 					res.constantArgs,
-					tmpVirtualArgs,--res.virtualArgs,
-					tmpVirtualDestArgs);--res.virtualDestArgs);
-			
-			--res.virtualArgs := tmpVirtualArgs;
-			--res.virtualDestArgs := tmpVirtualDestArgs;
+					tmpVirtualArgs,
+					tmpVirtualDestArgs);
 	
 		res.virtualArgSpec.intDestSel := tmpVirtualDestArgs.sel(0);
 		res.virtualArgSpec.floatDestSel := '0';
@@ -206,7 +203,6 @@ return HbuffOutData is
 begin
 	for i in 0 to PIPE_WIDTH-1 loop
 		res.data(i).bits := content(i).bits(15 downto 0) & content(i+1).bits(15 downto 0);		
-		--res.data(i).basicInfo := content(i).basicInfo;
 			res.data(i).ip := content(i).ip;
 		res.data(i).controlInfo.squashed := content(i).controlInfo.squashed;
 	end loop;
@@ -216,7 +212,6 @@ begin
 		if (fullMask(j) and content(j).classInfo.short) = '1' then
 			res.fullMask(i) := '1';
 			res.data(i).bits := content(j).bits(15 downto 0) & content(j+1).bits(15 downto 0);			
-			--res.data(i).basicInfo := content(j).basicInfo;
 				res.data(i).ip := content(j).ip;
 				res.data(i).controlInfo.squashed := content(j).controlInfo.squashed;			
 				res.data(i).controlInfo.hasBranch := content(j).controlInfo.hasBranch;
@@ -224,7 +219,6 @@ begin
 		elsif (fullMask(j) and fullMask(j+1)) = '1' then
 			res.fullMask(i) := '1';
 			res.data(i).bits := content(j).bits(15 downto 0) & content(j+1).bits(15 downto 0);
-			--res.data(i).basicInfo := content(j).basicInfo;
 				res.data(i).ip := content(j).ip;
 				res.data(i).controlInfo.squashed := content(j).controlInfo.squashed;
 				res.data(i).controlInfo.hasBranch := content(j).controlInfo.hasBranch;
@@ -255,26 +249,22 @@ function getAnnotatedHwords(fetchIns: InstructionState; fetchInsMulti: StageData
 return InstructionStateArray is
 	variable res: InstructionStateArray(0 to 2*PIPE_WIDTH-1) := (others => DEFAULT_ANNOTATED_HWORD);
 	variable	tempWord: word := (others => '0');
-	--constant fetchBasicInfo: InstructionBasicInfo := fetchIns.basicInfo;
-	variable hwordBasicInfo: InstructionBasicInfo := DEFAULT_BASIC_INFO;--fetchBasicInfo;	
+	variable hwordIP: Mword := (others => '0');
 begin
 	for i in 0 to 2*PIPE_WIDTH-1 loop
-		hwordBasicInfo.ip := fetchIns.ip(MWORD_SIZE-1 downto ALIGN_BITS) & i2slv(2*i, ALIGN_BITS);
-		--	hwordBasicInfo.intLevel(SMALL_NUMBER_SIZE-1 downto 2) := (others => '0');
-		--	hwordBasicInfo.systemLevel(SMALL_NUMBER_SIZE-1 downto 2) := (others => '0');
+		hwordIP := fetchIns.ip(MWORD_SIZE-1 downto ALIGN_BITS) & i2slv(2*i, ALIGN_BITS);
 		tempWord(15 downto 0) := fetchBlock(i);		
 
 		res(i).bits := tempWord;
-		res(i).ip := hwordBasicInfo.ip;
+		res(i).ip := hwordIP;
 		res(i).classInfo.short := '0'; -- TEMP!
-			res(i).controlInfo.squashed := fetchIns.controlInfo.squashed; -- CAREFUL: guarding from wrong reading 
+		res(i).controlInfo.squashed := fetchIns.controlInfo.squashed; -- CAREFUL: guarding from wrong reading 
 	end loop;
-	
-		for i in 0 to PIPE_WIDTH-1 loop
-			--res(2*i).controlInfo.newEvent := fetchInsMulti.data(i).controlInfo.newEvent;
-			res(2*i).controlInfo.hasBranch := fetchInsMulti.data(i).controlInfo.hasBranch;
-			res(2*i).target := fetchInsMulti.data(i).target;
-		end loop;
+
+	for i in 0 to PIPE_WIDTH-1 loop
+		res(2*i).controlInfo.hasBranch := fetchInsMulti.data(i).controlInfo.hasBranch;
+		res(2*i).target := fetchInsMulti.data(i).target;
+	end loop;
 	
 	return res;
 end function;
@@ -376,7 +366,6 @@ return StageDataMulti is
 	variable res: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
 begin
 	res := getFrontEventMulti(predictedAddress, ins, receiving, valid, hbuffAccepting, fetchBlock);
-	
 	return res;
 end function;
 

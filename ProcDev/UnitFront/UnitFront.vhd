@@ -94,36 +94,36 @@ architecture Behavioral of UnitFront is
 	
 	signal fetchBlock: HwordArray(0 to FETCH_BLOCK_SIZE-1) := (others => (others => '0'));
 	
-		signal ivalid1: std_logic := '0';
-		signal stageDataOutFetch1: InstructionState := DEFAULT_DATA_PC;
-		signal sendingOutFetch1: std_logic := '0';	
-		signal acceptingOutFetch1: std_logic := '0';	
+	signal ivalid1: std_logic := '0';
+	signal stageDataOutFetch1: InstructionState := DEFAULT_DATA_PC;
+	signal sendingOutFetch1: std_logic := '0';	
+	signal acceptingOutFetch1: std_logic := '0';	
 
-		signal fetchBlock1, fetchBlockBP: HwordArray(0 to FETCH_BLOCK_SIZE-1) := (others => (others => '0'));
-	
-		signal ivalidFinal: std_logic := '0';
-		signal fetchBlockFinal: HwordArray(0 to FETCH_BLOCK_SIZE-1) := (others => (others => '0'));
-		signal stageDataOutFetchFinal:  InstructionState := DEFAULT_DATA_PC;
-		signal sendingOutFetchFinal: std_logic := '0';
-		
-		signal acceptingForFetchFirst, earlyBranchAccepting, earlyBranchSending, earlyBranchMultiSending
-							: std_logic := '0';
-		
-		signal hbufferDataIn, stallCausing: InstructionState := DEFAULT_INSTRUCTION_STATE;
-	
-		signal killAll, frontKill, stallEventSig: std_logic := '0';
-	
-		signal earlyBranchDataIn, earlyBranchDataOut: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
-		signal earlyBranchMultiDataIn, earlyBranchMultiDataOut: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
-	
-		signal sendingToEarlyBranch, stallAtFetchLast, fetchStall: std_logic := '0'; 
-		signal pcSendingDelayed0, pcSendingDelayed1, pcSendingDelayedFinal: std_logic := '0';
-		
-		signal frontCausingSig: InstructionState := DEFAULT_INSTRUCTION_STATE;
-		signal predictedAddress: Mword := (others => '0');
+	signal fetchBlock1, fetchBlockBP: HwordArray(0 to FETCH_BLOCK_SIZE-1) := (others => (others => '0'));
 
-		signal newDecoded, stageDataDecodeNew, stageDataDecodeOut: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
-		
+	signal ivalidFinal: std_logic := '0';
+	signal fetchBlockFinal: HwordArray(0 to FETCH_BLOCK_SIZE-1) := (others => (others => '0'));
+	signal stageDataOutFetchFinal:  InstructionState := DEFAULT_DATA_PC;
+	signal sendingOutFetchFinal: std_logic := '0';
+	
+	signal acceptingForFetchFirst, earlyBranchAccepting, earlyBranchSending, earlyBranchMultiSending
+						: std_logic := '0';
+	
+	signal hbufferDataIn, stallCausing: InstructionState := DEFAULT_INSTRUCTION_STATE;
+
+	signal killAll, frontKill, stallEventSig: std_logic := '0';
+
+	signal earlyBranchDataIn, earlyBranchDataOut: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
+	signal earlyBranchMultiDataIn, earlyBranchMultiDataOut: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
+
+	signal sendingToEarlyBranch, stallAtFetchLast, fetchStall: std_logic := '0'; 
+	signal pcSendingDelayed0, pcSendingDelayed1, pcSendingDelayedFinal: std_logic := '0';
+	
+	signal frontCausingSig: InstructionState := DEFAULT_INSTRUCTION_STATE;
+	signal predictedAddress: Mword := (others => '0');
+
+	signal newDecoded, stageDataDecodeNew, stageDataDecodeOut: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
+
 		signal ch0: std_logic := '0'; 
 	constant HAS_RESET_FRONT: std_logic := '0';
 	constant HAS_EN_FRONT: std_logic := '0';	
@@ -245,7 +245,7 @@ begin
 			);
 			
 			
-			--ch0 <= '1' when stageDataOutFetchFinal.basicInfo.ip = predictedAddress else '0';
+			--ch0 <= '1' when stageDataOutFetchFinal.ip = predictedAddress else '0';
 			
 			earlyBranchMultiDataIn <= getEarlyBranchMultiDataIn(predictedAddress,
 																				stageDataOutFetchFinal,

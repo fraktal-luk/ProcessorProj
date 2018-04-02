@@ -64,44 +64,41 @@ end ProcLogicSequence;
 
 package body ProcLogicSequence is
 
-	function getNextPC(pc: Mword; jumpPC: Mword; jump: std_logic) return Mword is
-		variable res, pcBase: Mword := (others => '0'); 
-	begin
-		pcBase := pc and i2slv(-PIPE_WIDTH*4, MWORD_SIZE); -- Clearing low bits
-		if jump = '1' then
-			res := jumpPC;
-		else
-			res := addMwordBasic(pcBase, PC_INC);
-		end if;
-		return res;
-	end function;
-	
-		-- group:  revTag = causing.groupTag and i2slv(-PIPE_WIDTH, SMALL_NUMBER_SIZE), mask = all ones
-		-- sequential: revTag = causing.numberTag, mask = new group's fullMask		
-		function nextCtr(ctr: InsTag; rewind: std_logic; revTag: InsTag;
-									 allow: std_logic; mask: std_logic_vector) 
-		return InsTag is
-		begin
-			if rewind = '1' then
-				return revTag;
-			elsif allow = '1' then
-				return i2slv(slv2u(ctr) + countOnes(mask), TAG_SIZE);
-			else
-				return ctr;
-			end if;
-		end function;
-
-
-function getLinkInfo(ins: InstructionState; state: Mword) return InstructionState is
-	variable res: InstructionState := DEFAULT_INSTRUCTION_STATE;--ins.basicInfo;
+function getNextPC(pc: Mword; jumpPC: Mword; jump: std_logic) return Mword is
+	variable res, pcBase: Mword := (others => '0'); 
 begin
-	res.ip := ins.target;
-	--res.basicInfo.intLevel := state(7 downto 0);
-	--res.basicInfo.systemLevel := state(15 downto 8);
-		res.result := state;
+	pcBase := pc and i2slv(-PIPE_WIDTH*4, MWORD_SIZE); -- Clearing low bits
+	if jump = '1' then
+		res := jumpPC;
+	else
+		res := addMwordBasic(pcBase, PC_INC);
+	end if;
 	return res;
 end function;
 
+-- group:  revTag = causing.groupTag and i2slv(-PIPE_WIDTH, SMALL_NUMBER_SIZE), mask = all ones
+-- sequential: revTag = causing.numberTag, mask = new group's fullMask		
+function nextCtr(ctr: InsTag; rewind: std_logic; revTag: InsTag;
+							 allow: std_logic; mask: std_logic_vector) 
+return InsTag is
+begin
+	if rewind = '1' then
+		return revTag;
+	elsif allow = '1' then
+		return i2slv(slv2u(ctr) + countOnes(mask), TAG_SIZE);
+	else
+		return ctr;
+	end if;
+end function;
+
+
+function getLinkInfo(ins: InstructionState; state: Mword) return InstructionState is
+	variable res: InstructionState := DEFAULT_INSTRUCTION_STATE;
+begin
+	res.ip := ins.target;
+	res.result := state;
+	return res;
+end function;
 
 
 function getLatePCData(commitEvent: std_logic; commitCausing: InstructionState;
@@ -116,9 +113,8 @@ begin
 			else
 				res.ip := INT_BASE; -- TEMP!
 			end if;
-				res.result := currentState or X"00000001";
-				res.result := res.result and X"fdffffff"; -- Clear dbtrap
-			--res.basicInfo.intLevel := "00000001";		
+			res.result := currentState or X"00000001";
+			res.result := res.result and X"fdffffff"; -- Clear dbtrap
 		elsif commitCausing.controlInfo.hasException = '1'
 			or commitCausing.controlInfo.dbtrap = '1' then
 			-- TODO, FIX: exceptionCode sliced - shift left by ALIGN_BITS? or leave just base address
@@ -126,11 +122,9 @@ begin
 									& commitCausing.controlInfo.exceptionCode(
 													commitCausing.controlInfo.exceptionCode'length-1 downto ALIGN_BITS)
 									& EXC_BASE(ALIGN_BITS-1 downto 0);	
-									--		INT_BASE;
 			-- TODO: if exception, it overrides dbtrap, but if only dbtrap, a specific vector address
 				res.result := currentState or X"00000100";
 				res.result := res.result and X"fdffffff";	-- Clear dbtrap
-			--res.basicInfo.systemLevel := "00000001";
 		elsif commitCausing.controlInfo.specialAction = '1' then
 					res.result := currentState;
 				if commitCausing.operation.func = sysSync then
@@ -140,15 +134,11 @@ begin
 				elsif commitCausing.operation.func = sysHalt then
 					res.ip := commitCausing.target; -- ???
 				elsif commitCausing.operation.func = sysRetI then
-						res.result := stateInt;
+					res.result := stateInt;
 					res.ip := linkInt;
-					--res.basicInfo.systemLevel := stateInt(15 downto 8);
-					--res.basicInfo.intLevel := stateInt(7 downto 0);
 				elsif commitCausing.operation.func = sysRetE then
-						res.result := stateExc;
+					res.result := stateExc;
 					res.ip := linkExc;
-					--res.basicInfo.systemLevel := stateExc(15 downto 8);
-					--res.basicInfo.intLevel := stateExc(7 downto 0); 
 				end if;
 		end if;		
 	

@@ -27,12 +27,10 @@ function unit2queue(unit: ExecUnit) return integer;
 function routeToIQ(sd: StageDataMulti; srcVec: std_logic_vector) return StageDataMulti;	
 function routeToIQ2(sd: StageDataMulti; srcVec: std_logic_vector) return StageDataMulti;	
 
-
 function findForALU(iv: InstructionStateArray) return std_logic_vector;
 
 function findStores(insv: StageDataMulti) return std_logic_vector;
 function findLoads(insv: StageDataMulti) return std_logic_vector;
-
 
 function prepareForAGU(insVec: StageDataMulti) return StageDataMulti;
 function prepareForStoreData(insVec: StageDataMulti) return StageDataMulti;
@@ -48,7 +46,6 @@ package body ProcLogicRouting is
 
 function unit2queue(unit: ExecUnit) return integer is
 begin
-	--return ISSUE_ROUTING_TABLE(unit);
 	case unit is
 		when General => return -1; -- Should never happen!
 		when ALU => return 0;
@@ -197,20 +194,17 @@ begin
 end function;
 
 
-
 function prepareForAGU(insVec: StageDataMulti) return StageDataMulti is
 	variable res: StageDataMulti := insVec;
 begin
 	for i in 0 to PIPE_WIDTH-1 loop
-		--res.data(i).virtualArgs.sel(2) := '0';
-		--res.data(i).physicalArgs.sel(2) := '0';
 		res.data(i).argValues.missing(2) := '0';
 		
 		res.data(i).virtualArgSpec.intArgSel(2) := '0';
 		res.data(i).physicalArgSpec.intArgSel(2) := '0';
 		
-			res.data(i).controlInfo.completed := '0';
-			res.data(i).controlInfo.completed2 := '0';
+		res.data(i).controlInfo.completed := '0';
+		res.data(i).controlInfo.completed2 := '0';
 	end loop;
 	return res;
 end function;
@@ -219,25 +213,19 @@ end function;
 function prepareForStoreData(insVec: StageDataMulti) return StageDataMulti is
 	variable res: StageDataMulti := insVec;
 begin
-	for i in 0 to PIPE_WIDTH-1 loop
-		--res.data(i).virtualArgs.sel(0) := '0';
-		--res.data(i).virtualArgs.sel(1) := '0';		
-		--res.data(i).physicalArgs.sel(0) := '0';
-		--res.data(i).physicalArgs.sel(1) := '0';		
+	for i in 0 to PIPE_WIDTH-1 loop	
 		res.data(i).constantArgs.immSel := '0';
-		--res.data(i).virtualDestArgs.sel(0) := '0';
-		--res.data(i).physicalDestArgs.sel(0) := '0';
 
-			res.data(i).virtualArgSpec.intArgSel(0) := '0';
-			res.data(i).virtualArgSpec.intArgSel(1) := '0';
-			res.data(i).virtualArgSpec.intDestSel := '0';			
+		res.data(i).virtualArgSpec.intArgSel(0) := '0';
+		res.data(i).virtualArgSpec.intArgSel(1) := '0';
+		res.data(i).virtualArgSpec.intDestSel := '0';			
 
-			res.data(i).physicalArgSpec.intArgSel(0) := '0';
-			res.data(i).physicalArgSpec.intArgSel(1) := '0';
-			res.data(i).physicalArgSpec.intDestSel := '0';
-			
-			res.data(i).controlInfo.completed := '0';
-			res.data(i).controlInfo.completed2 := '0';
+		res.data(i).physicalArgSpec.intArgSel(0) := '0';
+		res.data(i).physicalArgSpec.intArgSel(1) := '0';
+		res.data(i).physicalArgSpec.intDestSel := '0';
+		
+		res.data(i).controlInfo.completed := '0';
+		res.data(i).controlInfo.completed2 := '0';
 	end loop;
 	return res;
 end function;

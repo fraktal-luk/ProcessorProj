@@ -564,8 +564,7 @@ begin
 	-- CAREFUL! DEPREC statement?
 	res.argValues.newInQueue := isNew;
 	
-		--res.basicInfo := DEFAULT_BASIC_INFO;		
-		res.ip := (others => '0');
+	res.ip := (others => '0');
 	return res;
 end function;
 
@@ -608,24 +607,13 @@ begin
 --		
 		res.controlInfo.completed := '0';
 		res.controlInfo.completed2 := '0';
-			--res.basicInfo := DEFAULT_BASIC_INFO;
-			res.ip := (others => '0');
-		res.controlInfo.newEvent := '0';
-		--res.controlInfo.newInterrupt := '0';
-		--res.controlInfo.newException := '0';
-		--res.controlInfo.newBranch := '0';
-		--res.controlInfo.newReturn := '0';
-		--res.controlInfo.newFetchLock := '0';
+		res.ip := (others => '0');
 
-		--	res.controlInfo.hasEvent := '0';
+		res.controlInfo.newEvent := '0';
 		res.controlInfo.hasInterrupt := '0';
-		--	res.controlInfo.hasException := '0';
-		--	res.controlInfo.hasBranch := '0';
-		res.controlInfo.hasReturn := '0';
-		--res.controlInfo.hasFetchLock := '0';
-		
+		res.controlInfo.hasReturn := '0';		
 		res.controlInfo.exceptionCode := (others => '0');
-	
+
 	return res;
 end function;
 							

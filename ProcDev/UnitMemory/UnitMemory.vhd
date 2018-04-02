@@ -131,8 +131,7 @@ architecture Behavioral of UnitMemory is
 			 sendingAddressingForLoad, sendingAddressingForMfc,
 			 sendingAddressingForStore, sendingAddressingForMtc: std_logic := '0';
 	signal storeAddressDataSig, storeValueDataSig: InstructionState := DEFAULT_INSTRUCTION_STATE;
-	signal sqSelectedOutput, lqSelectedOutput, lmqSelectedOutput: InstructionSlot
-				:= DEFAULT_INSTRUCTION_SLOT;
+	signal sqSelectedOutput, lqSelectedOutput, lmqSelectedOutput: InstructionSlot := DEFAULT_INSTRUCTION_SLOT;
 begin
 	eventSignal <= execOrIntEventSignalIn;	
 
@@ -213,7 +212,7 @@ begin
 	addressUnitSendingSig <= (dataAfterMem.fullMask(0) and not sendingToDLQ) or lqSelectedOutput.full;
 																									--??? -- because load exc to ROB
 	outputC <= (addressUnitSendingSig, clearTempControlInfoSimple(execResultData));
-	outputOpPreC <= DEFAULT_INS_STATE;-- stageDataOutMem0.data(0); -- CAREFUL: Don't show this because not supported
+	outputOpPreC <= DEFAULT_INS_STATE; -- CAREFUL: Don't show this because not supported
 
 		-- CAREFUL, TODO: if mem subpipe can be locked, then memLoadReady will expire while the
 		--						corresponding load is stalled, and it will go to LMQ. In such case
@@ -362,8 +361,7 @@ begin
 			execAcceptingE <= '1';
 			
 			-- Mem interface
-			memLoadAddress <= addressingData.--result;
-														target;
+			memLoadAddress <= addressingData.target;
 			memLoadAllow <= sendingAddressingForLoad;
 			sysLoadAllow <= sendingAddressingForMfc;	 
 				 

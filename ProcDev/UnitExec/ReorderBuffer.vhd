@@ -58,19 +58,14 @@ entity ReorderBuffer is
 		commitGroupCtr: in InsTag;
 		commitGroupCtrNext: in InsTag;
 
-		--execEnds: in InstructionStateArray(0 to 3);
-		--execReady: in std_logic_vector(0 to 3);
-		--execEnds2: in InstructionStateArray(0 to 3);
-		--execReady2:  in std_logic_vector(0 to 3);
-		
-			execEndSigs1: in InstructionSlotArray(0 to 3);
-			execEndSigs2: in InstructionSlotArray(0 to 3);
+		execEndSigs1: in InstructionSlotArray(0 to 3);
+		execEndSigs2: in InstructionSlotArray(0 to 3);
 		
 		inputData: in StageDataMulti;
 		prevSending: in std_logic;
 		acceptingOut: out std_logic;
 		
-			nextAccepting: in std_logic;
+		nextAccepting: in std_logic;
 		sendingOut: out std_logic; 
 		
 		outputData: out StageDataMulti
@@ -80,15 +75,13 @@ end ReorderBuffer;
 
 
 architecture Implem of ReorderBuffer is
-
-		signal fullMask, TMP_mask, TMP_ckEnForInput, TMP_sendingMask, TMP_killMask, TMP_livingMask, TMP_maskNext:
+	signal fullMask, TMP_mask, TMP_ckEnForInput, TMP_sendingMask, TMP_killMask, TMP_livingMask, TMP_maskNext:
 				std_logic_vector(0 to ROB_SIZE-1) := (others => '0');
 
 		signal TMP_front, TMP_frontCircular: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
 	signal stageData, stageDataLiving, stageDataNext, stageDataUpdated,
 					TMP_stageData, TMP_stageDataUpdated, TMP_stageDataNext: 
-							StageDataROB := (fullMask => (others => '0'),
-												  data => (others => DEFAULT_STAGE_DATA_MULTI));
+							StageDataROB := (fullMask => (others => '0'), data => (others => DEFAULT_STAGE_DATA_MULTI));
 	signal flowDrive: FlowDriveBuffer	:= (killAll => '0', lockAccept => '0', lockSend => '0',
 																others=>(others=>'0'));
 	signal flowResponse: FlowResponseBuffer := (others => (others=> '0'));
@@ -99,18 +92,15 @@ architecture Implem of ReorderBuffer is
 		
 	signal numKilled: SmallNumber := (others => '0');
 
-
-		signal qs0, qs1: TMP_queueState := TMP_defaultQueueState;
-		signal ta, tb: SmallNumber := (others => '0');
+	signal qs0, qs1: TMP_queueState := TMP_defaultQueueState;
 		
-		signal inputIndices: SmallNumberArray(0 to ROB_SIZE-1) := (others => (others => '0'));
+	signal inputIndices: SmallNumberArray(0 to ROB_SIZE-1) := (others => (others => '0'));
 
 	signal inputIndices_T: SmallNumberArray(0 to ROB_SIZE-1) := (others => (others => '0'));
 	signal ckEnForInput_T, sendingMask_T: std_logic_vector(0 to ROB_SIZE-1) := (others => '0');
 	
 	signal robView, robLivingView, robNextView, robLivingViewU, robNextViewU:
-							StageDataROB := (fullMask => (others => '0'),
-																					 data => (others => DEFAULT_STAGE_DATA_MULTI));
+							StageDataROB := (fullMask => (others => '0'), data => (others => DEFAULT_STAGE_DATA_MULTI));
 
 		signal execEnds: InstructionStateArray(0 to 3) := (others => DEFAULT_INSTRUCTION_STATE);
 		signal execReady: std_logic_vector(0 to 3) := (others => '0');
@@ -128,11 +118,7 @@ begin
 		execEnds2 <= extractData(execEndSigs2);
 		execReady2 <= extractFullMask(execEndSigs2);
 		
-				--ta <= flowDrive.nextAccepting;
-				--tb <= flowDrive.prevSending;
-				qs1 <= TMP_change(qs0,-- ta, tb,
-									flowDrive.nextAccepting,
-									flowDrive.prevSending,
+				qs1 <= TMP_change(qs0, flowDrive.nextAccepting, flowDrive.prevSending,
 										TMP_mask, TMP_killMask, lateEventSignal or execEventSignal,
 										TMP_maskNext);
 										
@@ -142,9 +128,7 @@ begin
 					-- in shifting queue this would be shfited by nSend
 					-- Also slots for moved part would have enable, found from (i < nRemaining), only if nSend /= 0
 				TMP_sendingMask <= getQueueSendingMask(qs0, ROB_SIZE, flowDrive.nextAccepting);
-				TMP_killMask <= getKillMaskROB(qs0, TMP_mask, --execCausing,
-																				execEnds2(3),
-																				execEventSignal, lateEventSignal);
+				TMP_killMask <= getKillMaskROB(qs0, TMP_mask, execEnds2(3), execEventSignal, lateEventSignal);
 
 					TMP_livingMask <= TMP_mask and not TMP_killMask;
 
@@ -219,9 +203,8 @@ begin
 	-- TODO: allow accepting also when queue full but sending, that is freeing a place?
 	acceptingOut <= not getBitFromROBMaskPre(TMP_stageData, qs0.pStart);
 								
-	--outputData <= TMP_frontCircular;
-		outputData.data <= TMP_frontCircular.data;
-		outputData.fullMask <= TMP_frontCircular.fullMask when isSending = '1' else (others => '0');
+	outputData.data <= TMP_frontCircular.data;
+	outputData.fullMask <= TMP_frontCircular.fullMask when isSending = '1' else (others => '0');
 
 	sendingOut <= isSending;
 end Implem;

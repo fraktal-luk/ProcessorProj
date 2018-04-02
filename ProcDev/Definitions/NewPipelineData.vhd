@@ -25,8 +25,8 @@ package NewPipelineData is
 	-- Configuration defs 
 	constant MW: natural := 4; -- Max pipe width  
 
-	constant LOG2_PIPE_WIDTH: natural := 0 + 0; -- + 2; -- Must match the width!
-	constant PIPE_WIDTH: positive := 2**LOG2_PIPE_WIDTH; -- + 1 + 2; 
+	constant LOG2_PIPE_WIDTH: natural := 0 + 0;
+	constant PIPE_WIDTH: positive := 2**LOG2_PIPE_WIDTH;
 	constant ALIGN_BITS: natural := LOG2_PIPE_WIDTH + 2;
 	constant PC_INC: Mword := (ALIGN_BITS => '1', others => '0');	
 
@@ -122,22 +122,13 @@ type ExecFunc is (unknown,
 
 
 constant TAG_SIZE: integer := 7 + LOG2_PIPE_WIDTH;
--- CAREFUL, TEMP: to change to enable more than 8 bits
-subtype InsTag is --SmallNumber;--
-						std_logic_vector(TAG_SIZE-1 downto 0);
+subtype InsTag is std_logic_vector(TAG_SIZE-1 downto 0);
 type InsTagArray is array (integer range <>) of InsTag;
 
 
 type BinomialOp is record
 	unit: ExecUnit;
 	func: ExecFunc;
-end record;
-
-type InstructionBasicInfo is record
-	ip: Mword;
-	--thread: SmallNumber;
-	intLevel: SmallNumber;
-	systemLevel: SmallNumber;
 end record;
 
 type InstructionControlInfo is record
@@ -235,8 +226,7 @@ end record;
 
 type InstructionState is record
 	controlInfo: InstructionControlInfo;
-	--basicInfo: InstructionBasicInfo;
-		ip: Mword;
+	ip: Mword;
 	bits: word; -- instruction word
 	tags: InstructionTags;
 	operation: BinomialOp;
@@ -255,8 +245,6 @@ type InstructionStateArray is array(integer range <>) of InstructionState;
 -- Number of words proper for fetch group size
 subtype InsGroup is WordArray(0 to PIPE_WIDTH-1);
 
-
-function defaultBasicInfo return InstructionBasicInfo;
 function defaultControlInfo return InstructionControlInfo;
 function defaultClassInfo return InstructionClassInfo;
 function defaultConstantArgs return InstructionConstantArgs;
@@ -268,7 +256,6 @@ function defaultArgValues return InstructionArgValues;
 
 function defaultInstructionState return InstructionState;
 
-constant DEFAULT_BASIC_INFO: InstructionBasicInfo := defaultBasicInfo;
 constant DEFAULT_CONTROL_INFO: InstructionControlInfo := defaultControlInfo;
 constant DEFAULT_CLASS_INFO: InstructionClassInfo := defaultClassInfo;
 constant DEFAULT_CONSTANT_ARGS: InstructionConstantArgs := defaultConstantArgs;
@@ -340,14 +327,6 @@ end NewPipelineData;
 
 
 package body NewPipelineData is
- 
-function defaultBasicInfo return InstructionBasicInfo is
-begin
-	return InstructionBasicInfo'( ip => (others=>'0'),		-- CAREFUL! '1' hinder constant propagation, but 
-																			--				sometimes useful for debugging	
-											intLevel => (others=>'0'),
-											systemLevel => (others=>'0'));
-end function;
 
 function defaultControlInfo return InstructionControlInfo is
 begin
@@ -430,22 +409,13 @@ function defaultInstructionState return InstructionState is
 	variable res: InstructionState;
 begin 
 	res.controlInfo := defaultControlInfo;
-	--res.basicInfo := defaultBasicInfo;
-		res.ip := (others => '0');
+	res.ip := (others => '0');
 	res.bits := (others=>'0');
-		res.tags := DEFAULT_INSTRUCTION_TAGS;
-	--res.operation := BinomialOp'(unknown, unknown);
+	res.tags := DEFAULT_INSTRUCTION_TAGS;
 	res.classInfo := defaultClassInfo;
 	res.constantArgs := defaultConstantArgs;
-	--res.virtualArgs := defaultVirtualArgs;
-	--res.virtualDestArgs := defaultVirtualDestArgs;
-	--res.physicalArgs := defaultPhysicalArgs;
-	--res.physicalDestArgs := defaultPhysicalDestArgs;
-		res.virtualArgSpec := DEFAULT_ARG_SPEC;
-		res.physicalArgSpec := DEFAULT_ARG_SPEC;
-	--res.numberTag := (others => '0'); -- '1');
-	--res.gprTag := (others => '0'); -- '1');
-	--res.groupTag := (others => '0');
+	res.virtualArgSpec := DEFAULT_ARG_SPEC;
+	res.physicalArgSpec := DEFAULT_ARG_SPEC;
 	res.argValues := defaultArgValues;
 	res.result := (others => '0');
 	res.target := (others => '0');
