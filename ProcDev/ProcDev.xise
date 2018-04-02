@@ -27,9 +27,6 @@
       <association xil_pn:name="BehavioralSimulation" xil_pn:seqID="2"/>
       <association xil_pn:name="Implementation" xil_pn:seqID="2"/>
     </file>
-    <file xil_pn:name="LowLevelModules/TestVerilogModule.v" xil_pn:type="FILE_VERILOG"/>
-    <file xil_pn:name="LowLevelModules/VerilogALU32.v" xil_pn:type="FILE_VERILOG"/>
-    <file xil_pn:name="LowLevelModules/TempVerilogMultiplier.v" xil_pn:type="FILE_VERILOG"/>
     <file xil_pn:name="Definitions/NewPipelineData.vhd" xil_pn:type="FILE_VHDL">
       <association xil_pn:name="BehavioralSimulation" xil_pn:seqID="3"/>
       <association xil_pn:name="Implementation" xil_pn:seqID="3"/>
@@ -173,10 +170,6 @@
     <file xil_pn:name="UnitExec/ReadyRegisterTable.vhd" xil_pn:type="FILE_VHDL">
       <association xil_pn:name="BehavioralSimulation" xil_pn:seqID="46"/>
       <association xil_pn:name="Implementation" xil_pn:seqID="46"/>
-    </file>
-    <file xil_pn:name="LowLevelModules/ReadyRegTableV.vhd" xil_pn:type="FILE_VHDL">
-      <association xil_pn:name="BehavioralSimulation" xil_pn:seqID="0"/>
-      <association xil_pn:name="Implementation" xil_pn:seqID="0"/>
     </file>
     <file xil_pn:name="UnitMemory/UnitMemory.vhd" xil_pn:type="FILE_VHDL">
       <association xil_pn:name="BehavioralSimulation" xil_pn:seqID="32"/>
