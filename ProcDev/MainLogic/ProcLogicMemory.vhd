@@ -53,22 +53,17 @@ function setDataCompleted(ins: InstructionState; state: std_logic) return Instru
 
 				function lmQueueNext(content: InstructionStateArray;
 									  livingMask: std_logic_vector;
-									  newContent: InstructionStateArray;
-									  newMask: std_logic_vector;
-									  nLiving: integer;
+									  newContent: InstructionState;
 									  sendingVec: std_logic_vector; -- shows which one sending
 									  receiving: std_logic;
-									  dataA, dataD: InstructionState;
-									  wrA, wrD: std_logic;
-									  mA, mD: std_logic_vector;
-									  clearCompleted: boolean
-									  ) return InstructionStateArray;
+									  receivingVec: std_logic_vector) return InstructionStateArray;
 
 function lmMaskNext(livingMask: std_logic_vector;
-					  newMask: std_logic_vector;
-					  nLivingIn: integer;
 					  sendingVec: std_logic_vector;
-					  receiving: std_logic) return std_logic_vector;
+					  receiving: std_logic;
+					  receivingVec: std_logic_vector) return std_logic_vector;
+
+function findFirstFree(mask: std_logic_vector) return std_logic_vector;
 
 	function TMP_cmpTagsBefore(content: InstructionStateArray; tag: InsTag)
 	return std_logic_vector;
@@ -253,158 +248,57 @@ begin
 end function;
 
 
+
 				function lmQueueNext(content: InstructionStateArray;
 									  livingMask: std_logic_vector;
-									  newContent: InstructionStateArray;
-									  newMask: std_logic_vector;
-									  nLiving: integer;
+									  newContent: InstructionState;
 									  sendingVec: std_logic_vector; -- shows which one sending
 									  receiving: std_logic;
-									  dataA, dataD: InstructionState;
-									  wrA, wrD: std_logic;
-									  mA, mD: std_logic_vector;
-									  clearCompleted: boolean
+									  receivingVec: std_logic_vector
 									  ) return InstructionStateArray is
 					constant LEN: integer := content'length;
-					variable tempContent, tempNewContent: InstructionStateArray(0 to LEN + PIPE_WIDTH-1)
-									:= (others => DEFAULT_INSTRUCTION_STATE);
-					variable tempMask: std_logic_vector(0 to LEN + PIPE_WIDTH-1) := (others => '0');
-					variable res: InstructionStateArray(0 to LEN-1)
-											:= (others => DEFAULT_INSTRUCTION_STATE);--content;
-					variable outMask: std_logic_vector(0 to LEN-1) := (others => '0');
-					variable c1, c2: std_logic := '0';
-					variable sv: Mword := (others => '0');
-					variable sh: integer := 0;
-					variable shifted: boolean := false;
+					variable res: InstructionStateArray(0 to LEN-1) := content;
 				begin
-					if isNonzero(sendingVec) = '1' then
-						sh := 1;
-					end if;
-				
-					tempContent(0 to LEN-1) := content;
 					for i in 0 to LEN-1 loop
-						tempNewContent(i) := newContent((nLiving-sh + i) mod PIPE_WIDTH);
-					end loop;
-					
-					tempMask(0 to LEN-1) := livingMask;
-
-					-- Shift by n of sending
-					for i in 0 to LEN-1 loop
-						if sendingVec(i) = '1' then
-							shifted := true;
+						if receiving = '1' and receivingVec(i) = '1' then
+							res(i) := newContent;
+						elsif sendingVec(i) = '1' then
+							null; 
 						end if;
-						if shifted then
-							tempContent(i) := tempContent(i+1);
-						else
-							null;
-						end if;
-					end loop;
-					
-					-- CAREFUL: tempMask must have enough zeros at the end to clear outdated 'ones'!
-					outMask(0 to LEN-1) := tempMask(sh to sh + LEN-1); 
-					
-					for i in 0 to LEN-1 loop
-							res(i).ip := (others => '0');
-							c1 := res(i).controlInfo.completed;
-							c2 := res(i).controlInfo.completed2;
-							res(i).controlInfo := DEFAULT_CONTROL_INFO;
-							res(i).controlInfo.completed := c1;
-							res(i).controlInfo.completed2 := c2;
-						res(i).bits := (others => '0');
-							res(i).operation := (Memory, store);
-						res(i).classInfo := DEFAULT_CLASS_INFO;
-						res(i).constantArgs := DEFAULT_CONSTANT_ARGS;
-						
-						res(i).tags.renameSeq := (others => '0');
-						res(i).tags.intPointer := (others => '0');
-						
-							sv := res(i).argValues.arg2;
-							res(i).argValues := DEFAULT_ARG_VALUES;
-							res(i).argValues.arg2 := sv;
-						res(i).target := (others => '0');
-						
-						if outMask(i) = '1' then									
-							res(i).tags.renameIndex := tempContent(i).tags.renameIndex;
-						else
-							res(i).tags.renameIndex := tempNewContent(i).tags.renameIndex;										
-						end if;
-															
-						if (wrA and mA(i)) = '1' then
-							res(i).argValues.arg1 := dataA.result;
-							res(i).controlInfo.completed := '1';
-						elsif outMask(i) = '1' then
-							res(i).argValues.arg1 := tempContent(i).argValues.arg1;
-							res(i).controlInfo.completed := tempContent(i).controlInfo.completed;									
-						else
-							res(i).argValues.arg1 := tempNewContent(i).argValues.arg1;
-							if clearCompleted then
-								res(i).controlInfo.completed := '0';
-							else
-								res(i).controlInfo.completed := tempNewContent(i).controlInfo.completed;
-							end if;	
-						end if;
-
-						if (wrD and mD(i)) = '1' then									
-							res(i).argValues.arg2 := dataD.argValues.arg2;
-							res(i).controlInfo.completed2 := '1';
-						elsif outMask(i) = '1' then
-							res(i).argValues.arg2 := tempContent(i).argValues.arg2;
-							res(i).controlInfo.completed2 := tempContent(i).controlInfo.completed2;
-						else	
-							res(i).argValues.arg2 := tempNewContent(i).argValues.arg2;
-							if clearCompleted then
-								res(i).controlInfo.completed2 := '0';
-							else
-								res(i).controlInfo.completed2 := tempNewContent(i).controlInfo.completed2;
-							end if;
-						end if;
-
 					end loop;
 					
 					return res;
 				end function;
 
+
 function lmMaskNext(livingMask: std_logic_vector;
-					  newMask: std_logic_vector;
-					  nLivingIn: integer;
 					  sendingVec: std_logic_vector;
-					  receiving: std_logic) return std_logic_vector is
-	variable nLiving: integer := nLivingIn;
+					  receiving: std_logic;
+					  receivingVec: std_logic_vector
+) return std_logic_vector is
 	constant LEN: integer := livingMask'length;
-	variable tempMask: std_logic_vector(0 to LEN + PIPE_WIDTH-1) := (others => '0');
 	variable outMask: std_logic_vector(0 to LEN-1) := (others => '0');
-	variable shifted: boolean := false;
 begin
-	if nLiving < 0  or nLiving > LEN then
-		nLiving := 0;
+	outMask := outMask and not sendingVec;
+	if receiving = '1' then 
+		outMask := outMask or receivingVec;
 	end if;
-		
-	tempMask(0 to LEN-1) := livingMask;	
-	for i in 0 to LEN-1 loop
-		if sendingVec(i) = '1' then
-			shifted := true;
-		end if;	
-	
-		if shifted then
-			tempMask(i) := tempMask(i+1);
-		else
-			tempMask(i) := tempMask(i);
-		end if;
-	end loop;
-
-	-- Append new data
-	if receiving = '1' then
-		if shifted then
-			tempMask(nLiving-1 to nLiving-1 + PIPE_WIDTH-1) := newMask;
-		else
-			tempMask(nLiving to nLiving + PIPE_WIDTH-1) := newMask;
-		end if;
-	end if;
-
-	outMask := tempMask(0 to LEN-1);
-	
 	return outMask;
 end function;
+
+function findFirstFree(mask: std_logic_vector) return std_logic_vector is
+	variable res: std_logic_vector(0 to mask'length-1) := (others => '0');
+begin
+	for i in 0 to mask'length-1 loop
+		if mask(i) = '0' then
+			res(i) := '1';
+			exit;
+		end if;
+	end loop;
+	
+	return res;
+end function;
+
 
 	function TMP_cmpTagsBefore(content: InstructionStateArray; tag: InsTag)
 	return std_logic_vector is
@@ -453,8 +347,7 @@ end function;
 			res := setDataCompleted(res, memLoadReady);
 			res := setInsResult(res, memLoadValue);
 		else -- is store or sys reg write?
-			--res := setDataCompleted(res, '1'); -- ?
-			--res := setAddressCompleted(res, '1'); -- ?
+
 		end if;
 		
 		return res;

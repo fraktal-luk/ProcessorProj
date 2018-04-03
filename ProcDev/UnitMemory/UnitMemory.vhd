@@ -163,6 +163,9 @@ begin
 
 	dataToMemPipe <= dataFromDLQ when sendingFromDLQ = '1' else stageDataOutAGU.data(0);
 	sendingToMemPipe <= stageDataOutAGU.fullMask(0) or sendingFromDLQ;
+	-- CAREFUL, TODO: at this point probably "completed" bits must be cleared, because they will be set (or not)
+	--						base on the success or failure of translation and cache access
+	-- CREFUL, TODO: sending from AGU must be blocked when sending from DLQ?
 
 	inputDataLoadUnit <= makeSDM((0 => (sendingToMemPipe, dataToMemPipe)));
 
@@ -184,6 +187,8 @@ begin
 		
 		stageEventsOut => open					
 	);
+
+	-- CAREFUL, TODO: after mem0 set "addressCompleted" according to success or failure of translation?
 
 	sendingAddressing <= stageDataOutMem0.fullMask(0); -- After translation
 	addressingData	<= stageDataOutMem0.data(0);

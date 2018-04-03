@@ -61,12 +61,9 @@ architecture LoadMissQueue of MemoryUnit is
 
 	signal content, contentNext, contentUpdated:
 					InstructionSlotArray(0 to QUEUE_SIZE-1) := (others => DEFAULT_INSTRUCTION_SLOT);
-	signal contentData: InstructionStateArray(0 to QUEUE_SIZE-1)
-																			:= (others => DEFAULT_INSTRUCTION_STATE);					
-	signal contentDataNext: InstructionStateArray(0 to QUEUE_SIZE-1)
-																			:= (others => DEFAULT_INSTRUCTION_STATE);
-	signal contentMaskNext, matchingA, matchingD,
-				matchingShA, matchingShD, firstReadyVec, sendingVec
+	signal contentData: InstructionStateArray(0 to QUEUE_SIZE-1) := (others => DEFAULT_INSTRUCTION_STATE);					
+	signal contentDataNext: InstructionStateArray(0 to QUEUE_SIZE-1) := (others => DEFAULT_INSTRUCTION_STATE);
+	signal contentMaskNext, matchingA, matchingD, matchingShA, matchingShD, firstReadyVec, sendingVec, receivingVec
 				: std_logic_vector(0 to QUEUE_SIZE-1) := (others => '0');
 
 	signal bufferDrive: FlowDriveBuffer := (killAll => '0', lockAccept => '0', lockSend => '0',
@@ -76,38 +73,23 @@ begin
 		fullMask <= extractFullMask(content);
 		livingMask <= fullMask and not killMask;
 							
-		matchingA <= findMatching(content, dataA);
-		matchingD <= findMatching(content, dataD);
+		--matchingA <= compareAddress(extractData(content), fullMask, compareAddressInput.ins);
+		--matchingD <= compareAddress(extractData(content), fullMask, compareDataInput.ins);
 							
-		sendingVec <= firstReadyVec when nextAccepting = '1' else (others => '0');					
-							
-		matchingShA <= lmMaskNext(matchingA, zeroMask,
-																 binFlowNum(bufferResponse.living),
-																 --binFlowNum(bufferResponse.sending),
-																 sendingVec,
-																 prevSending);																
-		matchingShD <= lmMaskNext(matchingD, zeroMask,
-																 binFlowNum(bufferResponse.living),
-																 --binFlowNum(bufferResponse.sending),
-																 sendingVec,
-																 prevSending);
+		sendingVec <= firstReadyVec when nextAccepting = '1' else (others => '0');
+		receivingVec <= findFirstFree(fullMask);
 		
 		-- TODO: enable sending from any slot! And preserve mem address (when enqueueing, don't clear it!)
 		--			Add vector with position of first ready
 		contentDataNext <= lmQueueNext(extractData(content), livingMask,
-																 dataIn.data, dataIn.fullMask,
-																 binFlowNum(bufferResponse.living),
-																 --binFlowNum(bufferResponse.sending),
+																 dataIn.data(0),
 																	sendingVec,
 																 prevSending,
-																 dataA, dataD, wrAddress, wrData,
-																 matchingShA, matchingShD,
-																 CLEAR_COMPLETED);
-		contentMaskNext <= lmMaskNext(livingMask, dataIn.fullMask,
-																 binFlowNum(bufferResponse.living),
-																 --binFlowNum(bufferResponse.sending),
+																 receivingVec);
+		contentMaskNext <= lmMaskNext(livingMask, 
 																 sendingVec,
-																 prevSending);
+																 prevSending,
+																 receivingVec);
 		contentUpdated <= makeSlotArray(contentDataNext, contentMaskNext);		
 		contentNext <= contentUpdated;
 		
@@ -119,7 +101,7 @@ begin
 			dataA <= storeAddressInput.ins;
 			dataD <= storeValueInput.ins;
 					
-			sendingSQ <= isNonzero(firstReadyVec);
+			sendingSQ <= isNonzero(firstReadyVec) and nextAccepting;
 				dataOutV.fullMask(0) <= sendingSq;
 				dataOutV.data(0) <= chooseIns(extractData(content), firstReadyVec);
 
