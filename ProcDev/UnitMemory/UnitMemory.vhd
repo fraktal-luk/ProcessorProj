@@ -89,6 +89,8 @@ entity UnitMemory is
 		execOrIntEventSignalIn: in std_logic;
 		execCausing: in InstructionState;
 		
+			cacheFillInput: in InstructionSlot;
+		
 			sqCommittedOutput: out InstructionSlot;
 			sqCommittedEmpty: out std_logic
 	);
@@ -142,7 +144,7 @@ begin
 		clk => clk, reset => reset, en => en,
 		
 		prevSending => inputC.full,
-		nextAccepting => acceptingLS,
+		nextAccepting => acceptingLS and not sendingFromDLQ,
 		
 		stageDataIn => inputDataC, 
 		acceptingOut => execAcceptingCSig,
@@ -164,7 +166,7 @@ begin
 	dataToMemPipe <= dataFromDLQ when sendingFromDLQ = '1' else stageDataOutAGU.data(0);
 	sendingToMemPipe <= stageDataOutAGU.fullMask(0) or sendingFromDLQ;
 	-- CAREFUL, TODO: at this point probably "completed" bits must be cleared, because they will be set (or not)
-	--						base on the success or failure of translation and cache access
+	--						based on the success or failure of translation and cache access
 	-- CREFUL, TODO: sending from AGU must be blocked when sending from DLQ?
 
 	inputDataLoadUnit <= makeSDM((0 => (sendingToMemPipe, dataToMemPipe)));
@@ -232,7 +234,7 @@ begin
 	
 		lqSelectedDataWithErr <= setLoadException(lqSelectedOutput.ins);
 	
-		-- Sending to Delayed Load Queue: when load miss or selected from LQ (going to ROB)
+		-- Sending to Delayed Load Queue: when load/store miss or selected from LQ (going to ROB)
 		sendingToDLQ <= getSendingToDLQ(dataAfterMem.fullMask(0), lqSelectedOutput.full, lsResultData); 
 		dataToDLQ <= makeSDM((0 => (sendingToDLQ, lsResultData)));
 
@@ -333,7 +335,7 @@ begin
 				dataIn => dataToDLQ,
 				
 					storeAddressInput => ('0', DEFAULT_INSTRUCTION_STATE),
-					storeValueInput => ('0', DEFAULT_INSTRUCTION_STATE),
+					storeValueInput => cacheFillInput,--('0', DEFAULT_INSTRUCTION_STATE),
 					compareAddressInput => ('0', DEFAULT_INSTRUCTION_STATE),
 					
 					selectedDataOutput => lmqSelectedOutput,
@@ -345,7 +347,7 @@ begin
 				execEventSignal => eventSignal,
 				execCausing => execCausing,
 				
-				nextAccepting => '1', -- TODO: when should it be allowed to send? Priorities!				
+				nextAccepting => acceptingLS, -- TODO: when should it be allowed to send? Priorities!				
 				sendingSQOut => sendingFromDLQ,
 					dataOutV => stageDataMultiDLQ,
 					

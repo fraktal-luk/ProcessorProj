@@ -63,7 +63,8 @@ architecture LoadMissQueue of MemoryUnit is
 					InstructionSlotArray(0 to QUEUE_SIZE-1) := (others => DEFAULT_INSTRUCTION_SLOT);
 	signal contentData: InstructionStateArray(0 to QUEUE_SIZE-1) := (others => DEFAULT_INSTRUCTION_STATE);					
 	signal contentDataNext: InstructionStateArray(0 to QUEUE_SIZE-1) := (others => DEFAULT_INSTRUCTION_STATE);
-	signal contentMaskNext, matchingA, matchingD, matchingShA, matchingShD, firstReadyVec, sendingVec, receivingVec
+	signal contentMaskNext, matchingA, matchingD, matchingShA, matchingShD, firstReadyVec, sendingVec, receivingVec,
+				newFilled
 				: std_logic_vector(0 to QUEUE_SIZE-1) := (others => '0');
 
 	signal bufferDrive: FlowDriveBuffer := (killAll => '0', lockAccept => '0', lockSend => '0',
@@ -72,9 +73,9 @@ architecture LoadMissQueue of MemoryUnit is
 begin				
 		fullMask <= extractFullMask(content);
 		livingMask <= fullMask and not killMask;
-							
-		--matchingA <= compareAddress(extractData(content), fullMask, compareAddressInput.ins);
-		--matchingD <= compareAddress(extractData(content), fullMask, compareDataInput.ins);
+
+		--matchingA <= compareAddress(extractData(content), fullMask, storeAddressInput.ins); -- for TLB fill!
+		newFilled <= compareAddress(extractData(content), fullMask, storeValueInput.ins);
 							
 		sendingVec <= firstReadyVec when nextAccepting = '1' else (others => '0');
 		receivingVec <= findFirstFree(fullMask);
@@ -85,7 +86,9 @@ begin
 																 dataIn.data(0),
 																	sendingVec,
 																 prevSending,
-																 receivingVec);
+																 receivingVec,
+																 newFilled,
+																 storeValueInput.full);
 		contentMaskNext <= lmMaskNext(livingMask, 
 																 sendingVec,
 																 prevSending,

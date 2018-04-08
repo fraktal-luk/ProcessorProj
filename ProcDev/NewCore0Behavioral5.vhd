@@ -77,7 +77,8 @@ architecture Behavioral5 of NewCore0 is
 			
 			signal sqCommittedOutput: InstructionSlot := DEFAULT_INSTRUCTION_SLOT;
 			signal sqCommittedEmpty: std_logic := '0';
-			
+		
+		signal cacheFill: InstructionSlot := DEFAULT_INSTRUCTION_SLOT;
 	constant HAS_RESET: std_logic := '0';
 	constant HAS_EN: std_logic := '0';
 begin
@@ -233,6 +234,8 @@ begin
 				commitAccepting => commitAccepting,--: in std_logic; -- INPUT
 
 					sbSending => sbSending,
+
+					cacheFillInput => cacheFill,
 
 				dataOutBQV => dataOutBQV,
 				dataOutSQ => dataOutSQ,

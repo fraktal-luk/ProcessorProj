@@ -83,6 +83,8 @@ entity OutOfOrderBox is
 
 				sbSending: in std_logic;
 
+				cacheFillInput: in InstructionSlot;
+
 			dataOutBQV: out StageDataMulti; -- OUTPUT
 			dataOutSQ: out StageDataMulti; -- OUTPUT			  
 			
@@ -324,6 +326,8 @@ begin
 					lateEventSignal => lateEventSignal,	
 					execOrIntEventSignalIn => execEventSignal,
 					execCausing => execCausing,
+					
+					cacheFillInput => cacheFillInput,
 					
 					sqCommittedOutput => sqCommittedOutput,
 					sqCommittedEmpty => sqCommittedEmpty

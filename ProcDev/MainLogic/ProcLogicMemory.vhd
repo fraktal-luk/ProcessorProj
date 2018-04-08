@@ -56,7 +56,9 @@ function setDataCompleted(ins: InstructionState; state: std_logic) return Instru
 									  newContent: InstructionState;
 									  sendingVec: std_logic_vector; -- shows which one sending
 									  receiving: std_logic;
-									  receivingVec: std_logic_vector) return InstructionStateArray;
+									  receivingVec: std_logic_vector;
+									  newFilled: std_logic_vector;
+									  filling: std_logic) return InstructionStateArray;
 
 function lmMaskNext(livingMask: std_logic_vector;
 					  sendingVec: std_logic_vector;
@@ -79,7 +81,7 @@ function findFirstFree(mask: std_logic_vector) return std_logic_vector;
 									  storeForwardSending: std_logic; storeForwardIns: InstructionState
 										) return InstructionState;
 
-	function getSendingToDLQ(sendingAfterRead, sendingSelectedLQ: std_logic;
+	function getSendingToDLQ(sendingAfterRW, sendingSelectedLQ: std_logic;
 									 lsResultData: InstructionState) return std_logic;	
 	function calcEffectiveAddress(ins: InstructionState) return InstructionState;
 
@@ -254,12 +256,19 @@ end function;
 									  newContent: InstructionState;
 									  sendingVec: std_logic_vector; -- shows which one sending
 									  receiving: std_logic;
-									  receivingVec: std_logic_vector
+									  receivingVec: std_logic_vector;
+									  newFilled: std_logic_vector;
+									  filling: std_logic
 									  ) return InstructionStateArray is
 					constant LEN: integer := content'length;
 					variable res: InstructionStateArray(0 to LEN-1) := content;
 				begin
 					for i in 0 to LEN-1 loop
+						if (filling and newFilled(i) and livingMask(i)) = '1' then
+							res(i).controlInfo.completed2 := '1';
+						end if;
+						
+					
 						if receiving = '1' and receivingVec(i) = '1' then
 							res(i) := newContent;
 						elsif sendingVec(i) = '1' then
@@ -347,17 +356,18 @@ end function;
 			res := setDataCompleted(res, memLoadReady);
 			res := setInsResult(res, memLoadValue);
 		else -- is store or sys reg write?
-
+			res := setDataCompleted(res, '1'); -- TEMP!
+			
 		end if;
 		
 		return res;
 	end function;
 
-	function getSendingToDLQ(sendingAfterRead, sendingSelectedLQ: std_logic;
+	function getSendingToDLQ(sendingAfterRW, sendingSelectedLQ: std_logic;
 									 lsResultData: InstructionState) return std_logic is
 	begin
-		return		(		sendingAfterRead
-								 and (isLoad(lsResultData) or isSysRegRead(lsResultData))
+		return		(		sendingAfterRW
+								 --and (isLoad(lsResultData) or isSysRegRead(lsResultData))
 								 and not getDataCompleted(lsResultData))  -- When missed etc.
 							or  sendingSelectedLQ; -- When store hits younger load and must get off the way	
 	end function;

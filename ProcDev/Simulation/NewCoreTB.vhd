@@ -74,6 +74,8 @@ ARCHITECTURE behavior OF NewCoreTB4 IS
 			intack: out std_logic;
          int0 : IN  std_logic;
          int1 : IN  std_logic;
+			filladr: in Mword;
+			fillready: in std_logic;
          iaux : IN  std_logic_vector(31 downto 0);
          oaux : OUT  std_logic_vector(31 downto 0)
         );
@@ -100,6 +102,8 @@ ARCHITECTURE behavior OF NewCoreTB4 IS
       signal     din :  Mword;
       signal     dout : Mword;
 
+		signal filladr: Mword := (others => '0');
+		signal fillready: std_logic := '0';
 
  	--Outputs
    signal iadrvalid : std_logic;
@@ -144,6 +148,10 @@ BEGIN
 			 intack => intack,
           int0 => int0,
           int1 => int1,
+			 
+			 filladr => filladr,
+			 fillready => fillready,
+			 
           iaux => iaux,
           oaux => oaux
         );
