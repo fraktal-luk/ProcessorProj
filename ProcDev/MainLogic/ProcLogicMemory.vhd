@@ -286,7 +286,7 @@ function lmMaskNext(livingMask: std_logic_vector;
 					  receivingVec: std_logic_vector
 ) return std_logic_vector is
 	constant LEN: integer := livingMask'length;
-	variable outMask: std_logic_vector(0 to LEN-1) := (others => '0');
+	variable outMask: std_logic_vector(0 to LEN-1) := livingMask;
 begin
 	outMask := outMask and not sendingVec;
 	if receiving = '1' then 

@@ -118,9 +118,9 @@ begin
 					--logBuffer(contentData, fullMask, livingMask, bufferResponse);	
 					-- NOTE: below has no info about flow constraints. It just checks data against
 					--			flow numbers, while the validity of those numbers is checked by slot logic
-					checkBuffer(extractData(content), fullMask, extractData(contentNext),
-																				extractFullMask(contentNext),
-										bufferDrive, bufferResponse);					
+					--checkBuffer(extractData(content), fullMask, extractData(contentNext),
+					--															extractFullMask(contentNext),
+					--					bufferDrive, bufferResponse);					
 				end if;
 			end process;
 					

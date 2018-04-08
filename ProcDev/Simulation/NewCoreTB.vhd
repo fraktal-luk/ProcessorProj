@@ -120,6 +120,7 @@ ARCHITECTURE behavior OF NewCoreTB4 IS
 
    -- Clock period definitions
    constant clk_period : time := 10 ns;
+		signal memEn: std_logic := '0';
  
 	alias testProgram is testProg1;
  
@@ -167,6 +168,11 @@ BEGIN
  
 	
 	en <= '1' after 105 ns;
+	
+				memEn <= '1' after 300 ns;
+				
+				filladr <= X"0000000c";
+				fillready <= '1' after 320 ns, '0' after 330 ns;
 	
 	int0 <= int0a or int0b;
 	
@@ -238,7 +244,7 @@ BEGIN
 						--				stalled content in fetch buffer!
 						baseIP := iadr and i2slv(-PIPE_WIDTH*4, MWORD_SIZE); -- Clearing low bits
 						for i in 0 to PIPE_WIDTH-1 loop
-							iin(i) <= testProg1--Mem
+							iin(i) <= testProgMem
 										(slv2u(baseIP(10 downto 2)) + i); -- CAREFUL! 2 low bits unused (32b memory) 									
 						end loop;
 					end if;
@@ -265,7 +271,7 @@ BEGIN
 				-- TODO: define effective address exact size
 			
 				-- Reading
-				memReadDone <= dread;
+				memReadDone <= dread and memEn;
 				memReadDonePrev <= memReadDone;
 				memReadValue <= dataMem(slv2u(dadr(MWORD_SIZE-1 downto 2))) ;-- CAREFUL: pseudo-byte addressing 
 				memReadValuePrev <= memReadValue;	

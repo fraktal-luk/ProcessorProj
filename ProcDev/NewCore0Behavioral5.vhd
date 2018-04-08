@@ -84,7 +84,11 @@ architecture Behavioral5 of NewCore0 is
 begin
 	resetSig <= reset and HAS_RESET;
 	enSig <= en or not HAS_EN;
-	
+
+	cacheFill.full <= fillready;
+	cacheFill.ins.argValues.arg1 <= filladr;
+
+
 	SEQUENCING_PART: entity work.UnitSequencer(Behavioral)
 	port map (
 		clk => clk, reset => resetSig, en => enSig,

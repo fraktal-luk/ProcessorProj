@@ -109,7 +109,7 @@ architecture Behavioral of UnitMemory is
 	signal inputDataLoadUnit: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
 	signal dataToMemPipe: InstructionState := DEFAULT_INSTRUCTION_STATE;
 	signal sendingToMemPipe: std_logic := '0';
-	signal stageDataOutMem0: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;			
+	signal stageDataOutMem0, stageDataToMem1: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;			
 	signal acceptingMem1: std_logic := '0';
 		
 	signal dlqAccepting, sendingToDLQ, sendingFromDLQ: std_logic := '0';
@@ -165,11 +165,13 @@ begin
 
 	dataToMemPipe <= dataFromDLQ when sendingFromDLQ = '1' else stageDataOutAGU.data(0);
 	sendingToMemPipe <= stageDataOutAGU.fullMask(0) or sendingFromDLQ;
-	-- CAREFUL, TODO: at this point probably "completed" bits must be cleared, because they will be set (or not)
+	-- CAREFUL, At this point probably "completed" bits must be cleared, because they will be set (or not)
 	--						based on the success or failure of translation and cache access
-	-- CREFUL, TODO: sending from AGU must be blocked when sending from DLQ?
 
-	inputDataLoadUnit <= makeSDM((0 => (sendingToMemPipe, dataToMemPipe)));
+	inputDataLoadUnit <= makeSDM((0 => (sendingToMemPipe, 
+														setDataCompleted(setAddressCompleted(dataToMemPipe, '0'), '0')
+													))
+											);
 
 	STAGE_MEM0: entity work.GenericStageMulti(SingleTagged)
 	port map(
@@ -195,6 +197,9 @@ begin
 	sendingAddressing <= stageDataOutMem0.fullMask(0); -- After translation
 	addressingData	<= stageDataOutMem0.data(0);
 	
+	-- TEMP: setting address always completed (simulating TLB always hitting)
+	stageDataToMem1 <= makeSDM( (0 =>  (stageDataOutMem0.fullMask(0), setAddressCompleted(stageDataOutMem0.data(0), '1'))) );
+	
 	STAGE_MEM1: entity work.GenericStageMulti(SingleTagged)
 	port map(
 		clk => clk, reset => reset, en => en,
@@ -202,7 +207,7 @@ begin
 		prevSending => '0',--sendingMem0,
 		nextAccepting => whichAcceptedCQ(2),
 		
-		stageDataIn => stageDataOutMem0,--dataM, 
+		stageDataIn => stageDataToMem1,--dataM, 
 		acceptingOut => acceptingMem1,
 		sendingOut => open,--sendingMem1,
 		stageDataOut => dataAfterMem,

@@ -54,7 +54,7 @@ return StageDataMulti;
 
 function isHalt(ins: InstructionState) return std_logic;
 
-function setInterrupt3(targetIns: InstructionState; intSignal, start: std_logic) return InstructionState;
+function setInterrupt3(ins: InstructionState; intSignal, start: std_logic) return InstructionState;
 
 function clearControlEvents(ins: InstructionState) return InstructionState;
 

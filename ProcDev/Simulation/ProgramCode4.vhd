@@ -367,46 +367,56 @@ package ProgramCode4 is
 		0 => insNOP,
 		1 => insSET(r1, 325),
 		2 => insSET(r2, 0),
-		3 => insSTORE(r1, r2, 12), -- This should go immediately
-		4 => insLOAD(r5, r0, 12), -- Addres hit, forwarding
+		3 => insNOP,--insSTORE(r1, r2, 12), -- This should go immediately
+		4 => insLOAD(r5, r0, 12),
 
-		5 => insNOP,
-				--insLOAD(r7, r0, 20), -- Addres hit, forwarding
+		
 
-		6 => insNOP,
-		7 => --insNOP,
-				insSET(r5, 0),
-		8 => --insNOP,
-			  ins655655(ext0, r12, r5, mulS, r5, 0), -- long operation, delaying store address
-		9 => --insNOP,
-			  insSTORE(r2, r12, 16),
-		10 => --insNOP,
-				insLOAD(r10, r0, 16), -- younger load, address hit by older but later store
-		11 => insNOP,
-		12 => insNOP,
-		13 => insNOP,
-		14 => insNOP,
-		
-		15 => insSET(r2, 221),
-		16 => ins655655(ext0, r2, r5, mulS, r5, 0), -- long operation, delaying store address
-		17 => insNOP,--insSTORE(r2, r0, 16),
-		18 => insLOAD(r10, r0, 16), -- data not ready
-		
-		19 => insNOP,
-		20 => insNOP,
-		21 => insNOP,
-		22 => insNOP,
-		23 => insNOP,
-		24 => insNOP,
-		25 => insNOP,
-		26 => insNOP,
-		27 => insNOP,
+	
+--		0 => insNOP,
+--		1 => insSET(r1, 325),
+--		2 => insSET(r2, 0),
+--		3 => insSTORE(r1, r2, 12), -- This should go immediately
+--		4 => insLOAD(r5, r0, 12), -- Addres hit, forwarding
+--
+--		5 => insNOP,
+--				--insLOAD(r7, r0, 20), -- Addres hit, forwarding
+--
+--		6 => insNOP,
+--		7 => --insNOP,
+--				insSET(r5, 0),
+--		8 => --insNOP,
+--			  ins655655(ext0, r12, r5, mulS, r5, 0), -- long operation, delaying store address
+--		9 => --insNOP,
+--			  insSTORE(r2, r12, 16),
+--		10 => --insNOP,
+--				insLOAD(r10, r0, 16), -- younger load, address hit by older but later store
+--		11 => insNOP,
+--		12 => insNOP,
+--		13 => insNOP,
+--		14 => insNOP,
+--		
+--		15 => insSET(r2, 221),
+--		16 => ins655655(ext0, r2, r5, mulS, r5, 0), -- long operation, delaying store address
+--		17 => insNOP,--insSTORE(r2, r0, 16),
+--		18 => insLOAD(r10, r0, 16), -- data not ready
+--		
+--		19 => insNOP,
+--		20 => insNOP,
+--		21 => insNOP,
+--		22 => insNOP,
+--		23 => insNOP,
+--		24 => insNOP,
+--		25 => insNOP,
+--		26 => insNOP,
+--		27 => insNOP,
 		28 => insNOP,
 		
 		29 => ins65J(jz, r0, -4*(29-0)),
 		
 		
-		others => insERROR
+		others => --insERROR
+						insNOP
 	);
 	
 end ProgramCode4;
