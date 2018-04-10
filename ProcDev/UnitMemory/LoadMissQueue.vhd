@@ -75,7 +75,7 @@ begin
 		livingMask <= fullMask and not killMask;
 
 		--matchingA <= compareAddress(extractData(content), fullMask, storeAddressInput.ins); -- for TLB fill!
-		newFilled <= compareAddress(extractData(content), fullMask, storeValueInput.ins);
+		newFilled <= compareAddressDLQ(extractData(content), fullMask, storeValueInput.ins);
 							
 		sendingVec <= firstReadyVec when nextAccepting = '1' else (others => '0');
 		receivingVec <= findFirstFree(fullMask);

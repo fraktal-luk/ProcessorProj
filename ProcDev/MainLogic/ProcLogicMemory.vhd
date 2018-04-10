@@ -29,6 +29,9 @@ package ProcLogicMemory is
 
 function compareAddress(content: InstructionStateArray; fullMask: std_logic_vector;
 								ins: InstructionState) return std_logic_vector;
+function compareAddressDLQ(content: InstructionStateArray; fullMask: std_logic_vector;
+								ins: InstructionState) return std_logic_vector;
+								
 function findNewestMatch(content: InstructionStateArray;
 								 cmpMask: std_logic_vector; pStart: SmallNumber; ins: InstructionState)
 return std_logic_vector;
@@ -100,6 +103,24 @@ begin
 		if 	 fullMask(i) = '1'
 			and content(i).controlInfo.completed = '1' -- Addressmust be already known!
 			and ins.argValues.arg1 = content(i).argValues.arg1 then
+			res(i) := '1';
+		end if;
+	end loop;
+	
+	return res;
+end function;
+
+-- Compares only cache line address
+function compareAddressDLQ(content: InstructionStateArray; fullMask: std_logic_vector;
+								ins: InstructionState) return std_logic_vector is
+	variable res: std_logic_vector(0 to content'length-1) := (others => '0');
+	constant LOG2_CACHE_LINE_SIZE: integer := 6; -- TEMP! 2^6 = 64B
+begin
+	for i in 0 to res'length-1 loop
+		if 	 fullMask(i) = '1'
+			and content(i).controlInfo.completed = '1' -- Addressmust be already known!
+			and ins.argValues.arg1(MWORD_SIZE-1 downto LOG2_CACHE_LINE_SIZE)
+				= content(i).argValues.arg1(MWORD_SIZE-1 downto LOG2_CACHE_LINE_SIZE) then
 			res(i) := '1';
 		end if;
 	end loop;
@@ -271,6 +292,14 @@ end function;
 					
 						if receiving = '1' and receivingVec(i) = '1' then
 							res(i) := newContent;
+							
+							res(i).argValues.arg1 := (others => '0');
+							res(i).argValues.arg2 := (others => '0');
+							res(i).result := (others => '0');
+							--res(i).target := (others => '0'); !!! adress to load!
+								res(i).constantArgs := DEFAULT_CONSTANT_ARGS;
+								res(i).virtualArgSpec := DEFAULT_ARG_SPEC;
+								res(i).physicalArgSpec := DEFAULT_ARG_SPEC;
 						elsif sendingVec(i) = '1' then
 							null; 
 						end if;

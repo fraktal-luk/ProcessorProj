@@ -172,7 +172,7 @@ BEGIN
 				memEn <= '1' after 300 ns;
 				
 				filladr <= X"0000000c";
-				fillready <= '1' after 320 ns, '0' after 330 ns;
+				--fillready <= '1' after 320 ns, '0' after 330 ns;
 	
 	int0 <= int0a or int0b;
 	
@@ -244,7 +244,7 @@ BEGIN
 						--				stalled content in fetch buffer!
 						baseIP := iadr and i2slv(-PIPE_WIDTH*4, MWORD_SIZE); -- Clearing low bits
 						for i in 0 to PIPE_WIDTH-1 loop
-							iin(i) <= testProgMem
+							iin(i) <= testProg1 --Mem
 										(slv2u(baseIP(10 downto 2)) + i); -- CAREFUL! 2 low bits unused (32b memory) 									
 						end loop;
 					end if;
