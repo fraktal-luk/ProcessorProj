@@ -292,14 +292,11 @@ end function;
 					
 						if receiving = '1' and receivingVec(i) = '1' then
 							res(i) := newContent;
-							
-							res(i).argValues.arg1 := (others => '0');
-							res(i).argValues.arg2 := (others => '0');
+							res(i).argValues := DEFAULT_ARG_VALUES;	
 							res(i).result := (others => '0');
-							--res(i).target := (others => '0'); !!! adress to load!
-								res(i).constantArgs := DEFAULT_CONSTANT_ARGS;
-								res(i).virtualArgSpec := DEFAULT_ARG_SPEC;
-								res(i).physicalArgSpec := DEFAULT_ARG_SPEC;
+							res(i).constantArgs := DEFAULT_CONSTANT_ARGS;
+							res(i).virtualArgSpec := DEFAULT_ARG_SPEC;
+							res(i).physicalArgSpec := DEFAULT_ARG_SPEC;
 						elsif sendingVec(i) = '1' then
 							null; 
 						end if;
@@ -386,7 +383,7 @@ end function;
 			res := setInsResult(res, memLoadValue);
 		else -- is store or sys reg write?
 			res := setDataCompleted(res, '1'); -- TEMP!
-			
+				res := setInsResult(res, memLoadValue); -- Unneeded, to reduce logic
 		end if;
 		
 		return res;
