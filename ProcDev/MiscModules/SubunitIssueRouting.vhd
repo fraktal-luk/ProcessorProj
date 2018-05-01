@@ -49,7 +49,7 @@ entity SubunitIssueRouting is
 		acceptingVecA: in std_logic_vector(0 to PIPE_WIDTH-1);
 		acceptingVecB: in std_logic_vector(0 to PIPE_WIDTH-1);
 		acceptingVecC: in std_logic_vector(0 to PIPE_WIDTH-1);
-		acceptingVecD: in std_logic_vector(0 to PIPE_WIDTH-1);
+		--acceptingVecD: in std_logic_vector(0 to PIPE_WIDTH-1);
 		acceptingVecE: in std_logic_vector(0 to PIPE_WIDTH-1);
 		
 		acceptingROB: in std_logic;
@@ -65,7 +65,7 @@ entity SubunitIssueRouting is
 		dataOutA: out StageDataMulti;
 		dataOutB: out StageDataMulti;
 		dataOutC: out StageDataMulti;
-		dataOutD: out StageDataMulti;
+		--dataOutD: out StageDataMulti;
 		dataOutE: out StageDataMulti;
 		
 		dataOutSQ: out StageDataMulti;
@@ -81,13 +81,13 @@ architecture Behavioral of SubunitIssueRouting is
 	signal issueRouteVec: IntArray(0 to PIPE_WIDTH-1) := (others => 0);
 
 	signal iqAcceptingA: std_logic := '0';						
-	signal iqAcceptingB, iqAcceptingC, iqAcceptingD, iqAcceptingE: std_logic := '0';
+	signal iqAcceptingB, iqAcceptingC, iqAcceptingE: std_logic := '0';
 
-	signal dataToA, dataToB, dataToC, dataToD, dataToE, dataToSQ: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
+	signal dataToA, dataToB, dataToC, dataToE, dataToSQ: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
 
 	signal renamedSending: std_logic := '0';
 	
-	signal invA, invB, invC, invD, invE: std_logic_vector(0 to PIPE_WIDTH-1) := (others => '0');
+	signal invA, invB, invC, invE: std_logic_vector(0 to PIPE_WIDTH-1) := (others => '0');
 begin	
 	renamedSending <= renamedSendingIn;
 
@@ -119,27 +119,27 @@ begin
 		dataOutSQ <= dataToSQ;
 		dataToSQ <= routeToIQ(renamedDataLiving, storeVec);
 		dataOutLQ <= routeToIQ(renamedDataLiving, loadVec);	
-			dataOutBQ <= trgForBQ(routeToIQ(renamedDataLiving, srcVecD)); -- TEMP! Contains system instructions!
+		dataOutBQ <= trgForBQ(routeToIQ(renamedDataLiving, srcVecD)); -- TEMP! Contains system instructions!
 	
 		invA <= invertVec(acceptingVecA);
 		invB <= invertVec(acceptingVecB);
 		invC <= invertVec(acceptingVecC);
-		invD <= invertVec(acceptingVecD);
+		--invD <= invertVec(acceptingVecD);
 		invE <= invertVec(acceptingVecE);
 	
 		iqAcceptingA <= not isNonzero(not invA);
 		iqAcceptingB <= not isNonzero(not invB);
 		iqAcceptingC <= not isNonzero(not invC);
-		iqAcceptingD <= not isNonzero(not invD);
+		--iqAcceptingD <= not isNonzero(not invD);
 		iqAcceptingE <= not isNonzero(not invE);
 			
-		iqAccepts <= iqAcceptingA and iqAcceptingB and iqAcceptingC and iqAcceptingD and iqAcceptingE
+		iqAccepts <= iqAcceptingA and iqAcceptingB and iqAcceptingC and iqAcceptingE
 							and acceptingROB and acceptingSQ and acceptingLQ and acceptingBQ;
 
 	dataOutA <= dataToA;
 	dataOutB <= dataToB;
 	dataOutC <= dataToC;
-	dataOutD <= dataToD;
+	--dataOutD <= dataToD;
 	dataOutE <= dataToE;
 	
 	renamedSendingOut <= renamedSending;

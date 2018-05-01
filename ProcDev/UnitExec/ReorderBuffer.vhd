@@ -56,7 +56,7 @@ entity ReorderBuffer is
 		execCausing: in InstructionState; -- Redundant cause we have inputs from all Exec ends? 
 		
 		commitGroupCtr: in InsTag;
-		commitGroupCtrNext: in InsTag;
+		--commitGroupCtrNext: in InsTag;
 
 		execEndSigs1: in InstructionSlotArray(0 to 3);
 		execEndSigs2: in InstructionSlotArray(0 to 3);

@@ -77,7 +77,7 @@ entity UnitMemory is
 		sysLoadVal: in Mword;
 		
 		committing: in std_logic;
-		groupCtrNext: in InsTag;
+		--groupCtrNext: in InsTag;
 		groupCtrInc: in InsTag;
 	
 		sbAcceptingIn: in std_logic;

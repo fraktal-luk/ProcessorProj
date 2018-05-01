@@ -103,7 +103,7 @@ entity UnitSequencer is
 					sysStoreAddress: in slv5; 
 					sysStoreValue: in Mword;		
 		
-			committing: out std_logic;
+		--	committing: out std_logic;
 		
 		-- Counter outputs
 		commitGroupCtrOut: out InsTag;
@@ -380,7 +380,7 @@ begin
 	end block;
 
 	sendingToCommit <= sendingFromROB;
-	committing <= sendingFromROB;
+	--committing <= sendingFromROB;
 
 	-- Commit stage: in order again				
 	SUBUNIT_COMMIT: entity work.GenericStageMulti(Behavioral)

@@ -160,7 +160,7 @@ begin
 				acceptingVecA => iqAcceptingVecArr(0),
 				acceptingVecB => iqAcceptingVecArr(1),
 				acceptingVecC => iqAcceptingVecArr(2),
-				acceptingVecD => (others => '1'),--iqAcceptingVecArr(3),
+				--acceptingVecD => (others => '1'),--iqAcceptingVecArr(3),
 				acceptingVecE => iqAcceptingVecArr(4),
 
 				acceptingROB => robAccepting,
@@ -176,8 +176,8 @@ begin
 				dataOutA => dataToQueuesArr(0),--dataToA,
 				dataOutB => dataToQueuesArr(1),--dataToB,
 				dataOutC => dataToQueuesArr(2),--dataToC,
-				dataOutD => --dataToQueuesArr(3),--dataToD,
-								open,
+				--dataOutD => --dataToQueuesArr(3),--dataToD,
+				--				open,
 				dataOutE => dataToQueuesArr(4),--dataToE,
 				
 				dataOutSQ => compactedToSQ,
@@ -272,7 +272,7 @@ begin
 					
 				committing => robSending,
 					
-				groupCtrNext => commitGroupCtrNextSig,
+				--groupCtrNext => commitGroupCtrNextSig,
 				groupCtrInc => commitGroupCtrIncSig,
 				
 				execEvent => execEventSignal,
@@ -315,7 +315,7 @@ begin
 					sysLoadVal => sysRegReadValue,
 
 					committing => robSending,
-					groupCtrNext => commitGroupCtrNextSig,				
+					--groupCtrNext => commitGroupCtrNextSig,				
 					groupCtrInc => commitGroupCtrIncSig,
 						
 						sbAcceptingIn => sbAccepting,
@@ -426,7 +426,7 @@ begin
 				execCausing => execCausing,
 				
 				commitGroupCtr => commitGroupCtrSig,
-				commitGroupCtrNext => commitGroupCtrNextSig,
+				--commitGroupCtrNext => commitGroupCtrNextSig,
 
 				execEndSigs1 => execOutputs1,
 				execEndSigs2 => execOutputs2,

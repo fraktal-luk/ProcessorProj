@@ -1,7 +1,4 @@
 
--- CAREFUL! If partial kill occurs, we have to check if any slot of the stage remains alive,
---				and if no one, then generate killAll signal for that stage! 
-
 architecture Behavioral5 of NewCore0 is	
 	signal resetSig, enSig: std_logic := '0';				
 				
@@ -55,7 +52,7 @@ architecture Behavioral5 of NewCore0 is
 		signal newPhysDestPointer: SmallNumber := (others => '0');
 		signal newPhysSources: PhysNameArray(0 to 3*PIPE_WIDTH-1) := (others => (others => '0'));
 
-		signal committingSig: std_logic := '0';	-- !! Just a copy of robSending
+		signal committingSig: std_logic := '0';
 			
 		signal committedSending, renameLockEnd: std_logic := '0';
 		signal committedDataOut: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
@@ -141,7 +138,7 @@ begin
 		commitAccepting => commitAccepting,
 		sendingFromROB => robSending,	
 		robDataLiving => dataOutROB,
-		committing => committingSig,
+		--committing => committingSig,
 
 		---
 		dataFromBQV => dataOutBQV,
