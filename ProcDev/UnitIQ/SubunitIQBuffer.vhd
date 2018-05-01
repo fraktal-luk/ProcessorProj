@@ -130,8 +130,7 @@ architecture Implem of SubunitIQBuffer is
 	end function;
 	
 begin
-	flowDriveQ.prevSending <= --prevSending;		
-										num2flow(countOnes(newData.fullMask)) when prevSendingOK = '1'
+	flowDriveQ.prevSending <= num2flow(countOnes(newData.fullMask)) when prevSendingOK = '1'
 										else (others => '0');
 	flowDriveQ.kill <= num2flow(countOnes(killMask));
 	flowDriveQ.nextAccepting <=  num2flow(1) when (nextAccepting and isNonzero(readyMask_C)) = '1'			
@@ -154,10 +153,8 @@ begin
 					  flowDriveQ, flowResponseQ);
 		end if;
 	end process;	
-
-		--ta <= flowDriveQ.nextAccepting;
-		--tb <= flowDriveQ.prevSending;		
-		qs1 <= TMP_change_Shifting(qs0,-- ta, tb,
+	
+		qs1 <= TMP_change_Shifting(qs0,
 											flowDriveQ.nextAccepting,
 											flowDriveQ.prevSending,
 											fullMask, killMask,

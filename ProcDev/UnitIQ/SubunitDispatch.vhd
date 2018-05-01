@@ -54,15 +54,11 @@ entity SubunitDispatch is
 		en: in std_logic;
 
 	 	nextAccepting: in std_logic;
-		
-	 	--prevSending: in std_logic;		
-	 	--stageDataIn: in InstructionState;
+
 		input: in InstructionSlot;
 		
 		acceptingOut: out std_logic;
-		--sendingOut: out std_logic;
-		--stageDataOut: out InstructionState;
-			output: out InstructionSlot;
+		output: out InstructionSlot;
 		
 		execEventSignal: in std_logic;
 		lateEventSignal: in std_logic;
@@ -91,8 +87,6 @@ begin
 	stageDataIn <= input.ins;
 
 	inputDataWithArgs <= getDispatchArgValues(stageDataIn, resultVals, USE_IMM);
-	--stageDataM.fullMask(0) <= prevSending;
-	--stageDataM.data(0) <= inputDataWithArgs;
 	stageDataM <= makeSDM((0 => (prevSending, inputDataWithArgs)));
 	
 	BASIC_LOGIC: entity work.GenericStageMulti(SingleTagged)

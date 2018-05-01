@@ -63,10 +63,15 @@ entity NewCore0 is
 			  dwrite: out std_logic;
 			  doutadr: out Mword;
            dout : out  Mword;
-			  			  
+			  
+			  intallow: out std_logic;
+			  intack: out std_logic;
 			  -- Interrupt input (int0) and additional input (int1)
            int0 : in  STD_LOGIC;
            int1 : in  STD_LOGIC;
+			  
+			  filladr: in Mword;
+			  fillready: in std_logic;
 			  
 			  -- Other buses for development 
            iaux : in  Mword;

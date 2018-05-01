@@ -384,7 +384,7 @@ end function;
 		variable res: std_logic_vector(0 to LEN-1) := (others => '0');
 		variable sn, sn0, ih: SmallNumber := (others => '0');
 	begin
-		ih := getTagHighSN(causing.groupTag);
+		ih := getTagHighSN(causing.tags.renameIndex);
 			ih := subSN(ih, qs.pStart);
 			ih := ih and MASK_NUM; -- We must cut it to effective index size, because it must be 
 										  -- inside the range of ROB indices
@@ -451,26 +451,11 @@ begin
 		tmpSN := indices(i) and MASK_NUM;
 		--		Also: write only needed entires: for D -> result, completed2; for A -> target, completed 
 
-		if (wrA and maskA(i)) = '1' then
-			res(i).--target 
-					argValues.arg1
-					:= insA.result;
-			res(i).controlInfo.completed := '1';
-		end if;
-		
-		if (wrD and maskD(i)) = '1' then
-			res(i).--result
-					argValues.arg2
-					:= insD.argValues.arg2;
-			res(i).controlInfo.completed2 := '1';						
-		end if;
-
-
 		if cken(i) = '1' then -- cken is for new input
 			-- CAREFUL: write only those fields that have to be written:
 			--				groupTag, operation, completed = 0, completed2 = 0
 			-- res(i) := newContent(slv2u(tmpSN));
-			res(i).groupTag := newContent(slv2u(tmpSN)).groupTag;
+			res(i).tags.renameIndex := newContent(slv2u(tmpSN)).tags.renameIndex;
 			res(i).operation := newContent(slv2u(tmpSN)).operation;
 			
 			if keepInputContent then
@@ -484,6 +469,22 @@ begin
 				res(i).controlInfo.completed := newContent(slv2u(tmpSN)).controlInfo.completed;
 				res(i).controlInfo.completed2 := newContent(slv2u(tmpSN)).controlInfo.completed2;				
 			end if;
+		end if;
+	
+		if (wrA and maskA(i)) = '1' then
+			res(i).--target 
+					argValues.arg1
+					:= insA.--result;
+								target;
+			res(i).controlInfo.completed := '1';
+		end if;
+		
+		if (wrD and maskD(i)) = '1' then
+			res(i).--result
+					argValues.arg2
+					:= insD.--argValues.arg2;
+								result;
+			res(i).controlInfo.completed2 := '1';						
 		end if;
 	end loop;
 	return res;

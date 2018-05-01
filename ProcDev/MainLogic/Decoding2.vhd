@@ -78,6 +78,7 @@ package Decoding2 is
 			leftImm: 		word;
 			hasImm: 			std_logic;
 			imm: 				word;
+			target: 			word;
 		end record;		
 
 				type OpFieldStructW is record
@@ -91,6 +92,7 @@ package Decoding2 is
 					leftImm: 		word;
 					hasImm: 			std_logic;
 					imm: 				word;
+					target:			word;
 				end record;	
 
 
@@ -121,7 +123,7 @@ package Decoding2 is
 					((others=>none), none, '0','0','0',
 							(others => Int));
 
-				-- TEMP: experimental new formar
+				-- TEMP: experimental new format
 				constant formatImm: ArgFormatNew := 
 					((qa, Int), 	(qb, Int), (qc, none), (qd, none),
 						(none, none), (none, none),	'1', '0', imm16);
@@ -177,21 +179,17 @@ package Decoding2 is
 			constant fmtJumpRNZ: ArgFormatStruct := 
 					((d0=>qa, d1=>none, s0=>qb, s1=>qc, s2=>none, c0=>none, c1=> one), none, '0', '0', '0',
 							(others => Int));	
-					
-			constant fmtShiftC: ArgFormatStruct :=		
-					((d0=>qa, d1=>none, s0=>qb, s1=>none, s2=>none, c0=>qc, c1=>none), none, '0', '0', '0',
-							(others => Int));					
+				
+			constant fmtShiftImm: ArgFormatStruct :=		
+					((d0=>qa, d1=>none, s0=>qb, s1=>none, s2=>none, c0=>none, c1=>none), imm10, '0', '0', '0',
+							(others => Int));
 			
 			constant fmtNoArgs: ArgFormatStruct :=		
 					((others=>none), none, '0', '0', '0',
 							(others => Int));			
 			
-				constant fmtMFC_TEMP: ArgFormatStruct := 
-																		fmtLoadImm;
-					--((d0=>qa, c1=>qd, others=>none), none, '0','0','0');
-				constant fmtMTC_TEMP: ArgFormatStruct := 
-																		fmtStoreImm;
-					--((s0=>qb, c0=>qc, others=>none), none, '0','0','0');			
+				constant fmtMFC_TEMP: ArgFormatStruct := fmtLoadImm;
+				constant fmtMTC_TEMP: ArgFormatStruct := fmtStoreImm;
 		
 		constant undefInsDef: InsDefNewW := (opcode2slv(ext2), opcont2slv(ext2, undef),
 																				System, sysUndef, fmtUndef);
@@ -213,9 +211,9 @@ package Decoding2 is
 				10=> (ext0, muls, Mac, mulS, fmtReg3),
 				11=> (ext0, mulu, Mac, mulU, fmtReg3),
 
-				12 => (ext0, shlC,  Alu,  logicShl,	fmtShiftC),
-				13 => (ext0, shrlC, Alu,  logicShrl,fmtShiftC),
-				14 => (ext0, shraC, Alu,  arithShra,fmtShiftC), 
+				12 => (ext0, shlC,  Alu,  logicShl,	fmtShiftImm),
+				13 => (ext0, shrlC, Alu,  logicShrl,fmtShiftImm),
+				14 => (ext0, shraC, Alu,  arithShra,fmtShiftImm), 
 
 				15=> (ext2, mfc,	System, sysMFC, fmtMFC_TEMP),
 				16=> (ext2, mtc, 	System, sysMTC, fmtMTC_TEMP),		
@@ -358,26 +356,46 @@ package body Decoding2 is
 			
 			-- Handle imm value (and leftImm)		
 			res.imm := iw;
-			case fmt.immSize is
-				when none =>
-					res.hasImm := '0';
-					res.imm := (others => '0');
-				when imm10 =>
-					res.hasImm := '1';
-					res.imm(31 downto 10) := (others => iw(9) and fmt.immSign);	
-				when imm16 =>
-					res.hasImm := '1';		
-					res.imm(31 downto 16) := (others => iw(15) and fmt.immSign);
-				when imm21 =>
-					res.hasImm := '1';	
-					res.imm(31 downto 21) := (others => iw(20) and fmt.immSign);
-				when imm26 =>
-					res.hasImm := '1';	
-					res.imm(31 downto 26) := (others => iw(25) and fmt.immSign);					
-				when others =>
-					report "bad imm format specification" severity error;
-			end case;
+			res.target := iw;
 			
+			if fmt.immSize = none then
+				res.hasImm := '0';
+			else
+				res.hasImm := '1';
+			end if;
+			
+			if fmt.immSize = imm10 then
+				res.imm(31 downto 10) := (others => iw(9) and fmt.immSign);
+			else
+				res.imm(31 downto 16) := (others => iw(15) and fmt.immSign);
+			end if;
+
+			if fmt.immSize = imm26 then
+				res.target(31 downto 26) := (others => iw(25) and fmt.immSign);
+			else
+				res.target(31 downto 21) := (others => iw(20) and fmt.immSign);
+			end if;
+			
+--			case fmt.immSize is
+--				when none =>
+--					--res.hasImm := '0';
+--					res.imm := (others => '0');
+--				when imm10 =>
+--					--res.hasImm := '1';
+--					res.imm(31 downto 10) := (others => iw(9) and fmt.immSign);	
+--				when imm16 =>
+--					--res.hasImm := '1';		
+--					res.imm(31 downto 16) := (others => iw(15) and fmt.immSign);
+--				when imm21 =>
+--					--res.hasImm := '1';	
+--					res.imm(31 downto 21) := (others => iw(20) and fmt.immSign);
+--				when imm26 =>
+--					--res.hasImm := '1';	
+--					res.imm(31 downto 26) := (others => iw(25) and fmt.immSign);					
+--				when others =>
+--					report "bad imm format specification" severity error;
+--			end case;
+
 			if fmt.hasLeftImm = '1' then
 				res.hasLeftImm := '1';
 				iw := tab(leftImm);

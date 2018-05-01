@@ -77,15 +77,22 @@ entity UnitMemory is
 		sysLoadVal: in Mword;
 		
 		committing: in std_logic;
-		groupCtrNext: in SmallNumber;
-		groupCtrInc: in SmallNumber;
+		groupCtrNext: in InsTag;
+		groupCtrInc: in InsTag;
 	
 		sbAcceptingIn: in std_logic;
 		dataOutSQ: out StageDataMulti;
 
+			sbSending: in std_logic;
+
 		lateEventSignal: in std_logic;	
 		execOrIntEventSignalIn: in std_logic;
-		execCausing: in InstructionState
+		execCausing: in InstructionState;
+		
+			cacheFillInput: in InstructionSlot;
+		
+			sqCommittedOutput: out InstructionSlot;
+			sqCommittedEmpty: out std_logic
 	);
 end UnitMemory;
 
@@ -102,7 +109,7 @@ architecture Behavioral of UnitMemory is
 	signal inputDataLoadUnit: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
 	signal dataToMemPipe: InstructionState := DEFAULT_INSTRUCTION_STATE;
 	signal sendingToMemPipe: std_logic := '0';
-	signal stageDataOutMem0: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;			
+	signal stageDataOutMem0, stageDataToMem1: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;			
 	signal acceptingMem1: std_logic := '0';
 		
 	signal dlqAccepting, sendingToDLQ, sendingFromDLQ: std_logic := '0';
@@ -126,8 +133,7 @@ architecture Behavioral of UnitMemory is
 			 sendingAddressingForLoad, sendingAddressingForMfc,
 			 sendingAddressingForStore, sendingAddressingForMtc: std_logic := '0';
 	signal storeAddressDataSig, storeValueDataSig: InstructionState := DEFAULT_INSTRUCTION_STATE;
-	signal sqSelectedOutput, lqSelectedOutput, lmqSelectedOutput: InstructionSlot
-				:= DEFAULT_INSTRUCTION_SLOT;
+	signal sqSelectedOutput, lqSelectedOutput, lmqSelectedOutput: InstructionSlot := DEFAULT_INSTRUCTION_SLOT;
 begin
 	eventSignal <= execOrIntEventSignalIn;	
 
@@ -138,7 +144,7 @@ begin
 		clk => clk, reset => reset, en => en,
 		
 		prevSending => inputC.full,
-		nextAccepting => acceptingLS,
+		nextAccepting => acceptingLS and not sendingFromDLQ,
 		
 		stageDataIn => inputDataC, 
 		acceptingOut => execAcceptingCSig,
@@ -159,8 +165,13 @@ begin
 
 	dataToMemPipe <= dataFromDLQ when sendingFromDLQ = '1' else stageDataOutAGU.data(0);
 	sendingToMemPipe <= stageDataOutAGU.fullMask(0) or sendingFromDLQ;
+	-- CAREFUL, At this point probably "completed" bits must be cleared, because they will be set (or not)
+	--						based on the success or failure of translation and cache access
 
-	inputDataLoadUnit <= makeSDM((0 => (sendingToMemPipe, dataToMemPipe)));
+	inputDataLoadUnit <= makeSDM((0 => (sendingToMemPipe, 
+														setDataCompleted(setAddressCompleted(dataToMemPipe, '0'), '0')
+													))
+											);
 
 	STAGE_MEM0: entity work.GenericStageMulti(SingleTagged)
 	port map(
@@ -181,8 +192,13 @@ begin
 		stageEventsOut => open					
 	);
 
+	-- CAREFUL, TODO: after mem0 set "addressCompleted" according to success or failure of translation?
+
 	sendingAddressing <= stageDataOutMem0.fullMask(0); -- After translation
 	addressingData	<= stageDataOutMem0.data(0);
+	
+	-- TEMP: setting address always completed (simulating TLB always hitting)
+	stageDataToMem1 <= makeSDM( (0 =>  (stageDataOutMem0.fullMask(0), setAddressCompleted(stageDataOutMem0.data(0), '1'))) );
 	
 	STAGE_MEM1: entity work.GenericStageMulti(SingleTagged)
 	port map(
@@ -191,7 +207,7 @@ begin
 		prevSending => '0',--sendingMem0,
 		nextAccepting => whichAcceptedCQ(2),
 		
-		stageDataIn => stageDataOutMem0,--dataM, 
+		stageDataIn => stageDataToMem1,--dataM, 
 		acceptingOut => acceptingMem1,
 		sendingOut => open,--sendingMem1,
 		stageDataOut => dataAfterMem,
@@ -208,7 +224,7 @@ begin
 	addressUnitSendingSig <= (dataAfterMem.fullMask(0) and not sendingToDLQ) or lqSelectedOutput.full;
 																									--??? -- because load exc to ROB
 	outputC <= (addressUnitSendingSig, clearTempControlInfoSimple(execResultData));
-	outputOpPreC <= stageDataOutMem0.data(0);
+	outputOpPreC <= DEFAULT_INS_STATE; -- CAREFUL: Don't show this because not supported
 
 		-- CAREFUL, TODO: if mem subpipe can be locked, then memLoadReady will expire while the
 		--						corresponding load is stalled, and it will go to LMQ. In such case
@@ -223,7 +239,7 @@ begin
 	
 		lqSelectedDataWithErr <= setLoadException(lqSelectedOutput.ins);
 	
-		-- Sending to Delayed Load Queue: when load miss or selected from LQ (going to ROB)
+		-- Sending to Delayed Load Queue: when load/store miss or selected from LQ (going to ROB)
 		sendingToDLQ <= getSendingToDLQ(dataAfterMem.fullMask(0), lqSelectedOutput.full, lsResultData); 
 		dataToDLQ <= makeSDM((0 => (sendingToDLQ, lsResultData)));
 
@@ -241,7 +257,7 @@ begin
 				
 		-- SQ inputs
 		storeAddressDataSig <= addressingData; -- Mem unit interface
-		storeValueDataSig <= inputE.ins; -- Mem unit interface		
+		storeValueDataSig <= setInsResult(inputE.ins, inputE.ins.argValues.arg2); -- Mem unit interface		
 
 			STORE_QUEUE: entity work.MemoryUnit(Behavioral)
 			generic map(
@@ -268,10 +284,13 @@ begin
 				execEventSignal => eventSignal,
 				execCausing => execCausing,
 				
-				nextAccepting => '1',
+				nextAccepting => sbSending,--'1',
 				
 				sendingSQOut => open,
-					dataOutV => dataOutSQV
+					dataOutV => dataOutSQV,
+					
+					committedOutput => sqCommittedOutput,
+					committedEmpty => sqCommittedEmpty
 			);
 
 			MEM_LOAD_QUEUE: entity work.MemoryUnit(Behavioral)
@@ -302,7 +321,10 @@ begin
 				nextAccepting => '1',
 
 				sendingSQOut => open,
-					dataOutV => open
+					dataOutV => open,
+					
+					committedOutput => open,
+					committedEmpty => open
 			);
 
 			DELAYED_LOAD_QUEUE: entity work.MemoryUnit(LoadMissQueue)
@@ -318,7 +340,7 @@ begin
 				dataIn => dataToDLQ,
 				
 					storeAddressInput => ('0', DEFAULT_INSTRUCTION_STATE),
-					storeValueInput => ('0', DEFAULT_INSTRUCTION_STATE),
+					storeValueInput => cacheFillInput,--('0', DEFAULT_INSTRUCTION_STATE),
 					compareAddressInput => ('0', DEFAULT_INSTRUCTION_STATE),
 					
 					selectedDataOutput => lmqSelectedOutput,
@@ -330,9 +352,12 @@ begin
 				execEventSignal => eventSignal,
 				execCausing => execCausing,
 				
-				nextAccepting => '1', -- TODO: when should it be allowed to send? Priorities!				
+				nextAccepting => acceptingLS, -- TODO: when should it be allowed to send? Priorities!				
 				sendingSQOut => sendingFromDLQ,
-					dataOutV => stageDataMultiDLQ
+					dataOutV => stageDataMultiDLQ,
+					
+					committedOutput => open,
+					committedEmpty => open
 			);
 			
 			dataFromDLQ <= stageDataMultiDLQ.data(0);
@@ -348,7 +373,7 @@ begin
 			execAcceptingE <= '1';
 			
 			-- Mem interface
-			memLoadAddress <= addressingData.result;
+			memLoadAddress <= addressingData.target;
 			memLoadAllow <= sendingAddressingForLoad;
 			sysLoadAllow <= sendingAddressingForMfc;	 
 				 

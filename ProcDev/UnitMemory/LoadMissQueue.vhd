@@ -49,47 +49,9 @@ use work.ProcLogicMemory.all;
 
 use work.BasicCheck.all;
 
---entity LoadMissQueue is
---	generic(
---		QUEUE_SIZE: integer := 4;
---		CLEAR_COMPLETED: boolean := true
---	);
---	port(
---		clk: in std_logic;
---		reset: in std_logic;
---		en: in std_logic;
---
---		acceptingOut: out std_logic;
---		prevSending: in std_logic;
---		dataIn: in StageDataMulti;
---
---		storeAddressWr: in std_logic;
---		storeValueWr: in std_logic;
---
---		storeAddressDataIn: in InstructionState;
---		storeValueDataIn: in InstructionState;
---
---			compareAddressDataIn: in InstructionState;
---			compareAddressReady: in std_logic;
---
---			selectedDataOut: out InstructionState;
---			selectedSending: out std_logic;
---
---		committing: in std_logic;
---		groupCtrInc: in SmallNumber; -- CAREFUL: differs from MemoryUnit
---
---		lateEventSignal: in std_logic;
---		execEventSignal: in std_logic;
---		execCausing: in InstructionState;
---		
---		nextAccepting: in std_logic;	
---		sendingSQOut: out std_logic;
---			dataOutV: out StageDataMulti
---	);
---end LoadMissQueue;
 
 
-architecture LoadMissQueue of MemoryUnit is--LoadMissQueue is
+architecture LoadMissQueue of MemoryUnit is
 	constant zeroMask: std_logic_vector(0 to PIPE_WIDTH-1) := (others => '0');
 
 	signal wrAddress, wrData, sendingSQ: std_logic := '0';
@@ -99,12 +61,10 @@ architecture LoadMissQueue of MemoryUnit is--LoadMissQueue is
 
 	signal content, contentNext, contentUpdated:
 					InstructionSlotArray(0 to QUEUE_SIZE-1) := (others => DEFAULT_INSTRUCTION_SLOT);
-	signal contentData: InstructionStateArray(0 to QUEUE_SIZE-1)
-																			:= (others => DEFAULT_INSTRUCTION_STATE);					
-	signal contentDataNext: InstructionStateArray(0 to QUEUE_SIZE-1)
-																			:= (others => DEFAULT_INSTRUCTION_STATE);
-	signal contentMaskNext, matchingA, matchingD,
-				matchingShA, matchingShD, firstReadyVec, sendingVec
+	signal contentData: InstructionStateArray(0 to QUEUE_SIZE-1) := (others => DEFAULT_INSTRUCTION_STATE);					
+	signal contentDataNext: InstructionStateArray(0 to QUEUE_SIZE-1) := (others => DEFAULT_INSTRUCTION_STATE);
+	signal contentMaskNext, matchingA, matchingD, matchingShA, matchingShD, firstReadyVec, sendingVec, receivingVec,
+				newFilled
 				: std_logic_vector(0 to QUEUE_SIZE-1) := (others => '0');
 
 	signal bufferDrive: FlowDriveBuffer := (killAll => '0', lockAccept => '0', lockSend => '0',
@@ -113,39 +73,26 @@ architecture LoadMissQueue of MemoryUnit is--LoadMissQueue is
 begin				
 		fullMask <= extractFullMask(content);
 		livingMask <= fullMask and not killMask;
+
+		--matchingA <= compareAddress(extractData(content), fullMask, storeAddressInput.ins); -- for TLB fill!
+		newFilled <= compareAddressDLQ(extractData(content), fullMask, storeValueInput.ins);
 							
-		matchingA <= findMatching(content, dataA);
-		matchingD <= findMatching(content, dataD);
-							
-		sendingVec <= firstReadyVec when nextAccepting = '1' else (others => '0');					
-							
-		matchingShA <= lmMaskNext(matchingA, zeroMask,
-																 binFlowNum(bufferResponse.living),
-																 --binFlowNum(bufferResponse.sending),
-																 sendingVec,
-																 prevSending);																
-		matchingShD <= lmMaskNext(matchingD, zeroMask,
-																 binFlowNum(bufferResponse.living),
-																 --binFlowNum(bufferResponse.sending),
-																 sendingVec,
-																 prevSending);
+		sendingVec <= firstReadyVec when nextAccepting = '1' else (others => '0');
+		receivingVec <= findFirstFree(fullMask);
 		
 		-- TODO: enable sending from any slot! And preserve mem address (when enqueueing, don't clear it!)
 		--			Add vector with position of first ready
 		contentDataNext <= lmQueueNext(extractData(content), livingMask,
-																 dataIn.data, dataIn.fullMask,
-																 binFlowNum(bufferResponse.living),
-																 --binFlowNum(bufferResponse.sending),
+																 dataIn.data(0),
 																	sendingVec,
 																 prevSending,
-																 dataA, dataD, wrAddress, wrData,
-																 matchingShA, matchingShD,
-																 CLEAR_COMPLETED);
-		contentMaskNext <= lmMaskNext(livingMask, dataIn.fullMask,
-																 binFlowNum(bufferResponse.living),
-																 --binFlowNum(bufferResponse.sending),
+																 receivingVec,
+																 newFilled,
+																 storeValueInput.full);
+		contentMaskNext <= lmMaskNext(livingMask, 
 																 sendingVec,
-																 prevSending);
+																 prevSending,
+																 receivingVec);
 		contentUpdated <= makeSlotArray(contentDataNext, contentMaskNext);		
 		contentNext <= contentUpdated;
 		
@@ -157,7 +104,7 @@ begin
 			dataA <= storeAddressInput.ins;
 			dataD <= storeValueInput.ins;
 					
-			sendingSQ <= isNonzero(firstReadyVec);
+			sendingSQ <= isNonzero(firstReadyVec) and nextAccepting;
 				dataOutV.fullMask(0) <= sendingSq;
 				dataOutV.data(0) <= chooseIns(extractData(content), firstReadyVec);
 
@@ -171,9 +118,9 @@ begin
 					--logBuffer(contentData, fullMask, livingMask, bufferResponse);	
 					-- NOTE: below has no info about flow constraints. It just checks data against
 					--			flow numbers, while the validity of those numbers is checked by slot logic
-					checkBuffer(extractData(content), fullMask, extractData(contentNext),
-																				extractFullMask(contentNext),
-										bufferDrive, bufferResponse);					
+					--checkBuffer(extractData(content), fullMask, extractData(contentNext),
+					--															extractFullMask(contentNext),
+					--					bufferDrive, bufferResponse);					
 				end if;
 			end process;
 					

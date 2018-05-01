@@ -30,12 +30,12 @@ architecture Behavioral5 of NewCore0 is
 	signal memLoadAllow, memLoadReady: std_logic := '0';  -- OUTPUT, INPUT
 
 	-- evt
-	signal execEventSignal, lateEventSignal: std_logic := '0';	-- OUTPUT/SIG, INPUT 	
-	signal execCausing: InstructionState := defaultInstructionState; -- OUTPUT/SIG
+	signal execEventSignal, lateEventSignal, lateEventSetPC: std_logic := '0';	-- OUTPUT/SIG, INPUT 	
+	signal execCausing, lateCausing: InstructionState := defaultInstructionState; -- OUTPUT/SIG
 
 	-- Hidden to some degree, but may be useful for sth
-	signal commitGroupCtrSig, commitGroupCtrNextSig: SmallNumber := (others => '0'); -- INPUT
-	signal commitGroupCtrIncSig: SmallNumber := (others => '0');	-- INPUT
+	signal commitGroupCtrSig, commitGroupCtrNextSig: InsTag := (others => '0'); -- INPUT
+	signal commitGroupCtrIncSig: InsTag := (others => '0');	-- INPUT
 												
 	-- ROB interface	
 	signal robSending: std_logic := '0';		-- OUTPUT
@@ -75,12 +75,20 @@ architecture Behavioral5 of NewCore0 is
 		signal memStoreAddress, memStoreValue: Mword := (others => '0');
 		signal memStoreAllow: std_logic := '0';
 			
+			signal sqCommittedOutput: InstructionSlot := DEFAULT_INSTRUCTION_SLOT;
+			signal sqCommittedEmpty: std_logic := '0';
+		
+		signal cacheFill: InstructionSlot := DEFAULT_INSTRUCTION_SLOT;
 	constant HAS_RESET: std_logic := '0';
 	constant HAS_EN: std_logic := '0';
 begin
 	resetSig <= reset and HAS_RESET;
 	enSig <= en or not HAS_EN;
-	
+
+	cacheFill.full <= fillready;
+	cacheFill.ins.argValues.arg1 <= filladr;
+
+
 	SEQUENCING_PART: entity work.UnitSequencer(Behavioral)
 	port map (
 		clk => clk, reset => resetSig, en => enSig,
@@ -92,15 +100,13 @@ begin
 			 sysStoreAddress => sysStoreAddress,
 			 sysStoreValue => sysStoreValue,
 
-		-- Icache interface
-		iadr => iadr,
-		iadrvalid => iadrvalid,		
-		
 		-- to front pipe
 		frontAccepting => acceptingOutFront,
 		pcDataLiving => pcDataSig,
 		pcSending => pcSendingSig,
-
+		
+		intAllowOut => intallow,
+		intAckOut => intack,
 		-- Events in
 		intSignal => int0,
 		start => int1,		
@@ -114,6 +120,8 @@ begin
 		execOrIntEventSignalOut => execOrIntEventSignal,
 		execOrIntCausingOut => execOrIntCausing,
 		lateEventOut => lateEventSignal,
+		lateEventSetPC => lateEventSetPC,
+		lateCausing => lateCausing,
 		-- Data from front pipe interface		
 		renameAccepting => renameAccepting, -- to frontend
 		frontLastSending => frontLastSending,
@@ -152,6 +160,9 @@ begin
 		commitGroupCtrIncOut => commitGroupCtrIncSig
 	);
 		
+	iadr <= pcDataSig.ip;
+	iadrvalid <= pcSendingSig;
+		
 	FRONT_PART: entity work.UnitFront(Behavioral)
 	port map(
 		clk => clk, reset => resetSig, en => enSig,
@@ -170,8 +181,12 @@ begin
 		frontEventSignal => frontEventSignal,
 		frontCausing => frontCausing,
 		
+		execCausing => execCausing,
+		lateCausing => lateCausing,
+		
 		execEventSignal => execEventSignal,
-		lateEventSignal => lateEventSignal		
+		lateEventSignal => lateEventSignal,
+		lateEventSetPC => lateEventSetPC
 	);
 
 	--------------------------------
@@ -219,13 +234,20 @@ begin
 				robSendingOut => robSending,
 				dataOutROB => dataOutROB,
 
-				sbAccepting => sbAccepting,--: in std_logic;	-- INPUT
+				sbAccepting => '1',--sbAccepting,--: in std_logic;	-- INPUT
 				commitAccepting => commitAccepting,--: in std_logic; -- INPUT
+
+					sbSending => sbSending,
+
+					cacheFillInput => cacheFill,
 
 				dataOutBQV => dataOutBQV,
 				dataOutSQ => dataOutSQ,
 				readyRegFlags => readyRegFlags,
-				cqOutput => cqOutput
+				cqOutput => cqOutput,
+				
+				sqCommittedOutput => sqCommittedOutput,
+				sqCommittedEmpty => sqCommittedEmpty
 		);
 
 			cqMaskOut <= extractFullMask(cqOutput);
@@ -287,13 +309,7 @@ begin
 				LAST_COMMITTED_SYNCHRONOUS: process(clk) 	
 				begin
 					if rising_edge(clk) then
-						-- CAREFUL! When writing the same virtual reg multiple times, to get a vector to put on FreeList,
-						-- 			we either A) bypass phys dests to next instructions instead of reading stable map, 
-						--				or B) don't bypass but select to put the phys dests for all but the last writing op,
-						--				and that last one returns the stable map entry.
-						--				Option A means that below we substitute relevant phys names, and B means that
-						--				we don't, and handle overridden dests by seleciton bits in RegisterFreeList.
-						physStableDelayed <= work.ProcLogicRenaming.getStableDestsParallel(dataOutROB, physStable);					
+						physStableDelayed <= physStable;
 					end if;
 				end process;
 		
@@ -304,7 +320,8 @@ begin
 					en => enSig,
 					
 					rewind => execOrIntEventSignal,
-					causingInstruction => execOrIntCausing,
+					--causingInstruction => execOrIntCausing,
+					causingPointer => execOrIntCausing.tags.intPointer,
 					
 					sendingToReserve => frontLastSending, 
 					takeAllow => frontLastSending,	-- FROM SEQ
@@ -326,30 +343,11 @@ begin
 
 					sbAccepting <= sbAcceptingV(0);
 
-					STORE_BUFFER: entity work.TestCQPart0(WriteBuffer)
-					generic map(
-						INPUT_WIDTH => PIPE_WIDTH,
-						QUEUE_SIZE => SB_SIZE,
-						OUTPUT_SIZE => 1
-					)
-					port map(
-						clk => clk, reset => reset, en => en,
-						
-						whichAcceptedCQ => sbAcceptingV,
-						input => makeSlotArray(dataOutSQ.data, dataOutSQ.fullMask),
-						
-						anySending => open,--sbSending,
-
-						cqOutput => sbOutputSig,
-						bufferOutput => sbBufferOutputSig,
-						
-						execEventSignal => '0',
-						execCausing => DEFAULT_INSTRUCTION_STATE
-					);
 				
-				sbSending <= sbOutputSig(0).full;
-			sbEmpty <= not sbBufferOutputSig(0).full;-- sbFullMask(0);
-			dataFromSB <= sbOutputSig(0).ins;--sbDataOut(0);
+				sbSending <= sqCommittedOutput.full;
+			sbEmpty <= sqCommittedEmpty;
+			dataFromSB <= sqCommittedOutput.ins;
+
 
 -----------------------------------------
 ----- Mem signals -----------------------

@@ -70,9 +70,9 @@ entity OutOfOrderBox is
 			 execCausingOut: out InstructionState;
 
 	-- Hidden to some degree, but may be useful for sth
-			commitGroupCtrSig: in SmallNumber;
-			commitGroupCtrNextSig: in SmallNumber; -- INPUT
-		   commitGroupCtrIncSig: in SmallNumber;	-- INPUT
+			commitGroupCtrSig: in InsTag;
+			commitGroupCtrNextSig: in InsTag; -- INPUT
+		   commitGroupCtrIncSig: in InsTag;	-- INPUT
 												
 	-- ROB interface	
 			robSendingOut: out std_logic;		-- OUTPUT
@@ -81,12 +81,19 @@ entity OutOfOrderBox is
 			sbAccepting: in std_logic;	-- INPUT
 			commitAccepting: in std_logic; -- INPUT
 
+				sbSending: in std_logic;
+
+				cacheFillInput: in InstructionSlot;
+
 			dataOutBQV: out StageDataMulti; -- OUTPUT
 			dataOutSQ: out StageDataMulti; -- OUTPUT			  
 			
 				readyRegFlags: in std_logic_vector(0 to 3*PIPE_WIDTH-1);		
 	
-				cqOutput: out InstructionSlotArray(0 to INTEGER_WRITE_WIDTH-1)
+				cqOutput: out InstructionSlotArray(0 to INTEGER_WRITE_WIDTH-1);
+				
+			sqCommittedOutput: out InstructionSlot;
+			sqCommittedEmpty: out std_logic
 			  );
 end OutOfOrderBox;
 
@@ -153,7 +160,7 @@ begin
 				acceptingVecA => iqAcceptingVecArr(0),
 				acceptingVecB => iqAcceptingVecArr(1),
 				acceptingVecC => iqAcceptingVecArr(2),
-				acceptingVecD => iqAcceptingVecArr(3),
+				acceptingVecD => (others => '1'),--iqAcceptingVecArr(3),
 				acceptingVecE => iqAcceptingVecArr(4),
 
 				acceptingROB => robAccepting,
@@ -169,7 +176,8 @@ begin
 				dataOutA => dataToQueuesArr(0),--dataToA,
 				dataOutB => dataToQueuesArr(1),--dataToB,
 				dataOutC => dataToQueuesArr(2),--dataToC,
-				dataOutD => dataToQueuesArr(3),--dataToD,
+				dataOutD => --dataToQueuesArr(3),--dataToD,
+								open,
 				dataOutE => dataToQueuesArr(4),--dataToE,
 				
 				dataOutSQ => compactedToSQ,
@@ -207,7 +215,7 @@ begin
 			regsSelA <= getPhysicalSources(iqOutputArr(0).ins);
 			regsSelB <= getPhysicalSources(iqOutputArr(1).ins);
 			regsSelC <= getPhysicalSources(iqOutputArr(2).ins);
-			regsSelD <= getPhysicalSources(iqOutputArr(3).ins);
+			--regsSelD <= getPhysicalSources(iqOutputArr(3).ins);
 			regsSelE <= getPhysicalSources(iqOutputArr(4).ins);
 
 			regValsArr <= regValsA & regValsB & regValsC & regValsD & regValsE;
@@ -247,7 +255,7 @@ begin
 
 				inputA => schedOutputArr(0),
 				inputB => schedOutputArr(1),
-				inputD => schedOutputArr(3),
+				inputD => DEFAULT_INS_SLOT,--schedOutputArr(3),
 				
 				outputA => outputA,
 				outputB => outputB,
@@ -312,17 +320,24 @@ begin
 						
 						sbAcceptingIn => sbAccepting,
 						dataOutSQ => dataOutSQ,
+
+							sbSending => sbSending,
 											
 					lateEventSignal => lateEventSignal,	
 					execOrIntEventSignalIn => execEventSignal,
-					execCausing => execCausing
+					execCausing => execCausing,
+					
+					cacheFillInput => cacheFillInput,
+					
+					sqCommittedOutput => sqCommittedOutput,
+					sqCommittedEmpty => sqCommittedEmpty
 				);
 
 				sysRegReadSel <= memLoadAddress(4 downto 0);
 
 		execOutputs1 <= (0 => outputA, 1 => outputB, 2 => outputC, others => DEFAULT_INSTRUCTION_SLOT);
 		execOutputs2 <= (		2 => outputE, 3 => outputD, others => DEFAULT_INSTRUCTION_SLOT); -- (-,-,E,D)! 
-		execOutputsPre <= (0 => ('0', outputOpPreB), 1 => ('0', outputOpPreC),
+		execOutputsPre <= (1 => ('0', outputOpPreB), --1 => ('0', outputOpPreC),
 																				others => DEFAULT_INSTRUCTION_SLOT);
 			COMMIT_QUEUE: entity work.TestCQPart0(Implem)
 			generic map(

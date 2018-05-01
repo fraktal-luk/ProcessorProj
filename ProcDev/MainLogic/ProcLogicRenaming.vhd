@@ -35,40 +35,33 @@ constant DEFAULT_REGISTER_MAP_REQUEST: RegisterMapRequest :=
 function getRegMapRequest(sd: StageDataMulti; newPhys: PhysNameArray) return RegisterMapRequest;
 
 
-function baptizeVec(sd: StageDataMulti; tags: SmallNumberArray) 
+function renameRegs2(insVec: StageDataMulti; takeVec, destMask: std_logic_vector; psVec, pdVec: PhysNameArray) 		
 return StageDataMulti;
 
-function renameRegs2(insVec: StageDataMulti; takeVec, destMask: std_logic_vector;
-								psVec, pdVec: PhysNameArray) 		
+function setArgStatus(insVec: StageDataMulti) return StageDataMulti;
+
+function genNewNumberTags(renameCtr: InsTag) return InsTagArray;
+		
+function genNewGprTags(newPhysDestPointer: SmallNumber; nToTake: integer) return SmallNumberArray;
+		
+function renameGroup(insVec: StageDataMulti;
+							newPhysSources: PhysNameArray;
+							newPhysDests: PhysNameArray;
+							renameCtr: InsTag;
+							renameGroupCtrNext: InsTag;
+							newPhysDestPointer: SmallNumber;
+							dbtrap: std_logic
+							) return StageDataMulti;
+
+function baptizeAll(insVec: StageDataMulti; numberTags: InsTagArray;
+						  newGroupTag: InsTag; gprTags: SmallNumberArray)
 return StageDataMulti;
 
-function setArgStatus(insVec: StageDataMulti)--; readyRegFlagsVirtualNext: std_logic_vector) 
-return StageDataMulti;
+-- Clears non-effective 'full' bits in group (after exception or special)
+function TMP_handleSpecial(sd: StageDataMulti; dbtrap: std_logic) return StageDataMulti;
 
-	
-
-
-
-function getStableDestsParallel(insVec: StageDataMulti; pdVec: PhysNameArray) return PhysNameArray;
-
-function baptizeGroup(insVec: StageDataMulti; newGroupTag: SmallNumber) return StageDataMulti;
-
-function baptizeAll(insVec: StageDataMulti; numberTags: SmallNumberArray;
-						  newGroupTag: SmallNumber; gprTags: SmallNumberArray)
-return StageDataMulti;
-
-
-function getSysRegWriteAllow(sd: StageDataMulti; effective: std_logic_vector) return std_logic;
--- CAREFUL: this seems not used and would choose the last value in group
-function getSysRegWriteSel(sd: StageDataMulti) return slv5;
--- CAREFUL: this seems not used and would choose the last value in group
-function getSysRegWriteValue(sd: StageDataMulti) return Mword;
-
-function TMP_handleSpecial(sd: StageDataMulti) return StageDataMulti;
-
-function findWhichTakeReg(sd: StageDataMulti) return std_logic_vector;
+function findWhichTakeReg(sd: StageDataMulti) return std_logic_vector; -- USELESS? just fullMask
 function findWhichPutReg(sd: StageDataMulti) return std_logic_vector;
-
 
 function initList return PhysNameArray;
 
@@ -87,22 +80,61 @@ begin
 					and not getExceptionMask(sd)			-- if exception, doesn't write
 					and not findOverriddenDests(sd);
 	for i in 0 to PIPE_WIDTH-1 loop
-		res.index(i) := sd.data(i).virtualDestArgs.d0;
+		res.index(i) := sd.data(i).virtualArgSpec.dest(4 downto 0);
 		res.value(i) := newPhys(i);
 	end loop;
 	return res;
 end function;
 
 
-function baptizeVec(sd: StageDataMulti; tags: SmallNumberArray) 
-return StageDataMulti is
-	variable res: StageDataMulti := sd;
+function genNewNumberTags(renameCtr: InsTag) return InsTagArray is
+	variable res: InsTagArray(0 to PIPE_WIDTH-1) := (others => (others => '0'));
 begin
-	for i in res.data'range loop
-		if true or res.fullMask(i) = '1' then
-			res.data(i).numberTag := tags(i);
+	for i in  0 to PIPE_WIDTH-1 loop
+		res(i) := i2slv(slv2u(renameCtr) + i + 1, TAG_SIZE);
+	end loop;
+	return res;
+end function;
+
+function genNewGprTags(newPhysDestPointer: SmallNumber; nToTake: integer) return SmallNumberArray is
+	variable res: SmallNumberArray(0 to PIPE_WIDTH-1) := (others => (others => '0'));
+begin
+	for i in  0 to PIPE_WIDTH-1 loop
+		if FREE_LIST_COARSE_REWIND = '1' then
+			res(i) := i2slv((slv2u(newPhysDestPointer) + nToTake) mod FREE_LIST_SIZE, SMALL_NUMBER_SIZE);
+		else
+			res(i) := i2slv((slv2u(newPhysDestPointer) + i + 1) mod FREE_LIST_SIZE, SMALL_NUMBER_SIZE);
 		end if;
 	end loop;
+	return res;
+end function;
+
+function renameGroup(insVec: StageDataMulti;
+							newPhysSources: PhysNameArray;
+							newPhysDests: PhysNameArray;
+							renameCtr: InsTag;
+							renameGroupCtrNext: InsTag;
+							newPhysDestPointer: SmallNumber;
+							dbtrap: std_logic
+							) return StageDataMulti is
+	variable res: StageDataMulti := insVec;
+	variable reserveSelSig, takeVec: std_logic_vector(0 to PIPE_WIDTH-1) := (others => '0' );
+	variable nToTake: integer := 0;
+	variable newGprTags: SmallNumberArray(0 to PIPE_WIDTH-1) := (others=>(others=>'0'));	
+	variable newNumberTags: InsTagArray(0 to PIPE_WIDTH-1) := (others=>(others=>'0'));
+begin
+	reserveSelSig := getDestMask(insVec); -- Just full and having a destination?
+	takeVec := findWhichTakeReg(insVec); -- REG ALLOC
+	nToTake := countOnes(takeVec);
+
+	newNumberTags := genNewNumberTags(renameCtr);
+	newGprTags := genNewGprTags(newPhysDestPointer, nToTake);			
+	
+	res := baptizeAll(res, newNumberTags, renameGroupCtrNext, newGprTags);
+	res := renameRegs2(res, takeVec, reserveSelSig, newPhysSources, newPhysDests);
+	res := setArgStatus(res);
+	res := TMP_handleSpecial(res, dbtrap);
+	
 	return res;
 end function;
 
@@ -115,37 +147,40 @@ return StageDataMulti is
 begin
 	for i in insVec.fullMask'range loop
 		-- Set physical dest
-		res.data(i).physicalDestArgs.sel(0) := destMask(i);
+		res.data(i).physicalArgSpec.intDestSel := destMask(i);
 		if takeVec(i) = '1' then
-			res.data(i).physicalDestArgs.d0 := pdVec(k);
+			res.data(i).physicalArgSpec.dest := pdVec(k);
 			k := k + 1;
 		end if;
 	end loop;
 	
 	for i in insVec.fullMask'range loop	
 		-- Set physical sources
-		res.data(i).physicalArgs.sel := res.data(i).virtualArgs.sel;
-		res.data(i).physicalArgs.s0 := psVec(3*i+0);	
-		res.data(i).physicalArgs.s1 := psVec(3*i+1);			
-		res.data(i).physicalArgs.s2 := psVec(3*i+2);							
+		res.data(i).physicalArgSpec.intArgSel := res.data(i).virtualArgSpec.intArgSel;
+		res.data(i).physicalArgSpec.args(0) := psVec(3*i+0);	
+		res.data(i).physicalArgSpec.args(1) := psVec(3*i+1);			
+		res.data(i).physicalArgSpec.args(2) := psVec(3*i+2);							
 		-- Correct physical sources for group dependencies
 		for j in insVec.fullMask'range loop	
 			-- Is s0 equal to prev instruction's dest?				
 			if j = i then exit; end if;				
-			if insVec.data(i).virtualArgs.s0 = insVec.data(j).virtualDestArgs.d0
-				and isNonzero(insVec.data(i).virtualArgs.s0) = '1' -- CAREFUL: don't copy dummy dest for r0
+			if insVec.data(i).virtualArgSpec.args(0)(4 downto 0) = insVec.data(j).virtualArgSpec.dest(4 downto 0)
+				and isNonzero(insVec.data(i).virtualArgSpec.args(0)(4 downto 0)) = '1'
+																							-- CAREFUL: don't copy dummy dest for r0
 			then
-				res.data(i).physicalArgs.s0 := res.data(j).physicalDestArgs.d0;
+				res.data(i).physicalArgSpec.args(0) := res.data(j).physicalArgSpec.dest;
 			end if;		
-			if 	 insVec.data(i).virtualArgs.s1 = insVec.data(j).virtualDestArgs.d0
-				and isNonzero(insVec.data(i).virtualArgs.s1) = '1' -- CAREFUL: don't copy dummy dest for r0
+			if 	 insVec.data(i).virtualArgSpec.args(1)(4 downto 0) = insVec.data(j).virtualArgSpec.dest(4 downto 0)
+				and isNonzero(insVec.data(i).virtualArgSpec.args(1)(4 downto 0)) = '1'
+																							-- CAREFUL: don't copy dummy dest for r0
 			then	
-				res.data(i).physicalArgs.s1 := res.data(j).physicalDestArgs.d0;						
+				res.data(i).physicalArgSpec.args(1) := res.data(j).physicalArgSpec.dest;						
 			end if;	
-			if 	 insVec.data(i).virtualArgs.s2 = insVec.data(j).virtualDestArgs.d0 
-				and isNonzero(insVec.data(i).virtualArgs.s2) = '1' -- CAREFUL: don't copy dummy dest for r0
+			if 	 insVec.data(i).virtualArgSpec.args(2)(4 downto 0) = insVec.data(j).virtualArgSpec.dest(4 downto 0)
+				and isNonzero(insVec.data(i).virtualArgSpec.args(2)(4 downto 0)) = '1'
+																							-- CAREFUL: don't copy dummy dest for r0
 			then
-				res.data(i).physicalArgs.s2 := res.data(j).physicalDestArgs.d0;						
+				res.data(i).physicalArgSpec.args(2) := res.data(j).physicalArgSpec.dest;
 			end if;						
 		end loop;
 		
@@ -155,26 +190,25 @@ begin
 end function;
 
 
-function setArgStatus(insVec: StageDataMulti)--; readyRegFlagsVirtualNext: std_logic_vector) 
-return StageDataMulti is
+function setArgStatus(insVec: StageDataMulti) return StageDataMulti is
 	variable res: StageDataMulti := insVec;
 begin
 	for i in insVec.fullMask'range loop	
 		-- Set state markers: "zero" bit		
-		if isNonzero(res.data(i).virtualArgs.s0) = '0' then
+		if isNonzero(res.data(i).virtualArgSpec.args(0)(4 downto 0)) = '0' then
 			res.data(i).argValues.zero(0) := '1';
 		end if;
 		
-		if isNonzero(res.data(i).virtualArgs.s1) = '0' then
+		if isNonzero(res.data(i).virtualArgSpec.args(1)(4 downto 0)) = '0' then
 			res.data(i).argValues.zero(1) := '1';
 		end if;
 
-		if isNonzero(res.data(i).virtualArgs.s2) = '0' then
+		if isNonzero(res.data(i).virtualArgSpec.args(2)(4 downto 0)) = '0' then
 			res.data(i).argValues.zero(2) := '1';
 		end if;		
 			
 		-- Set 'missing' flags for non-const arguments
-		res.data(i).argValues.missing := res.data(i).physicalArgs.sel and not res.data(i).argValues.zero;
+		res.data(i).argValues.missing := res.data(i).physicalArgSpec.intArgSel and not res.data(i).argValues.zero;
 		
 		-- Handle possible immediate arg
 		if res.data(i).constantArgs.immSel = '1' then
@@ -190,114 +224,31 @@ begin
 			res.data(i).controlInfo.completed2 := not res.data(i).classInfo.secCluster;
 				
 	end loop;	
-	
-	
+
 	return res; -- CAREFUL: this must be removed if using virtual ready map
-	
---		-- Virtual ready table
---		for i in 0 to PIPE_WIDTH-1 loop
---			res.data(i).argValues.missing(0) := res.data(i).argValues.missing(0) 
---					and not readyRegFlagsVirtualNext(3*i + 0);
---			res.data(i).argValues.missing(1) := res.data(i).argValues.missing(1)
---					and not readyRegFlagsVirtualNext(3*i + 1);
---			res.data(i).argValues.missing(2) := res.data(i).argValues.missing(2)
---					and not readyRegFlagsVirtualNext(3*i + 2);
---		end loop;	
-	
-	return res;
-end function;
-
-
--- CAREFUL: if use bypassing (>> usage in top module), don't exclude overridden dests 
---				from selection in RegisterFreeList!
-function getStableDestsParallel(insVec: StageDataMulti; pdVec: PhysNameArray) return PhysNameArray is
-	variable res: PhysNameArray(0 to PIPE_WIDTH-1) := pdVec(0 to PIPE_WIDTH-1);
-begin
-		return res; -- no bypassing
-		
-	for i in insVec.fullMask'range loop
-		for j in insVec.fullMask'range loop	
-			-- Is s0 equal to prev instruction's dest?				
-			if j = i then exit; end if;				
-			if insVec.data(i).virtualDestArgs.d0 = insVec.data(j).virtualDestArgs.d0
-				and isNonzero(insVec.data(i).virtualDestArgs.d0) = '1' -- CAREFUL: don't copy dummy dest for r0
-			then
-				res(i) := insVec.data(j).physicalDestArgs.d0;
-			end if;		
-		end loop;			
-	end loop;
-
-	return res;
-end function;
-
-
-function baptizeGroup(insVec: StageDataMulti; newGroupTag: SmallNumber) return StageDataMulti is
-	variable res: StageDataMulti := insVec;
-begin
-	for i in 0 to PIPE_WIDTH-1 loop
-		res.data(i).groupTag := newGroupTag or i2slv(i, SMALL_NUMBER_SIZE);
-	end loop;
-	return res;
 end function;
 
 	
-function baptizeAll(insVec: StageDataMulti; numberTags: SmallNumberArray;
-						  newGroupTag: SmallNumber; gprTags: SmallNumberArray)
+function baptizeAll(insVec: StageDataMulti; numberTags: InsTagArray;
+						  newGroupTag: InsTag; gprTags: SmallNumberArray)
 return StageDataMulti is
 	variable res: StageDataMulti := insVec;
 begin
 	for i in 0 to PIPE_WIDTH-1 loop
-		res.data(i).groupTag := newGroupTag or i2slv(i, SMALL_NUMBER_SIZE);
-		res.data(i).numberTag := numberTags(i);
-		res.data(i).gprTag := gprTags(i); -- ???		
+		res.data(i).tags.renameIndex := newGroupTag or i2slv(i, TAG_SIZE);
+		res.data(i).tags.renameSeq := numberTags(i);
+		res.data(i).tags.intPointer := gprTags(i);
 	end loop;
 	return res;
 end function;
 
-	
-	function getSysRegWriteAllow(sd: StageDataMulti; effective: std_logic_vector) return std_logic is
-	begin
-		for i in sd.fullMask'range loop
-			if 	--sd.fullMask(i) = '1'
-					effective(i) = '1'
-				and sd.data(i).operation.unit = System
-				and sd.data(i).operation.func = sysMtc
-				and sd.data(i).controlInfo.hasException = '0' -- Don't allow if instruction had exception!
-			then
-				return '1';
-			end if;
-		end loop;
-		return '0';
-	end function;
 
-	-- CAREFUL: this seems not used and would choose the last value in group
-	function getSysRegWriteSel(sd: StageDataMulti) return slv5 is
-		variable res: slv5 := (others => '0');
-	begin
-		for i in sd.fullMask'range loop
-			if sd.fullMask(i) = '1' then
-				res := sd.data(i).constantArgs.c0;
-			end if;
-		end loop;
-		return res;
-	end function;
-
-	-- CAREFUL: this seems not used and would choose the last value in group
-	function getSysRegWriteValue(sd: StageDataMulti) return Mword is
-		variable res: Mword := (others => '0');
-	begin
-		for i in sd.fullMask'range loop
-			if sd.fullMask(i) = '1' then
-				res := sd.data(i).result;
-			end if;
-		end loop;
-		return res;
-	end function;
-
-function TMP_handleSpecial(sd: StageDataMulti) return StageDataMulti is
+function TMP_handleSpecial(sd: StageDataMulti; dbtrap: std_logic) return StageDataMulti is
 	variable res: StageDataMulti := sd;
 	variable found: boolean := false;
 begin
+	res.data(0).controlInfo.dbtrap := dbtrap;
+	
 	-- If found special instruction, kill next ones
 	for i in 0 to PIPE_WIDTH-1 loop
 		if found then
@@ -305,8 +256,8 @@ begin
 		end if;
 
 		if 	res.data(i).controlInfo.specialAction = '1'
-			or res.data(i).controlInfo.hasException = '1' -- CAREFUL
-			--	TODO: include here also early branches? 
+			or res.data(i).controlInfo.hasException = '1'
+			or res.data(i).controlInfo.dbtrap = '1'
 		then
 			found := true;
 		end if;

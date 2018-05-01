@@ -70,9 +70,9 @@ entity UnitExec is
 			
 			committing: in std_logic;
 			
-			groupCtrNext: in SmallNumber;
-			groupCtrInc: in SmallNumber;
-			
+			groupCtrNext: in InsTag; -- UNUSED?
+			groupCtrInc: in InsTag;
+				
 		outputA: out InstructionSlot;
 		outputB: out InstructionSlot;
 		outputD: out InstructionSlot;
@@ -115,7 +115,7 @@ begin
 		resetSig <= reset and HAS_RESET_EXEC;
 		enSig <= en or not HAS_EN_EXEC; 
 
-		inputDataA <= makeSDM((0 => (inputA.full, executeAlu(inputA.ins))));
+		inputDataA <= makeSDM((0 => (inputA.full, executeAlu(inputA.ins, branchQueueSelectedOut))));
 
 		dataA0 <= outputDataA.data(0);
 		
@@ -159,10 +159,10 @@ begin
 				
 ------------------------------------------------
 -- Branch
-		branchData <=  basicBranch(setInstructionTarget(inputD.ins, inputD.ins.constantArgs.imm),
-											inputD.ins.result);					
+		branchData <=  basicBranch(setInstructionTarget(inputA.ins, inputD.ins.constantArgs.imm),
+											 branchQueueSelectedOut, branchQueueSelectedSending);					
 		
-		inputDataD <= makeSDM((0 => (inputD.full, branchData)));
+		inputDataD <= makeSDM((0 => (inputA.full and isBranch(inputA.ins), branchData)));
 		
 		dataD0 <= outputDataD.data(0);
 		
@@ -186,14 +186,15 @@ begin
 			stageEventsOut => eventsD						
 		);	
 
-		storeTargetDataSig <= setInsResult(dataD0, dataD0.target);
-		storeTargetWrSig <= execSendingD and isIndirectBranchOrReturn(dataD0);
+		storeTargetDataSig <= dataD0;
+		storeTargetWrSig <= execSendingD;
 
 			BRANCH_QUEUE: entity work.MemoryUnit(Behavioral)
 			generic map(
 				QUEUE_SIZE => BQ_SIZE,
 				KEEP_INPUT_CONTENT => true,
-				MODE => branch
+				MODE => branch,
+				ACCESS_REG => false
 			)
 			port map(
 				clk => clk,
@@ -206,7 +207,7 @@ begin
 				
 					storeAddressInput => (storeTargetWrSig, storeTargetDataSig),
 					storeValueInput => (storeTargetWrSig, DEFAULT_INSTRUCTION_STATE),
-					compareAddressInput => inputD,
+					compareAddressInput => (inputA.full and isBranch(inputA.ins), inputA.ins),
 					
 					selectedDataOutput => bqSelectedOutput,
 	
@@ -220,7 +221,10 @@ begin
 				nextAccepting => '1',
 				
 				sendingSQOut => open,
-					dataOutV => dataOutBQV
+					dataOutV => dataOutBQV,
+					
+					committedOutput => open,
+					committedEmpty => open
 			);
 
 			branchQueueSelectedSending <= bqSelectedOutput.full;

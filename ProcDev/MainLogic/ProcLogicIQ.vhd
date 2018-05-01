@@ -31,7 +31,7 @@ function updateDispatchArgs(ins: InstructionState; vals: MwordArray; regValues: 
 return InstructionState;
 
 
-function getForwardingStatusInfoD2(av: in InstructionArgValues; pa: in InstructionPhysicalArgs; 
+function getForwardingStatusInfoD2(av: in InstructionArgValues; pa: in InstructionArgSpec; 
 										tags0, tags1, tags2, 
 										nextTags, writtenTags: in PhysNameArray) return ArgStatusInfo;
 
@@ -237,7 +237,7 @@ begin
 	
 	if res.argValues.immediate = '1' and USE_IMM then
 		res.argValues.arg1 := res.constantArgs.imm;
-			--res.argValues.arg1(31 downto 16) := (others => res.constantArgs.imm(15));
+			res.argValues.arg1(31 downto 17) := (others => res.constantArgs.imm(16)); -- 16b + addditional sign bit
 	else
 		res.argValues.arg1 := vals(slv2u(res.argValues.locs(1)));
 	end if;
@@ -324,7 +324,7 @@ begin
 end function;
 
 
-function getForwardingStatusInfoD2(av: in InstructionArgValues; pa: in InstructionPhysicalArgs; 
+function getForwardingStatusInfoD2(av: in InstructionArgValues; pa: in InstructionArgSpec; 
 										tags0, tags1, tags2, 
 										nextTags, writtenTags: in PhysNameArray) return ArgStatusInfo
 is		
@@ -336,36 +336,36 @@ begin
 	stored := not av.missing;	
 	
 	for i in writtenTags'length-1 downto 0 loop
-		if writtenTags(i) = pa.s0 then
+		if writtenTags(i)(PHYS_REG_BITS-1 downto 0) = pa.args(0)(PHYS_REG_BITS-1 downto 0) then
 			written(0) := '1';
 		end if;
 
-		if writtenTags(i) = pa.s1 then
+		if writtenTags(i)(PHYS_REG_BITS-1 downto 0) = pa.args(1)(PHYS_REG_BITS-1 downto 0) then
 			written(1) := '1';
 		end if;
 
-		if writtenTags(i) = pa.s2 then
+		if writtenTags(i)(PHYS_REG_BITS-1 downto 0) = pa.args(2)(PHYS_REG_BITS-1 downto 0) then
 			written(2) := '1';
 		end if;		
 	end loop;
 	
 	-- Find where tag agrees with s0
 	for i in tags0'length-1 downto 0 loop		
-		if tags0(i) = pa.s0 then
+		if tags0(i)(PHYS_REG_BITS-1 downto 0) = pa.args(0)(PHYS_REG_BITS-1 downto 0) then
 			ready(0) := '1';
 			locs(0) := i2slv(i, SMALL_NUMBER_SIZE);
 		end if;
 	end loop;
 		
 	for i in tags1'length-1 downto 0 loop				
-		if tags1(i) = pa.s1 then
+		if tags1(i)(PHYS_REG_BITS-1 downto 0) = pa.args(1)(PHYS_REG_BITS-1 downto 0) then
 			ready(1) := '1';
 			locs(1) := i2slv(i, SMALL_NUMBER_SIZE);
 		end if;
 	end loop;		
 		
 	for i in tags2'length-1 downto 0 loop				
-		if tags2(i) = pa.s2 then
+		if tags2(i)(PHYS_REG_BITS-1 downto 0) = pa.args(2)(PHYS_REG_BITS-1 downto 0) then
 			ready(2) := '1';
 			locs(2) := i2slv(i, SMALL_NUMBER_SIZE);
 		end if;
@@ -373,15 +373,15 @@ begin
 	
 	for i in nextTags'range loop
 	
-		if nextTags(i) = pa.s0 then
+		if nextTags(i)(PHYS_REG_BITS-1 downto 0) = pa.args(0)(PHYS_REG_BITS-1 downto 0) then
 			nextReady(0) := '1';
 			nextLocs(0) := i2slv(i, SMALL_NUMBER_SIZE);
 		end if;
-		if nextTags(i) = pa.s1 then
+		if nextTags(i)(PHYS_REG_BITS-1 downto 0) = pa.args(1)(PHYS_REG_BITS-1 downto 0) then
 			nextReady(1) := '1';
 			nextLocs(1) := i2slv(i, SMALL_NUMBER_SIZE);
 		end if;
-		if nextTags(i) = pa.s2 then
+		if nextTags(i)(PHYS_REG_BITS-1 downto 0) = pa.args(2)(PHYS_REG_BITS-1 downto 0) then
 			nextReady(2) := '1';
 			nextLocs(2) := i2slv(i, SMALL_NUMBER_SIZE);
 		end if;			
@@ -405,7 +405,7 @@ return ArgStatusInfoArray is
 	variable res: ArgStatusInfoArray(data'range);
 begin
 	for i in res'range loop
-		res(i) := getForwardingStatusInfoD2(data(i).argValues, data(i).physicalArgs,
+		res(i) := getForwardingStatusInfoD2(data(i).argValues, data(i).physicalArgSpec,
 														tags0, tags1, tags2,
 														nextTags, writtenTags);
 	end loop;
@@ -495,7 +495,8 @@ begin
 		
 	-- CAREFUL! When not dispatching, dispatch stage must signal no result, so clear it here
 	if sends = '0' then
-		dispatchDataNew.physicalDestArgs.d0 := (others => '0');
+		dispatchDataNew.--physicalDestArgs.d0 := (others => '0');
+							 physicalArgSpec.dest := (others => '0');
 	end if;
 	
 	if nAfterSending < 0 then
@@ -551,7 +552,7 @@ begin
 
 	-- 
 	if res.argValues.newInQueue = '1' then
-		tmp8 := res.groupTag and i2slv(PIPE_WIDTH-1, SMALL_NUMBER_SIZE);
+		tmp8 := getTagLowSN(res.tags.renameIndex);-- and i2slv(PIPE_WIDTH-1, SMALL_NUMBER_SIZE);
 		rrf := readyRegFlags(3*slv2u(tmp8) to 3*slv2u(tmp8) + 2);
 		res.argValues.missing := res.argValues.missing and not rrf;
 	end if;
@@ -563,8 +564,7 @@ begin
 	-- CAREFUL! DEPREC statement?
 	res.argValues.newInQueue := isNew;
 	
-		res.basicInfo := DEFAULT_BASIC_INFO;	
-	
+	res.ip := (others => '0');
 	return res;
 end function;
 
@@ -584,7 +584,7 @@ begin
 	-- CAREFUL! Which reg ready flags are for this instruction?
 	--				Use groupTag, because it identifies the slot in previous superscalar stage
 	if res.argValues.newInQueue = '1' then
-		tmp8 := res.groupTag and i2slv(PIPE_WIDTH-1, SMALL_NUMBER_SIZE);
+		tmp8 := getTagLowSN(res.tags.renameIndex);-- and i2slv(PIPE_WIDTH-1, SMALL_NUMBER_SIZE);
 		rrf := readyRegFlags(3*slv2u(tmp8) to 3*slv2u(tmp8) + 2);
 		res.argValues.missing := res.argValues.missing and not rrf;
 	end if;
@@ -607,23 +607,13 @@ begin
 --		
 		res.controlInfo.completed := '0';
 		res.controlInfo.completed2 := '0';
-			res.basicInfo := DEFAULT_BASIC_INFO;
-		res.controlInfo.newEvent := '0';
-		--res.controlInfo.newInterrupt := '0';
-		--res.controlInfo.newException := '0';
-		res.controlInfo.newBranch := '0';
-		--res.controlInfo.newReturn := '0';
-		--res.controlInfo.newFetchLock := '0';
+		res.ip := (others => '0');
 
-		--	res.controlInfo.hasEvent := '0';
+		res.controlInfo.newEvent := '0';
 		res.controlInfo.hasInterrupt := '0';
-		--	res.controlInfo.hasException := '0';
-		--	res.controlInfo.hasBranch := '0';
-		res.controlInfo.hasReturn := '0';
-		--res.controlInfo.hasFetchLock := '0';
-		
+		res.controlInfo.hasReturn := '0';		
 		res.controlInfo.exceptionCode := (others => '0');
-	
+
 	return res;
 end function;
 							

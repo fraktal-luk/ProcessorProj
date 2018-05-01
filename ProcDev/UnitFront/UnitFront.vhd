@@ -31,6 +31,7 @@ use IEEE.STD_LOGIC_1164.ALL;
 
 use work.ProcBasicDefs.all;
 use work.Helpers.all;
+use work.ProcHelpers.all;
 
 use work.ProcInstructionsNew.all;
 
@@ -70,8 +71,12 @@ entity UnitFront is
 		frontEventSignal: out std_logic;
 		frontCausing: out InstructionState;
 		
+		execCausing: in InstructionState;
+		lateCausing: in InstructionState;
+		
 		execEventSignal: in std_logic;
-		lateEventSignal: in std_logic		
+		lateEventSignal: in std_logic;
+		lateEventSetPC: in std_logic		
 	);
 end UnitFront;
 
@@ -79,7 +84,7 @@ end UnitFront;
 architecture Behavioral of UnitFront is
 	signal resetSig, enSig: std_logic := '0';							
 		
-	signal stage0Events: StageMultiEventInfo;	-- from later stages
+	signal stage0Events, stage0MultiEvents: StageMultiEventInfo;	-- from later stages
 
 	-- Interfaces between stages:														
 	signal stageDataOutFetch: InstructionState := DEFAULT_DATA_PC;
@@ -89,29 +94,37 @@ architecture Behavioral of UnitFront is
 	
 	signal fetchBlock: HwordArray(0 to FETCH_BLOCK_SIZE-1) := (others => (others => '0'));
 	
-		signal ivalid1: std_logic := '0';
-		signal stageDataOutFetch1: InstructionState := DEFAULT_DATA_PC;
-		signal sendingOutFetch1: std_logic := '0';	
-		signal acceptingOutFetch1: std_logic := '0';	
+	signal ivalid1: std_logic := '0';
+	signal stageDataOutFetch1: InstructionState := DEFAULT_DATA_PC;
+	signal sendingOutFetch1: std_logic := '0';	
+	signal acceptingOutFetch1: std_logic := '0';	
 
-		signal fetchBlock1, fetchBlockBP: HwordArray(0 to FETCH_BLOCK_SIZE-1) := (others => (others => '0'));
+	signal fetchBlock1, fetchBlockBP: HwordArray(0 to FETCH_BLOCK_SIZE-1) := (others => (others => '0'));
+
+	signal ivalidFinal: std_logic := '0';
+	signal fetchBlockFinal: HwordArray(0 to FETCH_BLOCK_SIZE-1) := (others => (others => '0'));
+	signal stageDataOutFetchFinal:  InstructionState := DEFAULT_DATA_PC;
+	signal sendingOutFetchFinal: std_logic := '0';
 	
-		signal ivalidFinal: std_logic := '0';
-		signal fetchBlockFinal: HwordArray(0 to FETCH_BLOCK_SIZE-1) := (others => (others => '0'));
-		signal stageDataOutFetchFinal:  InstructionState := DEFAULT_DATA_PC;
-		signal sendingOutFetchFinal: std_logic := '0';
-		
-		signal acceptingForFetchFirst, earlyBranchAccepting, earlyBranchSending: std_logic := '0';
-		
-		signal hbufferDataIn, stallCausing: InstructionState := DEFAULT_INSTRUCTION_STATE;
+	signal acceptingForFetchFirst, earlyBranchAccepting, earlyBranchSending, earlyBranchMultiSending
+						: std_logic := '0';
 	
-		signal killAll, frontKill, stallEventSig: std_logic := '0';
+	signal hbufferDataIn, stallCausing: InstructionState := DEFAULT_INSTRUCTION_STATE;
+
+	signal killAll, frontKill, stallEventSig: std_logic := '0';
+
+	signal earlyBranchDataIn, earlyBranchDataOut: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
+	signal earlyBranchMultiDataIn, earlyBranchMultiDataOut: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
+
+	signal sendingToEarlyBranch, stallAtFetchLast, fetchStall: std_logic := '0'; 
+	signal pcSendingDelayed0, pcSendingDelayed1, pcSendingDelayedFinal: std_logic := '0';
 	
-		signal earlyBranchDataIn, earlyBranchDataOut: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
-	
-		signal sendingToEarlyBranch, stallAtFetchLast, fetchStall: std_logic := '0'; 
-		signal pcSendingDelayed0, pcSendingDelayed1, pcSendingDelayedFinal: std_logic := '0';
-	
+	signal frontCausingSig: InstructionState := DEFAULT_INSTRUCTION_STATE;
+	signal predictedAddress: Mword := (others => '0');
+
+	signal newDecoded, stageDataDecodeNew, stageDataDecodeOut: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
+
+		signal ch0: std_logic := '0'; 
 	constant HAS_RESET_FRONT: std_logic := '0';
 	constant HAS_EN_FRONT: std_logic := '0';	
 begin	 
@@ -156,15 +169,13 @@ begin
 	FETCH_DELAY: process (clk)
 	begin
 		if rising_edge(clk) then
-			--if sendingOutFetch = '1' then
-				pcSendingDelayed0 <= pcSending;
-				pcSendingDelayed1 <= pcSendingDelayed0;
-				
-				ivalid1 <= ivalid;
-				fetchBlock1 <= fetchBlock;
+			pcSendingDelayed0 <= pcSending;
+			pcSendingDelayed1 <= pcSendingDelayed0;
+			
+			ivalid1 <= ivalid;
+			fetchBlock1 <= fetchBlock;
 
-				fetchBlockBP <= fetchBlockFinal;
-			--end if;
+			fetchBlockBP <= fetchBlockFinal;
 		end if;	
 	end process;				
 
@@ -204,14 +215,12 @@ begin
 	sendingOutFetchFinal <= sendingOutFetch1;
 	
 	acceptingForFetchFirst <= acceptingOutFetch1;
-	
-	hbufferDataIn <= checkIvalid(earlyBranchDataOut.data(0), '1');
-	
-			earlyBranchDataIn.data(0) <= getFrontEvent(stageDataOutFetchFinal,
-															pcSendingDelayedFinal, ivalidFinal, '1',
-															fetchBlockFinal);
-			earlyBranchdataIn.fullMask(0) <= --pcSendingDelayedFinal;
-														sendingOutFetchFinal;
+
+			earlyBranchDataIn.data(0) <= setInstructionIP(
+													findEarlyTakenJump(stageDataOutFetchFinal, earlyBranchMultiDataIn)
+													,predictedAddress
+												);
+			earlyBranchDataIn.fullMask(0) <= sendingOutFetchFinal;
 			
 			sendingToEarlyBranch <= sendingOutFetchFinal;
 											
@@ -233,15 +242,59 @@ begin
 					lockCommand => '0',
 
 					stageEventsOut => stage0Events
-			);	
+			);
+			
+			
+			--ch0 <= '1' when stageDataOutFetchFinal.ip = predictedAddress else '0';
+			
+			earlyBranchMultiDataIn <= getEarlyBranchMultiDataIn(predictedAddress,
+																				stageDataOutFetchFinal,
+																				pcSendingDelayedFinal, ivalidFinal, '1',
+																				fetchBlockFinal);
+			
+			SUBUNIT_EARLY_BRANCH_MULTI: entity work.GenericStageMulti(Behavioral2)
+			port map(
+					clk => clk, reset => resetSig, en => enSig,
+							
+					prevSending => sendingToEarlyBranch,	
+					nextAccepting => '1',--acceptingOutHbuffer,
+					stageDataIn => earlyBranchMultiDataIn,
+					
+					acceptingOut => open,--earlyBranchAccepting,
+					sendingOut => earlyBranchMultiSending,
+					stageDataOut => earlyBranchMultiDataOut,
+					
+					execEventSignal => killAll, -- CAREFUL: not killing on stall, because is sent to void
+					lateEventSignal => killAll,
+					execCausing => DEFAULT_INSTRUCTION_STATE,
+					lockCommand => '0',
+
+					stageEventsOut => stage0MultiEvents
+			);
 	
-			stallEventSig <= fetchStall;
-			stallCausing <= setInstructionTarget(earlyBranchDataOut.data(0),
-															 earlyBranchDataOut.data(0).basicInfo.ip);
-			frontKill <= stage0Events.eventOccured or fetchStall;
-			fetchStall <= earlyBranchSending and not acceptingOutHbuffer;
+		stallEventSig <= fetchStall;
+		stallCausing <= setInstructionTarget(earlyBranchDataOut.data(0), earlyBranchDataOut.data(0).ip);
+		frontKill <= stage0Events.eventOccured or fetchStall;
+		fetchStall <= earlyBranchSending and not acceptingOutHbuffer;
 	
-	-- Hword buffer		
+		SAVE_PRED_TARGET: process(clk)
+		begin
+			if rising_edge(clk) then
+				if lateEventSetPC = '1' then				
+					predictedAddress <= lateCausing.target;
+				elsif execEventSignal = '1' then
+					predictedAddress <= execCausing.target;
+				elsif (stallEventSig or stage0Events.eventOccured) = '1' then -- CAREFUL: must equal frontEventSignal
+					predictedAddress <= frontCausingSig.target; -- ?
+				elsif sendingToEarlyBranch = '1' then
+					predictedAddress <= earlyBranchDataIn.data(0).target; -- ??
+				end if;
+			end if;
+		end process;
+	
+	-- Hword buffer
+	hbufferDataIn <= earlyBranchDataOut.data(0);
+	
 	SUBUNIT_HBUFFER: entity work.SubunitHbuffer(Implem)
 	port map(
 		clk => clk, reset => resetSig, en => enSig,
@@ -249,6 +302,7 @@ begin
 		prevSending => earlyBranchSending and not fetchStall,
 		nextAccepting => acceptingOut0,
 		stageDataIn => hbufferDataIn,
+		stageDataInMulti => earlyBranchMultiDataOut,
 		fetchBlock => fetchBlockBP,
 		
 		acceptingOut => acceptingOutHbuffer,
@@ -259,28 +313,11 @@ begin
 		execCausing => DEFAULT_INSTRUCTION_STATE		
 	);		
 	
-	
-	-- Decode stage				
-	STAGE_DECODE: block
-		signal newDecoded, newDecodedWithTargets, stageDataDecodeNew, stageDataDecodeOut: StageDataMulti
-				:= DEFAULT_STAGE_DATA_MULTI;
-		signal targets, links: MwordArray(0 to PIPE_WIDTH-1) := (others => (others => '0'));				
-	begin	
+
+	-- Decode stage
 		newDecoded <= decodeMulti(stageDataOutHbuffer);
-
-		newDecodedWithTargets.fullMask <= newDecoded.fullMask;
-		
-		CALC_TARGETS: for i in 0 to PIPE_WIDTH-1 generate
-		begin	
-			newDecodedWithTargets.data(i) <=
-				setInsResult(setInstructionTarget(newDecoded.data(i), targets(i)), links(i));
-
-			targets(i) <= addMwordFaster(newDecoded.data(i).basicInfo.ip, newDecoded.data(i).constantArgs.imm);		
-			links(i) <= addMwordBasic(newDecoded.data(i).basicInfo.ip, getAddressIncrement(newDecoded.data(i)));			
-		end generate;	
-
-		stageDataDecodeNew <= newDecodedWithTargets when EARLY_TARGET_ENABLE
-								else newDecoded;	
+		stageDataDecodeNew <= fillTargetsAndLinks(newDecoded);
+								
 		SUBUNIT_DECODE: entity work.GenericStageMulti(Behavioral)
 			port map(
 			clk => clk, reset => resetSig, en => enSig,
@@ -299,18 +336,16 @@ begin
 			lockCommand => '0',
 			-- to event part
 			stageEventsOut => open--stage0Events
-		);	
-		
-		stageDataOut0 <= clearTempControlInfoMulti(stageDataDecodeOut);
-	end block;	
+		);		
 		
 	-- from later stages
-	dataLastLiving <= stageDataOut0;
+	dataLastLiving <= clearTempControlInfoMulti(stageDataDecodeOut);
 	lastSending <= sendingOut0;
 	
 	frontAccepting <= acceptingOutFetch;
 	
 		frontEventSignal <= stallEventSig or stage0Events.eventOccured;
-		frontCausing <= stallCausing when stallEventSig = '1' else stage0Events.causing;
+		frontCausingSig <= stallCausing when stallEventSig = '1' else stage0Events.causing;
+		frontCausing <= frontCausingSig;
 end Behavioral;
 

@@ -12,6 +12,7 @@ use IEEE.STD_LOGIC_1164.all;
 
 use work.ProcBasicDefs.all;
 use work.Helpers.all;
+use work.ProcHelpers.all;
 
 use work.ProcInstructionsNew.all;
 use work.NewPipelineData.all;
@@ -24,7 +25,7 @@ use work.GeneralPipeDev.all;
 
 package ProcLogicExec is
 
-	-- DUMMY: This performs some siple operation to obtain a result
+	-- DUMMY: This performs some simple operation to obtain a result
 	function passArg0(ins: InstructionState) return InstructionState;
 	function passArg1(ins: InstructionState) return InstructionState;
 	function execLogicOr(ins: InstructionState) return InstructionState;
@@ -35,15 +36,15 @@ package ProcLogicExec is
 	
 	function resolveBranchCondition(av: InstructionArgValues; ca: InstructionConstantArgs) return std_logic;
 
-	function basicBranch(ins: InstructionState; linkAddress: Mword) return InstructionState;
+	function basicBranch(ins: InstructionState; queueData: InstructionState; qs: std_logic) return InstructionState;
 
 	function setExecState(ins: InstructionState;
 								result: Mword; carry: std_logic; exc: std_logic_vector(3 downto 0))
 	return InstructionState;
 
-	function executeAlu(ins: InstructionState) return InstructionState;
+	function isBranch(ins: InstructionState) return std_logic;
 
-	function isIndirectBranchOrReturn(ins: InstructionState) return std_logic;
+	function executeAlu(ins: InstructionState; queueData: InstructionState) return InstructionState;
 	
 end ProcLogicExec;
 
@@ -107,10 +108,12 @@ package body ProcLogicExec is
 		
 	end function;
 
-	function basicBranch(ins: InstructionState; linkAddress: Mword) return InstructionState is
+
+	function basicBranch(ins: InstructionState; queueData: InstructionState; qs: std_logic
+									) return InstructionState is
 		variable res: InstructionState := ins;
 		variable branchTaken: std_logic := '0';
-		variable storedTarget, storedReturn: Mword := (others => '0');
+		variable storedTarget, storedReturn, trueTarget: Mword := (others => '0');
 		variable targetEqual: std_logic := '0';
 	begin		
 		res.operation := (General, Unknown);
@@ -126,31 +129,51 @@ package body ProcLogicExec is
 		-- storedTarget := res.target; 
 		-- storedReturn := res.result;
 		-- targetEqual := [if storedTarget = reg then '1' else '0'];
-		
-		if ins.classInfo.branchCond = '1' then
-			branchTaken := resolveBranchCondition(ins.argValues, ins.constantArgs);
-			if res.controlInfo.hasBranch = '1' and branchTaken = '0' then
-				res.controlInfo.hasBranch := '0';
-				--res.controlInfo.newReturn := '1';
-				res.controlInfo.hasReturn := '1';						
-				res.controlInfo.newEvent := '1';
-				--res.controlInfo.hasEvent := '1';						
-			elsif res.controlInfo.hasBranch = '0' and branchTaken = '1' then				
-				res.controlInfo.hasReturn := '0';
-				res.controlInfo.newBranch := '1';
-				res.controlInfo.hasBranch := '1';						
-				res.controlInfo.newEvent := '1';
-				--res.controlInfo.hasEvent := '1';					
-			end if;
-		end if;	
 
-		res.target := ins.argValues.arg1;
+		branchTaken := resolveBranchCondition(ins.argValues, ins.constantArgs);
+
+		if res.controlInfo.hasBranch = '1' and branchTaken = '0' then
+			res.controlInfo.hasBranch := '0';
+			--res.controlInfo.newReturn := '1';
+			res.controlInfo.hasReturn := '1';						
+			res.controlInfo.newEvent := '1';
+			--res.controlInfo.hasEvent := '1';
+				trueTarget := queueData.argValues.arg2;
+		elsif res.controlInfo.hasBranch = '0' and branchTaken = '1' then				
+			res.controlInfo.hasReturn := '0';
+			--res.controlInfo.newBranch := '1';
+			res.controlInfo.hasBranch := '1';						
+			res.controlInfo.newEvent := '1';
+			--res.controlInfo.hasEvent := '1';
+			if ins.constantArgs.immSel = '0' then -- if branch reg			
+				trueTarget := ins.argValues.arg1;
+			else
+				trueTarget := queueData.argValues.arg1;
+			end if;
+		elsif res.controlInfo.hasBranch = '0' and branchTaken = '0' then
+			
+			trueTarget := queueData.argValues.arg2;
+		else -- taken -> taken
+			if ins.constantArgs.immSel = '0' then -- if branch reg
+				if queueData.argValues.arg1 /= ins.argValues.arg1 then
+					res.controlInfo.newEvent := '1';	-- Need to correct the target!				
+				end if;
+				trueTarget := ins.argValues.arg1; -- reg destination
+			else
+				trueTarget := queueData.argValues.arg1;				
+			end if;
+		end if;
+
+		res.target := --ins.argValues.arg1;
+							trueTarget;
 		-- Return address
-		res.result := linkAddress;
+		res.result := --linkAddress;
+							queueData.argValues.arg2; -- Link address
 							
 		return res;
 	end function;
- 
+
+
 	function setExecState(ins: InstructionState;
 								result: Mword; carry: std_logic; exc: std_logic_vector(3 downto 0))
 	return InstructionState is
@@ -166,9 +189,19 @@ package body ProcLogicExec is
 		return res;
 	end function;
 	
-	function executeAlu(ins: InstructionState) return InstructionState is
+	function isBranch(ins: InstructionState) return std_logic is
+	begin
+		if ins.operation = (Jump, jump) then
+			return '1';
+		else
+			return '0';
+		end if;
+	end function;
+	
+	
+	function executeAlu(ins: InstructionState; queueData: InstructionState) return InstructionState is
 		variable res: InstructionState := ins;
-		variable result: Mword := (others => '0');
+		variable result, linkAdr: Mword := (others => '0');
 		variable arg0, arg1, arg2: Mword := (others => '0');
 			variable argAddSub: Mword := (others => '0');
 			variable carryIn: std_logic := '0';
@@ -188,21 +221,19 @@ package body ProcLogicExec is
 		c1 := ins.constantArgs.c1;	
 	
 	
-			if ins.operation.func = arithSub then
-				argAddSub := not arg1;
-				carryIn := '1';
-			else
-				argAddSub := arg1;
-				carryIn := '0';
-			end if;
+		if ins.operation.func = arithSub then
+			argAddSub := not arg1;
+			carryIn := '1';
+		else
+			argAddSub := arg1;
+			carryIn := '0';
+		end if;
 	
 	
 		shTemp(4 downto 0) := c0; -- CAREFUL, TODO: handle the issue of 1-32 vs 0-31	
+			shTemp(5 downto 0) := arg1(5 downto 0);
 		if ins.operation.func = logicShl then
 			shNum := subSN(shNum, shTemp);
-			
-			--	report integer'image(slv2u(shNum));
-			--	report integer'image(slv2s(shNum(5 downto 3)));
 		else
 			shNum := shTemp;
 		end if;
@@ -216,8 +247,7 @@ package body ProcLogicExec is
 		end if;
 		tempBits(63 downto 32) := arg0;
 	
-			shiftedBytes := tempBits(71 + 8*shH downto 32 + 8*shH);
-			
+		shiftedBytes := tempBits(71 + 8*shH downto 32 + 8*shH);	
 	
 		-- Shifting: divide into byte part and intra-byte part
 		--	shift left by 8*H + L
@@ -233,71 +263,57 @@ package body ProcLogicExec is
 		-- Most negative byte count is -4, giving -4*8 + 0 = -32
 		-- Most positive byte count is 3, giving 3*8 + 7 = 31
 		
+		resultExt := addMwordFasterExt(arg0, argAddSub, carryIn);	
+		linkAdr := queueData.argValues.arg2;
 
-				resultExt := --addMwordExt(arg0, arg1);
-								addMwordFasterExt(arg0, --arg1, '0');
-																argAddSub, carryIn);	
-		case ins.operation.func is 
-			when arithAdd => 
-				--resultExt := --addMwordExt(arg0, arg1);
-				--				addMwordFasterExt(arg0, --arg1, '0');
-				--												argAddSub, carryIn);
-				if
-					(arg0(MWORD_SIZE-1) = arg1(MWORD_SIZE-1)) and
-					(arg0(MWORD_SIZE-1) /= resultExt(MWORD_SIZE-1))				
-				then
-					ov := '1';
-				end if;
-				carry := resultExt(MWORD_SIZE);
-				result := resultExt(MWORD_SIZE-1 downto 0);
-			when arithSub =>
-				--resultExt := --subMwordExt(arg0, arg1);
-				--				addMwordFasterExt(arg0, --not arg1, '1'); -- NOTE: sub x,y as add x,~y+1	
-				--												argAddSub, carryIn);
-				if
-					(arg0(MWORD_SIZE-1) /= arg1(MWORD_SIZE-1)) and
-					(arg0(MWORD_SIZE-1) /= resultExt(MWORD_SIZE-1))				
-				then
-					ov := '1';
-				end if;
-				carry := resultExt(MWORD_SIZE); -- CAREFUL, with subtraction carry is different, keep in mind
-				result := resultExt(MWORD_SIZE-1 downto 0);	
+--		if ins.operation.func = jump then
+--			result := linkAdr;
+--		else
 
-			when logicAnd =>
-				result := arg0 and arg1;				
-			when logicOr =>
-				result := arg0 or arg1;
-				
---				when arithShra => 
---					--result := (others => arg0(MWORD_SIZE-1)); -- Sign injection
---					--result(MWORD_SIZE-1 - sh downto 0) := arg0(MWORD_SIZE-1 downto sh);
---				
---				when logicShrl =>
---					result(MWORD_SIZE-1 - shL downto 0) := arg0(MWORD_SIZE-1 downto shL);
---				when logicShl =>
---					result(MWORD_SIZE-1 downto shL) := arg0(MWORD_SIZE-1 - shL downto 0);				
---				
-			when others => 
-				result := shiftedBytes(31 + shL downto shL);
-			
-				--report "Unknown alu operation" severity error;
-		end case;
+		if (	(ins.operation.func = arithAdd 
+			and arg0(MWORD_SIZE-1) = arg1(MWORD_SIZE-1)
+			and arg0(MWORD_SIZE-1) /= resultExt(MWORD_SIZE-1)))
+			or
+			(	(ins.operation.func = arithSub 
+			and arg0(MWORD_SIZE-1) /= arg1(MWORD_SIZE-1)
+			and arg0(MWORD_SIZE-1) /= resultExt(MWORD_SIZE-1)))
+		then 
+			if ENABLE_INT_OVERFLOW then
+				ov := '1';
+			end if;
+		end if;
+
+		if ins.operation.func = arithAdd or ins.operation.func = arithSub then
+			carry := resultExt(MWORD_SIZE); -- CAREFUL, with subtraction carry is different, keep in mind
+			result := resultExt(MWORD_SIZE-1 downto 0);					
+		else
+		
+			case ins.operation.func is
+				when logicAnd =>
+					result := arg0 and arg1;				
+				when logicOr =>
+					result := arg0 or arg1;
+				when jump => 
+					result := linkAdr;
+				when others => 
+					result := shiftedBytes(31 + shL downto shL);
+			end case;
+		end if;
+		
+			res.controlInfo.newEvent := '0';
+			res.controlInfo.hasException := '0';
+			res.controlInfo.exceptionCode := (others => '0'); -- ???		
 		
 		if ov = '1' then
 			res.controlInfo.newEvent := '1';
 			res.controlInfo.hasException := '1';
 			res.controlInfo.exceptionCode := (0 => '1', others => '0'); -- ???
 		end if;
+		--	res.controlInfo.exceptionCode := (0 => ov, others => '0'); -- ???
 		
 		res.result := result;
 		
 		return res;
 	end function;
-
-		function isIndirectBranchOrReturn(ins: InstructionState) return std_logic is
-		begin
-			return 	  (ins.controlInfo.hasBranch and not ins.constantArgs.immSel)
-					 or   ins.controlInfo.hasReturn;
-		end function;
 
 end ProcLogicExec;

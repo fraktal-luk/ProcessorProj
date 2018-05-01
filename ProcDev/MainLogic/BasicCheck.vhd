@@ -78,6 +78,12 @@ procedure logFreeList(indTake, indPut, nTaken, nPut: in integer;
 							 takeAllow: in std_logic; putAllow: in std_logic;
 							 freeListRewind: in std_logic; freeListWriteTag: in SmallNumber);
 
+
+procedure reportWriting(signal storeAddressInput, storeValueInput: in InstructionSlot; mode: in MemQueueMode);
+
+procedure reportForwarding(signal compareAddressInput: InstructionSlot;
+											selectedDataOutputSig: InstructionSlot; mode: in MemQueueMode);
+
 end BasicCheck;
 
 
@@ -119,9 +125,9 @@ begin
 				write(fline, "x");
 			end if;
 			write(fline,
-						  integer'image(slv2u(insArr(i).groupTag))
+						  integer'image(slv2u(insArr(i).tags.renameIndex))
 				--& "/" & integer'image(slv2u(insArr(i).numberTag))
-				& "@" & integer'image(slv2u(insArr(i).basicInfo.ip)));
+				& "@" & integer'image(slv2u(insArr(i).ip)));
 		end if;
 		write(fline, ", ");
 		
@@ -229,8 +235,8 @@ begin
 	
 	-- CHECK: does it make sense to examine this? Should other kinds of data be compared?
 	for i in 0 to nCommon-1 loop
-		assert commonPart1(i).groupTag = commonPart2(i).groupTag report "u";
-		assert commonPart1(i).basicInfo.ip = commonPart2(i).basicInfo.ip report "yio";
+		assert commonPart1(i).tags.renameIndex = commonPart2(i).tags.renameIndex report "u";
+		assert commonPart1(i).ip = commonPart2(i).ip report "yio";
 	end loop;
 	
 	-- pragma synthesis on	
@@ -266,7 +272,7 @@ begin
 	
 	nFull:= countOnes(stageData.fullMask);
 	if flowResponse.full = '1' then
-		assert countOnes(stageData.fullMask(0 to nFull-1)) = nFull; -- check continuity of mask?
+		assert countOnes(stageData.fullMask(0 to nFull-1)) = nFull report "myr"; -- check continuity of mask?
 	end if;
 	-- pragma synthesis on	
 end procedure;
@@ -315,14 +321,14 @@ begin
 	nCommon := nLiving - nSending;	
 	for i in 0 to nLiving - 1 loop
 		-- In old array we have to skip the op that is being sent
-		if sending = '1' and bufferData(i).groupTag = insSending.groupTag 
+		if sending = '1' and bufferData(i).tags.renameIndex = insSending.tags.renameIndex 
 			then -- CAREFUL: is this the right tag field?
 			move := 1;
 					--report "rtttt";
 			insSendingMatch := bufferData(i);
 			-- Check the op that is sent?
-			assert insSendingMatch.groupTag = insSending.groupTag report "byj";
-			assert insSendingMatch.basicInfo.ip = insSending.basicInfo.ip report "jjj";		
+			assert insSendingMatch.tags.renameIndex = insSending.tags.renameIndex report "byj";
+			assert insSendingMatch.ip = insSending.ip report "jjj";		
 		end if;
 		
 		-- If we have visited all living instructions in old array, we break, because 
@@ -337,8 +343,8 @@ begin
 	
 	-- CHECK: does it make sense to examine this? Should other kinds of data be compared?
 	for i in 0 to nCommon-1 loop
-		assert commonPart1(i).groupTag = commonPart2(i).groupTag report "jutrrrr";
-		assert commonPart1(i).basicInfo.ip = commonPart2(i).basicInfo.ip report "oiu";
+		assert commonPart1(i).tags.renameIndex = commonPart2(i).tags.renameIndex report "jutrrrr";
+		assert commonPart1(i).ip = commonPart2(i).ip report "oiu";
 	end loop;
 	
 	-- pragma synthesis on	
@@ -440,5 +446,82 @@ begin
 	--	pragma synthesis on
 end procedure;
 
+
+procedure reportWriting(signal storeAddressInput, storeValueInput: in InstructionSlot; mode: in MemQueueMode) is
+begin
+	-- pragma synthesis off
+	if not REPORT_MEM_QUEUE_WRITES then
+		return;
+	end if;
+	
+	case mode is
+		when store =>
+			if storeAddressInput.full = '1' then
+				report makeLogPath(storeAddressInput'path_name) & ": " &
+							"writing store address " & integer'image(slv2u(storeAddressInput.ins.result)) &
+							" by " & integer'image(slv2u(storeAddressInput.ins.tags.renameIndex));
+			end if;
+
+			if storeValueInput.full = '1' then
+				report makeLogPath(storeAddressInput'path_name) & ": " &
+							"writing store value " & integer'image(slv2u(storeAddressInput.ins.argValues.arg2)) &
+							" by " & integer'image(slv2u(storeAddressInput.ins.tags.renameIndex));
+			end if;
+			
+		when load =>
+			if storeAddressInput.full = '1' then
+				report makeLogPath(storeAddressInput'path_name) & ": " &
+							"writing load address " & integer'image(slv2u(storeAddressInput.ins.result)) &
+							" by " & integer'image(slv2u(storeAddressInput.ins.tags.renameIndex));
+			end if;
+
+--			if storeValueInput.full = '1' then
+--				report makeLogPath(storeAddressInput'path_name) & ": " &
+--							"writing value " & integer'image(slv2u(storeAddressInput.ins.argValues.arg2)) &
+--							" by " & integer'image(slv2u(storeAddressInput.ins.tags.renameIndex));
+--			end if;
+		when others =>
+	end case;
+	-- pragma synthesis on
+end procedure;
+
+procedure reportForwarding(signal compareAddressInput: InstructionSlot;
+											selectedDataOutputSig: InstructionSlot; mode: in MemQueueMode) is
+begin	
+	-- pragma synthesis off
+	if not REPORT_MEM_QUEUE_FORWARDING then
+		return;
+	end if;
+	
+	case mode is
+		when store => -- Checking what to forward from store queue
+			if compareAddressInput.full = '1' then
+				report makeLogPath(compareAddressInput'path_name) & ": " &
+							"checking loading address " & integer'image(slv2u(compareAddressInput.ins.result)) &
+							" by " & integer'image(slv2u(compareAddressInput.ins.tags.renameIndex));
+			end if;
+
+			if selectedDataOutputSig.full = '1' then
+				report makeLogPath(compareAddressInput'path_name) & ": " &
+							"matched storeded value " & integer'image(slv2u(selectedDataOutputSig.ins.argValues.arg2)) &
+							" by " & integer'image(slv2u(selectedDataOutputSig.ins.tags.renameIndex));
+			end if;
+			
+		when load => -- checking in load queue if there was a hazard
+			if compareAddressInput.full = '1' then
+				report makeLogPath(compareAddressInput'path_name) & ": " &
+							"checking storing address " & integer'image(slv2u(compareAddressInput.ins.result)) &
+							" by " & integer'image(slv2u(compareAddressInput.ins.tags.renameIndex));
+			end if;
+
+			if selectedDataOutputSig.full = '1' then
+				report makeLogPath(compareAddressInput'path_name) & ": " &
+							"matched load" &
+							" by " & integer'image(slv2u(selectedDataOutputSig.ins.tags.renameIndex));
+			end if;
+		when others =>
+	end case;
+	-- pragma synthesis on
+end procedure;
 
 end BasicCheck;

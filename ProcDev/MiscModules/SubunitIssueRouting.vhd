@@ -102,8 +102,7 @@ begin
 	-- New concept for IQ routing.  {renamedData, srcVec*} -> (StageDataMulti){A,B,C,D}
 	-- Based on "push left" of each destination type, generating "New" StageDataMulti data for each one
 	-- dataToA <= [func](stageData1Living, srcVecA); -- s.d.1.l includes fullMask!		
-		srcVecA <= (findByNumber(issueRouteVec, 0) or whichBranchLink(renamedDataLiving))
-																							and renamedDataLiving.fullMask;
+		srcVecA <= (findByNumber(issueRouteVec, 0) or srcVecD) and renamedDataLiving.fullMask;
 		srcVecB <= findByNumber(issueRouteVec, 1) and renamedDataLiving.fullMask;
 		srcVecC <= (findByNumber(issueRouteVec, 2)
 								or storeVec or loadVec) and renamedDataLiving.fullMask;
@@ -111,12 +110,11 @@ begin
 								and not storeVec and not loadVec) and renamedDataLiving.fullMask;
 		srcVecE <= storeVec and renamedDataLiving.fullMask;
 
-		dataToA <= routeToIQ2(prepareForAlu(renamedDataLiving, whichBranchLink(renamedDataLiving)), srcVecA);
+		dataToA <= routeToIQ2(renamedDataLiving, srcVecA);
 		dataToB <= routeToIQ2(renamedDataLiving, srcVecB);
 		dataToC <= routeToIQ2(prepareForAGU(renamedDataLiving), srcVecC);
-		dataToD <= routeToIQ2(prepareForBranch(renamedDataLiving), srcVecD);
-		dataToE <= --routeToIQ2(prepareForStoreData(renamedDataLiving), srcVecE);
-						prepareForStoreData(dataToSQ);
+
+		dataToE <= prepareForStoreData(dataToSQ);
 	
 		dataOutSQ <= dataToSQ;
 		dataToSQ <= routeToIQ(renamedDataLiving, storeVec);
@@ -129,16 +127,11 @@ begin
 		invD <= invertVec(acceptingVecD);
 		invE <= invertVec(acceptingVecE);
 	
-		iqAcceptingA <= --not isNonzero(dataToA.fullMask and not invA);
-								not isNonzero(not invA);
-		iqAcceptingB <= --not isNonzero(dataToB.fullMask and not invB);							 
-								not isNonzero(not invB);
-		iqAcceptingC <= --not isNonzero(dataToC.fullMask and not invC);							 
-								not isNonzero(not invC);
-		iqAcceptingD <= --not isNonzero(dataToD.fullMask and not invD);							 
-								not isNonzero(not invD);
-		iqAcceptingE <= --not isNonzero(dataToE.fullMask and not invE);							 
-								not isNonzero(not invE);
+		iqAcceptingA <= not isNonzero(not invA);
+		iqAcceptingB <= not isNonzero(not invB);
+		iqAcceptingC <= not isNonzero(not invC);
+		iqAcceptingD <= not isNonzero(not invD);
+		iqAcceptingE <= not isNonzero(not invE);
 			
 		iqAccepts <= iqAcceptingA and iqAcceptingB and iqAcceptingC and iqAcceptingD and iqAcceptingE
 							and acceptingROB and acceptingSQ and acceptingLQ and acceptingBQ;

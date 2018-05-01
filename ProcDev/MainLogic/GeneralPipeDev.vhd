@@ -13,6 +13,7 @@ use IEEE.STD_LOGIC_1164.all;
 
 use work.ProcBasicDefs.all;
 use work.Helpers.all;
+use work.ProcHelpers.all;
 
 use work.ProcInstructionsNew.all;
 
@@ -26,24 +27,17 @@ package GeneralPipeDev is
 
 function getTagHigh(tag: std_logic_vector) return std_logic_vector;
 function getTagLow(tag: std_logic_vector) return std_logic_vector;
-function getTagHighSN(tag: SmallNumber) return SmallNumber;
-function getTagLowSN(tag: SmallNumber) return SmallNumber;	
+function getTagHighSN(tag: InsTag) return SmallNumber;
+function getTagLowSN(tag: InsTag) return SmallNumber;	
 function clearTagLow(tag: std_logic_vector) return std_logic_vector;	
 function clearTagHigh(tag: std_logic_vector) return std_logic_vector;	
 function alignAddress(adr: std_logic_vector) return std_logic_vector;
 function clearLowBits(vec: std_logic_vector; n: integer) return std_logic_vector;
 function getLowBits(vec: std_logic_vector; n: integer) return std_logic_vector;
 
-constant INITIAL_GROUP_TAG: SmallNumber := (others => '0');
-
-constant INITIAL_PC: Mword := i2slv(-PIPE_WIDTH*4, MWORD_SIZE);
-
-constant INITIAL_BASIC_INFO: InstructionBasicInfo := (ip => INITIAL_PC,
-																		systemLevel => (others => '0'),
-																		intLevel => (others => '0'));																		
+constant INITIAL_GROUP_TAG: InsTag := (others => '0');
 
 constant DEFAULT_DATA_PC: InstructionState := defaultInstructionState;
-
 constant DEFAULT_ANNOTATED_HWORD: InstructionState := defaultInstructionState;
 
 
@@ -52,6 +46,7 @@ type StageDataCommitQueue is record
 	data: InstructionStateArray(0 to CQ_SIZE-1);
 end record;
 
+-- FORWARDING NETWORK
 type ForwardingInfo is record
 	writtenTags: PhysNameArray(0 to PIPE_WIDTH-1);
 	resultTags: PhysNameArray(0 to N_RES_TAGS-1);
@@ -65,6 +60,7 @@ constant DEFAULT_FORWARDING_INFO: ForwardingInfo := (
 	nextResultTags => (others => (others => '0')),
 	resultValues => (others => (others => '0'))
 );
+
 
 type StageMultiEventInfo is record
 	eventOccured: std_logic;
@@ -95,9 +91,6 @@ function removeFromQueue(content: InstructionSlotArray; index: integer) return I
 function chooseIns(content: InstructionStateArray; which: std_logic_vector)
 return InstructionState;
 
--- CAREFUL! This is not a general function, only a special type of compacting
-function compactData(data: InstructionStateArray; mask: std_logic_vector) return InstructionStateArray;
-function compactMask(data: InstructionStateArray; mask: std_logic_vector) return std_logic_vector;
 
 function findMatching(content: InstructionSlotArray; ins: InstructionState)
 return std_logic_vector;
@@ -168,9 +161,32 @@ function getLastEffective(newContent: StageDataMulti) return InstructionState;
 
 function getSendingFromCQ(livingMask: std_logic_vector) return std_logic_vector;
 
+
+function CMP_tagBefore(tagA, tagB: InsTag) return std_logic is
+	variable wA, wB: word := (others => '0');
+	variable wC: std_logic_vector(32 downto 0) := (others => '0');
+begin
+	wA(TAG_SIZE-1 downto 0) := tagA;
+	wB(TAG_SIZE-1 downto 0) := tagB;
+	wB := not wB;
+	-- TODO: when going to 64 bit, this must be changed!
+	wC := addMwordFasterExt(wA, wB, '1');
+	wC(32 downto TAG_SIZE) := (others => '0');
+	return wC(TAG_SIZE-1);
+end function;
+
+function CMP_tagAfter(tagA, tagB: InsTag) return std_logic is
+	variable wA, wB, wC: word := (others => '0');
+begin
+	return CMP_tagBefore(tagB, tagA);
+end function;
+
+
+
 function killByTag(before, ei, int: std_logic) return std_logic;
 	
 -- FORWARDING NETWORK ------------
+-- UNUSED
 function getWrittenTags(lastCommitted: StageDataMulti) return PhysNameArray; -- DEPREC
 
 function getResultTags(execOutputs: InstructionSlotArray;
@@ -202,6 +218,7 @@ function getKillMask(content: InstructionStateArray; fullMask: std_logic_vector;
 							causing: InstructionState; execEventSig: std_logic; lateEventSig: std_logic)
 return std_logic_vector;
 
+function setInstructionIP(ins: InstructionState; ip: Mword) return InstructionState;
 function setInstructionTarget(ins: InstructionState; target: Mword) return InstructionState;
 function setInsResult(ins: InstructionState; result: Mword) return InstructionState;
 
@@ -210,6 +227,9 @@ function setInsResult(ins: InstructionState; result: Mword) return InstructionSt
 	function isStore(ins: InstructionState) return std_logic;
 	function isSysRegWrite(ins: InstructionState) return std_logic;
 
+function getAddressIncrement(ins: InstructionState) return Mword;
+
+function stageMultiEvents(sd: StageDataMulti; isNew: std_logic) return StageMultiEventInfo;
 
 	type SLVA is array (integer range <>) of std_logic_vector(0 to PIPE_WIDTH-1);
 
@@ -234,14 +254,14 @@ begin
 	return res;
 end function;
 
-function getTagHighSN(tag: SmallNumber) return SmallNumber is
+function getTagHighSN(tag: InsTag) return SmallNumber is
 	variable res: SmallNumber := (others => '0');
 begin
-	res(SMALL_NUMBER_SIZE-1-LOG2_PIPE_WIDTH downto 0) := tag(SMALL_NUMBER_SIZE-1 downto LOG2_PIPE_WIDTH);
+	res(TAG_SIZE-1-LOG2_PIPE_WIDTH downto 0) := tag(TAG_SIZE-1 downto LOG2_PIPE_WIDTH);
 	return res;
 end function;
 
-function getTagLowSN(tag: SmallNumber) return SmallNumber is
+function getTagLowSN(tag: InsTag) return SmallNumber is
 	variable res: SmallNumber := (others => '0');
 begin
 	res(LOG2_PIPE_WIDTH-1 downto 0) := tag(LOG2_PIPE_WIDTH-1 downto 0);
@@ -430,7 +450,7 @@ return std_logic_vector is
 begin
 	-- Find where to put addressData
 	for i in 0 to content'length-1 loop							
-		if ins.groupTag = content(i).ins.groupTag and content(i).full = '1' then
+		if ins.tags.renameIndex = content(i).ins.tags.renameIndex and content(i).full = '1' then
 			res(i) := '1';
 		end if;
 	end loop;							
@@ -443,7 +463,7 @@ return std_logic_vector is
 	variable res: std_logic_vector(0 to arr'length-1) := (others => '0');
 begin
 	for i in 0 to arr'length-1 loop
-		if arr(i).groupTag = ins.groupTag then
+		if arr(i).tags.renameIndex = ins.tags.renameIndex then
 			res(i) := '1';
 		end if;
 	end loop;
@@ -463,7 +483,8 @@ begin
 		-- CAREFUL: omitting this clearing would spare some logic, but clearing of result tag is needed!
 		--						Otherwise following instructions would read results form empty slots!
 		--res := defaultInstructionState;
-			res.physicalDestArgs.d0 := (others => '0'); -- CAREFUL: clear result tag!
+			--res.physicalDestArgs.d0 := (others => '0'); -- CAREFUL: clear result tag!
+			res.physicalArgSpec.dest := (others => '0');
 	else -- stall
 		if full = '1' then
 		--	res := content;
@@ -504,13 +525,15 @@ end function;
 
 			-- CAREFUL: clearing result tags for empty slots
 			for i in 0 to PIPE_WIDTH-1 loop
-				res.data(i).physicalDestArgs.d0 := (others => '0');
+				--res.data(i).physicalDestArgs.d0 := (others => '0');
+				res.data(i).physicalArgSpec.dest := (others => '0');
 			end loop;
 		else -- stall or killed (kill can be partial)
 			if full = '0' then
 				-- Do nothing
 				for i in 0 to PIPE_WIDTH-1 loop
-					res.data(i).physicalDestArgs.d0 := (others => '0');
+					--res.data(i).physicalDestArgs.d0 := (others => '0');
+					res.data(i).physicalArgSpec.dest := (others => '0');
 				end loop;
 			else
 				res := livingContent;
@@ -561,7 +584,8 @@ end function;
 		variable res: PhysNameArray(0 to ia'length-1) := (others => (others => '0'));
 	begin
 		for i in 0 to res'length-1 loop
-			res(i) := ia(i).physicalDestArgs.d0; 
+			--res(i) := ia(i).physicalDestArgs.d0;
+			res(i) := ia(i).physicalArgSpec.dest;			
 		end loop;
 		return res;
 	end function;
@@ -570,7 +594,8 @@ end function;
 		variable res: std_logic_vector(0 to ia'length-1) := (others => '0');
 	begin
 		for i in 0 to res'length-1 loop
-			res(i) := fm(i) and ia(i).physicalDestArgs.sel(0); 
+			res(i) := fm(i) and ia(i).--physicalDestArgs.sel(0);
+												physicalArgSpec.intDestSel;
 		end loop;
 		return res;
 	end function;
@@ -589,9 +614,9 @@ function getVirtualArgs(insVec: StageDataMulti) return RegNameArray is
 	variable res: RegNameArray(0 to 3*insVec.fullMask'length-1) := (others=>(others=>'0'));
 begin
 	for i in insVec.fullMask'range loop
-		res(3*i+0) := insVec.data(i).virtualArgs.s0;
-		res(3*i+1) := insVec.data(i).virtualArgs.s1;
-		res(3*i+2) := insVec.data(i).virtualArgs.s2;
+		res(3*i+0) := insVec.data(i).virtualArgSpec.args(0)(4 downto 0);
+		res(3*i+1) := insVec.data(i).virtualArgSpec.args(1)(4 downto 0);
+		res(3*i+2) := insVec.data(i).virtualArgSpec.args(2)(4 downto 0);
 	end loop;
 	return res;
 end function;
@@ -600,9 +625,9 @@ function getPhysicalArgs(insVec: StageDataMulti) return PhysNameArray is
 	variable res: PhysNameArray(0 to 3*insVec.fullMask'length-1) := (others=>(others=>'0'));
 begin
 	for i in insVec.fullMask'range loop
-		res(3*i+0) := insVec.data(i).physicalArgs.s0;
-		res(3*i+1) := insVec.data(i).physicalArgs.s1;
-		res(3*i+2) := insVec.data(i).physicalArgs.s2;
+		res(3*i+0) := insVec.data(i).physicalArgSpec.args(0);
+		res(3*i+1) := insVec.data(i).physicalArgSpec.args(1);
+		res(3*i+2) := insVec.data(i).physicalArgSpec.args(2);
 	end loop;
 	return res;
 end function;
@@ -611,7 +636,7 @@ function getVirtualDests(insVec: StageDataMulti) return RegNameArray is
 	variable res: RegNameArray(0 to insVec.fullMask'length-1) := (others=>(others=>'0'));
 begin
 	for i in insVec.fullMask'range loop
-		res(i) := insVec.data(i).virtualDestArgs.d0;
+		res(i) := insVec.data(i).virtualArgSpec.dest(4 downto 0);
 	end loop;
 	return res;
 end function;		
@@ -620,7 +645,8 @@ function getPhysicalDests(insVec: StageDataMulti) return PhysNameArray is
 	variable res: PhysNameArray(0 to insVec.fullMask'length-1) := (others=>(others=>'0'));
 begin
 	for i in insVec.fullMask'range loop
-		res(i) := insVec.data(i).physicalDestArgs.d0;
+		res(i) := insVec.data(i).--physicalDestArgs.d0;
+											physicalArgSpec.dest;
 	end loop;
 	return res;
 end function;
@@ -631,8 +657,8 @@ function getDestMask(insVec: StageDataMulti) return std_logic_vector is
 begin
 	for i in insVec.fullMask'range loop
 		res(i) := insVec.fullMask(i) 
-				and insVec.data(i).virtualDestArgs.sel(0) 
-				and isNonzero(insVec.data(i).virtualDestArgs.d0);
+				and insVec.data(i).virtualArgSpec.intDestSel				
+				and isNonzero(insVec.data(i).virtualArgSpec.dest(4 downto 0));
 	end loop;			
 	return res;
 end function;
@@ -646,7 +672,8 @@ begin
 	for i in insVec.fullMask'range loop
 		for j in insVec.fullMask'range loop
 			if 		j > i and insVec.fullMask(j) = '1' and em(j) = '0' -- CAREFUL: if exception, doesn't write
-				and insVec.data(i).virtualDestArgs.d0 = insVec.data(j).virtualDestArgs.d0 then
+				and insVec.data(i).virtualArgSpec.dest(4 downto 0) = insVec.data(j).virtualArgSpec.dest(4 downto 0)
+			then				
 				res(i) := '1';
 			end if;
 		end loop;
@@ -659,7 +686,8 @@ function getPhysicalDestMask(insVec: StageDataMulti) return std_logic_vector is
 	variable res: std_logic_vector(insVec.fullMask'range) := (others=>'0');
 begin
 	for i in insVec.fullMask'range loop
-		res(i) := insVec.data(i).physicalDestArgs.sel(0);
+		res(i) := insVec.data(i).--physicalDestArgs.sel(0);
+											physicalArgSpec.intDestSel;
 	end loop;			
 	return res;
 end function;
@@ -678,7 +706,8 @@ function getWrittenTags(lastCommitted: StageDataMulti) return PhysNameArray is
 	variable writtenTags: PhysNameArray(0 to PIPE_WIDTH-1) := (others=>(others=>'0'));	
 begin	
 	for i in 0 to PIPE_WIDTH-1 loop -- Slots in writeback stage
-		writtenTags(i) := lastCommitted.data(i).physicalDestArgs.d0;
+		writtenTags(i) := lastCommitted.data(i).--physicalDestArgs.d0;
+																physicalArgSpec.dest;
 	end loop;	
 	return writtenTags;
 end function;
@@ -691,13 +720,17 @@ return PhysNameArray is
 begin
 	-- CAREFUL! Remember tht empty slots should have 0 as result tag, even though the rest of 
 	--				their state may remain invalid for simplicity!
-	resultTags(0) := execOutputs(0).ins.physicalDestArgs.d0;
-	resultTags(1) := execOutputs(1).ins.physicalDestArgs.d0;
-	resultTags(2) := execOutputs(2).ins.physicalDestArgs.d0;
-	
+	resultTags(0) := execOutputs(0).ins.--physicalDestArgs.d0;
+													physicalArgSpec.dest;
+	resultTags(1) := execOutputs(1).ins.--physicalDestArgs.d0;
+													physicalArgSpec.dest;													
+	resultTags(2) := execOutputs(2).ins.--physicalDestArgs.d0;
+													physicalArgSpec.dest;
+
 	-- CQ slots
 	for i in 0 to CQ_SIZE-1 loop 
-		resultTags(4-1 + i) := stageDataCQ(i).ins.physicalDestArgs.d0;  	
+		resultTags(4-1 + i) := stageDataCQ(i).ins.--physicalDestArgs.d0;
+																physicalArgSpec.dest;		
 	end loop;
 	return resultTags;
 end function;		
@@ -708,8 +741,10 @@ function getNextResultTags(execOutputsPre: InstructionSlotArray;
 return PhysNameArray is
 	variable nextResultTags: PhysNameArray(0 to N_NEXT_RES_TAGS-1) := (others=>(others=>'0'));
 begin
-	nextResultTags(0) := schedOutputArr(0).ins.physicalDestArgs.d0; -- sched stage for A	
-	nextResultTags(1) := execOutputsPre(1).ins.physicalDestArgs.d0;
+	nextResultTags(0) := schedOutputArr(0).ins.--physicalDestArgs.d0; -- sched stage for A
+															 physicalArgSpec.dest;
+	nextResultTags(1) := execOutputsPre(1).ins.--physicalDestArgs.d0;
+															 physicalArgSpec.dest;
 	--nextResultTags(2) := execPreEnds(2).physicalDestArgs.d0;
 	return nextResultTags;
 end function;
@@ -747,6 +782,7 @@ end function;
 			-- If this one has an event, following ones don't count
 			if 	newContent.data(i).controlInfo.hasException = '1'
 				or newContent.data(i).controlInfo.specialAction = '1'	-- CAREFUL! This also breaks flow!
+				or newContent.data(i).controlInfo.dbtrap = '1'
 			then 
 				res.controlInfo.newEvent := '1'; -- Announce that event is to happen now!
 				exit;
@@ -771,6 +807,7 @@ end function;
 			-- If this one has an event, following ones don't count
 			if 	newContent.data(i).controlInfo.hasException = '1'
 				or newContent.data(i).controlInfo.specialAction = '1'
+				or newContent.data(i).controlInfo.dbtrap = '1'
 			then
 				exit;
 			end if;
@@ -783,65 +820,6 @@ end function;
 	begin
 		return (before and ei) or int;
 	end function;
-
-
-function compactData(data: InstructionStateArray; mask: std_logic_vector) return InstructionStateArray is
-	variable res: InstructionStateArray(0 to 3) := --data(0 to 3);
-														(data(1), data(2), data(0), data(3));
-	variable k: integer := 0;
-begin
-	res(k) := data(1);
-	if mask(1) = '1' then
-		k := k + 1;
-	end if;
-	
-	res(k) := data(2);
-	if mask(2) = '1' then
-		k := k + 1;
-	end if;
-
-	res(k) := data(0);	
-	if mask(0) = '1' then
-		k := k + 1;
-	end if;	
-
--- CAREFUL: not using the 4th one because branch has no register write				
---	res(k) := data(3);	
---	if mask(3) = '1' then
---		k := k + 1;
---	end if;
-	
-	return res;
-end function;
-
-
-function compactMask(data: InstructionStateArray; mask: std_logic_vector) return std_logic_vector is
-	variable res: std_logic_vector(0 to 3) := (others => '0');
-	variable k: integer := 0;
-begin
-	res(k) := mask(1);
-	if mask(1) = '1' then
-		k := k + 1;
-	end if;
-	
-	res(k) := mask(2);
-	if mask(2) = '1' then
-		k := k + 1;
-	end if;
-
-	res(k) := mask(0);	
-	if mask(0) = '1' then
-		k := k + 1;
-	end if;
-		
--- CAREFUL: not using the 4th one because branch has no register write		
---	res(k) := mask(3);	
---	if mask(3) = '1' then
---		k := k + 1;
---	end if;
-	
-	return res;
-end function;
 
 
 
@@ -914,15 +892,13 @@ begin
 	-- CAREFUL! Clearing tags in empty slots, to avoid incorrect info about available results!
 	for i in 0 to res.fullMask'length-1 loop
 		if res.fullMask(i) = '0' then
-			res.data(i).physicalDestArgs.d0 := (others => '0');
+			res.data(i).physicalArgSpec.dest := (others => '0');
 		end if;
 		
 		-- TEMP: also clear unneeded data for all instructions
-		res.data(i).virtualArgs := defaultVirtualArgs;
-		--	res.data(i).virtualDestArgs := defaultVirtualDestArgs;
 		res.data(i).constantArgs := defaultConstantArgs; -- c0 needed for sysMtc if not using temp reg in Exec
 		res.data(i).argValues := defaultArgValues;
-		res.data(i).basicInfo := defaultBasicInfo;
+		res.data(i).ip := (others => '0');
 		res.data(i).bits := (others => '0');
 	end loop;
 	
@@ -970,15 +946,13 @@ begin
 	-- CAREFUL! Clearing tags in empty slots, to avoid incorrect info about available results!
 	for i in 0 to res.fullMask'length-1 loop
 		if res.fullMask(i) = '0' then
-			res.data(i).physicalDestArgs.d0 := (others => '0');
+			res.data(i).physicalArgSpec.dest := (others => '0');
 		end if;
 		
 		-- TEMP: also clear unneeded data for all instructions
-		res.data(i).virtualArgs := defaultVirtualArgs;
-		--	res.data(i).virtualDestArgs := defaultVirtualDestArgs;
 		res.data(i).constantArgs := defaultConstantArgs; -- c0 needed for sysMtc if not using temp reg in Exec
 		res.data(i).argValues := defaultArgValues;
-		res.data(i).basicInfo := defaultBasicInfo;
+		res.data(i).ip := (others => '0');
 		res.data(i).bits := (others => '0');
 	end loop;
 	
@@ -990,7 +964,7 @@ end function;
 function getPhysicalSources(ins: InstructionState) return PhysNameArray is
 	variable res: PhysNameArray(0 to 2) := (others => (others => '0'));
 begin
-	res := (0 => ins.physicalArgs.s0, 1 => ins.physicalArgs.s1, 2 => ins.physicalArgs.s2);			
+	res := (0 => ins.physicalArgSpec.args(0), 1 => ins.physicalArgSpec.args(1), 2 => ins.physicalArgSpec.args(2));			
 	return res;
 end function;
 
@@ -1000,7 +974,7 @@ begin
 	res.controlInfo.newEvent := '0';
 	--res.controlInfo.newInterrupt := '0';
 	--res.controlInfo.newException := '0';
-	res.controlInfo.newBranch := '0';
+	--res.controlInfo.newBranch := '0';
 	--res.controlInfo.newReturn := '0';
 	return res;
 end function;
@@ -1078,12 +1052,21 @@ return std_logic_vector is
 	variable diff: SmallNumber := (others => '0');
 begin
 	for i in 0 to fullMask'length-1 loop
-		diff := subSN(causing.groupTag, content(i).groupTag); -- High bit of diff carries the info "tag is before"
-		res(i) := killByTag(diff(SMALL_NUMBER_SIZE-1), execEventSig, lateEventSig) and fullMask(i);
+		--diff := subSN(causing.tags.renameIndex, content(i).tags.renameIndex); 
+																	-- High bit of diff carries the info "tag is before"
+		res(i) := killByTag(--diff(SMALL_NUMBER_SIZE-1),-- 
+									CMP_tagBefore(causing.tags.renameIndex, content(i).tags.renameIndex),
+									execEventSig, lateEventSig) and fullMask(i);
 	end loop;
 	return res;
 end function;
 
+function setInstructionIP(ins: InstructionState; ip: Mword) return InstructionState is
+	variable res: InstructionState := ins;
+begin
+	res.ip := ip;
+	return res;
+end function;
 
 function setInstructionTarget(ins: InstructionState; target: Mword) return InstructionState is
 	variable res: InstructionState := ins;
@@ -1134,6 +1117,50 @@ end function;
 			return '0';
 		end if;
 	end function;
+
+function getAddressIncrement(ins: InstructionState) return Mword is
+	variable res: Mword := (others => '0');
+begin
+	if ins.classInfo.short = '1' then
+		res(1) := '1'; -- 2
+	else
+		res(2) := '1'; -- 4
+	end if;
+	return res;
+end function;
+
+
+function stageMultiEvents(sd: StageDataMulti; isNew: std_logic) return StageMultiEventInfo is
+	variable res: StageMultiEventInfo := (eventOccured => '0', causing => defaultInstructionState,
+														partialKillMask => (others=>'0'));
+	variable t, tp: std_logic := '0';
+	variable eVec: std_logic_vector(0 to PIPE_WIDTH-1) := (others=>'0');
+begin
+	-- TODO: change default res.causing to the value "causing" input of the pipe stage?
+	res.causing := sd.data(PIPE_WIDTH-1);
+	if isNew = '0' then
+		return res;
+	end if;
+	
+	for i in sd.fullMask'reverse_range loop
+		-- Is there an event at this slot? 
+		t := sd.fullMask(i) and sd.data(i).controlInfo.newEvent;		
+		eVec(i) := t;
+		if t = '1' then
+			res.causing := sd.data(i);				
+		end if;
+	end loop;
+
+	for i in sd.fullMask'range loop
+		if tp = '1' then
+			res.partialKillMask(i) := '1';
+		end if;
+		tp := tp or eVec(i);			
+	end loop;
+	res.eventOccured := tp;
+	
+	return res;
+end function;
 
 
 end GeneralPipeDev;
