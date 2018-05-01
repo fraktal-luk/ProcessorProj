@@ -80,7 +80,7 @@ entity UnitMemory is
 		--groupCtrNext: in InsTag;
 		groupCtrInc: in InsTag;
 	
-		sbAcceptingIn: in std_logic;
+		--sbAcceptingIn: in std_logic;
 		dataOutSQ: out StageDataMulti;
 
 			sbSending: in std_logic;

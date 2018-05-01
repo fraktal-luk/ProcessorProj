@@ -38,7 +38,7 @@ architecture Behavioral5 of NewCore0 is
 	signal robSending: std_logic := '0';		-- OUTPUT
 	signal dataOutROB: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;		-- OUTPUT
 
-		signal sbAccepting: std_logic := '0';	-- INPUT
+		--signal sbAccepting: std_logic := '0';	-- INPUT
 		signal commitAccepting: std_logic := '0'; -- INPUT
 
 		signal dataOutBQV: StageDataMulti := DEFAULT_STAGE_DATA_MULTI; -- OUTPUT
@@ -59,7 +59,7 @@ architecture Behavioral5 of NewCore0 is
 
 		signal sbEmpty, sbSending: std_logic := '0';
 		signal dataFromSB: InstructionState := DEFAULT_INSTRUCTION_STATE;
-		signal sbAcceptingV: std_logic_vector(0 to 3) := (others => '0');				
+		--signal sbAcceptingV: std_logic_vector(0 to 3) := (others => '0');				
 
 		signal sbOutputSig: InstructionSlotArray(0 to 1-1)
 						:= (others => DEFAULT_INSTRUCTION_SLOT);
@@ -153,7 +153,7 @@ begin
 		renameLockEndOut => renameLockEnd,
 				
 		commitGroupCtrOut => commitGroupCtrSig,
-		commitGroupCtrNextOut => commitGroupCtrNextSig,	
+		--commitGroupCtrNextOut => commitGroupCtrNextSig,	
 		commitGroupCtrIncOut => commitGroupCtrIncSig
 	);
 		
@@ -224,14 +224,14 @@ begin
 											
 		-- Hidden to some degree, but may be useful for sth
 				commitGroupCtrSig => commitGroupCtrSig,--: in SmallNumber;
-				commitGroupCtrNextSig => commitGroupCtrNextSig,--: in SmallNumber; -- INPUT
+				--commitGroupCtrNextSig => commitGroupCtrNextSig,--: in SmallNumber; -- INPUT
 				commitGroupCtrIncSig => commitGroupCtrIncSig,--: in SmallNumber;	-- INPUT
 													
 		-- ROB interface	
 				robSendingOut => robSending,
 				dataOutROB => dataOutROB,
 
-				sbAccepting => '1',--sbAccepting,--: in std_logic;	-- INPUT
+				--sbAccepting => '1',--sbAccepting,--: in std_logic;	-- INPUT
 				commitAccepting => commitAccepting,--: in std_logic; -- INPUT
 
 					sbSending => sbSending,
@@ -338,7 +338,7 @@ begin
 	
 	end block; -- OUTER_OOO
 
-					sbAccepting <= sbAcceptingV(0);
+					--sbAccepting <= sbAcceptingV(0);
 
 				
 				sbSending <= sqCommittedOutput.full;

@@ -110,9 +110,9 @@ begin
 								and not storeVec and not loadVec) and renamedDataLiving.fullMask;
 		srcVecE <= storeVec and renamedDataLiving.fullMask;
 
-		dataToA <= routeToIQ2(renamedDataLiving, srcVecA);
-		dataToB <= routeToIQ2(renamedDataLiving, srcVecB);
-		dataToC <= routeToIQ2(prepareForAGU(renamedDataLiving), srcVecC);
+		dataToA <= routeToIQ(renamedDataLiving, srcVecA);
+		dataToB <= routeToIQ(renamedDataLiving, srcVecB);
+		dataToC <= routeToIQ(prepareForAGU(renamedDataLiving), srcVecC);
 
 		dataToE <= prepareForStoreData(dataToSQ);
 	

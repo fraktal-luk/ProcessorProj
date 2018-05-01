@@ -71,14 +71,14 @@ entity OutOfOrderBox is
 
 	-- Hidden to some degree, but may be useful for sth
 			commitGroupCtrSig: in InsTag;
-			commitGroupCtrNextSig: in InsTag; -- INPUT
+			--commitGroupCtrNextSig: in InsTag; -- INPUT
 		   commitGroupCtrIncSig: in InsTag;	-- INPUT
 												
 	-- ROB interface	
 			robSendingOut: out std_logic;		-- OUTPUT
 			dataOutROB: out StageDataMulti;		-- OUTPUT
 
-			sbAccepting: in std_logic;	-- INPUT
+			--sbAccepting: in std_logic;	-- INPUT
 			commitAccepting: in std_logic; -- INPUT
 
 				sbSending: in std_logic;
@@ -318,7 +318,7 @@ begin
 					--groupCtrNext => commitGroupCtrNextSig,				
 					groupCtrInc => commitGroupCtrIncSig,
 						
-						sbAcceptingIn => sbAccepting,
+					--	sbAcceptingIn => sbAccepting,
 						dataOutSQ => dataOutSQ,
 
 							sbSending => sbSending,
@@ -435,7 +435,7 @@ begin
 				prevSending => renamedSending,
 				acceptingOut => robAccepting,
 				
-				nextAccepting => commitAccepting and sbAccepting,
+				nextAccepting => commitAccepting,
 				sendingOut => robSending, 
 				outputData => dataOutROB		
 			);

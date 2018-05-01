@@ -107,7 +107,7 @@ entity UnitSequencer is
 		
 		-- Counter outputs
 		commitGroupCtrOut: out InsTag;
-		commitGroupCtrNextOut: out InsTag;
+		--commitGroupCtrNextOut: out InsTag;
 		
 		commitGroupCtrIncOut: out InsTag;
 		
@@ -509,8 +509,7 @@ begin
 	renamedSending <= sendingOutRename;
 	
 	commitGroupCtrOut <= commitGroupCtr;
-	commitGroupCtrNextOut <= commitGroupCtrNext;
-
+	--commitGroupCtrNextOut <= commitGroupCtrNext;
 	commitGroupCtrIncOut <= commitGroupCtrInc;
 
 	renameLockEndOut <= renameLockEnd;

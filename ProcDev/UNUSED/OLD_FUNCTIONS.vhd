@@ -1491,4 +1491,46 @@ end function;
 					return res;
 				end function;
 
+				--	function routeToIQ(sd: StageDataMulti; srcVec: std_logic_vector) return StageDataMulti is
+
+--		variable res: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
+
+--		variable k: natural := 0;
+
+--			constant CLEAR_EMPTY_SLOTS_IQ_ROUTING: boolean := false;
+
+--	begin
+
+--		if not CLEAR_EMPTY_SLOTS_IQ_ROUTING then
+
+--			res.data := sd.data;
+
+--		end if;
+
+--	
+
+--		for i in sd.fullMask'range loop
+
+--			if srcVec(i) = '1' then
+
+--				if sd.fullMask(k) = '0' then -- If no more instructions in packet, stop
+
+--					exit;
+
+--				end if;
+
+--				res.fullMask(k) := '1';
+
+--				res.data(k) := sd.data(i);
+
+--				k := k + 1;
+
+--			end if;
+
+--		end loop;
+
+--		return res;
+
+--	end function;	
+
 end OLD_FUNCTIONS;
