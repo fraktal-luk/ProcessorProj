@@ -241,9 +241,9 @@ begin
 					execEventSignal => killAll, -- CAREFUL: not killing on stall, because is sent to void
 					lateEventSignal => killAll,
 					execCausing => DEFAULT_INSTRUCTION_STATE,
-					lockCommand => '0',
+					lockCommand => '0'
 
-					stageEventsOut => open--stage0Events
+					--stageEventsOut => open--stage0Events
 			);
 			
 			
@@ -269,9 +269,9 @@ begin
 					execEventSignal => killAll, -- CAREFUL: not killing on stall, because is sent to void
 					lateEventSignal => killAll,
 					execCausing => DEFAULT_INSTRUCTION_STATE,
-					lockCommand => '0',
+					lockCommand => '0'
 
-					stageEventsOut => open--stage0MultiEvents
+					--stageEventsOut => open--stage0MultiEvents
 			);
 	
 	
@@ -338,9 +338,9 @@ begin
 			execEventSignal => killAll,
 			lateEventSignal => killAll,
 			execCausing => DEFAULT_INSTRUCTION_STATE,
-			lockCommand => '0',
+			lockCommand => '0'
 			-- to event part
-			stageEventsOut => open--stage0Events
+			--stageEventsOut => open--stage0Events
 		);		
 		
 	-- from later stages

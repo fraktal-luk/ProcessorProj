@@ -95,7 +95,7 @@ architecture Implem of UnitExec is
 	signal dataA0, dataB0, dataB1, dataB2, dataC0, dataD0: InstructionState := DEFAULT_INSTRUCTION_STATE;
 	signal execSendingA, execSendingB, execSendingD: std_logic := '0';
 	signal execAcceptingASig, execAcceptingBSig, execAcceptingDSig: std_logic := '0';
-	signal eventsD: StageMultiEventInfo;
+	--signal eventsD: StageMultiEventInfo;
 	signal inputDataA, outputDataA: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
 	signal inputDataD, outputDataD: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
 
@@ -134,9 +134,9 @@ begin
 			execEventSignal => eventSignal,
 			lateEventSignal => lateEventSignal,
 			execCausing => execCausing,
-			lockCommand => '0',
+			lockCommand => '0'
 			
-			stageEventsOut => open
+			--stageEventsOut => open
 		);
 
 	SUBPIPE_B: entity work.IntegerMultiplier(Behavioral)
@@ -181,9 +181,9 @@ begin
 			execEventSignal => eventSignal,
 			lateEventSignal => lateEventSignal,
 			execCausing => execCausing,
-			lockCommand => '0',
+			lockCommand => '0'
 			
-			stageEventsOut => eventsD						
+			--stageEventsOut => open-- eventsD						
 		);	
 
 		storeTargetDataSig <= dataD0;

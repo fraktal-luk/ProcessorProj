@@ -440,9 +440,9 @@ begin
 				lateEventSignal => '0',	
 				execCausing => DEFAULT_INSTRUCTION_STATE,--interruptCause,		
 
-				lockCommand => '0',
+				lockCommand => '0'
 
-				stageEventsOut => open--eiEvents2
+				--stageEventsOut => open--eiEvents2
 			);
 
 			EV_PHASES: block

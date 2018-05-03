@@ -68,9 +68,9 @@ entity GenericStageMulti is
 		execEventSignal: in std_logic;
 		lateEventSignal: in std_logic;
 		execCausing: in InstructionState;
-		lockCommand: in std_logic;
+		lockCommand: in std_logic
 		
-		stageEventsOut: out StageMultiEventInfo		
+		--stageEventsOut: out StageMultiEventInfo		
 	);
 end GenericStageMulti;
 
@@ -82,7 +82,7 @@ architecture Behavioral of GenericStageMulti is
 	signal stageData, stageDataLiving, stageDataNext, stageDataNew:
 														StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
 	signal partialKillMask: std_logic_vector(0 to PIPE_WIDTH-1) := (others => '0');	
-	signal stageEvents: StageMultiEventInfo;
+	--signal stageEvents: StageMultiEventInfo;
 	
 		signal contentState, contentStateNext: ContentStateSimple := DEFAULT_CS_SIMPLE;
 begin
@@ -118,8 +118,8 @@ begin
 		flowResponse => flowResponse
 	);
 	
-		stageEvents <= stageMultiEvents(stageData, flowResponse.isNew);								
-		partialKillMask <= stageEvents.partialKillMask;
+	--	stageEvents <= stageMultiEvents(stageData, flowResponse.isNew);								
+	--	partialKillMask <= stageEvents.partialKillMask;
 	
 	flowDrive.prevSending <= --prevSending;
 										stageDataIn.fullMask(0);
@@ -134,7 +134,7 @@ begin
 		stageDataOut.fullMask <= stageDataLiving.fullMask when flowResponse.sending = '1'
 								 else (others => '0');
 								 
-	stageEventsOut <= stageEvents;
+	--stageEventsOut <= stageEvents;
 end Behavioral;
 
 
@@ -145,7 +145,7 @@ architecture Behavioral2 of GenericStageMulti is
 	signal stageData, stageDataLiving, stageDataNext, stageDataNew:
 														StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
 	signal partialKillMask: std_logic_vector(0 to PIPE_WIDTH-1) := (others => '0');	
-	signal stageEvents: StageMultiEventInfo;
+	--signal stageEvents: StageMultiEventInfo;
 	
 		signal contentState, contentStateNext: ContentStateSimple := DEFAULT_CS_SIMPLE;
 begin
@@ -181,8 +181,8 @@ begin
 		flowResponse => flowResponse
 	);
 	
-		stageEvents <= stageMultiEvents(stageData, flowResponse.isNew);								
-		partialKillMask <= stageEvents.partialKillMask;
+	--	stageEvents <= stageMultiEvents(stageData, flowResponse.isNew);								
+	--	partialKillMask <= stageEvents.partialKillMask;
 	
 	flowDrive.prevSending <= --prevSending;
 										isNonzero(stageDataIn.fullMask); -- CAREFUL: The difference from Behavioral
@@ -197,7 +197,7 @@ begin
 		stageDataOut.fullMask <= stageDataLiving.fullMask when flowResponse.sending = '1'
 								 else (others => '0');
 								 
-	stageEventsOut <= stageEvents;
+	--stageEventsOut <= stageEvents;
 end Behavioral2;
 
 
@@ -208,7 +208,7 @@ architecture Renaming of GenericStageMulti is
 	signal stageData, stageDataLiving, stageDataNext, stageDataNew:
 														StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
 	signal partialKillMask: std_logic_vector(0 to PIPE_WIDTH-1) := (others => '0');	
-	signal stageEvents: StageMultiEventInfo;
+	--signal stageEvents: StageMultiEventInfo;
 begin
 	stageDataNew <= stageDataIn;--work.ProcLogicRouting.setBranchLink(stageDataIn);
 	stageDataNext <= stageMultiNextCl(stageDataLiving, stageDataNew,
@@ -235,8 +235,8 @@ begin
 		flowResponse => flowResponse
 	);
 	
-		stageEvents <= stageMultiEvents(stageData, flowResponse.isNew);								
-		partialKillMask <= stageEvents.partialKillMask;
+	--	stageEvents <= stageMultiEvents(stageData, flowResponse.isNew);								
+	--	partialKillMask <= stageEvents.partialKillMask;
 	
 	flowDrive.prevSending <= --prevSending;
 										stageDataIn.fullMask(0);
@@ -251,7 +251,7 @@ begin
 		stageDataOut.fullMask <= stageDataLiving.fullMask when flowResponse.sending = '1'
 								 else (others => '0');
 	
-	stageEventsOut <= stageEvents;
+	--stageEventsOut <= stageEvents;
 end Renaming;
 
 
@@ -262,7 +262,7 @@ architecture SingleTagged of GenericStageMulti is
 	signal stageData, stageDataLiving, stageDataNext, stageDataNew:
 														StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
 	signal partialKillMask: std_logic_vector(0 to PIPE_WIDTH-1) := (others => '0');
-	signal stageEvents: StageMultiEventInfo;	
+	--signal stageEvents: StageMultiEventInfo;	
 begin
 	stageDataNew <= stageDataIn;										
 	stageDataNext <= stageMultiNext(stageDataLiving, stageDataNew,
@@ -303,7 +303,7 @@ begin
 										lateEventSignal);
 	end block;	
 
-		stageEvents <= stageMultiEvents(stageData, flowResponse.isNew);
+	--	stageEvents <= stageMultiEvents(stageData, flowResponse.isNew);
 	
 	flowDrive.prevSending <= --prevSending;
 										stageDataIn.fullMask(0);
@@ -318,7 +318,7 @@ begin
 		stageDataOut.fullMask <= stageDataLiving.fullMask when flowResponse.sending = '1'
 								 else (others => '0');
 								 
-	stageEventsOut <= stageEvents;
+	--stageEventsOut <= stageEvents;
 end SingleTagged;
 
 
@@ -328,5 +328,5 @@ begin
 	sendingOut <= prevSending;
 	stageDataOut <= stageDataIn; -- TODO: clear temp ctrl info?
 	
-	stageEventsOut <= DEFAULT_STAGE_MULTI_EVENT_INFO;	
+	--stageEventsOut <= DEFAULT_STAGE_MULTI_EVENT_INFO;	
 end Bypassed;

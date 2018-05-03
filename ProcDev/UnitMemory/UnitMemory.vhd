@@ -154,9 +154,9 @@ begin
 		execEventSignal => eventSignal,
 		lateEventSignal => lateEventSignal,
 		execCausing => execCausing,
-		lockCommand => '0',
+		lockCommand => '0'
 		
-		stageEventsOut => open
+		--stageEventsOut => open
 	);
 
 	SUBPIPE_E: block begin end block; -- Block empty
@@ -187,9 +187,9 @@ begin
 		execEventSignal => eventSignal,
 		lateEventSignal => lateEventSignal,					
 		execCausing => execCausing,
-		lockCommand => '0',
+		lockCommand => '0'
 		
-		stageEventsOut => open					
+		--stageEventsOut => open					
 	);
 
 	-- CAREFUL, TODO: after mem0 set "addressCompleted" according to success or failure of translation?
@@ -215,9 +215,9 @@ begin
 		execEventSignal => eventSignal,
 		lateEventSignal => lateEventSignal,
 		execCausing => execCausing,
-		lockCommand => '0',
+		lockCommand => '0'
 		
-		stageEventsOut => open					
+		--stageEventsOut => open					
 	);
 
 	-- CAREFUL: when miss (incl. forwarding miss), no 'completed' signal.

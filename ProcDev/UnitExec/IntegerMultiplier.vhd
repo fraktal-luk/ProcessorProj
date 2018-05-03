@@ -106,9 +106,9 @@ begin
 		execEventSignal => execEventSignal,
 		lateEventSignal => lateEventSignal,
 		execCausing => eventCausing,
-		lockCommand => '0',
+		lockCommand => '0'
 		
-		stageEventsOut => open					
+		--stageEventsOut => open					
 	);
 	
 	STAGE_1: entity work.GenericStageMulti(SingleTagged)
@@ -126,9 +126,9 @@ begin
 		execEventSignal => execEventSignal,
 		lateEventSignal => lateEventSignal,
 		execCausing => eventCausing,
-		lockCommand => '0',
+		lockCommand => '0'
 		
-		stageEventsOut => open					
+		--stageEventsOut => open					
 	);
 	
 	 --dataM.data(0) <= execLogicXor(data1.data(0));
@@ -150,9 +150,9 @@ begin
 		execEventSignal => execEventSignal,
 		lateEventSignal => lateEventSignal,
 		execCausing => eventCausing,
-		lockCommand => '0',
+		lockCommand => '0'
 		
-		stageEventsOut => open					
+		--stageEventsOut => open					
 	);		
 	
 	data1Prev <= data1.data(0);				
