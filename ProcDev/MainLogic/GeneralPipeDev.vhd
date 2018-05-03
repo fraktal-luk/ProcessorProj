@@ -527,6 +527,7 @@ end function;
 			for i in 0 to PIPE_WIDTH-1 loop
 				--res.data(i).physicalDestArgs.d0 := (others => '0');
 				res.data(i).physicalArgSpec.dest := (others => '0');
+					res.data(i).controlInfo.newEvent := '0';
 			end loop;
 		else -- stall or killed (kill can be partial)
 			if full = '0' then
@@ -534,6 +535,7 @@ end function;
 				for i in 0 to PIPE_WIDTH-1 loop
 					--res.data(i).physicalDestArgs.d0 := (others => '0');
 					res.data(i).physicalArgSpec.dest := (others => '0');
+						res.data(i).controlInfo.newEvent := '0';
 				end loop;
 			else
 				res := livingContent;

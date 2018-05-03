@@ -171,7 +171,7 @@ begin
 			clk => clk, reset => resetSig, en => enSig,
 			
 			prevSending => '0',
-			nextAccepting => whichAcceptedCQ(3),
+			nextAccepting => '1',--whichAcceptedCQ(3),
 			
 			stageDataIn => inputDataD, 
 			acceptingOut => execAcceptingDSig,
@@ -230,8 +230,10 @@ begin
 			branchQueueSelectedSending <= bqSelectedOutput.full;
 			branchQueueSelectedOut <= bqSelectedOutput.ins;
 
-		execEventSignal <= eventsD.eventOccured;
-		execCausing <= eventsD.causing;
+		execEventSignal <= --eventsD.eventOccured;
+									dataD0.controlInfo.newEvent;
+		execCausing <= --eventsD.causing;
+								dataD0;
 
 		eventSignal <= execOrIntEventSignalIn;	
 
