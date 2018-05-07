@@ -64,14 +64,14 @@ entity UnitSequencer is
 		execEventSignal: in std_logic;
 		execCausing: in InstructionState;		
 		
-			frontEventSignal: in std_logic;
-			frontCausing: in InstructionState;
+		frontEventSignal: in std_logic;
+		frontCausing: in InstructionState;
 		
 		execOrIntEventSignalOut: out std_logic;
 		execOrIntCausingOut: out InstructionState;	
-			lateEventOut: out std_logic;
-			lateEventSetPC: out std_logic;
-			lateCausing : out InstructionState;
+		lateEventOut: out std_logic;
+		lateEventSetPC: out std_logic;
+		lateCausing : out InstructionState;
 		
 		-- Interface PC <-> front pipe
 		frontAccepting: in std_logic;
@@ -93,32 +93,28 @@ entity UnitSequencer is
 		robDataLiving: in StageDataMulti;
 		sendingFromROB: in std_logic;
 		
-				dataFromBQV: in StageDataMulti;
+		dataFromBQV: in StageDataMulti;
 		
-				dataFromSB: in InstructionState;
-					sbEmpty: in std_logic;
-					sbSending: in std_logic;
+		dataFromSB: in InstructionState;
+		sbEmpty: in std_logic;
+		sbSending: in std_logic;
 		
-					sysStoreAllow: in std_logic;
-					sysStoreAddress: in slv5; 
-					sysStoreValue: in Mword;		
-		
-		--	committing: out std_logic;
+		sysStoreAllow: in std_logic;
+		sysStoreAddress: in slv5; 
+		sysStoreValue: in Mword;		
 		
 		-- Counter outputs
-		commitGroupCtrOut: out InsTag;
-		--commitGroupCtrNextOut: out InsTag;
-		
+		commitGroupCtrOut: out InsTag;		
 		commitGroupCtrIncOut: out InsTag;
 		
-			committedSending: out std_logic;
-			committedDataOut: out StageDataMulti;
-		
-			renameLockEndOut: out std_logic;
-		
-			newPhysDestsIn: in PhysNameArray(0 to PIPE_WIDTH-1);
-			newPhysDestPointerIn: in SmallNumber;
-			newPhysSourcesIn: in PhysNameArray(0 to 3*PIPE_WIDTH-1);
+		committedSending: out std_logic;
+		committedDataOut: out StageDataMulti;
+	
+		renameLockEndOut: out std_logic;
+	
+		newPhysDestsIn: in PhysNameArray(0 to PIPE_WIDTH-1);
+		newPhysDestPointerIn: in SmallNumber;
+		newPhysSourcesIn: in PhysNameArray(0 to 3*PIPE_WIDTH-1);
 		
 		intAllowOut: out std_logic;
 		intAckOut: out std_logic;
@@ -138,7 +134,7 @@ architecture Behavioral of UnitSequencer is
 
 	signal tmpPcIn, tmpPcOut: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
 
-	signal excLinkInfo, intLinkInfo: InstructionState := DEFAULT_INSTRUCTION_STATE;
+	signal linkInfo: InstructionState := DEFAULT_INSTRUCTION_STATE;
 	signal excInfoUpdate, intInfoUpdate: std_logic := '0';
 
 	signal execOrIntEventSignal: std_logic := '0';
@@ -163,9 +159,9 @@ architecture Behavioral of UnitSequencer is
 														StageDataMulti := DEFAULT_STAGE_DATA_MULTI;	
 	signal insToLastEffective: InstructionState := DEFAULT_INSTRUCTION_STATE;	
 
-	signal eiEvents2: StageMultiEventInfo;
-							
-	signal TMP_targetIns2: InstructionState := DEFAULT_INSTRUCTION_STATE;		
+	signal lateCausingSig: InstructionState := DEFAULT_INSTRUCTION_STATE;
+			
+	signal lateTargetIns: InstructionState := DEFAULT_INSTRUCTION_STATE;		
 			
 	signal gE_eventOccurred, gE_killPC, ch0, ch1: std_logic := '0';
 
@@ -187,8 +183,8 @@ begin
 			lateEventOut <= evtPhase0;
 			lateEventSetPC <= evtPhase2;
 		execOrIntEventSignal <= evtPhase0 or execEventSignal;
-		execOrIntCausing <= eiEvents2.causing when evtPhase0 = '1' else execCausing;
-		lateCausing <= eiEvents2.causing;
+		execOrIntCausing <= lateCausingSig when evtPhase0 = '1' else execCausing;
+		lateCausing <= lateCausingSig;
 
 		execOrIntEventSignalOut <= execOrIntEventSignal;	-- $MODULE_OUT
 		execOrIntCausingOut <= execOrIntCausing; -- $MODULE_OUT
@@ -196,13 +192,13 @@ begin
 
 	pcNext <= getNextPC(stageDataOutPC.ip, (others => '0'), '0');
 
-	stageDataToPC <= newPCData(evtPhase2, eiEvents2.causing,
+	stageDataToPC <= newPCData(evtPhase2, lateCausingSig,
 										execEventSignal, execCausing,
 										frontEventSignal, frontCausing,
 										pcNext);
 			
 	sendingToPC <= 
-			sendingOutPC or (gE_eventOccurred and not gE_killPC) or (evtPhase2 and not isHalt(eiEvents2.causing));
+			sendingOutPC or (gE_eventOccurred and not gE_killPC) or (evtPhase2 and not isHalt(lateCausingSig));
 										-- CAREFUL: Because of the above, PC is not updated in phase2 of halt instruction,
 										--				so the PC of a halted logical processor is not defined.
 
@@ -230,9 +226,9 @@ begin
 		stageDataOutPC.ip <= tmpPcOut.data(0).ip;
 		stageDataOutPC.target <= pcNext; -- CAREFUL: Attaching next address from line predictor. Correct?
 
-	excInfoUpdate <= evtPhase1 and (eiEvents2.causing.controlInfo.hasException
-												or eiEvents2.causing.controlInfo.dbtrap);
-	intInfoUpdate <= evtPhase1 and eiEvents2.causing.controlInfo.hasInterrupt;
+	excInfoUpdate <= evtPhase1 and (lateCausingSig.controlInfo.hasException
+												or lateCausingSig.controlInfo.dbtrap);
+	intInfoUpdate <= evtPhase1 and lateCausingSig.controlInfo.hasInterrupt;
 	
 	----------------------------------------------------------------------
 	
@@ -245,8 +241,7 @@ begin
 		alias savedStateExc is sysRegArray(4);
 		alias savedStateInt is sysRegArray(5);
 	begin
-		excLinkInfo <= getLinkInfo(dataFromLastEffective2.data(0), currentState);
-		intLinkInfo <= getLinkInfo(dataFromLastEffective2.data(0), currentState);
+		linkInfo <= getLinkInfo(dataFromLastEffective2.data(0), currentState);
 	
 		CLOCKED: process(clk)
 		begin					
@@ -260,8 +255,8 @@ begin
 				end if;
 
 				-- Writing specialized fields on events
-				if evtPhase1 = '1' then --eiEvents.causing.controlInfo.phase1 = '1' then
-					currentState <= TMP_targetIns2.result;
+				if evtPhase1 = '1' then
+					currentState <= lateTargetIns.result;
 					currentState(15 downto 10) <= (others => '0');
 					currentState(7 downto 2) <= (others => '0');
 				end if;
@@ -270,16 +265,14 @@ begin
 				--			but committing a sysMtc shouldn't happen in parallel with any control event
 				-- Writing exc status registers
 				if excInfoUpdate = '1' then
-					linkRegExc <= excLinkInfo.ip;
-					--savedStateExc <= X"0000" & excLinkInfo.systemLevel & excLinkInfo.intLevel;
-						savedStateExc <= excLinkInfo.result;
+					linkRegExc <= linkInfo.ip;
+					savedStateExc <= linkInfo.result;
 				end if;
 				
 				-- Writing int status registers
 				if intInfoUpdate = '1' then
-					linkRegInt <= intLinkInfo.ip;
-					--savedStateInt <= X"0000" & intLinkInfo.systemLevel & intLinkInfo.intLevel;
-						savedStateInt <= intLinkInfo.result;
+					linkRegInt <= linkInfo.ip;
+					savedStateInt <= linkInfo.result;
 				end if;
 				
 				-- Enforcing content of read-only registers
@@ -294,16 +287,14 @@ begin
 
 		
 		-- CAREFUL: this counts at phase1 --------------------------------------------------
-		TMP_targetIns2 <= getLatePCData('1', -- CAREFUL: if interrupt, it must be confirmed at phase1 
-														--  			cause target address is generated at phase1.
-													setInterrupt3(dataFromLastEffective2.data(0), intPhase1, start),
+		lateTargetIns <= getLatePCData(lateCausingSig,
 													currentState,
 													linkRegExc, linkRegInt,
 													savedStateExc, savedStateInt);
 
 			NEW_eiCausing.fullMask(0) <= '1';
 			NEW_eiCausing.data(0) <= clearControlEvents(
-												setInstructionTarget(dataFromLastEffective2.data(0), TMP_targetIns2.ip));
+												setInstructionTarget(dataFromLastEffective2.data(0), lateTargetIns.ip));
 		-------------------------------------------------------------------------------------
 		dbtrapOn <= currentState(25);
 	end block;
@@ -312,30 +303,29 @@ begin
 	pcSending <= sendingOutPC;	
 
 	-- Rename stage
-		stageDataRenameIn <= renameGroup(frontDataLastLiving, newPhysSourcesIn, newPhysDestsIn, renameCtr,
-															renameGroupCtrNext, newPhysDestPointerIn, dbtrapOn);
-	
-		SUBUNIT_RENAME: entity work.GenericStageMulti(Renaming)
-		port map(
-			clk => clk, reset => resetSig, en => enSig,
-			
-			-- Interface with front
-			prevSending => frontLastSending,	
-			stageDataIn => stageDataRenameIn, --readyRegFlagsV),
-			acceptingOut => acceptingOutRename,
-			
-			-- Interface with IQ
-			nextAccepting => iqAccepts,
-			sendingOut => sendingOutRename,
-			stageDataOut => stageDataOutRename,
-			
-			-- Event interface
-			execEventSignal => execOrIntEventSignal,
-			lateEventSignal => evtPhase0,		
-			execCausing => execOrIntCausing,
-			lockCommand => renameLockState		
-		);
---	end block;
+	stageDataRenameIn <= renameGroup(frontDataLastLiving, newPhysSourcesIn, newPhysDestsIn, renameCtr,
+														renameGroupCtrNext, newPhysDestPointerIn, dbtrapOn);
+
+	SUBUNIT_RENAME: entity work.GenericStageMulti(Renaming)
+	port map(
+		clk => clk, reset => resetSig, en => enSig,
+		
+		-- Interface with front
+		prevSending => frontLastSending,	
+		stageDataIn => stageDataRenameIn, --readyRegFlagsV),
+		acceptingOut => acceptingOutRename,
+		
+		-- Interface with IQ
+		nextAccepting => iqAccepts,
+		sendingOut => sendingOutRename,
+		stageDataOut => stageDataOutRename,
+		
+		-- Event interface
+		execEventSignal => execOrIntEventSignal,
+		lateEventSignal => evtPhase0,		
+		execCausing => execOrIntCausing,
+		lockCommand => renameLockState		
+	);
 
 	COMMON_STATE: block
 	begin
@@ -380,7 +370,6 @@ begin
 	end block;
 
 	sendingToCommit <= sendingFromROB;
-	--committing <= sendingFromROB;
 
 	-- Commit stage: in order again				
 	SUBUNIT_COMMIT: entity work.GenericStageMulti(Behavioral)
@@ -417,11 +406,11 @@ begin
 		insToLastEffective <= getLastEffective(stageDataToCommit);	
 		dataToLastEffective <= makeSDM((0 => (sendingToCommit, insToLastEffective)));
 
-			eiEvents2.causing <= setInterrupt3(dataFromLastEffective2.data(0), intPhase1, start);
+			lateCausingSig <= setInterrupt3(dataFromLastEffective2.data(0), intPhase1, start);
 
 			dataToLastEffective2 <= dataToLastEffective when (evtPhase1) = '0' else NEW_eiCausing;
 
-			LAST_EFFECTIVE_SLOT_2: entity work.GenericStageMulti(Behavioral)
+			LAST_EFFECTIVE_SLOT: entity work.GenericStageMulti(Behavioral)
 			port map(
 				clk => clk, reset => resetSig, en => enSig,
 				
@@ -441,8 +430,6 @@ begin
 				execCausing => DEFAULT_INSTRUCTION_STATE,--interruptCause,		
 
 				lockCommand => '0'
-
-				--stageEventsOut => open--eiEvents2
 			);
 
 			EV_PHASES: block
@@ -509,7 +496,6 @@ begin
 	renamedSending <= sendingOutRename;
 	
 	commitGroupCtrOut <= commitGroupCtr;
-	--commitGroupCtrNextOut <= commitGroupCtrNext;
 	commitGroupCtrIncOut <= commitGroupCtrInc;
 
 	renameLockEndOut <= renameLockEnd;

@@ -36,7 +36,7 @@ package ProcLogicSequence is
 function getLinkInfo(ins: InstructionState; state: Mword) return InstructionState;
 
 
-function getLatePCData(commitEvent: std_logic; commitCausing: InstructionState;
+function getLatePCData(commitCausing: InstructionState;
 								currentState, linkExc, linkInt, stateExc, stateInt: Mword)
 return InstructionState;
 
@@ -101,7 +101,7 @@ begin
 end function;
 
 
-function getLatePCData(commitEvent: std_logic; commitCausing: InstructionState;
+function getLatePCData(commitCausing: InstructionState;
 								currentState, linkExc, linkInt, stateExc, stateInt: Mword)
 return InstructionState is
 	variable res: InstructionState := DEFAULT_INSTRUCTION_STATE;-- content;

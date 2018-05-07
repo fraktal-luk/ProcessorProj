@@ -1533,4 +1533,142 @@ end function;
 
 --	end function;	
 
+function stageSimpleNext(content, newContent: InstructionState; full, sending, receiving: std_logic)
+
+return InstructionState is 
+
+	variable res: InstructionState := --defaultInstructionState;
+
+												content;
+
+begin
+
+	if receiving = '1' then -- take full
+
+		res := newContent;
+
+	elsif sending = '1' then -- take empty
+
+		-- CAREFUL: omitting this clearing would spare some logic, but clearing of result tag is needed!
+
+		--						Otherwise following instructions would read results form empty slots!
+
+		--res := defaultInstructionState;
+
+			--res.physicalDestArgs.d0 := (others => '0'); -- CAREFUL: clear result tag!
+
+			res.physicalArgSpec.dest := (others => '0');
+
+	else -- stall
+
+		if full = '1' then
+
+		--	res := content;
+
+		else
+
+			-- leave it empty
+
+		end if;
+
+	end if;
+
+	return res;
+
+end function;
+
+
+function simpleQueueNext(content: InstructionStateArray; newContent: InstructionStateArray;
+
+		livingMask: std_logic_vector;
+
+		newMask: std_logic_vector;
+
+		nFull: integer;
+
+		sending: std_logic
+
+)
+
+return InstructionSlotArray is
+
+	constant LEN: integer := content'length;
+
+	constant INPUT_LEN: integer := newContent'length;
+
+	variable res: InstructionSlotArray(0 to LEN-1) := (others => DEFAULT_INSTRUCTION_SLOT);
+
+	variable contentExtended: InstructionStateArray(0 to LEN + INPUT_LEN - 1) := content & newContent;
+
+	variable dataTemp: InstructionStateArray(0 to LEN + INPUT_LEN - 1) := (others => defaultInstructionState);
+
+	variable fullMaskTemp: std_logic_vector(0 to LEN + INPUT_LEN - 1) := (others => '0');
+
+		
+
+	--variable j: integer;
+
+	variable k: integer := 0;
+
+	variable newFullMask: std_logic_vector(0 to LEN-1) := (others => '0');
+
+	constant CLEAR_EMPTY_SLOTS: boolean := false;
+
+	variable nFullNew: integer := nFull;
+
+begin
+
+	-- CAREFUL: even when not clearing empty slots, result tags probably should be cleared!
+
+	--				It's to prevent reading of fake results from empty slots
+
+
+
+	dataTemp(0 to LEN-1) := content;
+
+	if not CLEAR_EMPTY_SLOTS then
+
+		dataTemp := contentExtended;
+
+	end if;	
+
+
+
+	if sending = '1' then
+
+		dataTemp(0 to LEN + INPUT_LEN - 2) := dataTemp(1 to LEN + INPUT_LEN - 1);
+
+		nFullNew := nFull-1;
+
+	end if;
+
+		
+
+	for i in 0 to LEN + INPUT_LEN - 1 loop
+
+		if i < nFullNew then	
+
+			fullMaskTemp(i) := '1';
+
+		elsif i < nFullNew + INPUT_LEN then
+
+			dataTemp(i) := newContent(k);
+
+			fullMaskTemp(i) := newMask(k);
+
+			k := k + 1;
+		end if;
+
+	end loop;
+
+
+
+	res := makeSlotArray(dataTemp(0 to LEN-1), fullMaskTemp(0 to LEN-1));
+
+
+
+	return res;		
+
+end function;
+
 end OLD_FUNCTIONS;

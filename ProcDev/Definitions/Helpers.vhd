@@ -12,6 +12,8 @@ use work.ProcBasicDefs.all;
 
 package Helpers is
 
+function std2bool(arg: std_logic) return boolean;
+function bool2std(b: boolean) return std_logic;
 
 	function addWordE(a, b: word) return std_logic_vector;
 	function addWord(a, b: word) return word;
@@ -49,7 +51,21 @@ end Helpers;
 
 
 package body Helpers is
-		
+
+function std2bool(arg: std_logic) return boolean is
+begin
+	return (arg = '1');
+end function;
+
+function bool2std(b: boolean) return std_logic is
+begin
+	if b then
+		return '1';
+	else
+		return '0';
+	end if;
+end function;
+
 		function addWordE(a, b: word) return std_logic_vector is
 			variable res: std_logic_vector(32 downto 0) := (others => '0');
 			variable al, ah, bl, bh, cl, ch: integer := 0;
