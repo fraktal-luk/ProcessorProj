@@ -10,13 +10,12 @@ architecture Behavioral5 of NewCore0 is
 	signal frontDataLastLiving: StageDataMulti;
 	signal frontLastSending, renameAccepting: std_logic := '0';
 
-		signal frontEventSignal: std_logic := '0';
-		signal frontCausing: InstructionState := DEFAULT_INSTRUCTION_STATE;
+	signal frontEventSignal: std_logic := '0';
+	signal frontCausing: InstructionState := DEFAULT_INSTRUCTION_STATE;
 
 ---------------------------------
 	signal renamedDataLiving: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;	-- INPUT			
-	signal renamedSending, -- INPUT
-				iqAccepts: std_logic := '0'; -- OUTPUT
+	signal renamedSending, iqAccepts: std_logic := '0';
 
 	-- Sys reg interface	
 	signal sysRegReadSel: slv5 := (others => '0'); -- OUTPUT  -- Doesn't need to be a port of OOO part
@@ -38,44 +37,37 @@ architecture Behavioral5 of NewCore0 is
 	signal robSending: std_logic := '0';		-- OUTPUT
 	signal dataOutROB: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;		-- OUTPUT
 
-		--signal sbAccepting: std_logic := '0';	-- INPUT
-		signal commitAccepting: std_logic := '0'; -- INPUT
+	signal commitAccepting: std_logic := '0'; -- INPUT
 
-		signal dataOutBQV: StageDataMulti := DEFAULT_STAGE_DATA_MULTI; -- OUTPUT
-		signal dataOutSQ: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;	-- OUTPUT
+	signal dataOutBQV: StageDataMulti := DEFAULT_STAGE_DATA_MULTI; -- OUTPUT
+	signal dataOutSQ: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;	-- OUTPUT
 -------------------------------------------------------
 
 	signal execOrIntCausing: InstructionState := defaultInstructionState;
 	signal execOrIntEventSignal: std_logic := '0';
 
-		signal newPhysDests: PhysNameArray(0 to PIPE_WIDTH-1) := (others => (others => '0'));
-		signal newPhysDestPointer: SmallNumber := (others => '0');
-		signal newPhysSources: PhysNameArray(0 to 3*PIPE_WIDTH-1) := (others => (others => '0'));
-
-		signal committingSig: std_logic := '0';
-			
-		signal committedSending, renameLockEnd: std_logic := '0';
-		signal committedDataOut: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
-
-		signal sbEmpty, sbSending: std_logic := '0';
-		signal dataFromSB: InstructionState := DEFAULT_INSTRUCTION_STATE;
-		--signal sbAcceptingV: std_logic_vector(0 to 3) := (others => '0');				
-
-		signal sbOutputSig: InstructionSlotArray(0 to 1-1)
-						:= (others => DEFAULT_INSTRUCTION_SLOT);
-		signal sbBufferOutputSig: InstructionSlotArray(0 to SB_SIZE-1)
-						:= (others => DEFAULT_INSTRUCTION_SLOT);
-		signal sysStoreAllow: std_logic := '0';
-		signal sysStoreAddress: slv5 := (others => '0'); 
-		signal sysStoreValue: Mword := (others => '0');
+	signal newPhysDests: PhysNameArray(0 to PIPE_WIDTH-1) := (others => (others => '0'));
+	signal newPhysDestPointer: SmallNumber := (others => '0');
+	signal newPhysSources: PhysNameArray(0 to 3*PIPE_WIDTH-1) := (others => (others => '0'));
 		
-		signal memStoreAddress, memStoreValue: Mword := (others => '0');
-		signal memStoreAllow: std_logic := '0';
-			
-			signal sqCommittedOutput: InstructionSlot := DEFAULT_INSTRUCTION_SLOT;
-			signal sqCommittedEmpty: std_logic := '0';
+	signal committedSending, renameLockEnd: std_logic := '0';
+	signal committedDataOut: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
+
+	signal sbEmpty, sbSending: std_logic := '0';
+	signal dataFromSB: InstructionState := DEFAULT_INSTRUCTION_STATE;
+
+	signal sysStoreAllow: std_logic := '0';
+	signal sysStoreAddress: slv5 := (others => '0'); 
+	signal sysStoreValue: Mword := (others => '0');
+	
+	signal memStoreAddress, memStoreValue: Mword := (others => '0');
+	signal memStoreAllow: std_logic := '0';
 		
-		signal cacheFill: InstructionSlot := DEFAULT_INSTRUCTION_SLOT;
+	signal sqCommittedOutput: InstructionSlot := DEFAULT_INSTRUCTION_SLOT;
+	signal sqCommittedEmpty: std_logic := '0';
+	
+	signal cacheFill: InstructionSlot := DEFAULT_INSTRUCTION_SLOT;
+
 	constant HAS_RESET: std_logic := '0';
 	constant HAS_EN: std_logic := '0';
 begin
@@ -85,7 +77,6 @@ begin
 	cacheFill.full <= fillready;
 	cacheFill.ins.argValues.arg1 <= filladr;
 
-
 	SEQUENCING_PART: entity work.UnitSequencer(Behavioral)
 	port map (
 		clk => clk, reset => resetSig, en => enSig,
@@ -93,9 +84,9 @@ begin
 		-- sys reg interface
 		sysRegReadSel => sysRegReadSel,
 		sysRegReadValue => sysRegReadValue,	
-			 sysStoreAllow => sysStoreAllow,
-			 sysStoreAddress => sysStoreAddress,
-			 sysStoreValue => sysStoreValue,
+		sysStoreAllow => sysStoreAllow,
+		sysStoreAddress => sysStoreAddress,
+		sysStoreValue => sysStoreValue,
 
 		-- to front pipe
 		frontAccepting => acceptingOutFront,
@@ -138,7 +129,6 @@ begin
 		commitAccepting => commitAccepting,
 		sendingFromROB => robSending,	
 		robDataLiving => dataOutROB,
-		--committing => committingSig,
 
 		---
 		dataFromBQV => dataOutBQV,
@@ -153,7 +143,6 @@ begin
 		renameLockEndOut => renameLockEnd,
 				
 		commitGroupCtrOut => commitGroupCtrSig,
-		--commitGroupCtrNextOut => commitGroupCtrNextSig,	
 		commitGroupCtrIncOut => commitGroupCtrIncSig
 	);
 		
@@ -190,161 +179,150 @@ begin
 	--- Out of order domain
 	OUTER_OOO_AREA: block
 		signal cqMaskOut: std_logic_vector(0 to INTEGER_WRITE_WIDTH-1) := (others => '0');
-		signal cqDataOut: InstructionStateArray(0 to INTEGER_WRITE_WIDTH-1)
-					:= (others => DEFAULT_INSTRUCTION_STATE);
-		signal cqOutput: InstructionSlotArray(0 to INTEGER_WRITE_WIDTH-1)
-					:= (others => DEFAULT_INSTRUCTION_SLOT);
-
+		signal cqDataOut: InstructionStateArray(0 to INTEGER_WRITE_WIDTH-1) := (others => DEFAULT_INSTRUCTION_STATE);
+		signal cqOutput: InstructionSlotArray(0 to INTEGER_WRITE_WIDTH-1) := (others => DEFAULT_INSTRUCTION_SLOT);
 		signal readyRegFlags: std_logic_vector(0 to 3*PIPE_WIDTH-1) := (others => '0');		
 		signal readyRegFlagsNext: std_logic_vector(0 to 3*PIPE_WIDTH-1) := (others => '0');					
 	begin
 
 		OOO_BOX: entity work.OutOfOrderBox(Behavioral)
 		port map(
-				  clk => clk, reset => resetSig, en => enSig,
-				  
-				  renamedDataLiving => renamedDataLiving,--: in StageDataMulti;	-- INPUT			
-				  renamedSending => renamedSending,--: in std_logic;
-				  
-				  iqAccepts => iqAccepts,
+		   clk => clk, reset => resetSig, en => enSig,
+		
+		   renamedDataLiving => renamedDataLiving,--: in StageDataMulti;	-- INPUT			
+		   renamedSending => renamedSending,--: in std_logic;
+		  
+		   iqAccepts => iqAccepts,
 
 		-- Sys reg interface	
-				  sysRegReadSel => sysRegReadSel,
-				  sysRegReadValue => sysRegReadValue,--: in Mword; -- INPUT
+			sysRegReadSel => sysRegReadSel,
+			sysRegReadValue => sysRegReadValue,--: in Mword; -- INPUT
 
 		-- Mem interface
-				  memLoadAddressOut => memLoadAddress,
-				  memLoadValue => memLoadValue,--: in Mword;
-				  memLoadAllow => memLoadAllow,
-				  memLoadReady => memLoadReady,--: in std_logic;
+			memLoadAddressOut => memLoadAddress,
+			memLoadValue => memLoadValue,--: in Mword;
+			memLoadAllow => memLoadAllow,
+			memLoadReady => memLoadReady,--: in std_logic;
 		-- evt
-				 execEventSignalOut => execEventSignal,
-				 lateEventSignal => lateEventSignal,--: in std_logic;
-				 execCausingOut => execCausing,
+			execEventSignalOut => execEventSignal,
+			lateEventSignal => lateEventSignal,--: in std_logic;
+			execCausingOut => execCausing,
 											
 		-- Hidden to some degree, but may be useful for sth
-				commitGroupCtrSig => commitGroupCtrSig,--: in SmallNumber;
-				--commitGroupCtrNextSig => commitGroupCtrNextSig,--: in SmallNumber; -- INPUT
-				commitGroupCtrIncSig => commitGroupCtrIncSig,--: in SmallNumber;	-- INPUT
+			commitGroupCtrSig => commitGroupCtrSig,--: in SmallNumber;
+			commitGroupCtrIncSig => commitGroupCtrIncSig,--: in SmallNumber;	-- INPUT
 													
 		-- ROB interface	
-				robSendingOut => robSending,
-				dataOutROB => dataOutROB,
+			robSendingOut => robSending,
+			dataOutROB => dataOutROB,
 
-				--sbAccepting => '1',--sbAccepting,--: in std_logic;	-- INPUT
-				commitAccepting => commitAccepting,--: in std_logic; -- INPUT
+			commitAccepting => commitAccepting,--: in std_logic; -- INPUT
 
-					sbSending => sbSending,
+			sbSending => sbSending,
+			cacheFillInput => cacheFill,
 
-					cacheFillInput => cacheFill,
-
-				dataOutBQV => dataOutBQV,
-				dataOutSQ => dataOutSQ,
-				readyRegFlags => readyRegFlags,
-				cqOutput => cqOutput,
+			dataOutBQV => dataOutBQV,
+			dataOutSQ => dataOutSQ,
+			readyRegFlags => readyRegFlags,
+			cqOutput => cqOutput,
 				
-				sqCommittedOutput => sqCommittedOutput,
-				sqCommittedEmpty => sqCommittedEmpty
+			sqCommittedOutput => sqCommittedOutput,
+			sqCommittedEmpty => sqCommittedEmpty
 		);
 
-			cqMaskOut <= extractFullMask(cqOutput);
-			cqDataOut <= extractData(cqOutput);
+		cqMaskOut <= extractFullMask(cqOutput);
+		cqDataOut <= extractData(cqOutput);
 
-				INT_READY_TABLE: entity work.ReadyRegisterTable(Behavioral)
-				generic map(
-					WRITE_WIDTH => INTEGER_WRITE_WIDTH
-				)
-				port map(
-					clk => clk, reset => resetSig, en => enSig, 
-					
-					sendingToReserve => frontLastSending,
-					stageDataToReserve => frontDataLastLiving,
-						
-					newPhysDests => newPhysDests,	-- FOR MAPPING
-					stageDataReserved => renamedDataLiving, --stageDataOutRename,
-						
-					-- TODO: change to ins slot based
-					writingMask => cqMaskOut,
-					writingData => cqDataOut,
-					readyRegFlagsNext => readyRegFlagsNext -- FOR IQs
-				);
+		INT_READY_TABLE: entity work.ReadyRegisterTable(Behavioral)
+		generic map(
+			WRITE_WIDTH => INTEGER_WRITE_WIDTH
+		)
+		port map(
+			clk => clk, reset => resetSig, en => enSig, 
+			
+			sendingToReserve => frontLastSending,
+			stageDataToReserve => frontDataLastLiving,
+				
+			newPhysDests => newPhysDests,	-- FOR MAPPING
+			stageDataReserved => renamedDataLiving, --stageDataOutRename,
+				
+			-- TODO: change to ins slot based
+			writingMask => cqMaskOut,
+			writingData => cqDataOut,
+			readyRegFlagsNext => readyRegFlagsNext -- FOR IQs
+		);
 
-				READY_REGS_SYNCHRONOUS: process(clk) 	
-				begin
-					if rising_edge(clk) then
-						readyRegFlags <= readyRegFlagsNext;
-					end if;
-				end process;
+		READY_REGS_SYNCHRONOUS: process(clk) 	
+		begin
+			if rising_edge(clk) then
+				readyRegFlags <= readyRegFlagsNext;
+			end if;
+		end process;
 			
 		INT_REG_MAPPING: block
 			signal physStable, physStableDelayed: PhysNameArray(0 to PIPE_WIDTH-1) := (others=>(others=>'0'));
 		begin
-					INT_MAPPER: entity work.RegisterMappingUnit(Behavioral)
-					port map(
-						clk => clk,
-						reset => resetSig,
-						en => enSig,
-						
-						rewind => renameLockEnd,	-- FROM SEQ
-						causingInstruction => DEFAULT_INSTRUCTION_STATE,
-						
-						sendingToReserve => frontLastSending,
-						stageDataToReserve => frontDataLastLiving,
-						newPhysDests => newPhysDests,	-- MAPPING (from FREE LIST)
+			INT_MAPPER: entity work.RegisterMappingUnit(Behavioral)
+			port map(
+				clk => clk,
+				reset => resetSig,
+				en => enSig,
+				
+				rewind => renameLockEnd,	-- FROM SEQ
+				causingInstruction => DEFAULT_INSTRUCTION_STATE,
+				
+				sendingToReserve => frontLastSending,
+				stageDataToReserve => frontDataLastLiving,
+				newPhysDests => newPhysDests,	-- MAPPING (from FREE LIST)
 
-						sendingToCommit => robSending,
-						stageDataToCommit => dataOutROB,
-						physCommitDests_TMP => (others => (others => '0')), -- CAREFUL: useless input?
-						
-						prevNewPhysDests => open,
-						newPhysSources => newPhysSources,	-- TO SEQ
-						
-						prevStablePhysDests => physStable,  -- FOR MAPPING (to FREE LIST)
-						stablePhysSources => open							
-					);
+				sendingToCommit => robSending,
+				stageDataToCommit => dataOutROB,
+				physCommitDests_TMP => (others => (others => '0')), -- CAREFUL: useless input?
+				
+				prevNewPhysDests => open,
+				newPhysSources => newPhysSources,	-- TO SEQ
+				
+				prevStablePhysDests => physStable,  -- FOR MAPPING (to FREE LIST)
+				stablePhysSources => open							
+			);
 
-				LAST_COMMITTED_SYNCHRONOUS: process(clk) 	
-				begin
-					if rising_edge(clk) then
-						physStableDelayed <= physStable;
-					end if;
-				end process;
-		
-				INT_FREE_LIST: entity work.RegisterFreeList(Behavioral)
-				port map(
-					clk => clk,
-					reset => resetSig,
-					en => enSig,
-					
-					rewind => execOrIntEventSignal,
-					--causingInstruction => execOrIntCausing,
-					causingPointer => execOrIntCausing.tags.intPointer,
-					
-					sendingToReserve => frontLastSending, 
-					takeAllow => frontLastSending,	-- FROM SEQ
-						auxTakeAllow => renameLockEnd,
-					stageDataToReserve => frontDataLastLiving,
-					
-					newPhysDests => newPhysDests,			-- TO SEQ
-					newPhysDestPointer => newPhysDestPointer, -- TO SEQ
+			LAST_COMMITTED_SYNCHRONOUS: process(clk) 	
+			begin
+				if rising_edge(clk) then
+					physStableDelayed <= physStable;
+				end if;
+			end process;
+	
+			INT_FREE_LIST: entity work.RegisterFreeList(Behavioral)
+			port map(
+				clk => clk,
+				reset => resetSig,
+				en => enSig,
+				
+				rewind => execOrIntEventSignal,
+				causingPointer => execOrIntCausing.tags.intPointer,
+				
+				sendingToReserve => frontLastSending, 
+				takeAllow => frontLastSending,	-- FROM SEQ
+				auxTakeAllow => renameLockEnd,
+				stageDataToReserve => frontDataLastLiving,
+				
+				newPhysDests => newPhysDests,			-- TO SEQ
+				newPhysDestPointer => newPhysDestPointer, -- TO SEQ
 
-					sendingToRelease => committedSending,  -- FROM SEQ
-					stageDataToRelease => committedDataOut,  -- FROM SEQ
-					
-					physStableDelayed => physStableDelayed -- FOR MAPPING (from MAP)
-				);		
+				sendingToRelease => committedSending,  -- FROM SEQ
+				stageDataToRelease => committedDataOut,  -- FROM SEQ
+				
+				physStableDelayed => physStableDelayed -- FOR MAPPING (from MAP)
+			);		
 
-			end block;
+		end block;
 	
 	end block; -- OUTER_OOO
-
-					--sbAccepting <= sbAcceptingV(0);
-
 				
-				sbSending <= sqCommittedOutput.full;
-			sbEmpty <= sqCommittedEmpty;
-			dataFromSB <= sqCommittedOutput.ins;
-
+	sbSending <= sqCommittedOutput.full;
+	sbEmpty <= sqCommittedEmpty;
+	dataFromSB <= sqCommittedOutput.ins;
 
 -----------------------------------------
 ----- Mem signals -----------------------
