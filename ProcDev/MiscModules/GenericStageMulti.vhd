@@ -68,9 +68,7 @@ entity GenericStageMulti is
 		execEventSignal: in std_logic;
 		lateEventSignal: in std_logic;
 		execCausing: in InstructionState;
-		lockCommand: in std_logic
-		
-		--stageEventsOut: out StageMultiEventInfo		
+		lockCommand: in std_logic		
 	);
 end GenericStageMulti;
 
@@ -81,15 +79,13 @@ architecture Behavioral of GenericStageMulti is
 	signal flowResponse, flowResponse_C: FlowResponseSimple := (others=>'0');		
 	signal stageData, stageDataLiving, stageDataNext, stageDataNew:
 														StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
-	signal partialKillMask: std_logic_vector(0 to PIPE_WIDTH-1) := (others => '0');	
-	--signal stageEvents: StageMultiEventInfo;
-	
-		signal contentState, contentStateNext: ContentStateSimple := DEFAULT_CS_SIMPLE;
+	signal partialKillMask: std_logic_vector(0 to PIPE_WIDTH-1) := (others => '0');		
+	signal contentState, contentStateNext: ContentStateSimple := DEFAULT_CS_SIMPLE;
 begin
 	stageDataNew <= stageDataIn;										
 	stageDataNext <= stageMultiNext(stageDataLiving, stageDataNew,
 								flowResponse.living, flowResponse.sending, flowDrive.prevSending);			
-	stageDataLiving <= stageMultiHandleKill(stageData, flowDrive.kill, partialKillMask);
+	stageDataLiving <= stageMultiHandleKill(stageData, flowDrive.kill);
 
 
 		contentStateNext <= nextContentState(contentState, flowDrive, reset, en);
@@ -117,24 +113,17 @@ begin
 		flowDrive => flowDrive,
 		flowResponse => flowResponse
 	);
-	
-	--	stageEvents <= stageMultiEvents(stageData, flowResponse.isNew);								
-	--	partialKillMask <= stageEvents.partialKillMask;
-	
-	flowDrive.prevSending <= --prevSending;
-										stageDataIn.fullMask(0);
+
+	flowDrive.prevSending <= stageDataIn.fullMask(0);
 	flowDrive.nextAccepting <= nextAccepting;
 	flowDrive.kill <= execEventSignal or lateEventSignal;
 	flowDrive.lockAccept <= lockCommand;
 
 	acceptingOut <= flowResponse.accepting;		
 	sendingOut <= flowResponse.sending;
-	--stageDataOut <= stageDataLiving; -- TODO: clear temp ctrl info?
 		stageDataOut.data <= stageDataLiving.data;
 		stageDataOut.fullMask <= stageDataLiving.fullMask when flowResponse.sending = '1'
-								 else (others => '0');
-								 
-	--stageEventsOut <= stageEvents;
+								 else (others => '0');								 
 end Behavioral;
 
 
@@ -145,14 +134,12 @@ architecture Behavioral2 of GenericStageMulti is
 	signal stageData, stageDataLiving, stageDataNext, stageDataNew:
 														StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
 	signal partialKillMask: std_logic_vector(0 to PIPE_WIDTH-1) := (others => '0');	
-	--signal stageEvents: StageMultiEventInfo;
-	
-		signal contentState, contentStateNext: ContentStateSimple := DEFAULT_CS_SIMPLE;
+	signal contentState, contentStateNext: ContentStateSimple := DEFAULT_CS_SIMPLE;
 begin
 	stageDataNew <= stageDataIn;										
 	stageDataNext <= stageMultiNext(stageDataLiving, stageDataNew,
 								flowResponse.living, flowResponse.sending, flowDrive.prevSending);			
-	stageDataLiving <= stageMultiHandleKill(stageData, flowDrive.kill, partialKillMask);
+	stageDataLiving <= stageMultiHandleKill(stageData, flowDrive.kill);
 
 
 		contentStateNext <= nextContentState(contentState, flowDrive, reset, en);
@@ -180,24 +167,17 @@ begin
 		flowDrive => flowDrive,
 		flowResponse => flowResponse
 	);
-	
-	--	stageEvents <= stageMultiEvents(stageData, flowResponse.isNew);								
-	--	partialKillMask <= stageEvents.partialKillMask;
-	
-	flowDrive.prevSending <= --prevSending;
-										isNonzero(stageDataIn.fullMask); -- CAREFUL: The difference from Behavioral
+
+	flowDrive.prevSending <= isNonzero(stageDataIn.fullMask); -- CAREFUL: The difference from Behavioral
 	flowDrive.nextAccepting <= nextAccepting;
 	flowDrive.kill <= execEventSignal or lateEventSignal;
 	flowDrive.lockAccept <= lockCommand;
 
 	acceptingOut <= flowResponse.accepting;		
 	sendingOut <= flowResponse.sending;
-	--stageDataOut <= stageDataLiving; -- TODO: clear temp ctrl info?
 		stageDataOut.data <= stageDataLiving.data;
 		stageDataOut.fullMask <= stageDataLiving.fullMask when flowResponse.sending = '1'
 								 else (others => '0');
-								 
-	--stageEventsOut <= stageEvents;
 end Behavioral2;
 
 
@@ -208,12 +188,11 @@ architecture Renaming of GenericStageMulti is
 	signal stageData, stageDataLiving, stageDataNext, stageDataNew:
 														StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
 	signal partialKillMask: std_logic_vector(0 to PIPE_WIDTH-1) := (others => '0');	
-	--signal stageEvents: StageMultiEventInfo;
 begin
 	stageDataNew <= stageDataIn;--work.ProcLogicRouting.setBranchLink(stageDataIn);
 	stageDataNext <= stageMultiNextCl(stageDataLiving, stageDataNew,
 								flowResponse.living, flowResponse.sending, flowDrive.prevSending, false);			
-	stageDataLiving <= stageMultiHandleKill(stageData, '0', partialKillMask);
+	stageDataLiving <= stageMultiHandleKill(stageData, '0');
 
 	PIPE_CLOCKED: process(clk) 	
 	begin
@@ -234,24 +213,17 @@ begin
 		flowDrive => flowDrive,
 		flowResponse => flowResponse
 	);
-	
-	--	stageEvents <= stageMultiEvents(stageData, flowResponse.isNew);								
-	--	partialKillMask <= stageEvents.partialKillMask;
-	
-	flowDrive.prevSending <= --prevSending;
-										stageDataIn.fullMask(0);
+
+	flowDrive.prevSending <= stageDataIn.fullMask(0);
 	flowDrive.nextAccepting <= nextAccepting;
 	flowDrive.kill <= execEventSignal or lateEventSignal;
 	flowDrive.lockAccept <= lockCommand;
 
 	acceptingOut <= flowResponse.accepting;		
 	sendingOut <= flowResponse.sending;
-	--stageDataOut <= stageDataLiving; -- TODO: clear temp ctrl info?
 		stageDataOut.data <= stageDataLiving.data;
 		stageDataOut.fullMask <= stageDataLiving.fullMask when flowResponse.sending = '1'
-								 else (others => '0');
-	
-	--stageEventsOut <= stageEvents;
+								 else (others => '0');	
 end Renaming;
 
 
@@ -262,12 +234,11 @@ architecture SingleTagged of GenericStageMulti is
 	signal stageData, stageDataLiving, stageDataNext, stageDataNew:
 														StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
 	signal partialKillMask: std_logic_vector(0 to PIPE_WIDTH-1) := (others => '0');
-	--signal stageEvents: StageMultiEventInfo;	
 begin
 	stageDataNew <= stageDataIn;										
 	stageDataNext <= stageMultiNext(stageDataLiving, stageDataNew,
 								flowResponse.living, flowResponse.sending, flowDrive.prevSending);			
-	stageDataLiving <= stageMultiHandleKill(stageData, flowDrive.kill, partialKillMask);
+	stageDataLiving <= stageMultiHandleKill(stageData, flowDrive.kill);
 
 	PIPE_CLOCKED: process(clk) 	
 	begin
@@ -291,34 +262,21 @@ begin
 	
 	KILLER: block
 		signal before: std_logic;
-		--signal a, b: std_logic_vector(7 downto 0);
-		--signal c: SmallNumber := (others => '0');
 	begin
-		--a <= execCausing.tags.renameIndex;
-		--b <= stageData.data(0).tags.renameIndex;
-		--c <= subSN(a, b);
-		before <= --c(7);
-					 CMP_tagBefore(execCausing.tags.renameIndex, stageData.data(0).tags.renameIndex);
+		before <= CMP_tagBefore(execCausing.tags.renameIndex, stageData.data(0).tags.renameIndex);
 		flowDrive.kill <= killByTag(before, execEventSignal,
 										lateEventSignal);
 	end block;	
-
-	--	stageEvents <= stageMultiEvents(stageData, flowResponse.isNew);
 	
-	flowDrive.prevSending <= --prevSending;
-										stageDataIn.fullMask(0);
+	flowDrive.prevSending <= stageDataIn.fullMask(0);
 	flowDrive.nextAccepting <= nextAccepting;
-	--flowDrive.kill <= execEventSignal;
 	flowDrive.lockAccept <= lockCommand;
 
 	acceptingOut <= flowResponse.accepting;		
 	sendingOut <= flowResponse.sending;
-	--stageDataOut <= stageDataLiving; -- TODO: clear temp ctrl info?
 		stageDataOut.data <= stageDataLiving.data;
 		stageDataOut.fullMask <= stageDataLiving.fullMask when flowResponse.sending = '1'
 								 else (others => '0');
-								 
-	--stageEventsOut <= stageEvents;
 end SingleTagged;
 
 
@@ -326,7 +284,5 @@ architecture Bypassed of GenericStageMulti is
 begin
 	acceptingOut <= nextAccepting;		
 	sendingOut <= prevSending;
-	stageDataOut <= stageDataIn; -- TODO: clear temp ctrl info?
-	
-	--stageEventsOut <= DEFAULT_STAGE_MULTI_EVENT_INFO;	
+	stageDataOut <= stageDataIn; -- TODO: clear temp ctrl info?	
 end Bypassed;

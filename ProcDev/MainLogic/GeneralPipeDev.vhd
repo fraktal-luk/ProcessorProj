@@ -96,7 +96,7 @@ return StageDataMulti;
 
 
 function stageMultiHandleKill(content: StageDataMulti; 
-										killAll: std_logic; killVec: std_logic_vector) 
+										killAll: std_logic) 
 										return StageDataMulti;
 
 function stageCQNext_New(content: StageDataCommitQueue; newContent: InstructionStateArray;
@@ -484,7 +484,7 @@ end function;
 
 
 function stageMultiHandleKill(content: StageDataMulti; 
-										killAll: std_logic; killVec: std_logic_vector) 
+										killAll: std_logic) 
 										return StageDataMulti is
 	variable res: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
 		constant CLEAR_KILLED_SLOTS_GENERAL: boolean := false;
@@ -494,17 +494,16 @@ begin
 	end if;
 	
 	if killAll = '1' then
-		-- Everything gets killed, so we just leave it
+		res.fullMask := (others => '0');
 	else
-		res.fullMask := content.fullMask and not killVec;
-		for i in res.data'range loop
-			if res.fullMask(i) = '1' then
-				res.data(i) := content.data(i);
-			else
-				-- Do nothing
-			end if;
-		end loop;
+		res.fullMask := content.fullMask;-- and not killVec;
 	end if;
+	
+	for i in res.data'range loop
+		if res.fullMask(i) = '1' then
+			res.data(i) := content.data(i);
+		end if;
+	end loop;
 	return res;
 end function;
 
