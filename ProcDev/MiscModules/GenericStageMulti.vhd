@@ -87,24 +87,17 @@ begin
 								flowResponse.living, flowResponse.sending, flowDrive.prevSending);			
 	stageDataLiving <= stageMultiHandleKill(stageData, flowDrive.kill);
 
-
-		contentStateNext <= nextContentState(contentState, flowDrive, reset, en);
-		flowResponse_C <= getResponse(contentState, flowDrive);
+	contentStateNext <= nextContentState(contentState, flowDrive, reset, en);
+	flowResponse_C <= getResponse(contentState, flowDrive);
 
 	PIPE_CLOCKED: process(clk) 	
 	begin
 		if rising_edge(clk) then
-			contentState <= contentStateNext;
-		
-			if reset = '1' then
-				
-			elsif en = '1' then	
-				stageData <= stageDataNext;
-				
+			contentState <= contentStateNext;		
+			stageData <= stageDataNext;
 
-				logMulti(stageData.data, stageData.fullMask, stageDataLiving.fullMask, flowResponse);
-				checkMulti(stageData, stageDataNext, flowDrive, flowResponse);				
-			end if;
+			logMulti(stageData.data, stageData.fullMask, stageDataLiving.fullMask, flowResponse);
+			checkMulti(stageData, stageDataNext, flowDrive, flowResponse);				
 		end if;
 	end process;
 
@@ -114,16 +107,15 @@ begin
 		flowResponse => flowResponse
 	);
 
-	flowDrive.prevSending <= stageDataIn.fullMask(0);
+	flowDrive.prevSending <= isNonzero(stageDataIn.fullMask);--stageDataIn.fullMask(0);
 	flowDrive.nextAccepting <= nextAccepting;
 	flowDrive.kill <= execEventSignal or lateEventSignal;
 	flowDrive.lockAccept <= lockCommand;
 
 	acceptingOut <= flowResponse.accepting;		
 	sendingOut <= flowResponse.sending;
-		stageDataOut.data <= stageDataLiving.data;
-		stageDataOut.fullMask <= stageDataLiving.fullMask when flowResponse.sending = '1'
-								 else (others => '0');								 
+	stageDataOut.data <= stageDataLiving.data;
+	stageDataOut.fullMask <= stageDataLiving.fullMask when flowResponse.sending = '1' else (others => '0');								 
 end Behavioral;
 
 
@@ -141,24 +133,17 @@ begin
 								flowResponse.living, flowResponse.sending, flowDrive.prevSending);			
 	stageDataLiving <= stageMultiHandleKill(stageData, flowDrive.kill);
 
-
-		contentStateNext <= nextContentState(contentState, flowDrive, reset, en);
-		flowResponse_C <= getResponse(contentState, flowDrive);
+	contentStateNext <= nextContentState(contentState, flowDrive, reset, en);
+	flowResponse_C <= getResponse(contentState, flowDrive);
 
 	PIPE_CLOCKED: process(clk) 	
 	begin
 		if rising_edge(clk) then
 			contentState <= contentStateNext;
-		
-			if reset = '1' then
+			stageData <= stageDataNext;
 				
-			elsif en = '1' then	
-				stageData <= stageDataNext;
-				
-
-				logMulti(stageData.data, stageData.fullMask, stageDataLiving.fullMask, flowResponse);
-				checkMulti(stageData, stageDataNext, flowDrive, flowResponse);				
-			end if;
+			logMulti(stageData.data, stageData.fullMask, stageDataLiving.fullMask, flowResponse);
+			checkMulti(stageData, stageDataNext, flowDrive, flowResponse);				
 		end if;
 	end process;
 
@@ -175,9 +160,8 @@ begin
 
 	acceptingOut <= flowResponse.accepting;		
 	sendingOut <= flowResponse.sending;
-		stageDataOut.data <= stageDataLiving.data;
-		stageDataOut.fullMask <= stageDataLiving.fullMask when flowResponse.sending = '1'
-								 else (others => '0');
+	stageDataOut.data <= stageDataLiving.data;
+	stageDataOut.fullMask <= stageDataLiving.fullMask when flowResponse.sending = '1' else (others => '0');
 end Behavioral2;
 
 
@@ -197,14 +181,10 @@ begin
 	PIPE_CLOCKED: process(clk) 	
 	begin
 		if rising_edge(clk) then
-			if reset = '1' then
-				
-			elsif en = '1' then	
-				stageData <= stageDataNext;
+			stageData <= stageDataNext;
 
-				logMulti(stageData.data, stageData.fullMask, stageDataLiving.fullMask, flowResponse);
-				checkMulti(stageData, stageDataNext, flowDrive, flowResponse);				
-			end if;
+			logMulti(stageData.data, stageData.fullMask, stageDataLiving.fullMask, flowResponse);
+			checkMulti(stageData, stageDataNext, flowDrive, flowResponse);
 		end if;
 	end process;
 
@@ -221,9 +201,8 @@ begin
 
 	acceptingOut <= flowResponse.accepting;		
 	sendingOut <= flowResponse.sending;
-		stageDataOut.data <= stageDataLiving.data;
-		stageDataOut.fullMask <= stageDataLiving.fullMask when flowResponse.sending = '1'
-								 else (others => '0');	
+	stageDataOut.data <= stageDataLiving.data;
+	stageDataOut.fullMask <= stageDataLiving.fullMask when flowResponse.sending = '1' else (others => '0');	
 end Renaming;
 
 
@@ -231,8 +210,7 @@ end Renaming;
 architecture SingleTagged of GenericStageMulti is
 	signal flowDrive: FlowDriveSimple := (others=>'0');
 	signal flowResponse: FlowResponseSimple := (others=>'0');		
-	signal stageData, stageDataLiving, stageDataNext, stageDataNew:
-														StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
+	signal stageData, stageDataLiving, stageDataNext, stageDataNew: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
 	signal partialKillMask: std_logic_vector(0 to PIPE_WIDTH-1) := (others => '0');
 begin
 	stageDataNew <= stageDataIn;										
@@ -243,14 +221,10 @@ begin
 	PIPE_CLOCKED: process(clk) 	
 	begin
 		if rising_edge(clk) then
-			if reset = '1' then
-				
-			elsif en = '1' then	
-				stageData <= stageDataNext;
+			stageData <= stageDataNext;
 
-				logMulti(stageData.data, stageData.fullMask, stageDataLiving.fullMask, flowResponse);
-				checkMulti(stageData, stageDataNext, flowDrive, flowResponse);
-			end if;
+			logMulti(stageData.data, stageData.fullMask, stageDataLiving.fullMask, flowResponse);
+			checkMulti(stageData, stageDataNext, flowDrive, flowResponse);
 		end if;
 	end process;
 
@@ -274,9 +248,8 @@ begin
 
 	acceptingOut <= flowResponse.accepting;		
 	sendingOut <= flowResponse.sending;
-		stageDataOut.data <= stageDataLiving.data;
-		stageDataOut.fullMask <= stageDataLiving.fullMask when flowResponse.sending = '1'
-								 else (others => '0');
+	stageDataOut.data <= stageDataLiving.data;
+	stageDataOut.fullMask <= stageDataLiving.fullMask when flowResponse.sending = '1' else (others => '0');
 end SingleTagged;
 
 
