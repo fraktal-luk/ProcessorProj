@@ -119,7 +119,10 @@ begin
 
 		dataA0 <= outputDataA.data(0);
 		
-		SUBPIPE_A: entity work.GenericStageMulti(SingleTagged)
+		SUBPIPE_A: entity work.GenericStageMulti(Behavioral)
+		generic map(
+			COMPARE_TAG => '1'
+		)
 		port map(
 			clk => clk, reset => resetSig, en => enSig,
 			
@@ -166,7 +169,10 @@ begin
 		
 		dataD0 <= outputDataD.data(0);
 		
-		SUBPIPE_D: entity work.GenericStageMulti(SingleTagged)
+		SUBPIPE_D: entity work.GenericStageMulti(Behavioral)
+		generic map(
+			COMPARE_TAG => '1'
+		)
 		port map(
 			clk => clk, reset => resetSig, en => enSig,
 			

@@ -89,7 +89,10 @@ begin
 	inputDataWithArgs <= getDispatchArgValues(stageDataIn, resultVals, USE_IMM);
 	stageDataM <= makeSDM((0 => (prevSending, inputDataWithArgs)));
 	
-	BASIC_LOGIC: entity work.GenericStageMulti(SingleTagged)
+	BASIC_LOGIC: entity work.GenericStageMulti(Behavioral)
+	generic map(
+		COMPARE_TAG => '1'
+	)
 	port map(
 		clk => clk, reset => reset, en => en,
 		

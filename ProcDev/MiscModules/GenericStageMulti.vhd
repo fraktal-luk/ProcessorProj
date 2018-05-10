@@ -51,6 +51,10 @@ use work.ProcLogicSequence.all;
 
 
 entity GenericStageMulti is
+	generic(
+		USE_CLEAR: std_logic := '1';
+		COMPARE_TAG: std_logic := '0'
+	);
 	port(
 		clk: in std_logic;
 		reset: in std_logic;
@@ -80,20 +84,21 @@ architecture Behavioral of GenericStageMulti is
 	signal stageData, stageDataLiving, stageDataNext, stageDataNew:
 														StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
 	signal partialKillMask: std_logic_vector(0 to PIPE_WIDTH-1) := (others => '0');		
-	signal contentState, contentStateNext: ContentStateSimple := DEFAULT_CS_SIMPLE;
+	--signal contentState, contentStateNext: ContentStateSimple := DEFAULT_CS_SIMPLE;
+	signal before: std_logic := '0';
 begin
 	stageDataNew <= stageDataIn;										
 	stageDataNext <= stageMultiNext(stageDataLiving, stageDataNew,
 								flowResponse.living, flowResponse.sending, flowDrive.prevSending);			
-	stageDataLiving <= stageMultiHandleKill(stageData, flowDrive.kill);
+	stageDataLiving <= stageMultiHandleKill(stageData, flowDrive.kill and USE_CLEAR);
 
-	contentStateNext <= nextContentState(contentState, flowDrive, reset, en);
-	flowResponse_C <= getResponse(contentState, flowDrive);
+	--contentStateNext <= nextContentState(contentState, flowDrive, reset, en);
+	--flowResponse_C <= getResponse(contentState, flowDrive);
 
 	PIPE_CLOCKED: process(clk) 	
 	begin
 		if rising_edge(clk) then
-			contentState <= contentStateNext;		
+		--	contentState <= contentStateNext;		
 			stageData <= stageDataNext;
 
 			logMulti(stageData.data, stageData.fullMask, stageDataLiving.fullMask, flowResponse);
@@ -109,7 +114,10 @@ begin
 
 	flowDrive.prevSending <= isNonzero(stageDataIn.fullMask);--stageDataIn.fullMask(0);
 	flowDrive.nextAccepting <= nextAccepting;
-	flowDrive.kill <= execEventSignal or lateEventSignal;
+	
+	--before <= '1';
+	before <= (not COMPARE_TAG) or CMP_tagBefore(execCausing.tags.renameIndex, stageData.data(0).tags.renameIndex);
+	flowDrive.kill <= (before and execEventSignal) or lateEventSignal;
 	flowDrive.lockAccept <= lockCommand;
 
 	acceptingOut <= flowResponse.accepting;		
@@ -117,140 +125,6 @@ begin
 	stageDataOut.data <= stageDataLiving.data;
 	stageDataOut.fullMask <= stageDataLiving.fullMask when flowResponse.sending = '1' else (others => '0');								 
 end Behavioral;
-
-
-
-architecture Behavioral2 of GenericStageMulti is
-	signal flowDrive: FlowDriveSimple := (others=>'0');
-	signal flowResponse, flowResponse_C: FlowResponseSimple := (others=>'0');		
-	signal stageData, stageDataLiving, stageDataNext, stageDataNew:
-														StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
-	signal partialKillMask: std_logic_vector(0 to PIPE_WIDTH-1) := (others => '0');	
-	signal contentState, contentStateNext: ContentStateSimple := DEFAULT_CS_SIMPLE;
-begin
-	stageDataNew <= stageDataIn;										
-	stageDataNext <= stageMultiNext(stageDataLiving, stageDataNew,
-								flowResponse.living, flowResponse.sending, flowDrive.prevSending);			
-	stageDataLiving <= stageMultiHandleKill(stageData, flowDrive.kill);
-
-	contentStateNext <= nextContentState(contentState, flowDrive, reset, en);
-	flowResponse_C <= getResponse(contentState, flowDrive);
-
-	PIPE_CLOCKED: process(clk) 	
-	begin
-		if rising_edge(clk) then
-			contentState <= contentStateNext;
-			stageData <= stageDataNext;
-				
-			logMulti(stageData.data, stageData.fullMask, stageDataLiving.fullMask, flowResponse);
-			checkMulti(stageData, stageDataNext, flowDrive, flowResponse);				
-		end if;
-	end process;
-
-	SIMPLE_SLOT_LOGIC: SimplePipeLogic port map(
-		clk => clk, reset => reset, en => en,
-		flowDrive => flowDrive,
-		flowResponse => flowResponse
-	);
-
-	flowDrive.prevSending <= isNonzero(stageDataIn.fullMask); -- CAREFUL: The difference from Behavioral
-	flowDrive.nextAccepting <= nextAccepting;
-	flowDrive.kill <= execEventSignal or lateEventSignal;
-	flowDrive.lockAccept <= lockCommand;
-
-	acceptingOut <= flowResponse.accepting;		
-	sendingOut <= flowResponse.sending;
-	stageDataOut.data <= stageDataLiving.data;
-	stageDataOut.fullMask <= stageDataLiving.fullMask when flowResponse.sending = '1' else (others => '0');
-end Behavioral2;
-
-
-
-architecture Renaming of GenericStageMulti is
-	signal flowDrive: FlowDriveSimple := (others=>'0');
-	signal flowResponse: FlowResponseSimple := (others=>'0');		
-	signal stageData, stageDataLiving, stageDataNext, stageDataNew:
-														StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
-	signal partialKillMask: std_logic_vector(0 to PIPE_WIDTH-1) := (others => '0');	
-begin
-	stageDataNew <= stageDataIn;--work.ProcLogicRouting.setBranchLink(stageDataIn);
-	stageDataNext <= stageMultiNextCl(stageDataLiving, stageDataNew,
-								flowResponse.living, flowResponse.sending, flowDrive.prevSending, false);			
-	stageDataLiving <= stageMultiHandleKill(stageData, '0');
-
-	PIPE_CLOCKED: process(clk) 	
-	begin
-		if rising_edge(clk) then
-			stageData <= stageDataNext;
-
-			logMulti(stageData.data, stageData.fullMask, stageDataLiving.fullMask, flowResponse);
-			checkMulti(stageData, stageDataNext, flowDrive, flowResponse);
-		end if;
-	end process;
-
-	SIMPLE_SLOT_LOGIC: SimplePipeLogic port map(
-		clk => clk, reset => reset, en => en,
-		flowDrive => flowDrive,
-		flowResponse => flowResponse
-	);
-
-	flowDrive.prevSending <= stageDataIn.fullMask(0);
-	flowDrive.nextAccepting <= nextAccepting;
-	flowDrive.kill <= execEventSignal or lateEventSignal;
-	flowDrive.lockAccept <= lockCommand;
-
-	acceptingOut <= flowResponse.accepting;		
-	sendingOut <= flowResponse.sending;
-	stageDataOut.data <= stageDataLiving.data;
-	stageDataOut.fullMask <= stageDataLiving.fullMask when flowResponse.sending = '1' else (others => '0');	
-end Renaming;
-
-
--- Kill signal generated only when tag comparison allows or interrupt
-architecture SingleTagged of GenericStageMulti is
-	signal flowDrive: FlowDriveSimple := (others=>'0');
-	signal flowResponse: FlowResponseSimple := (others=>'0');		
-	signal stageData, stageDataLiving, stageDataNext, stageDataNew: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
-	signal partialKillMask: std_logic_vector(0 to PIPE_WIDTH-1) := (others => '0');
-begin
-	stageDataNew <= stageDataIn;										
-	stageDataNext <= stageMultiNext(stageDataLiving, stageDataNew,
-								flowResponse.living, flowResponse.sending, flowDrive.prevSending);			
-	stageDataLiving <= stageMultiHandleKill(stageData, flowDrive.kill);
-
-	PIPE_CLOCKED: process(clk) 	
-	begin
-		if rising_edge(clk) then
-			stageData <= stageDataNext;
-
-			logMulti(stageData.data, stageData.fullMask, stageDataLiving.fullMask, flowResponse);
-			checkMulti(stageData, stageDataNext, flowDrive, flowResponse);
-		end if;
-	end process;
-
-	SIMPLE_SLOT_LOGIC: SimplePipeLogic port map(
-		clk => clk, reset => reset, en => en,
-		flowDrive => flowDrive,
-		flowResponse => flowResponse
-	);
-	
-	KILLER: block
-		signal before: std_logic;
-	begin
-		before <= CMP_tagBefore(execCausing.tags.renameIndex, stageData.data(0).tags.renameIndex);
-		flowDrive.kill <= killByTag(before, execEventSignal,
-										lateEventSignal);
-	end block;	
-	
-	flowDrive.prevSending <= stageDataIn.fullMask(0);
-	flowDrive.nextAccepting <= nextAccepting;
-	flowDrive.lockAccept <= lockCommand;
-
-	acceptingOut <= flowResponse.accepting;		
-	sendingOut <= flowResponse.sending;
-	stageDataOut.data <= stageDataLiving.data;
-	stageDataOut.fullMask <= stageDataLiving.fullMask when flowResponse.sending = '1' else (others => '0');
-end SingleTagged;
 
 
 architecture Bypassed of GenericStageMulti is

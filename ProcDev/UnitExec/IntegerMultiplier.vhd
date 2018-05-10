@@ -90,7 +90,10 @@ begin
 	--inputData.data(0) <= dataIn;
 	--inputData.fullMask(0) <= prevSending;
 	
-	STAGE_0: entity work.GenericStageMulti(SingleTagged)
+	STAGE_0: entity work.GenericStageMulti(Behavioral)
+	generic map(
+		COMPARE_TAG => '1'
+	)
 	port map(
 		clk => clk, reset => reset, en => en,
 		
@@ -111,7 +114,10 @@ begin
 		--stageEventsOut => open					
 	);
 	
-	STAGE_1: entity work.GenericStageMulti(SingleTagged)
+	STAGE_1: entity work.GenericStageMulti(Behavioral)
+	generic map(
+		COMPARE_TAG => '1'
+	)
 	port map(
 		clk => clk, reset => reset, en => en,
 		
@@ -134,7 +140,10 @@ begin
 	 --dataM.data(0) <= execLogicXor(data1.data(0));
 	 --dataM.fullMask(0) <= sending1;
 		
-	STAGE_2: entity work.GenericStageMulti(SingleTagged)
+	STAGE_2: entity work.GenericStageMulti(Behavioral)
+	generic map(
+		COMPARE_TAG => '1'
+	)
 	port map(
 		clk => clk, reset => reset, en => en,
 		

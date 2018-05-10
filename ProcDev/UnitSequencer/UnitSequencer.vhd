@@ -306,7 +306,11 @@ begin
 	stageDataRenameIn <= renameGroup(frontDataLastLiving, newPhysSourcesIn, newPhysDestsIn, renameCtr,
 														renameGroupCtrNext, newPhysDestPointerIn, dbtrapOn);
 
-	SUBUNIT_RENAME: entity work.GenericStageMulti(Renaming)
+	-- TODO: turn off USE_CLEAR (not done so far because strangely inflates logic)
+	SUBUNIT_RENAME: entity work.GenericStageMulti(Behavioral)--Renaming)
+	--generic map(
+	--	USE_CLEAR => '0'
+	--)
 	port map(
 		clk => clk, reset => resetSig, en => enSig,
 		

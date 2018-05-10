@@ -139,7 +139,10 @@ begin
 
 	inputDataC <= makeSDM((0 => (inputC.full, calcEffectiveAddress(inputC.ins))));
 
-	STAGE_AGU: entity work.GenericStageMulti(SingleTagged)
+	STAGE_AGU: entity work.GenericStageMulti(Behavioral)
+	generic map(
+		COMPARE_TAG => '1'
+	)
 	port map(
 		clk => clk, reset => reset, en => en,
 		
@@ -173,7 +176,10 @@ begin
 													))
 											);
 
-	STAGE_MEM0: entity work.GenericStageMulti(SingleTagged)
+	STAGE_MEM0: entity work.GenericStageMulti(Behavioral)
+	generic map(
+		COMPARE_TAG => '1'
+	)
 	port map(
 		clk => clk, reset => reset, en => en,
 		
@@ -200,7 +206,10 @@ begin
 	-- TEMP: setting address always completed (simulating TLB always hitting)
 	stageDataToMem1 <= makeSDM( (0 =>  (stageDataOutMem0.fullMask(0), setAddressCompleted(stageDataOutMem0.data(0), '1'))) );
 	
-	STAGE_MEM1: entity work.GenericStageMulti(SingleTagged)
+	STAGE_MEM1: entity work.GenericStageMulti(Behavioral)
+	generic map(
+		COMPARE_TAG => '1'
+	)
 	port map(
 		clk => clk, reset => reset, en => en,
 		
