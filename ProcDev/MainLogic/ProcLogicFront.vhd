@@ -389,7 +389,7 @@ begin
 		then
 			res.controlInfo.newEvent := '1';
 			res.controlInfo.hasBranch := '1';
-			res.target  := insVec.data(i).target;			
+			res.target  := insVec.data(i).target;
 			exit;
 		end if;
 	end loop;
