@@ -1671,4 +1671,136 @@ begin
 
 end function;
 
+
+
+function getAnnotatedHwords(fetchIns: InstructionState; fetchInsMulti: StageDataMulti;
+
+									 fetchBlock: HwordArray)
+
+return InstructionStateArray is
+
+	variable res: InstructionStateArray(0 to 2*PIPE_WIDTH-1) := (others => DEFAULT_ANNOTATED_HWORD);
+
+	variable	tempWord: word := (others => '0');
+
+	variable hwordIP: Mword := (others => '0');
+
+begin
+
+	for i in 0 to 2*PIPE_WIDTH-1 loop
+
+		hwordIP := fetchIns.ip(MWORD_SIZE-1 downto ALIGN_BITS) & i2slv(2*i, ALIGN_BITS);
+
+		tempWord(15 downto 0) := fetchBlock(i);		
+
+
+
+		res(i).bits := tempWord;
+
+		res(i).ip := hwordIP;
+
+		res(i).classInfo.short := '0'; -- TEMP!
+
+		res(i).controlInfo.squashed := fetchIns.controlInfo.squashed; -- CAREFUL: guarding from wrong reading 
+
+	end loop;
+
+
+
+	for i in 0 to PIPE_WIDTH-1 loop
+
+		res(2*i).controlInfo.hasBranch := fetchInsMulti.data(i).controlInfo.hasBranch;
+
+		res(2*i).target := fetchInsMulti.data(i).target;
+
+	end loop;
+
+	
+
+	return res;
+
+end function;
+
+
+
+function newFromHbuffer(content: InstructionStateArray; fullMask: std_logic_vector)
+
+return HbuffOutData is
+
+	variable res: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
+
+	variable ret: HbuffOutData := DEFAULT_HBUFF_OUT;
+
+	variable j: integer := 0;
+
+	variable nOut: integer;
+
+begin
+
+	for i in 0 to PIPE_WIDTH-1 loop
+
+		res.data(i).bits := content(i).bits(15 downto 0) & content(i+1).bits(15 downto 0);		
+
+			res.data(i).ip := content(i).ip;
+
+		res.data(i).controlInfo.squashed := content(i).controlInfo.squashed;
+
+	end loop;
+
+
+
+	for i in 0 to PIPE_WIDTH-1 loop
+
+		nOut := PIPE_WIDTH;
+
+		if (fullMask(j) and content(j).classInfo.short) = '1' then
+
+			res.fullMask(i) := '1';
+
+			res.data(i).bits := content(j).bits(15 downto 0) & content(j+1).bits(15 downto 0);			
+
+				res.data(i).ip := content(j).ip;
+
+				res.data(i).controlInfo.squashed := content(j).controlInfo.squashed;			
+
+				res.data(i).controlInfo.hasBranch := content(j).controlInfo.hasBranch;
+
+			j := j + 1;
+
+		elsif (fullMask(j) and fullMask(j+1)) = '1' then
+
+			res.fullMask(i) := '1';
+
+			res.data(i).bits := content(j).bits(15 downto 0) & content(j+1).bits(15 downto 0);
+
+				res.data(i).ip := content(j).ip;
+
+				res.data(i).controlInfo.squashed := content(j).controlInfo.squashed;
+
+				res.data(i).controlInfo.hasBranch := content(j).controlInfo.hasBranch;
+
+			j := j + 2;
+
+		else
+
+			nOut := i;
+
+			exit;
+
+		end if;			
+
+	end loop;
+
+	-- CAREFUL: now 'j' is the number of consumed hwords?
+
+	ret.sd := res;
+
+	ret.nOut := i2slv(nOut, SMALL_NUMBER_SIZE);
+
+	ret.nHOut := i2slv(j, SMALL_NUMBER_SIZE);
+
+	return ret;
+
+end function;
+
 end OLD_FUNCTIONS;

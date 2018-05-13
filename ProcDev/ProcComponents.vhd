@@ -32,7 +32,7 @@ package ProcComponents is
 		CAPACITY: natural := 1;
 		MAX_OUTPUT: natural := 1;
 		MAX_INPUT: natural := 1
-	);		
+	);
 		port(
 			clk, reset, en: in std_logic;
 			--kill: in std_logic;

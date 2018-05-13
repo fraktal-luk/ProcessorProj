@@ -41,12 +41,9 @@ use work.GeneralPipeDev.all;
 use work.TEMP_DEV.all;
 
 use work.ProcComponents.all;
-
 use work.ProcLogicFront.all;
-
 use work.BasicCheck.all;
-
-	use work.Queues.all;
+use work.Queues.all;
 
 entity SubunitHbuffer is
 	port(
@@ -80,10 +77,9 @@ architecture Implem of SubunitHbuffer is
 	signal hbufferResponse: FlowResponseBuffer := (others=>(others=>'0'));
 
 	signal fullMask, fullMaskNext, livingMask: std_logic_vector(0 to HBUFFER_SIZE-1) := (others=>'0');
-	signal hbuffOut: HbuffOutData := (sd => DEFAULT_STAGE_DATA_MULTI, nOut=>(others=>'0'), nHOut=>(others=>'0'));
-
+	signal hbuffOut: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
 	signal partialKillMaskHbuffer: std_logic_vector(0 to HBUFFER_SIZE-1) := (others=>'0');
-	signal nHIn, nWIn, sendingSig: SmallNumber := (others => '0');
+	signal nWIn, sendingSig: SmallNumber := (others => '0');
 	
 	signal TMP_stageData, TMP_stageDataUpdated, TMP_stageDataNext: InstructionStateArray(0 to HBUFFER_SIZE-1)
 								:= (others => DEFAULT_INSTRUCTION_STATE);
@@ -118,18 +114,16 @@ begin
 
 	TMP_offset <= getFetchOffsetW(stageDataIn.ip);
 
-	nHIn <= i2slv(2 * countFullNonSkipped(stageDataInMulti), SMALL_NUMBER_SIZE);
 	nWIn <= i2slv(countFullNonSkipped(stageDataInMulti), SMALL_NUMBER_SIZE);
 
 	hbufferDataANew <= getAnnotatedWords(stageDataIn, stageDataInMulti, fetchBlock);					
 
 	livingMask <= fullMask when execEventSignal = '0' else (others => '0');
 		
-	hbuffOut <= --newFromHbuffer(hbufferDataA, livingMask);
-					newFromHbufferW(hbufferDataA, livingMask);
+	hbuffOut <= newFromHbufferW(hbufferDataA, livingMask);
 
-				hbufferDataANext <= TMP_stageDataNext;
-				fullMaskNext <= TMP_maskNext;
+		hbufferDataANext <= TMP_stageDataNext;
+		fullMaskNext <= TMP_maskNext;
 	
 		hbufferDataA <= TMP_stageData;
 		fullMask <= TMP_mask;
@@ -163,16 +157,17 @@ begin
 	);		
 	
 	hbufferDrive.prevSending <= nWIn when prevSending = '1' else (others=>'0');
-	hbufferDrive.nextAccepting <= hbuffOut.nOut when nextAccepting = '1' else (others=>'0');			
-							
+	hbufferDrive.nextAccepting <= --hbuffOut.nOut when nextAccepting = '1' else (others=>'0');			
+					i2slv(countOnes(hbuffOut.fullMask), SMALL_NUMBER_SIZE) when nextAccepting = '1' else (others=>'0');
+
 	-- CAREFUL! If in future using lockSend for Hbuff, it must be used also here, giving 0 for sending!								
-	sendingSig <= hbuffOut.nOut when nextAccepting = '1' else (others=>'0');
+	sendingSig <= i2slv(countOnes(hbuffOut.fullMask), SMALL_NUMBER_SIZE) when nextAccepting = '1' else (others=>'0');
 	hbufferDrive.killAll <= execEventSignal;
 
 	hbufferDrive.kill <=	num2flow(countOnes(fullMask and partialKillMaskHbuffer));
 
-	stageDataOut.data <= hbuffOut.sd.data;
-	stageDataOut.fullMask <= hbuffOut.sd.fullMask when isNonzero(sendingSig) = '1' else (others => '0');
+	stageDataOut.data <= hbuffOut.data;
+	stageDataOut.fullMask <= hbuffOut.fullMask when isNonzero(sendingSig) = '1' else (others => '0');
 	
 	acceptingOut <= not isNonzero(fullMask(HBUFFER_SIZE - FETCH_BLOCK_SIZE/2 to HBUFFER_SIZE-1));
 	sendingOut <= isNonzero(sendingSig);	
