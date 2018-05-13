@@ -49,6 +49,7 @@ function newFromHbufferW(content: InstructionStateArray; fullMask: std_logic_vec
 return HbuffOutData;
 
 function getFetchOffset(ip: Mword) return SmallNumber;
+function getFetchOffsetW(ip: Mword) return SmallNumber;
 
 function getAnnotatedHwords(fetchIns: InstructionState; fetchInsMulti: StageDataMulti;
 									 fetchBlock: HwordArray)
@@ -250,20 +251,20 @@ return HbuffOutData is
 	variable nOut: integer;
 begin
 	for i in 0 to PIPE_WIDTH-1 loop
-		res.data(i).bits := content(2*i).bits(15 downto 0) & content(2*i+1).bits(15 downto 0);		
-		res.data(i).ip := content(2*i).ip;
-		res.data(i).controlInfo.squashed := content(2*i).controlInfo.squashed;
+		res.data(i).bits := content(i).bits; --content(i).bits(15 downto 0) & content(2*i+1).bits(15 downto 0);		
+		res.data(i).ip := content(i).ip;
+		res.data(i).controlInfo.squashed := content(i).controlInfo.squashed;
 	end loop;
 
 	for i in 0 to PIPE_WIDTH-1 loop
 		--nOut := PIPE_WIDTH;
 		
 		--if fullMask(2*i) = '1' then
-			res.fullMask(i) := fullMask(2*i); --'1';
-			res.data(i).bits := content(2*i).bits(15 downto 0) & content(2*i+1).bits(15 downto 0);
-				res.data(i).ip := content(2*i).ip;
-				res.data(i).controlInfo.squashed := content(2*i).controlInfo.squashed;
-				res.data(i).controlInfo.hasBranch := content(2*i).controlInfo.hasBranch;
+			res.fullMask(i) := fullMask(i); --'1';
+			res.data(i).bits := content(i).bits;--(15 downto 0) & content(2*i+1).bits(15 downto 0);
+				res.data(i).ip := content(i).ip;
+				res.data(i).controlInfo.squashed := content(i).controlInfo.squashed;
+				res.data(i).controlInfo.hasBranch := content(i).controlInfo.hasBranch;
 			--j := j + 2;
 		--else
 		--	nOut := i;
@@ -281,7 +282,16 @@ end function;
 		function getFetchOffset(ip: Mword) return SmallNumber is
 			variable res: SmallNumber := (others => '0');
 		begin
-			res(ALIGN_BITS-2 downto 0) := ip(ALIGN_BITS-1 downto 1);
+			res(ALIGN_BITS-2 downto 0) := ip(ALIGN_BITS-1 downto 1);		
+			return res;
+		end function;
+
+		function getFetchOffsetW(ip: Mword) return SmallNumber is
+			variable res: SmallNumber := (others => '0');
+		begin
+			res(ALIGN_BITS-1 downto 0) := ip(ALIGN_BITS-1 downto 0);
+			-- Shift down by 2
+			res(SMALL_NUMBER_SIZE-3 downto 0) := res(SMALL_NUMBER_SIZE-1 downto 2);
 			return res;
 		end function;
 
@@ -320,7 +330,7 @@ return InstructionStateArray is
 	variable wordIP: Mword := (others => '0');
 begin
 	for i in 0 to PIPE_WIDTH-1 loop
-		wordIP := fetchIns.ip(MWORD_SIZE-1 downto ALIGN_BITS) & i2slv(2*i, ALIGN_BITS);
+		wordIP := fetchIns.ip(MWORD_SIZE-1 downto ALIGN_BITS) & i2slv(4*i, ALIGN_BITS);
 		tempWord(31 downto 16) := fetchBlock(2*i);
 		tempWord(15 downto 0) := fetchBlock(2*i+1);
 

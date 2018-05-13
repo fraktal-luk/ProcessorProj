@@ -33,7 +33,7 @@ package NewPipelineData is
 	constant FETCH_BLOCK_SIZE: natural := PIPE_WIDTH * 2;
 	constant FETCH_DELAYED: boolean := false; -- Additional fetch stage for slower caches
 	
-	constant HBUFFER_SIZE: natural := PIPE_WIDTH * 4;
+	constant HBUFFER_SIZE: natural := PIPE_WIDTH * 2;--4;
 	
 	constant EARLY_TARGET_ENABLE: boolean := true; -- Calc branch targets in front pipe
 	constant USE_LINE_PREDICTOR: boolean := true;

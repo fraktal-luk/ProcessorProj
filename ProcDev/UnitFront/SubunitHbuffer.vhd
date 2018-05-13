@@ -73,7 +73,7 @@ end SubunitHbuffer;
 architecture Implem of SubunitHbuffer is
 	signal hbufferDataA, hbufferDataANext:
 									InstructionStateArray(0 to HBUFFER_SIZE-1) := (others => DEFAULT_ANNOTATED_HWORD);
-	signal hbufferDataANew: InstructionStateArray(0 to 2*PIPE_WIDTH-1) := (others => DEFAULT_ANNOTATED_HWORD);
+	signal hbufferDataANew: InstructionStateArray(0 to PIPE_WIDTH-1) := (others => DEFAULT_ANNOTATED_HWORD);
 
 	signal hbufferDrive: FlowDriveBuffer := (killAll => '0', lockAccept => '0', lockSend => '0',
 																others=>(others=>'0'));
@@ -102,7 +102,7 @@ begin
 					qs0, hbufferDrive.nextAccepting, hbufferDrive.prevSending, TMP_mask, TMP_killMask, execEventSignal);
 
 	inputIndices <= getQueueIndicesForInput_ShiftingHbuff(
-							qs0, HBUFFER_SIZE, hbufferDrive.nextAccepting, 2*PIPE_WIDTH, TMP_offset);																					
+							qs0, HBUFFER_SIZE, hbufferDrive.nextAccepting, PIPE_WIDTH, TMP_offset);																					
 	TMP_ckEnForInput <= getEnableForInput_Shifting(
 							qs0, HBUFFER_SIZE, hbufferDrive.nextAccepting, hbufferDrive.prevSending);
 
@@ -116,12 +116,12 @@ begin
 															 TMP_ckEnForMoved, movedIndices,
 															 TMP_ckEnForInput, inputIndices);
 
-	TMP_offset <= getFetchOffset(stageDataIn.ip);
+	TMP_offset <= getFetchOffsetW(stageDataIn.ip);
 
 	nHIn <= i2slv(2 * countFullNonSkipped(stageDataInMulti), SMALL_NUMBER_SIZE);
 	nWIn <= i2slv(countFullNonSkipped(stageDataInMulti), SMALL_NUMBER_SIZE);
 
-	hbufferDataANew <= getAnnotatedHwords(stageDataIn, stageDataInMulti, fetchBlock);					
+	hbufferDataANew <= getAnnotatedWords(stageDataIn, stageDataInMulti, fetchBlock);					
 
 	livingMask <= fullMask when execEventSignal = '0' else (others => '0');
 		
@@ -162,8 +162,8 @@ begin
 		flowResponse => hbufferResponse
 	);		
 	
-	hbufferDrive.prevSending <= nHIn when prevSending = '1' else (others=>'0');
-	hbufferDrive.nextAccepting <= hbuffOut.nHOut when nextAccepting = '1' else (others=>'0');			
+	hbufferDrive.prevSending <= nWIn when prevSending = '1' else (others=>'0');
+	hbufferDrive.nextAccepting <= hbuffOut.nOut when nextAccepting = '1' else (others=>'0');			
 							
 	-- CAREFUL! If in future using lockSend for Hbuff, it must be used also here, giving 0 for sending!								
 	sendingSig <= hbuffOut.nOut when nextAccepting = '1' else (others=>'0');
@@ -174,7 +174,7 @@ begin
 	stageDataOut.data <= hbuffOut.sd.data;
 	stageDataOut.fullMask <= hbuffOut.sd.fullMask when isNonzero(sendingSig) = '1' else (others => '0');
 	
-	acceptingOut <= not isNonzero(fullMask(HBUFFER_SIZE - FETCH_BLOCK_SIZE to HBUFFER_SIZE-1));
+	acceptingOut <= not isNonzero(fullMask(HBUFFER_SIZE - FETCH_BLOCK_SIZE/2 to HBUFFER_SIZE-1));
 	sendingOut <= isNonzero(sendingSig);	
 
 end Implem;
