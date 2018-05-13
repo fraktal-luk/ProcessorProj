@@ -45,9 +45,16 @@ function fillTargetsAndLinks(insVec: StageDataMulti) return StageDataMulti;
 function newFromHbuffer(content: InstructionStateArray; fullMask: std_logic_vector)
 return HbuffOutData;
 
+function newFromHbufferW(content: InstructionStateArray; fullMask: std_logic_vector)
+return HbuffOutData;
+
 function getFetchOffset(ip: Mword) return SmallNumber;
 
 function getAnnotatedHwords(fetchIns: InstructionState; fetchInsMulti: StageDataMulti;
+									 fetchBlock: HwordArray)
+return InstructionStateArray;
+
+function getAnnotatedWords(fetchIns: InstructionState; fetchInsMulti: StageDataMulti;
 									 fetchBlock: HwordArray)
 return InstructionStateArray;
 
@@ -235,6 +242,41 @@ begin
 	return ret;
 end function;
 
+function newFromHbufferW(content: InstructionStateArray; fullMask: std_logic_vector)
+return HbuffOutData is
+	variable res: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
+	variable ret: HbuffOutData := DEFAULT_HBUFF_OUT;
+	variable j: integer := 0;
+	variable nOut: integer;
+begin
+	for i in 0 to PIPE_WIDTH-1 loop
+		res.data(i).bits := content(2*i).bits(15 downto 0) & content(2*i+1).bits(15 downto 0);		
+		res.data(i).ip := content(2*i).ip;
+		res.data(i).controlInfo.squashed := content(2*i).controlInfo.squashed;
+	end loop;
+
+	for i in 0 to PIPE_WIDTH-1 loop
+		--nOut := PIPE_WIDTH;
+		
+		--if fullMask(2*i) = '1' then
+			res.fullMask(i) := fullMask(2*i); --'1';
+			res.data(i).bits := content(2*i).bits(15 downto 0) & content(2*i+1).bits(15 downto 0);
+				res.data(i).ip := content(2*i).ip;
+				res.data(i).controlInfo.squashed := content(2*i).controlInfo.squashed;
+				res.data(i).controlInfo.hasBranch := content(2*i).controlInfo.hasBranch;
+			--j := j + 2;
+		--else
+		--	nOut := i;
+		--	exit;
+		--end if;			
+	end loop;
+	-- CAREFUL: now 'j' is the number of consumed hwords?
+	ret.sd := res;
+	ret.nOut := i2slv(countOnes(res.fullMask), SMALL_NUMBER_SIZE);
+	ret.nHOut := i2slv(2*countOnes(res.fullMask), SMALL_NUMBER_SIZE);--i2slv(j, SMALL_NUMBER_SIZE);
+	return ret;
+end function;
+
 		-- TODO: used once, refactor
 		function getFetchOffset(ip: Mword) return SmallNumber is
 			variable res: SmallNumber := (others => '0');
@@ -269,6 +311,32 @@ begin
 	return res;
 end function;
 
+
+function getAnnotatedWords(fetchIns: InstructionState; fetchInsMulti: StageDataMulti;
+									 fetchBlock: HwordArray)
+return InstructionStateArray is
+	variable res: InstructionStateArray(0 to PIPE_WIDTH-1) := (others => DEFAULT_INSTRUCTION_STATE);
+	variable	tempWord: word := (others => '0');
+	variable wordIP: Mword := (others => '0');
+begin
+	for i in 0 to PIPE_WIDTH-1 loop
+		wordIP := fetchIns.ip(MWORD_SIZE-1 downto ALIGN_BITS) & i2slv(2*i, ALIGN_BITS);
+		tempWord(31 downto 16) := fetchBlock(2*i);
+		tempWord(15 downto 0) := fetchBlock(2*i+1);
+
+		res(i).bits := tempWord;
+		res(i).ip := wordIP;
+		res(i).classInfo.short := '0'; -- TEMP!
+		res(i).controlInfo.squashed := fetchIns.controlInfo.squashed; -- CAREFUL: guarding from wrong reading 
+	end loop;
+
+	for i in 0 to PIPE_WIDTH-1 loop
+		res(i).controlInfo.hasBranch := fetchInsMulti.data(i).controlInfo.hasBranch;
+		res(i).target := fetchInsMulti.data(i).target;
+	end loop;
+	
+	return res;
+end function;
 
 function getFrontEventMulti(predictedAddress: Mword;
 							  ins: InstructionState; receiving: std_logic; valid: std_logic;

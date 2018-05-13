@@ -83,7 +83,7 @@ architecture Implem of SubunitHbuffer is
 	signal hbuffOut: HbuffOutData := (sd => DEFAULT_STAGE_DATA_MULTI, nOut=>(others=>'0'), nHOut=>(others=>'0'));
 
 	signal partialKillMaskHbuffer: std_logic_vector(0 to HBUFFER_SIZE-1) := (others=>'0');
-	signal nHIn, sendingSig: SmallNumber := (others => '0');
+	signal nHIn, nWIn, sendingSig: SmallNumber := (others => '0');
 	
 	signal TMP_stageData, TMP_stageDataUpdated, TMP_stageDataNext: InstructionStateArray(0 to HBUFFER_SIZE-1)
 								:= (others => DEFAULT_INSTRUCTION_STATE);
@@ -119,12 +119,14 @@ begin
 	TMP_offset <= getFetchOffset(stageDataIn.ip);
 
 	nHIn <= i2slv(2 * countFullNonSkipped(stageDataInMulti), SMALL_NUMBER_SIZE);
+	nWIn <= i2slv(countFullNonSkipped(stageDataInMulti), SMALL_NUMBER_SIZE);
 
 	hbufferDataANew <= getAnnotatedHwords(stageDataIn, stageDataInMulti, fetchBlock);					
 
 	livingMask <= fullMask when execEventSignal = '0' else (others => '0');
 		
-	hbuffOut <= newFromHbuffer(hbufferDataA, livingMask);
+	hbuffOut <= --newFromHbuffer(hbufferDataA, livingMask);
+					newFromHbufferW(hbufferDataA, livingMask);
 
 				hbufferDataANext <= TMP_stageDataNext;
 				fullMaskNext <= TMP_maskNext;
