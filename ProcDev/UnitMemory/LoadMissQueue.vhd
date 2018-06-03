@@ -136,15 +136,12 @@ begin
 				flowResponse => bufferResponse
 			);						
 
-			bufferDrive.prevSending <= 
-							num2flow(countOnes(dataIn.fullMask)) when prevSending = '1' else (others => '0');
-			bufferDrive.kill <= num2flow(countOnes(killMask));
-			bufferDrive.nextAccepting <= num2flow(1) when sendingSq = '1' else num2flow(0);
-			acceptingOut <= not fullMask(QUEUE_SIZE-PIPE_WIDTH);
-				
+	bufferDrive.prevSending <= num2flow(countOnes(dataIn.fullMask)) when prevSending = '1' else (others => '0');
+	bufferDrive.kill <= num2flow(countOnes(killMask));
+	bufferDrive.nextAccepting <= num2flow(1) when sendingSq = '1' else num2flow(0);
+	acceptingOut <= not fullMask(QUEUE_SIZE-PIPE_WIDTH);
 
-			killMask <=	getKillMask(extractData(content), fullMask,
-											execCausing, execEventSignal, lateEventSignal);
+	killMask <=	getKillMask(extractData(content), fullMask, execCausing, execEventSignal, lateEventSignal);
 		
 	sendingSQOut <= sendingSQ;	
 end LoadMissQueue;

@@ -22,22 +22,17 @@ use work.GeneralPipeDev.all;
 
 package ProcLogicIQ is				
 
-function getDispatchArgValues(ins: InstructionState;-- ai: ArgStatusInfo;
-										vals: MwordArray; USE_IMM: boolean)
+function getDispatchArgValues(ins: InstructionState; vals: MwordArray; USE_IMM: boolean)
 return InstructionState;
 
-function updateDispatchArgs(ins: InstructionState; vals: MwordArray; regValues: MwordArray) --;
-										--ai: ArgStatusInfo)
+function updateDispatchArgs(ins: InstructionState; vals: MwordArray; regValues: MwordArray)
 return InstructionState;
-
 
 function getForwardingStatusInfoD2(av: in InstructionArgValues; pa: in InstructionArgSpec; 
-										tags0, tags1, tags2, 
-										nextTags, writtenTags: in PhysNameArray) return ArgStatusInfo;
+												tags0, tags1, tags2, nextTags, writtenTags: in PhysNameArray)
+return ArgStatusInfo;
 
-function getArgInfoArrayD2(data: InstructionStateArray; 
-										tags0, tags1, tags2, 
-										nextTags, writtenTags: PhysNameArray)
+function getArgInfoArrayD2(data: InstructionStateArray; tags0, tags1, tags2, nextTags, writtenTags: PhysNameArray)
 return ArgStatusInfoArray;
 
 	
@@ -47,7 +42,7 @@ function readyForExec(ins: InstructionState) return std_logic;
 
 function iqContentNext3(queueData, queueDataSel: InstructionStateArray; inputData: StageDataMulti; 
 								 fullMask,
-										livingMask,
+								 livingMask,
 								 readyMask: std_logic_vector;
 								 nextAccepting: std_logic;
 								 living, sending, prevSending: integer;
@@ -57,27 +52,20 @@ return InstructionSlotArray;
 function extractReadyMaskNew(insVec: InstructionStateArray) return std_logic_vector;
 
 
-function updateForWaiting(ins: InstructionState;
-									readyRegFlags: std_logic_vector;
-									ai: ArgStatusInfo;
-									isNew: std_logic)
-									return InstructionState;
+function updateForWaiting(ins: InstructionState; readyRegFlags: std_logic_vector; ai: ArgStatusInfo; isNew: std_logic)
+return InstructionState;
 									
-function updateForSelection(ins: InstructionState;
-									readyRegFlags: std_logic_vector;
-									ai: ArgStatusInfo)
-									return InstructionState;
+function updateForSelection(ins: InstructionState; readyRegFlags: std_logic_vector; ai: ArgStatusInfo)
+return InstructionState;
 									
-function updateForWaitingArray(insArray: InstructionStateArray;
-									readyRegFlags: std_logic_vector;
-									aia: ArgStatusInfoArray;
-									isNew: std_logic)
-									return InstructionStateArray;
+function updateForWaitingArray(insArray: InstructionStateArray; readyRegFlags: std_logic_vector;
+										aia: ArgStatusInfoArray; isNew: std_logic)
+return InstructionStateArray;
 									
-function updateForSelectionArray(insArray: InstructionStateArray;
-									readyRegFlags: std_logic_vector;
+function updateForSelectionArray(insArray: InstructionStateArray; readyRegFlags: std_logic_vector;
 									aia: ArgStatusInfoArray)
-									return InstructionStateArray;	
+return InstructionStateArray;	
+
 end ProcLogicIQ;
 
 
@@ -85,7 +73,6 @@ end ProcLogicIQ;
 package body ProcLogicIQ is
 
 -- pragma synthesis off
-
 function beginHistory(avs: InstructionArgValues; ready: std_logic_vector; nextReady: std_logic_vector)
 return InstructionArgValues is
 	variable res: InstructionArgValues := avs;
@@ -197,13 +184,13 @@ begin
 	if	(avs.readyNext(ind) and not avs.zero(ind) and not immed) = '1' then
 		-- Use new value from Exec
 		res := vals(slv2u(avs.nextLocs(ind)));		
-			selector := avs.nextLocs(ind)(1 downto 0);
+		selector := avs.nextLocs(ind)(1 downto 0);
 	elsif (avs.readyNow(ind) and not avs.zero(ind)) = '1' then
 		res := def;
-			selector := "10";
+		selector := "10";
 	else -- Use register value
 		res := regValues(ind);
-			selector := "11";
+		selector := "11";
 	end if;
 		
 	tbl(0) := vals(0);
@@ -226,18 +213,17 @@ begin
 end function;
 
 
-function getDispatchArgValues(ins: InstructionState;-- ai: ArgStatusInfo;
-										vals: MwordArray; USE_IMM: boolean)
+function getDispatchArgValues(ins: InstructionState; vals: MwordArray; USE_IMM: boolean)
 return InstructionState is
 	variable res: InstructionState := ins;
-		variable v0, v1: std_logic_vector(1 downto 0) := "00";
-		variable selected0, selected1: Mword := (others => '0');
+	variable v0, v1: std_logic_vector(1 downto 0) := "00";
+	variable selected0, selected1: Mword := (others => '0');
 begin			
 	res.argValues.arg0 := vals(slv2u(res.argValues.locs(0)));
 	
 	if res.argValues.immediate = '1' and USE_IMM then
 		res.argValues.arg1 := res.constantArgs.imm;
-			res.argValues.arg1(31 downto 17) := (others => res.constantArgs.imm(16)); -- 16b + addditional sign bit
+		res.argValues.arg1(31 downto 17) := (others => res.constantArgs.imm(16)); -- 16b + addditional sign bit
 	else
 		res.argValues.arg1 := vals(slv2u(res.argValues.locs(1)));
 	end if;
@@ -281,7 +267,7 @@ begin
 --	
 --	res.argValues.arg1 := selected1;
 ----------------------------------
-	
+
 	res.argValues.arg2 := vals(slv2u(res.argValues.locs(2)));
 
 	-- pragma synthesis off
@@ -292,25 +278,22 @@ begin
 end function;
 
 
-function updateDispatchArgs(ins: InstructionState; vals: MwordArray; regValues: MwordArray) --;
-										--ai: ArgStatusInfo)
+function updateDispatchArgs(ins: InstructionState; vals: MwordArray; regValues: MwordArray)
 return InstructionState is
 	variable res: InstructionState := ins;
 	variable aa: MwordArray(0 to 5) := (others => (others => '0'));
 	variable ind: integer := 0;
-		variable selector: std_logic_vector(0 to 1) := "00";
-		variable tbl: MwordArray(0 to 3) := (others => (others => '0'));
-		variable carg0, carg1, carg2: Mword;
+	variable selector: std_logic_vector(0 to 1) := "00";
+	variable tbl: MwordArray(0 to 3) := (others => (others => '0'));
+	variable carg0, carg1, carg2: Mword;
 begin
 	-- pragma synthesis off
 	res.argValues := updateArgHistory(res.argValues);
 	-- pragma synthesis on
 
 -- readyNext && not zero -> next val, readyNow && not zero -> keep, else -> reg
-
 	-- Clear 'missing' flag where readyNext indicates.
-	res.argValues.missing := res.argValues.missing and 
-								not (res.argValues.readyNext and not res.argValues.zero);
+	res.argValues.missing := res.argValues.missing and not (res.argValues.readyNext and not res.argValues.zero);
 
 	carg0 := selectUpdatedArg(res.argValues, 0, '0', res.argValues.arg0, vals, regValues);	
 	carg1 := selectUpdatedArg(res.argValues, 1, res.argValues.immediate, res.argValues.arg1, vals, regValues);	
@@ -325,12 +308,11 @@ end function;
 
 
 function getForwardingStatusInfoD2(av: in InstructionArgValues; pa: in InstructionArgSpec; 
-										tags0, tags1, tags2, 
-										nextTags, writtenTags: in PhysNameArray) return ArgStatusInfo
+										tags0, tags1, tags2, nextTags, writtenTags: in PhysNameArray)
+return ArgStatusInfo
 is		
 	variable stored, ready, nextReady, written: std_logic_vector(0 to 2) := (others=>'0');
 	variable locs, nextLocs: SmallNumberArray(0 to 2) := (others=>(others=>'0'));
-	--variable vals: MwordArray(0 to 2) := (others=>(others=>'0'));
 	variable res: ArgStatusInfo;
 begin
 	stored := not av.missing;	
@@ -372,7 +354,6 @@ begin
 	end loop;
 	
 	for i in nextTags'range loop
-	
 		if nextTags(i)(PHYS_REG_BITS-1 downto 0) = pa.args(0)(PHYS_REG_BITS-1 downto 0) then
 			nextReady(0) := '1';
 			nextLocs(0) := i2slv(i, SMALL_NUMBER_SIZE);
@@ -388,26 +369,22 @@ begin
 	end loop;
 	
 	res.stored := stored;
-		res.written := written;
+	res.written := written;
 	res.ready := ready;
 	res.locs := locs;
-	--res.vals := vals;
 	res.nextReady := nextReady;
 	res.nextLocs := nextLocs;
 	
 	return res;								
 end function;
 
-function getArgInfoArrayD2(data: InstructionStateArray; 
-										tags0, tags1, tags2, 
-										nextTags, writtenTags: PhysNameArray)
+function getArgInfoArrayD2(data: InstructionStateArray; tags0, tags1, tags2, nextTags, writtenTags: PhysNameArray)
 return ArgStatusInfoArray is
 	variable res: ArgStatusInfoArray(data'range);
 begin
 	for i in res'range loop
 		res(i) := getForwardingStatusInfoD2(data(i).argValues, data(i).physicalArgSpec,
-														tags0, tags1, tags2,
-														nextTags, writtenTags);
+														tags0, tags1, tags2, nextTags, writtenTags);
 	end loop;
 	return res;
 end function;
@@ -431,20 +408,17 @@ end function;
 
 function iqContentNext3(queueData, queueDataSel: InstructionStateArray; inputData: StageDataMulti; 
 								 fullMask,
-									livingMask,
+								 livingMask,
 								 readyMask: std_logic_vector;
 								 nextAccepting: std_logic;
 								 living, sending, prevSending: integer;
 								 prevSendingOK: std_logic)
 return InstructionSlotArray is
-	constant QUEUE_SIZE: natural := queueData'length; -- queueData'right + 1;
-
-	variable res: InstructionSlotArray(-1 to QUEUE_SIZE-1) := (others => DEFAULT_INSTRUCTION_SLOT); 
-	
+	constant QUEUE_SIZE: natural := queueData'length;
+	variable res: InstructionSlotArray(-1 to QUEUE_SIZE-1) := (others => DEFAULT_INSTRUCTION_SLOT); 	
 	variable dataNew: StageDataMulti := inputData;
 	
-	variable iqDataNext: InstructionStateArray(0 to QUEUE_SIZE - 1) -- + PIPE_WIDTH)
-					:= (others => defaultInstructionState);
+	variable iqDataNext: InstructionStateArray(0 to QUEUE_SIZE - 1) := (others => defaultInstructionState);
 	variable iqFullMaskNext: std_logic_vector(0 to QUEUE_SIZE - 1) :=	(others => '0');
 	variable dispatchDataNew: InstructionState := defaultInstructionState;
 	variable sends, anyReady: std_logic := '0';
@@ -457,21 +431,21 @@ return InstructionSlotArray is
 	variable nAfterSending: integer := living;
 	variable shiftNum: integer := 0;			
 begin
-		-- Important, new instrucitons in queue must be marked!
-		for i in 0 to PIPE_WIDTH-1 loop
-			dataNew.data(i).argValues.newInQueue := '1';
-		end loop;
+	-- Important, new instrucitons in queue must be marked!
+	for i in 0 to PIPE_WIDTH-1 loop
+		dataNew.data(i).argValues.newInQueue := '1';
+	end loop;
 
-		xVec := queueData & dataNew.data; -- CAREFUL: What to append after queueData?
-		xVec(QUEUE_SIZE) := xVec(QUEUE_SIZE-1);
-					
-		for k in 0 to yVec'right loop
-			yVec(k) := dataNew.data(k mod PIPE_WIDTH);
-		end loop;	
-		
-		for k in 0 to PIPE_WIDTH-1 loop
-			yMask(k) := dataNew.fullMask(k); -- not wrapping mod k, to enable straight copying to new fullMask
-		end loop;
+	xVec := queueData & dataNew.data; -- CAREFUL: What to append after queueData?
+	xVec(QUEUE_SIZE) := xVec(QUEUE_SIZE-1);
+				
+	for k in 0 to yVec'right loop
+		yVec(k) := dataNew.data(k mod PIPE_WIDTH);
+	end loop;	
+	
+	for k in 0 to PIPE_WIDTH-1 loop
+		yMask(k) := dataNew.fullMask(k); -- not wrapping mod k, to enable straight copying to new fullMask
+	end loop;
 		
 	-- Finding slots that are before first ready
 	dispatchDataNew := queueDataSel(0);
@@ -495,8 +469,7 @@ begin
 		
 	-- CAREFUL! When not dispatching, dispatch stage must signal no result, so clear it here
 	if sends = '0' then
-		dispatchDataNew.--physicalDestArgs.d0 := (others => '0');
-							 physicalArgSpec.dest := (others => '0');
+		dispatchDataNew.physicalArgSpec.dest := (others => '0');
 	end if;
 	
 	if nAfterSending < 0 then
@@ -506,7 +479,7 @@ begin
 	end if;
 
 	shiftNum := nAfterSending;
-		shiftNum := countOnes(fullMaskSh); -- CAREFUL: this seems to reduce some logic
+	shiftNum := countOnes(fullMaskSh); -- CAREFUL: this seems to reduce some logic
 		
 	-- CAREFUL, TODO:	solve the issue with HDLCompiler:1827
 	yVec(shiftNum to yVec'length - 1) := yVec(0 to yVec'length - 1 - shiftNum);
@@ -538,11 +511,9 @@ begin
 end function;
 
 
-function updateForWaiting(ins: InstructionState;
-									readyRegFlags: std_logic_vector;
-									ai: ArgStatusInfo;
+function updateForWaiting(ins: InstructionState; readyRegFlags: std_logic_vector; ai: ArgStatusInfo;
 									isNew: std_logic)
-									return InstructionState is
+return InstructionState is
 	variable res: InstructionState := ins;
 	variable tmp8: SmallNumber := (others => '0');
 	variable rrf: std_logic_vector(0 to 2) := (others => '0');
@@ -569,10 +540,8 @@ begin
 end function;
 
 
-function updateForSelection(ins: InstructionState;
-									readyRegFlags: std_logic_vector;
-									ai: ArgStatusInfo)
-									return InstructionState is
+function updateForSelection(ins: InstructionState; readyRegFlags: std_logic_vector; ai: ArgStatusInfo)
+return InstructionState is
 	variable res: InstructionState := ins;
 	variable tmp8: SmallNumber := (others => '0');
 	variable rrf: std_logic_vector(0 to 2) := (others => '0');
@@ -601,28 +570,26 @@ begin
 	res.argValues.locs := ai.locs;	
 	res.argValues.nextLocs := ai.nextLocs;
 
-		res.bits := (others => '0');
-		res.result := (others => '0');
-		res.target := (others => '0');		
+	res.bits := (others => '0');
+	res.result := (others => '0');
+	res.target := (others => '0');		
 --		
-		res.controlInfo.completed := '0';
-		res.controlInfo.completed2 := '0';
-		res.ip := (others => '0');
+	res.controlInfo.completed := '0';
+	res.controlInfo.completed2 := '0';
+	res.ip := (others => '0');
 
-		res.controlInfo.newEvent := '0';
-		res.controlInfo.hasInterrupt := '0';
-		res.controlInfo.hasReturn := '0';		
-		res.controlInfo.exceptionCode := (others => '0');
+	res.controlInfo.newEvent := '0';
+	res.controlInfo.hasInterrupt := '0';
+	res.controlInfo.hasReturn := '0';		
+	res.controlInfo.exceptionCode := (others => '0');
 
 	return res;
 end function;
 							
 									
-function updateForWaitingArray(insArray: InstructionStateArray;
-									readyRegFlags: std_logic_vector;
-									aia: ArgStatusInfoArray;
-									isNew: std_logic)
-									return InstructionStateArray is
+function updateForWaitingArray(insArray: InstructionStateArray; readyRegFlags: std_logic_vector;
+									aia: ArgStatusInfoArray; isNew: std_logic)
+return InstructionStateArray is
 	variable res: InstructionStateArray(0 to insArray'length-1) := insArray;
 begin
 	for i in insArray'range loop			
@@ -632,10 +599,9 @@ begin
 end function;
 
 
-function updateForSelectionArray(insArray: InstructionStateArray;
-									readyRegFlags: std_logic_vector;
+function updateForSelectionArray(insArray: InstructionStateArray; readyRegFlags: std_logic_vector;
 									aia: ArgStatusInfoArray)
-									return InstructionStateArray is
+return InstructionStateArray is
 	variable res: InstructionStateArray(0 to insArray'length-1) := insArray;
 begin
 	for i in insArray'range loop

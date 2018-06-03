@@ -56,13 +56,10 @@ entity UnitIQ is
 
 		prevSendingOK: in std_logic;
 		acceptingVec: out std_logic_vector(0 to PIPE_WIDTH-1);
-			issueAccepting: in std_logic;
-		
-			--queueSendingOut: out std_logic;
-			--queueDataOut: out InstructionState;	
-			queueOutput: out InstructionSlot;
-		
-		newData: in StageDataMulti;			
+		issueAccepting: in std_logic;
+		newData: in StageDataMulti;		
+	
+		queueOutput: out InstructionSlot;
 
 		readyRegFlags: in std_logic_vector(0 to 3*PIPE_WIDTH-1);
 		
@@ -100,7 +97,7 @@ begin
 	resetSig <= reset and HAS_RESET_IQ;
 	enSig <= en or not HAS_EN_IQ;
 		
-		eventCausing <= execCausing;
+	eventCausing <= execCausing;
 		
 	-- The queue	
 	QUEUE_MAIN_LOGIC: entity work.SubunitIQBuffer(Implem)
@@ -116,60 +113,22 @@ begin
 		execEventSignal => execEventSignal,
 		execCausing => eventCausing,
 		aiArray => aiArray,
-			aiNew => aiNew,
+		aiNew => aiNew,
 		readyRegFlags => readyRegFlags,
-			acceptingVec => acceptingVec,
+		acceptingVec => acceptingVec,
 		queueSending => queueSending,
 		iqDataOut => iqData,
 		newDataOut => toDispatch
 	);
 
-		NEW_DATA_TAG_MATCHER: entity work.QueueTagMatcher(Behavioral) 
-		generic map(IQ_SIZE => PIPE_WIDTH)
-		port map(
-			queueData => newData.data,
-			resultTags => fni.resultTags,
-			nextResultTags => fni.nextResultTags,
-			writtenTags => fni.writtenTags,
-			aiArray => aiNew
-		);
-		
-	QUEUE_TAG_MATCHER: entity work.QueueTagMatcher(Behavioral) 
-	generic map(IQ_SIZE => IQ_SIZE)
-	port map(
-		queueData => iqData,
-		resultTags => fni.resultTags,
-		nextResultTags => fni.nextResultTags,
-		writtenTags => writtenTagsZ,
-		aiArray => aiArray
-	);
+	aiNew <= getArgInfoArrayD2(newData.data, 
+											fni.resultTags, fni.resultTags, fni.resultTags,
+											fni.nextResultTags, fni.writtenTags);
 
-	--	queueSendingOut <= queueSending;
-	--	queueDataOut <= toDispatch;
+	aiArray <= getArgInfoArrayD2(iqData, 
+											fni.resultTags, fni.resultTags, fni.resultTags,
+											fni.nextResultTags, writtenTagsZ);
 	
 	queueOutput <= (queueSending, toDispatch);
-	
---	-- Dispatch stage			
---	DISPATCH_MAIN_LOGIC: entity work.SubunitDispatch(Alternative)	
---	port map(
---	 	clk => clk, reset => resetSig, en => enSig,
---	 	prevSending => queueSending,
---	 	nextAccepting => nextAccepting,
---		execEventSignal => execEventSignal,
---		lateEventSignal => lateEventSignal,
---		execCausing => eventCausing,
---		resultTags => fni.resultTags,
---		resultVals => fni.resultValues,
---		regValues => regValues,
---	 	stageDataIn => toDispatch,		
---		acceptingOut => dispatchAccepting,
---		sendingOut => sendingOut,
---		stageDataOut => dataOutIQ
---	);
-	
---	regsForDispatch <=
---			(0 => toDispatch.physicalArgs.s0, 1 => toDispatch.physicalArgs.s1, 2 => toDispatch.physicalArgs.s2);
-	--regReadAllow <= queueSending;
-		
 end Behavioral;
 

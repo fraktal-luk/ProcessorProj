@@ -75,8 +75,6 @@ architecture Alternative of SubunitDispatch is
 	signal stageDataM, stageDataStored: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
 	signal inputDataWithArgs, dispatchDataUpdated: InstructionState := defaultInstructionState;
 	signal lockSend: std_logic := '0';
-	signal nextResultTags: PhysNameArray(0 to N_NEXT_RES_TAGS-1) := (others => (others => '0'));
-	signal writtenTags: PhysNameArray(0 to PIPE_WIDTH-1) := (others => (others => '0'));
 	
 	signal prevSending: std_logic := '0';		
 	signal stageDataIn: InstructionState := DEFAULT_INSTRUCTION_STATE;
@@ -116,10 +114,7 @@ begin
 	-- CAREFUL: this does nothing. To make it work:
 	--											nextAcceptingEffective <= nextAccepting and not lockSend
 	lockSend <= BLOCK_ISSUE_WHEN_MISSING and isNonzero(dispatchDataUpdated.argValues.missing);
-	
-	stageDataOut <= dispatchDataUpdated;
-	
-	output <= (sendingOut, stageDataOut);
+	output <= (sendingOut, dispatchDataUpdated);
 end Alternative;
 
 
