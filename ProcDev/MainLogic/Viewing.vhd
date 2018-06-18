@@ -73,7 +73,7 @@ package Viewing is
 		dataOutSchedE => DEFAULT_INSTRUCTION_STATE		
 	);
 		
-	function getIssueView(iqOutputArr, schedOutputArr: InstructionSlotArray;
+	function getIssueView(iqOutputArr, schedOutputArr: SchedulerEntrySlotArray;
 								 iqAcceptingVecArr: SLVA;
 								 issueAcceptingArr, execAcceptingArr: std_logic_vector)
 	return IssueView;
@@ -85,7 +85,7 @@ end Viewing;
 package body Viewing is
 
 
-	function getIssueView(iqOutputArr, schedOutputArr: InstructionSlotArray;
+	function getIssueView(iqOutputArr, schedOutputArr: SchedulerEntrySlotArray;
 								 iqAcceptingVecArr: SLVA;
 								 issueAcceptingArr, execAcceptingArr: std_logic_vector)
 	return IssueView is

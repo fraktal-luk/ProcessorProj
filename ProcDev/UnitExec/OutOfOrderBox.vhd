@@ -135,7 +135,7 @@ architecture Behavioral of OutOfOrderBox is
 	signal iqAcceptingVecArr: SLVA(0 to 4) := (others => (others => '0'));	
 	signal issueAcceptingArr, execAcceptingArr: std_logic_vector(0 to 4) := (others => '0');
 	signal queueDataArr, schedDataArr: InstructionStateArray(0 to 4) := (others => DEFAULT_INS_STATE);
-	signal iqOutputArr, schedOutputArr: InstructionSlotArray(0 to 4) := (others => DEFAULT_INS_SLOT);
+	signal iqOutputArr, schedOutputArr: SchedulerEntrySlotArray(0 to 4) := (others => DEFAULT_SCH_ENTRY_SLOT);
 	signal dataToQueuesArr: StageDataMultiArray(0 to 4) := (others => DEFAULT_STAGE_DATA_MULTI);
 	signal regValsArr: MwordArray(0 to 3*5-1) := (others => (others => '0'));
 	
@@ -246,7 +246,7 @@ begin
 
 			inputA => schedOutputArr(0),
 			inputB => schedOutputArr(1),
-			inputD => DEFAULT_INS_SLOT,--schedOutputArr(3),
+			inputD => DEFAULT_SCH_ENTRY_SLOT,--schedOutputArr(3),
 			
 			outputA => outputA,
 			outputB => outputB,

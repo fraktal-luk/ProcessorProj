@@ -59,7 +59,7 @@ entity UnitIQ is
 		issueAccepting: in std_logic;
 		newData: in StageDataMulti;		
 	
-		queueOutput: out InstructionSlot;
+		queueOutput: out SchedulerEntrySlot;
 
 		readyRegFlags: in std_logic_vector(0 to 3*PIPE_WIDTH-1);
 		
@@ -116,9 +116,10 @@ begin
 		aiNew => aiNew,
 		readyRegFlags => readyRegFlags,
 		acceptingVec => acceptingVec,
-		queueSending => queueSending,
-		iqDataOut => iqData,
-		newDataOut => toDispatch
+		schedulerOut => queueOutput,
+		--queueSending => queueSending,
+		iqDataOut => iqData
+		--newDataOut => toDispatch
 	);
 
 	aiNew <= getArgInfoArrayD2(newData.data, 
@@ -129,6 +130,6 @@ begin
 											fni.resultTags, fni.resultTags, fni.resultTags,
 											fni.nextResultTags, writtenTagsZ);
 	
-	queueOutput <= (queueSending, toDispatch);
+	--queueOutput <= (queueSending, toDispatch, DEFAULT_SCHED_STATE);
 end Behavioral;
 

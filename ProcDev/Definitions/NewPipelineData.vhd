@@ -294,9 +294,32 @@ end record;
 	
 constant DEFAULT_INSTRUCTION_SLOT: InstructionSlot := ('0', defaultInstructionState);
 constant DEFAULT_INS_SLOT: InstructionSlot := ('0', defaultInstructionState);
-	
+
 -- NOTE: index can be negative to enable logical division into 2 different ranges 
 type InstructionSlotArray is array(integer range <>) of InstructionSlot;
+
+type SchedulerState is record
+	dummy: std_logic;
+end record;
+
+constant DEFAULT_SCHEDULER_STATE: SchedulerState := (dummy => '0');
+constant DEFAULT_SCHED_STATE: SchedulerState := (dummy => '0');
+																				
+type SchedulerEntrySlot is record
+	full: std_logic;
+	ins: InstructionState;
+	state: SchedulerState;
+end record;
+
+constant DEFAULT_SCHEDULER_ENTRY_SLOT: SchedulerEntrySlot := (full => '0',
+																				ins => DEFAULT_INS_STATE,
+																				state => DEFAULT_SCHEDULER_STATE);
+constant DEFAULT_SCH_ENTRY_SLOT: SchedulerEntrySlot := (full => '0',
+																				ins => DEFAULT_INS_STATE,
+																				state => DEFAULT_SCHEDULER_STATE);
+
+type SchedulerEntrySlotArray is array(integer range <>) of SchedulerEntrySlot;
+
 
 type StageDataMulti is record
 	fullMask: std_logic_vector(0 to PIPE_WIDTH-1);

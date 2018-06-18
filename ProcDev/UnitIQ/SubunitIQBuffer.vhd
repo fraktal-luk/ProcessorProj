@@ -70,9 +70,10 @@ entity SubunitIQBuffer is
 		readyRegFlags: in std_logic_vector(0 to 3*PIPE_WIDTH-1);
 		
 		acceptingVec: out std_logic_vector(0 to PIPE_WIDTH-1);
-		queueSending: out std_logic;
-		iqDataOut: out InstructionStateArray(0 to IQ_SIZE-1);
-		newDataOut: out InstructionState
+		schedulerOut: out SchedulerEntrySlot;
+		--queueSending: out std_logic;
+		iqDataOut: out InstructionStateArray(0 to IQ_SIZE-1)
+		--newDataOut: out InstructionState
 	);
 end SubunitIQBuffer;
 
@@ -176,7 +177,7 @@ begin
 			--dispatchDataNew <= sendingSlot.ins;
 			
 	-----------------------------------------------------------------------
-	queueDataLiving <= queueDataUpdated;
+	--queueDataLiving <= queueDataUpdated;
 			
 	livingMask <= fullMask and not killMask;
 					
@@ -187,7 +188,7 @@ begin
 
 			newDataU.fullMask <= newData.fullMask;
 			newDataU.data <= updateForWaitingArray(newData.data, readyRegFlags, aiNew, '1');
-		queueContentNext <= iqContentNext3(queueDataLiving, queueDataUpdatedSel, 
+		queueContentNext <= iqContentNext3(queueDataUpdated, queueDataUpdatedSel, 
 														newDataU, 
 															fullMask,
 																livingMask, 
@@ -220,7 +221,8 @@ begin
 	
 	acceptingVec <= not fullMask(IQ_SIZE-PIPE_WIDTH to IQ_SIZE-1);
 		
-	queueSending <= flowResponseQ.sending(0);	-- CAREFUL: assumes that flowResponseQ.sending is binary: [0,1]
+	--queueSending <= flowResponseQ.sending(0);	-- CAREFUL: assumes that flowResponseQ.sending is binary: [0,1]
 	iqDataOut <= queueData;						
-	newDataOut <= dispatchDataNew;
+	--newDataOut <= dispatchDataNew;
+	schedulerOut <= (flowResponseQ.sending(0), dispatchDataNew, DEFAULT_SCHED_STATE);
 end Implem;

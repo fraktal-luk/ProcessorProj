@@ -55,10 +55,10 @@ entity SubunitDispatch is
 
 	 	nextAccepting: in std_logic;
 
-		input: in InstructionSlot;
+		input: in SchedulerEntrySlot;
 		
 		acceptingOut: out std_logic;
-		output: out InstructionSlot;
+		output: out SchedulerEntrySlot;
 		
 		execEventSignal: in std_logic;
 		lateEventSignal: in std_logic;
@@ -114,7 +114,7 @@ begin
 	-- CAREFUL: this does nothing. To make it work:
 	--											nextAcceptingEffective <= nextAccepting and not lockSend
 	lockSend <= BLOCK_ISSUE_WHEN_MISSING and isNonzero(dispatchDataUpdated.argValues.missing);
-	output <= (sendingOut, dispatchDataUpdated);
+	output <= (sendingOut, dispatchDataUpdated, DEFAULT_SCHEDULER_STATE);
 end Alternative;
 
 

@@ -53,9 +53,9 @@ entity UnitExec is
 	  
 		whichAcceptedCQ: in std_logic_vector(0 to 3);
 
-		inputA: in InstructionSlot;
-		inputB: in InstructionSlot;
-		inputD: in InstructionSlot;	
+		inputA: in SchedulerEntrySlot;
+		inputB: in SchedulerEntrySlot;
+		inputD: in SchedulerEntrySlot;	
 
 		execAcceptingA: out std_logic;
 		execAcceptingB: out std_logic;

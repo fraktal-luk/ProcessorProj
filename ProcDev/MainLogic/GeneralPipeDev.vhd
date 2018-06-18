@@ -68,6 +68,10 @@ function makeSlotArray(insVec: InstructionStateArray; mask: std_logic_vector) re
 function extractFullMask(queueContent: InstructionSlotArray) return std_logic_vector;
 function extractData(queueContent: InstructionSlotArray) return InstructionStateArray;
 
+function extractFullMask(queueContent: SchedulerEntrySlotArray) return std_logic_vector;
+function extractData(queueContent: SchedulerEntrySlotArray) return InstructionStateArray;
+
+
 function moveQueue(content, newContent: InstructionSlotArray; nFull, nOut, nIn: integer)
 return InstructionSlotArray;
 
@@ -172,7 +176,7 @@ function getResultTags(execOutputs: InstructionSlotArray;
 return PhysNameArray;
 
 function getNextResultTags(execOutputsPre: InstructionSlotArray;
-			schedOutputArr: InstructionSlotArray)
+			schedOutputArr: SchedulerEntrySlotArray)
 return PhysNameArray;
 	
 function getResultValues(execOutputs: InstructionSlotArray; 
@@ -318,6 +322,25 @@ begin
 	end loop;
 	return res;
 end function;
+
+function extractFullMask(queueContent: SchedulerEntrySlotArray) return std_logic_vector is
+	variable res: std_logic_vector(0 to queueContent'length-1) := (others => '0');
+begin
+	for i in res'range loop
+		res(i) := queueContent(i).full;
+	end loop;
+	return res;
+end function;
+
+function extractData(queueContent: SchedulerEntrySlotArray) return InstructionStateArray is
+	variable res: InstructionStateArray(0 to queueContent'length-1) := (others => defaultInstructionState);
+begin
+	for i in res'range loop
+		res(i) := queueContent(i).ins;
+	end loop;
+	return res;
+end function;
+
 
 function moveQueue(content, newContent: InstructionSlotArray; nFull, nOut, nIn: integer)
 return InstructionSlotArray is
@@ -664,7 +687,7 @@ begin
 end function;		
 
 function getNextResultTags(execOutputsPre: InstructionSlotArray;
-						schedOutputArr: InstructionSlotArray
+						schedOutputArr: SchedulerEntrySlotArray
 						) 
 return PhysNameArray is
 	variable nextResultTags: PhysNameArray(0 to N_NEXT_RES_TAGS-1) := (others=>(others=>'0'));

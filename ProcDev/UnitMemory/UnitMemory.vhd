@@ -49,8 +49,8 @@ entity UnitMemory is
 		reset : in  STD_LOGIC;
 		en : in  STD_LOGIC;	
 			
-		inputC: in InstructionSlot;
-		inputE: in InstructionSlot;			
+		inputC: in SchedulerEntrySlot;
+		inputE: in SchedulerEntrySlot;			
 
 		execAcceptingC: out std_logic;
 		execAcceptingE: out std_logic; -- Store data
@@ -164,7 +164,7 @@ begin
 
 	SUBPIPE_E: block begin end block; -- Block empty
 
-	outputE <= inputE;
+	outputE <= (inputE.full, inputE.ins);
 
 	dataToMemPipe <= dataFromDLQ when sendingFromDLQ = '1' else stageDataOutAGU.data(0);
 	sendingToMemPipe <= stageDataOutAGU.fullMask(0) or sendingFromDLQ;

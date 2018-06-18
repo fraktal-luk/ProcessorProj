@@ -56,7 +56,7 @@ entity IntegerMultiplier is
 		
 		--prevSending: in std_logic;
 		nextAccepting: in std_logic;
-		input: in InstructionSlot;
+		input: in SchedulerEntrySlot;
 
 		--dataIn: in InstructionState;		
 		acceptingOut: out std_logic;
@@ -101,7 +101,7 @@ begin
 		nextAccepting => acc1,
 		
 		stageDataIn => --inputData,
-								makeSDM((0 => input)),
+								makeSDM((0 => (input.full, input.ins))),
 		acceptingOut => acceptingOut,
 		sendingOut => sending0,
 		stageDataOut => data0,
