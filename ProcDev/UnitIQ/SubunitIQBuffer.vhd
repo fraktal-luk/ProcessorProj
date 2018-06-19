@@ -83,7 +83,7 @@ architecture Implem of SubunitIQBuffer is
 								:= (others=>defaultInstructionState);
 	signal queueDataLiving, queueDataNext, TMP_dataNext, queueData_TMP: InstructionStateArray(0 to IQ_SIZE-1)
 								:= (others=>defaultInstructionState);		
-	signal fullMask, fullMaskNext, killMask, livingMask, readyMask, readyMask2, readyMask_C,
+	signal fullMask, fullMaskNext, killMask, livingMask, readyMask, readyMask2, readyMask_C, stayMask,
 				inputEnable, movedEnable, TMP_maskNext, sendingMask: std_logic_vector(0 to IQ_SIZE-1) := (others=>'0');	
 
 	signal inputIndices, movedIndices: SmallNumberArray(0 to IQ_SIZE-1) := (others => (others => '0'));
@@ -122,6 +122,38 @@ architecture Implem of SubunitIQBuffer is
 		return res;
 	end function;
 	
+	-- Select item at first '1', or the last one if all zeros
+	function prioSelect(elems: InstructionStateArray; selVec: std_logic_vector) return InstructionState is
+	begin	
+		for i in 0 to elems'length-1 loop
+			if selVec(i) = '1' then
+				return elems(i);
+			end if;
+		end loop;
+		return elems(elems'length-1);
+	end function;
+	
+	function TMP_clearDestIfEmpty(ins: InstructionState; sends: std_logic) return InstructionState is
+		variable res: InstructionState := ins;
+	begin
+		if sends = '0' then
+			res.physicalArgSpec.dest := (others => '0');
+		end if;
+		return res;
+	end function;
+	
+	function TMP_setUntil(selVec: std_logic_vector; nextAccepting: std_logic) return std_logic_vector is
+		variable res: std_logic_vector(0 to selVec'length-1) := (others => '0');
+	begin
+		for i in res'range loop
+			if (selVec(i) and nextAccepting) = '1' then
+				exit;
+			else
+				res(i) := '1';
+			end if;
+		end loop;
+		return res;
+	end function;
 begin
 	flowDriveQ.prevSending <= num2flow(countOnes(newData.fullMask)) when prevSendingOK = '1' else (others => '0');
 	flowDriveQ.kill <= num2flow(countOnes(killMask));
@@ -133,14 +165,10 @@ begin
 			qs0 <= qs1;
 		
 			queueData <= queueDataNext;
-							--	TMP_dataNext;
 			fullMask <= fullMaskNext;
-							--	TMP_maskNext;
 
-			--		logBuffer(queueData_TMP, fullMask, livingMask, flowResponseQ);								
 			logBuffer(queueData, fullMask, livingMask, flowResponseQ);
-			checkIQ(queueData, fullMask, queueDataNext, fullMaskNext, dispatchDataNew, sends,
-					  flowDriveQ, flowResponseQ);
+			checkIQ(queueData, fullMask, queueDataNext, fullMaskNext, dispatchDataNew, sends, flowDriveQ, flowResponseQ);
 		end if;
 	end process;	
 	
@@ -168,31 +196,22 @@ begin
 	TMP_dataNext <= TMP_getNewContent_General(queueDataUpdated, newDataU.data,
 															movedEnable, movedIndices, inputEnable, inputIndices);
 
-			--TMP_sendingWin <= getQueueWindow(queueDataUpdatedSel, readyMask_C, sendingIndex);
-
-		sendingSlot <=	selectSending(queueDataUpdatedSel, readyMask_C, nextAccepting);
-				--sends <= TMP_sendingWin.fullMask(0);
-				--dispatchDataNew <= TMP_sendingWin.data(0);
-			--sends <= sendingSlot.full;
-			--dispatchDataNew <= sendingSlot.ins;
-			
-	-----------------------------------------------------------------------
-	--queueDataLiving <= queueDataUpdated;
+	sendingSlot <=	selectSending(queueDataUpdatedSel, readyMask_C, nextAccepting);
 			
 	livingMask <= fullMask and not killMask;
 					
 	fullMaskNext <= extractFullMask(queueContentNext(0 to IQ_SIZE-1));
 	queueDataNext <= extractData(queueContentNext(0 to IQ_SIZE-1));	
-	sends <= queueContentNext(-1).full;
-	dispatchDataNew <= queueContentNext(-1).ins;			
+	sends <= isNonzero(readyMask2) and nextAccepting;
+	dispatchDataNew <= TMP_clearDestIfEmpty(prioSelect(queueDataUpdatedSel, readyMask2), sends);
+		stayMask <= TMP_setUntil(readyMask2, nextAccepting);
 
 			newDataU.fullMask <= newData.fullMask;
 			newDataU.data <= updateForWaitingArray(newData.data, readyRegFlags, aiNew, '1');
-		queueContentNext <= iqContentNext3(queueDataUpdated, queueDataUpdatedSel, 
-														newDataU, 
-															fullMask,
-																livingMask, 
-														readyMask2, --_C,
+		queueContentNext <= iqContentNext4(queueDataUpdated, newDataU, 
+														livingMask, 
+														stayMask,--readyMask2, --_C,
+														sends,
 														nextAccepting,
 														binFlowNum(flowResponseQ.living),
 														binFlowNum(flowResponseQ.sending),
@@ -221,8 +240,6 @@ begin
 	
 	acceptingVec <= not fullMask(IQ_SIZE-PIPE_WIDTH to IQ_SIZE-1);
 		
-	--queueSending <= flowResponseQ.sending(0);	-- CAREFUL: assumes that flowResponseQ.sending is binary: [0,1]
 	iqDataOut <= queueData;						
-	--newDataOut <= dispatchDataNew;
 	schedulerOut <= (flowResponseQ.sending(0), dispatchDataNew, DEFAULT_SCHED_STATE);
 end Implem;

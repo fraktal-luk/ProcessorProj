@@ -49,6 +49,15 @@ function iqContentNext3(queueData, queueDataSel: InstructionStateArray; inputDat
 								 prevSendingOK: std_logic)
 return InstructionSlotArray;
 
+function iqContentNext4(queueData: InstructionStateArray; inputData: StageDataMulti; 
+								 livingMask,
+								 stayMask: std_logic_vector;
+								 sends: std_logic;
+								 nextAccepting: std_logic;
+								 living, sending, prevSending: integer;
+								 prevSendingOK: std_logic)
+return InstructionSlotArray;
+
 function extractReadyMaskNew(insVec: InstructionStateArray) return std_logic_vector;
 
 
@@ -507,6 +516,95 @@ begin
 	end loop;
 	res(-1).full := sends;
 	res(-1).ins := dispatchDataNew;
+	return res;
+end function;
+
+
+function iqContentNext4(queueData: InstructionStateArray; inputData: StageDataMulti; 
+								 livingMask,
+								 stayMask: std_logic_vector;
+								 sends: std_logic;
+								 nextAccepting: std_logic;
+								 living, sending, prevSending: integer;
+								 prevSendingOK: std_logic)
+return InstructionSlotArray is
+	constant QUEUE_SIZE: natural := queueData'length;
+	variable res: InstructionSlotArray(-1 to QUEUE_SIZE-1) := (others => DEFAULT_INSTRUCTION_SLOT); 	
+	variable dataNew: StageDataMulti := inputData;
+	
+	variable iqDataNext: InstructionStateArray(0 to QUEUE_SIZE - 1) := (others => defaultInstructionState);
+	variable iqFullMaskNext: std_logic_vector(0 to QUEUE_SIZE - 1) :=	(others => '0');
+				
+	variable xVec: InstructionStateArray(0 to QUEUE_SIZE + PIPE_WIDTH - 1);
+	variable yVec: InstructionStateArray(0 to QUEUE_SIZE + PIPE_WIDTH - 1);
+	variable yMask: std_logic_vector(0 to QUEUE_SIZE + PIPE_WIDTH-1)	:= (others => '0');
+	variable fullMaskSh: std_logic_vector(0 to QUEUE_SIZE-1) := livingMask; --fullMask;
+	variable nAfterSending: integer := living;
+	variable shiftNum: integer := 0;			
+begin
+	-- Important, new instrucitons in queue must be marked!
+	for i in 0 to PIPE_WIDTH-1 loop
+		dataNew.data(i).argValues.newInQueue := '1';
+	end loop;
+
+	xVec := queueData & dataNew.data; -- CAREFUL: What to append after queueData?
+	xVec(QUEUE_SIZE) := xVec(QUEUE_SIZE-1);
+				
+	for k in 0 to yVec'right loop
+		yVec(k) := dataNew.data(k mod PIPE_WIDTH);
+	end loop;	
+	
+	for k in 0 to PIPE_WIDTH-1 loop
+		yMask(k) := dataNew.fullMask(k); -- not wrapping mod k, to enable straight copying to new fullMask
+	end loop;
+
+	if sends = '1' then
+--			if nAfterSending = 0 then
+--				nAfterSending := 0;
+--			--elsif nAfterSending
+--			else
+				nAfterSending := nAfterSending-1;
+--			end if;
+			
+		fullMaskSh(0 to QUEUE_SIZE-2) := livingMask(1 to QUEUE_SIZE-1);
+		fullMaskSh(QUEUE_SIZE-1) := '0';
+	end if;
+	
+			if nAfterSending < 0 then
+				nAfterSending := 0;
+			elsif nAfterSending > yVec'length then	
+				nAfterSending := yVec'length;
+			end if;
+
+	shiftNum := nAfterSending;
+	shiftNum := countOnes(fullMaskSh); -- CAREFUL: this seems to reduce some logic
+		
+	-- CAREFUL, TODO:	solve the issue with HDLCompiler:1827
+	yVec(shiftNum to yVec'length - 1) := yVec(0 to yVec'length - 1 - shiftNum);
+	yMask(shiftNum to yVec'length - 1) := yMask(0 to yVec'length - 1 - shiftNum);
+
+	-- Now assign from x or y
+	iqDataNext := queueData;
+	for i in 0 to QUEUE_SIZE-1 loop
+		iqFullMaskNext(i) := fullMaskSh(i) or (yMask(i) and prevSendingOK);
+		if fullMaskSh(i) = '1' then -- From x	
+			if stayMask(i) = '1' then
+				iqDataNext(i) := xVec(i);
+			else
+				iqDataNext(i) := xVec(i + 1);
+			end if;
+		else -- From y
+			iqDataNext(i) := yVec(i);
+		end if;
+	end loop;
+
+	-- Fill output array
+	for i in 0 to res'right loop
+		res(i).full := iqFullMaskNext(i);
+		res(i).ins := iqDataNext(i);
+	end loop;
+	res(-1).full := sends;
+	--res(-1).ins := dispatchDataNew;
 	return res;
 end function;
 
