@@ -566,9 +566,23 @@ begin
 				nAfterSending := nAfterSending-1;
 --			end if;
 			
-		fullMaskSh(0 to QUEUE_SIZE-2) := livingMask(1 to QUEUE_SIZE-1);
-		fullMaskSh(QUEUE_SIZE-1) := '0';
+--		fullMaskSh(0 to QUEUE_SIZE-2) := livingMask(1 to QUEUE_SIZE-1);
+--		fullMaskSh(QUEUE_SIZE-1) := '0';
 	end if;
+
+		for i in 0 to QUEUE_SIZE-2 loop
+			if livingMask(i) = '0' or (livingMask(i+1) = '0' and sends = '1') then
+				fullMaskSh(i) := '0';
+			else
+				fullMaskSh(i) := '1';
+			end if;
+		end loop;
+	
+			if livingMask(QUEUE_SIZE-1) = '0' or sends = '1' then
+				fullMaskSh(QUEUE_SIZE-1) := '0';
+			else
+				fullMaskSh(QUEUE_SIZE-1) := '1';
+			end if;
 	
 			if nAfterSending < 0 then
 				nAfterSending := 0;
@@ -578,7 +592,7 @@ begin
 
 	shiftNum := nAfterSending;
 	shiftNum := countOnes(fullMaskSh); -- CAREFUL: this seems to reduce some logic
-		
+
 	-- CAREFUL, TODO:	solve the issue with HDLCompiler:1827
 	yVec(shiftNum to yVec'length - 1) := yVec(0 to yVec'length - 1 - shiftNum);
 	yMask(shiftNum to yVec'length - 1) := yMask(0 to yVec'length - 1 - shiftNum);
