@@ -112,13 +112,14 @@ begin
 		lateEventSignal => lateEventSignal,
 		execEventSignal => execEventSignal,
 		execCausing => eventCausing,
-		aiArray => aiArray,
-		aiNew => aiNew,
+		--aiArray => aiArray,
+		--aiNew => aiNew,
+		fni => fni,
 		readyRegFlags => readyRegFlags,
 		acceptingVec => acceptingVec,
-		schedulerOut => queueOutput,
+		schedulerOut => queueOutput
 		--queueSending => queueSending,
-		iqDataOut => iqData
+		--iqDataOut => iqData
 		--newDataOut => toDispatch
 	);
 

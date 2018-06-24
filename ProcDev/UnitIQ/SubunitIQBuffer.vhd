@@ -65,14 +65,15 @@ entity SubunitIQBuffer is
 		lateEventSignal: in std_logic;
 		execEventSignal: in std_logic;
 		execCausing: in InstructionState;
-		aiArray: in ArgStatusInfoArray(0 to IQ_SIZE-1);
-		aiNew: in ArgStatusInfoArray(0 to PIPE_WIDTH-1);
+		--aiArray: in ArgStatusInfoArray(0 to IQ_SIZE-1);
+		--aiNew: in ArgStatusInfoArray(0 to PIPE_WIDTH-1);
+		fni: ForwardingInfo;
 		readyRegFlags: in std_logic_vector(0 to 3*PIPE_WIDTH-1);
 		
 		acceptingVec: out std_logic_vector(0 to PIPE_WIDTH-1);
-		schedulerOut: out SchedulerEntrySlot;
+		schedulerOut: out SchedulerEntrySlot
 		--queueSending: out std_logic;
-		iqDataOut: out InstructionStateArray(0 to IQ_SIZE-1)
+		--iqDataOut: out InstructionStateArray(0 to IQ_SIZE-1)
 		--newDataOut: out InstructionState
 	);
 end SubunitIQBuffer;
@@ -81,18 +82,18 @@ end SubunitIQBuffer;
 architecture Implem of SubunitIQBuffer is
 	signal queueData, queueDataUpdated, queueDataUpdatedSel: InstructionStateArray(0 to IQ_SIZE-1) 
 								:= (others=>defaultInstructionState);
-	signal queueDataLiving, queueDataNext, TMP_dataNext, queueData_TMP: InstructionStateArray(0 to IQ_SIZE-1)
+	signal queueDataLiving, queueDataNext: InstructionStateArray(0 to IQ_SIZE-1)
 								:= (others=>defaultInstructionState);		
 	signal fullMask, fullMaskNext, killMask, livingMask, readyMask, readyMask2, readyMask_C, stayMask,
-				inputEnable, movedEnable, TMP_maskNext, sendingMask: std_logic_vector(0 to IQ_SIZE-1) := (others=>'0');	
+				inputEnable, sendingMask: std_logic_vector(0 to IQ_SIZE-1) := (others=>'0');	
 
-	signal inputIndices, movedIndices: SmallNumberArray(0 to IQ_SIZE-1) := (others => (others => '0'));
+	signal inputIndices: SmallNumberArray(0 to IQ_SIZE-1) := (others => (others => '0'));
 								
 	signal flowDriveQ: FlowDriveBuffer := (killAll => '0', lockAccept => '0', lockSend => '0', others=>(others=>'0'));
 	signal flowResponseQ: FlowResponseBuffer := (others => (others=> '0'));
 
-	signal queueContent, queueContentNext: InstructionSlotArray(-1 to IQ_SIZE-1)
-				:= (others => DEFAULT_INSTRUCTION_SLOT);
+	signal queueContent, queueContentNext: SchedulerEntrySlotArray(-1 to IQ_SIZE-1)
+				:= (others => DEFAULT_SCH_ENTRY_SLOT);
 																
 	signal newDataU: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;												
 	signal sends: std_logic := '0';
@@ -100,9 +101,14 @@ architecture Implem of SubunitIQBuffer is
 	
 	signal sendingIndex: SmallNumber := (others => '0');
 	signal TMP_sendingWin: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
+
+	signal aiArray: ArgStatusInfoArray(0 to IQ_SIZE-1);
+	signal aiNew: ArgStatusInfoArray(0 to PIPE_WIDTH-1);
 	
 	signal qs0, qs1: TMP_queueState := TMP_defaultQueueState;
 	signal sendingSlot: InstructionSlot := DEFAULT_INSTRUCTION_SLOT;
+
+	signal writtenTagsZ: PhysNameArray(0 to PIPE_WIDTH-1) := (others => (others => '0'));		
 			
 	function selectSending(arr: InstructionStateArray; mask: std_logic_vector; nextAccepting: std_logic)
 	return InstructionSlot is
@@ -159,6 +165,14 @@ begin
 	flowDriveQ.kill <= num2flow(countOnes(killMask));
 	flowDriveQ.nextAccepting <=  num2flow(1) when (nextAccepting and isNonzero(readyMask_C)) = '1' else num2flow(0);															
 
+	aiNew <= getArgInfoArrayD2(newData.data, 
+											fni.resultTags, fni.resultTags, fni.resultTags,
+											fni.nextResultTags, fni.writtenTags);
+
+	aiArray <= getArgInfoArrayD2(queueData, 
+											fni.resultTags, fni.resultTags, fni.resultTags,
+											fni.nextResultTags, writtenTagsZ);
+
 	QUEUE_SYNCHRONOUS: process(clk) 	
 	begin
 		if rising_edge(clk) then
@@ -186,15 +200,6 @@ begin
 		-- CAREFUL: here we need to enable only those from sending, not from first
 			-- find index of sending - probably not used
 		sendingIndex <= findQueueIndex(sendingMask);
-			
-	movedEnable <= getEnableForMoved_Shifting(qs0, IQ_SIZE, flowDriveQ.nextAccepting, flowDriveQ.prevSending)
-						and setFromFirstOne(sendingMask);
-	movedIndices <= (others => (others => '0')); -- Always moved by 1 or not at all, so 0-th moved elem
-		
-	TMP_maskNext <= getQueueMaskNext_Shifting(qs1, IQ_SIZE);
-
-	TMP_dataNext <= TMP_getNewContent_General(queueDataUpdated, newDataU.data,
-															movedEnable, movedIndices, inputEnable, inputIndices);
 
 	sendingSlot <=	selectSending(queueDataUpdatedSel, readyMask_C, nextAccepting);
 			
@@ -202,9 +207,9 @@ begin
 					
 	fullMaskNext <= extractFullMask(queueContentNext(0 to IQ_SIZE-1));
 	queueDataNext <= extractData(queueContentNext(0 to IQ_SIZE-1));	
-	sends <= isNonzero(readyMask2) and nextAccepting;
+	sends <= isNonzero(readyMask_C) and nextAccepting;
 	dispatchDataNew <= TMP_clearDestIfEmpty(prioSelect(queueDataUpdatedSel, readyMask2), sends);
-		stayMask <= TMP_setUntil(readyMask2, nextAccepting);
+		stayMask <= TMP_setUntil(readyMask_C, nextAccepting);
 
 			newDataU.fullMask <= newData.fullMask;
 			newDataU.data <= updateForWaitingArray(newData.data, readyRegFlags, aiNew, '1');
@@ -240,6 +245,6 @@ begin
 	
 	acceptingVec <= not fullMask(IQ_SIZE-PIPE_WIDTH to IQ_SIZE-1);
 		
-	iqDataOut <= queueData;						
+	--iqDataOut <= queueData;						
 	schedulerOut <= (flowResponseQ.sending(0), dispatchDataNew, DEFAULT_SCHED_STATE);
 end Implem;

@@ -56,7 +56,7 @@ function iqContentNext4(queueData: InstructionStateArray; inputData: StageDataMu
 								 nextAccepting: std_logic;
 								 living, sending, prevSending: integer;
 								 prevSendingOK: std_logic)
-return InstructionSlotArray;
+return SchedulerEntrySlotArray;
 
 function extractReadyMaskNew(insVec: InstructionStateArray) return std_logic_vector;
 
@@ -527,9 +527,9 @@ function iqContentNext4(queueData: InstructionStateArray; inputData: StageDataMu
 								 nextAccepting: std_logic;
 								 living, sending, prevSending: integer;
 								 prevSendingOK: std_logic)
-return InstructionSlotArray is
+return SchedulerEntrySlotArray is
 	constant QUEUE_SIZE: natural := queueData'length;
-	variable res: InstructionSlotArray(-1 to QUEUE_SIZE-1) := (others => DEFAULT_INSTRUCTION_SLOT); 	
+	variable res: SchedulerEntrySlotArray(-1 to QUEUE_SIZE-1) := (others => DEFAULT_SCH_ENTRY_SLOT); 	
 	variable dataNew: StageDataMulti := inputData;
 	
 	variable iqDataNext: InstructionStateArray(0 to QUEUE_SIZE - 1) := (others => defaultInstructionState);
