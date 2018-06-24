@@ -49,7 +49,7 @@ function iqContentNext3(queueData, queueDataSel: InstructionStateArray; inputDat
 								 prevSendingOK: std_logic)
 return InstructionSlotArray;
 
-function iqContentNext4(queueData: InstructionStateArray; inputData: StageDataMulti; 
+function iqContentNext4(queueContent: SchedulerEntrySlotArray; inputData: StageDataMulti; 
 								 livingMask,
 								 stayMask: std_logic_vector;
 								 sends: std_logic;
@@ -58,7 +58,7 @@ function iqContentNext4(queueData: InstructionStateArray; inputData: StageDataMu
 								 prevSendingOK: std_logic)
 return SchedulerEntrySlotArray;
 
-function extractReadyMaskNew(insVec: InstructionStateArray) return std_logic_vector;
+function extractReadyMaskNew(entryVec: SchedulerEntrySlotArray) return std_logic_vector;
 
 
 function updateForWaiting(ins: InstructionState; readyRegFlags: std_logic_vector; ai: ArgStatusInfo; isNew: std_logic)
@@ -69,11 +69,11 @@ return InstructionState;
 									
 function updateForWaitingArray(insArray: InstructionStateArray; readyRegFlags: std_logic_vector;
 										aia: ArgStatusInfoArray; isNew: std_logic)
-return InstructionStateArray;
+return SchedulerEntrySlotArray;
 									
 function updateForSelectionArray(insArray: InstructionStateArray; readyRegFlags: std_logic_vector;
 									aia: ArgStatusInfoArray)
-return InstructionStateArray;	
+return SchedulerEntrySlotArray;	
 
 end ProcLogicIQ;
 
@@ -405,11 +405,11 @@ begin
 	return not isNonzero(ins.argValues.missing);
 end function;	
 
-function extractReadyMaskNew(insVec: InstructionStateArray) return std_logic_vector is
-	variable res: std_logic_vector(insVec'range);
+function extractReadyMaskNew(entryVec: SchedulerEntrySlotArray) return std_logic_vector is
+	variable res: std_logic_vector(entryVec'range);
 begin	
 	for i in res'range loop
-		res(i) := not isNonzero(insVec(i).argValues.missing);
+		res(i) := not isNonzero(entryVec(i).ins.argValues.missing);
 	end loop;
 	return res;
 end function;
@@ -520,7 +520,7 @@ begin
 end function;
 
 
-function iqContentNext4(queueData: InstructionStateArray; inputData: StageDataMulti; 
+function iqContentNext4(queueContent: SchedulerEntrySlotArray; inputData: StageDataMulti; 
 								 livingMask,
 								 stayMask: std_logic_vector;
 								 sends: std_logic;
@@ -528,8 +528,9 @@ function iqContentNext4(queueData: InstructionStateArray; inputData: StageDataMu
 								 living, sending, prevSending: integer;
 								 prevSendingOK: std_logic)
 return SchedulerEntrySlotArray is
-	constant QUEUE_SIZE: natural := queueData'length;
-	variable res: SchedulerEntrySlotArray(-1 to QUEUE_SIZE-1) := (others => DEFAULT_SCH_ENTRY_SLOT); 	
+	constant QUEUE_SIZE: natural := queueContent'length;
+	variable res: SchedulerEntrySlotArray(0 to QUEUE_SIZE-1) := (others => DEFAULT_SCH_ENTRY_SLOT); 	
+	variable queueData: InstructionStateArray(0 to QUEUE_SIZE-1) := extractData(queueContent);
 	variable dataNew: StageDataMulti := inputData;
 	
 	variable iqDataNext: InstructionStateArray(0 to QUEUE_SIZE - 1) := (others => defaultInstructionState);
@@ -617,7 +618,7 @@ begin
 		res(i).full := iqFullMaskNext(i);
 		res(i).ins := iqDataNext(i);
 	end loop;
-	res(-1).full := sends;
+	--res(-1).full := sends;
 	--res(-1).ins := dispatchDataNew;
 	return res;
 end function;
@@ -701,11 +702,13 @@ end function;
 									
 function updateForWaitingArray(insArray: InstructionStateArray; readyRegFlags: std_logic_vector;
 									aia: ArgStatusInfoArray; isNew: std_logic)
-return InstructionStateArray is
-	variable res: InstructionStateArray(0 to insArray'length-1) := insArray;
+return SchedulerEntrySlotArray is
+	variable res: SchedulerEntrySlotArray(0 to insArray'length-1);-- := insArray;
 begin
-	for i in insArray'range loop			
-		res(i) := updateForWaiting(insArray(i), readyRegFlags, aia(i), isNew);
+	for i in insArray'range loop	
+		res(i) := ('0',
+						updateForWaiting(insArray(i), readyRegFlags, aia(i), isNew),
+						DEFAULT_SCHED_STATE);
 	end loop;
 	return res;
 end function;
@@ -713,11 +716,13 @@ end function;
 
 function updateForSelectionArray(insArray: InstructionStateArray; readyRegFlags: std_logic_vector;
 									aia: ArgStatusInfoArray)
-return InstructionStateArray is
-	variable res: InstructionStateArray(0 to insArray'length-1) := insArray;
+return SchedulerEntrySlotArray is
+	variable res: SchedulerEntrySlotArray(0 to insArray'length-1);-- := insArray;
 begin
 	for i in insArray'range loop
-		res(i) := updateForSelection(insArray(i), readyRegFlags, aia(i));
+		res(i) := ('0',
+						updateForSelection(insArray(i), readyRegFlags, aia(i)),
+						DEFAULT_SCHED_STATE);
 	end loop;	
 	return res;
 end function;
