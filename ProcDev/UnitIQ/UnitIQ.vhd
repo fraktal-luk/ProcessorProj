@@ -75,20 +75,6 @@ end UnitIQ;
 
 architecture Behavioral of UnitIQ is
 	signal resetSig, enSig: std_logic := '0';
-												
-	signal aiDispatch: ArgStatusInfo;
-	
-	signal aiArray: ArgStatusInfoArray(0 to IQ_SIZE-1);
-	signal aiNew: ArgStatusInfoArray(0 to PIPE_WIDTH-1);
-			
-	-- Interface between queue and dispatch
-	signal dispatchAccepting, queueSending: std_logic := '0';		
-
-	signal iqData: InstructionStateArray(0 to IQ_SIZE-1) := (others => defaultInstructionState);
-	signal dispatchDataSig, toDispatch: InstructionState := defaultInstructionState;
-
-		signal writtenTagsZ: PhysNameArray(0 to PIPE_WIDTH-1) := (others => (others => '0'));		
-
 	signal eventCausing: InstructionState := DEFAULT_INSTRUCTION_STATE;
 
 	constant HAS_RESET_IQ: std_logic := '0';
@@ -112,25 +98,11 @@ begin
 		lateEventSignal => lateEventSignal,
 		execEventSignal => execEventSignal,
 		execCausing => eventCausing,
-		--aiArray => aiArray,
-		--aiNew => aiNew,
 		fni => fni,
 		readyRegFlags => readyRegFlags,
 		acceptingVec => acceptingVec,
 		schedulerOut => queueOutput
-		--queueSending => queueSending,
-		--iqDataOut => iqData
-		--newDataOut => toDispatch
 	);
 
-	aiNew <= getArgInfoArrayD2(newData.data, 
-											fni.resultTags, fni.resultTags, fni.resultTags,
-											fni.nextResultTags, fni.writtenTags);
-
-	aiArray <= getArgInfoArrayD2(iqData, 
-											fni.resultTags, fni.resultTags, fni.resultTags,
-											fni.nextResultTags, writtenTagsZ);
-	
-	--queueOutput <= (queueSending, toDispatch, DEFAULT_SCHED_STATE);
 end Behavioral;
 

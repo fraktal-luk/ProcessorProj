@@ -103,8 +103,8 @@ architecture Implem of SubunitIQBuffer is
 	
 	signal TMP_sendingWin: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
 
-	signal aiArray: ArgStatusInfoArray(0 to IQ_SIZE-1);
-	signal aiNew: ArgStatusInfoArray(0 to PIPE_WIDTH-1);
+	--signal aiArray: ArgStatusInfoArray(0 to IQ_SIZE-1);
+	--signal aiNew: ArgStatusInfoArray(0 to PIPE_WIDTH-1);
 	
 	signal qs0, qs1: TMP_queueState := TMP_defaultQueueState;
 
@@ -165,13 +165,13 @@ begin
 	flowDriveQ.kill <= num2flow(countOnes(killMask));
 	flowDriveQ.nextAccepting <=  num2flow(1) when sends = '1' else num2flow(0);															
 
-	aiNew <= getArgInfoArrayD2(newData.data, 
-											fni.resultTags, fni.resultTags, fni.resultTags,
-											fni.nextResultTags, fni.writtenTags);
-
-	aiArray <= getArgInfoArrayD2(queueData, 
-											fni.resultTags, fni.resultTags, fni.resultTags,
-											fni.nextResultTags, writtenTagsZ);
+--	aiNew <= getArgInfoArrayD2(newData.data, 
+--											fni.resultTags, fni.resultTags, fni.resultTags,
+--											fni.nextResultTags, fni.writtenTags);
+--
+--	aiArray <= getArgInfoArrayD2(queueData, 
+--											fni.resultTags, fni.resultTags, fni.resultTags,
+--											fni.nextResultTags, writtenTagsZ);
 
 	QUEUE_SYNCHRONOUS: process(clk) 	
 	begin
@@ -208,7 +208,8 @@ begin
 	dispatchDataNew <= TMP_clearDestIfEmpty(prioSelect(queueContentUpdatedSel, readyMask2), sends);
 		stayMask <= TMP_setUntil(readyMask_C, nextAccepting);
 
-		newContent <= updateForWaitingArray(newData.data, readyRegFlags, aiNew, '1');
+		newContent <= --updateForWaitingArray(newData.data, readyRegFlags, aiNew, '1');
+						  updateForWaitingArrayFNI(newData.data, readyRegFlags, fni, '1');
 			newDataU.fullMask <= newData.fullMask;
 			newDataU.data <= extractData(newContent);
 		
@@ -222,8 +223,10 @@ begin
 														binFlowNum(flowDriveQ.prevSending),
 														prevSendingOK);
 					
-	queueContentUpdated <= updateForWaitingArray(queueData, readyRegFlags, aiArray, '0');
-	queueContentUpdatedSel <= updateForSelectionArray(queueData, readyRegFlags, aiArray);
+	queueContentUpdated <= --updateForWaitingArray(queueData, readyRegFlags, aiArray, '0');
+									updateForWaitingArrayFNI(queueData, readyRegFlags, fni, '0');
+	queueContentUpdatedSel <= --updateForSelectionArray(queueData, readyRegFlags, aiArray);
+									 updateForSelectionArrayFNI(queueData, readyRegFlags, fni);
 
 	readyMask2 <= extractReadyMaskNew(queueContentUpdatedSel);	
 	readyMask_C <= readyMask2 and livingMask;
