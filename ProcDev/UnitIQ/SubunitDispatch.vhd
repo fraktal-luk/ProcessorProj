@@ -80,6 +80,10 @@ architecture Alternative of SubunitDispatch is
 	signal stageDataIn: InstructionState := DEFAULT_INSTRUCTION_STATE;
 	signal sendingOut: std_logic := '0';
 	signal stageDataOut: InstructionState := DEFAULT_INSTRUCTION_STATE;
+		signal stageDataOut_C: SchedulerEntrySlot := DEFAULT_SCH_ENTRY_SLOT;
+
+		signal ch0: std_logic := '0';
+		
 begin
 	prevSending <= input.full;
 	stageDataIn <= input.ins;
@@ -98,8 +102,8 @@ begin
 		nextAccepting => nextAccepting,
 		
 		stageDataIn => stageDataM,
-		acceptingOut => acceptingOut,
-		sendingOut => sendingOut,
+		acceptingOut => open,--acceptingOut,
+		sendingOut => open,--sendingOut,
 		stageDataOut => stageDataStored,
 		
 		execEventSignal => execEventSignal,
@@ -108,7 +112,32 @@ begin
 		lockCommand => '0'
 	);
 
-	dispatchDataUpdated <= updateDispatchArgs(stageDataStored.data(0), resultVals(0 to N_NEXT_RES_TAGS-1),
+			BASIC_LOGIC_SCH: entity work.SchedulerStage(Behavioral)
+			generic map(
+				COMPARE_TAG => '1'
+			)
+			port map(
+				clk => clk, reset => reset, en => en,
+				
+				prevSending => prevSending,
+				nextAccepting => nextAccepting,
+				
+				stageDataIn => (prevSending, inputDataWithArgs, DEFAULT_SCHEDULER_STATE),
+				acceptingOut => acceptingOut,
+				sendingOut => sendingOut,
+				stageDataOut => stageDataOut_C,--stageDataStored,
+				
+				execEventSignal => execEventSignal,
+				lateEventSignal => lateEventSignal,
+				execCausing => execCausing,
+				lockCommand => '0'
+			);
+
+		--ch0 <= bool2std(stageDataOut_C.ins = stageDataStored.data(0));
+
+	dispatchDataUpdated <= --updateDispatchArgs(stageDataStored.data(0), resultVals(0 to N_NEXT_RES_TAGS-1),
+									--						regValues);
+									updateDispatchArgs(stageDataOut_C.ins, resultVals(0 to N_NEXT_RES_TAGS-1),
 															regValues);
 
 	-- CAREFUL: this does nothing. To make it work:
