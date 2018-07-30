@@ -73,11 +73,11 @@ end SubunitDispatch;
 
 architecture Alternative of SubunitDispatch is
 	signal stageDataM, stageDataStored: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
-	signal inputDataWithArgs, dispatchDataUpdated: InstructionState := defaultInstructionState;
+	signal inputDataWithArgs, dispatchDataUpdated: SchedulerEntrySlot := DEFAULT_SCH_ENTRY_SLOT;
 	signal lockSend: std_logic := '0';
 	
 	signal prevSending: std_logic := '0';		
-	signal stageDataIn: InstructionState := DEFAULT_INSTRUCTION_STATE;
+	signal stageDataIn: InstructionState := DEFAULT_INSTRUCTION_STATE; -- DEPREC
 	signal sendingOut: std_logic := '0';
 	signal stageDataOut: InstructionState := DEFAULT_INSTRUCTION_STATE;
 		signal stageDataOut_C: SchedulerEntrySlot := DEFAULT_SCH_ENTRY_SLOT;
@@ -88,8 +88,8 @@ begin
 	prevSending <= input.full;
 	stageDataIn <= input.ins;
 
-	inputDataWithArgs <= getDispatchArgValues(stageDataIn, resultVals, USE_IMM);
-	stageDataM <= makeSDM((0 => (prevSending, inputDataWithArgs)));
+	inputDataWithArgs <= getDispatchArgValues(input.ins, input.state, resultVals, USE_IMM);
+	stageDataM <= makeSDM((0 => (prevSending, inputDataWithArgs.ins)));
 	
 	BASIC_LOGIC: entity work.GenericStageMulti(Behavioral)
 	generic map(
@@ -122,7 +122,7 @@ begin
 				prevSending => prevSending,
 				nextAccepting => nextAccepting,
 				
-				stageDataIn => (prevSending, inputDataWithArgs, DEFAULT_SCHEDULER_STATE),
+				stageDataIn => (prevSending, inputDataWithArgs.ins, inputDataWithArgs.state),
 				acceptingOut => acceptingOut,
 				sendingOut => sendingOut,
 				stageDataOut => stageDataOut_C,--stageDataStored,
@@ -137,13 +137,14 @@ begin
 
 	dispatchDataUpdated <= --updateDispatchArgs(stageDataStored.data(0), resultVals(0 to N_NEXT_RES_TAGS-1),
 									--						regValues);
-									updateDispatchArgs(stageDataOut_C.ins, resultVals(0 to N_NEXT_RES_TAGS-1),
+									updateDispatchArgs(stageDataOut_C.ins, stageDataOut_C.state,
+															resultVals(0 to N_NEXT_RES_TAGS-1),
 															regValues);
 
 	-- CAREFUL: this does nothing. To make it work:
 	--											nextAcceptingEffective <= nextAccepting and not lockSend
-	lockSend <= BLOCK_ISSUE_WHEN_MISSING and isNonzero(dispatchDataUpdated.argValues.missing);
-	output <= (sendingOut, dispatchDataUpdated, DEFAULT_SCHEDULER_STATE);
+	lockSend <= BLOCK_ISSUE_WHEN_MISSING and isNonzero(dispatchDataUpdated.ins.argValues.missing);
+	output <= (sendingOut, dispatchDataUpdated.ins, dispatchDataUpdated.state);
 end Alternative;
 
 

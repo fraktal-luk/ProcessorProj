@@ -22,11 +22,11 @@ use work.GeneralPipeDev.all;
 
 package ProcLogicIQ is				
 
-function getDispatchArgValues(ins: InstructionState; vals: MwordArray; USE_IMM: boolean)
-return InstructionState;
+function getDispatchArgValues(ins: InstructionState; st: SchedulerState; vals: MwordArray; USE_IMM: boolean)
+return SchedulerEntrySlot;
 
-function updateDispatchArgs(ins: InstructionState; vals: MwordArray; regValues: MwordArray)
-return InstructionState;
+function updateDispatchArgs(ins: InstructionState; st: SchedulerState; vals: MwordArray; regValues: MwordArray)
+return SchedulerEntrySlot;
 
 function getForwardingStatusInfoD2(av: in InstructionArgValues; pa: in InstructionArgSpec; 
 												tags0, tags1, tags2, nextTags, writtenTags: in PhysNameArray)
@@ -242,19 +242,21 @@ begin
 end function;
 
 
-function getDispatchArgValues(ins: InstructionState; vals: MwordArray; USE_IMM: boolean)
-return InstructionState is
-	variable res: InstructionState := ins;
+function getDispatchArgValues(ins: InstructionState; st: SchedulerState; vals: MwordArray; USE_IMM: boolean)
+return SchedulerEntrySlot is
+	variable res: SchedulerEntrySlot := DEFAULT_SCH_ENTRY_SLOT;
 	variable v0, v1: std_logic_vector(1 downto 0) := "00";
 	variable selected0, selected1: Mword := (others => '0');
-begin			
-	res.argValues.arg0 := vals(slv2u(res.argValues.locs(0)));
+begin
+	res.ins := ins;
+
+	res.ins.argValues.arg0 := vals(slv2u(res.ins.argValues.locs(0)));
 	
-	if res.argValues.immediate = '1' and USE_IMM then
-		res.argValues.arg1 := res.constantArgs.imm;
-		res.argValues.arg1(31 downto 17) := (others => res.constantArgs.imm(16)); -- 16b + addditional sign bit
+	if res.ins.argValues.immediate = '1' and USE_IMM then
+		res.ins.argValues.arg1 := res.ins.constantArgs.imm;
+		res.ins.argValues.arg1(31 downto 17) := (others => res.ins.constantArgs.imm(16)); -- 16b + addditional sign bit
 	else
-		res.argValues.arg1 := vals(slv2u(res.argValues.locs(1)));
+		res.ins.argValues.arg1 := vals(slv2u(res.ins.argValues.locs(1)));
 	end if;
 	
 ------ Different formulation for arg1 to use 2 LUTs rather than 3 per bit.
@@ -297,40 +299,42 @@ begin
 --	res.argValues.arg1 := selected1;
 ----------------------------------
 
-	res.argValues.arg2 := vals(slv2u(res.argValues.locs(2)));
+	res.ins.argValues.arg2 := vals(slv2u(res.ins.argValues.locs(2)));
 
 	-- pragma synthesis off
-	res.argValues := dispatchArgHistory(res.argValues);
+	res.ins.argValues := dispatchArgHistory(res.ins.argValues);
 	-- pragma synthesis on
 	
 	return res;
 end function;
 
 
-function updateDispatchArgs(ins: InstructionState; vals: MwordArray; regValues: MwordArray)
-return InstructionState is
-	variable res: InstructionState := ins;
+function updateDispatchArgs(ins: InstructionState; st: SchedulerState; vals: MwordArray; regValues: MwordArray)
+return SchedulerEntrySlot is
+	variable res: SchedulerEntrySlot := DEFAULT_SCH_ENTRY_SLOT;
 	variable aa: MwordArray(0 to 5) := (others => (others => '0'));
 	variable ind: integer := 0;
 	variable selector: std_logic_vector(0 to 1) := "00";
 	variable tbl: MwordArray(0 to 3) := (others => (others => '0'));
 	variable carg0, carg1, carg2: Mword;
 begin
+	res.ins := ins;
+	
 	-- pragma synthesis off
-	res.argValues := updateArgHistory(res.argValues);
+	res.ins.argValues := updateArgHistory(res.ins.argValues);
 	-- pragma synthesis on
 
 -- readyNext && not zero -> next val, readyNow && not zero -> keep, else -> reg
 	-- Clear 'missing' flag where readyNext indicates.
-	res.argValues.missing := res.argValues.missing and not (res.argValues.readyNext and not res.argValues.zero);
+	res.ins.argValues.missing := res.ins.argValues.missing and not (res.ins.argValues.readyNext and not res.ins.argValues.zero);
 
-	carg0 := selectUpdatedArg(res.argValues, 0, '0', res.argValues.arg0, vals, regValues);	
-	carg1 := selectUpdatedArg(res.argValues, 1, res.argValues.immediate, res.argValues.arg1, vals, regValues);	
-	carg2 := selectUpdatedArg(res.argValues, 2, '0', res.argValues.arg2, vals, regValues);	
+	carg0 := selectUpdatedArg(res.ins.argValues, 0, '0', res.ins.argValues.arg0, vals, regValues);	
+	carg1 := selectUpdatedArg(res.ins.argValues, 1, res.ins.argValues.immediate, res.ins.argValues.arg1, vals, regValues);	
+	carg2 := selectUpdatedArg(res.ins.argValues, 2, '0', res.ins.argValues.arg2, vals, regValues);	
 
-	res.argValues.arg0 := carg0;
-	res.argValues.arg1 := carg1;
-	res.argValues.arg2 := carg2;
+	res.ins.argValues.arg0 := carg0;
+	res.ins.argValues.arg1 := carg1;
+	res.ins.argValues.arg2 := carg2;
 
 	return res;
 end function;
