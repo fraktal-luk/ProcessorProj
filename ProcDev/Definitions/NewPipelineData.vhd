@@ -300,10 +300,11 @@ type InstructionSlotArray is array(integer range <>) of InstructionSlot;
 
 type SchedulerState is record
 	dummy: std_logic;
+	argValues: InstructionArgValues;
 end record;
 
-constant DEFAULT_SCHEDULER_STATE: SchedulerState := (dummy => '0');
-constant DEFAULT_SCHED_STATE: SchedulerState := (dummy => '0');
+constant DEFAULT_SCHEDULER_STATE: SchedulerState := (dummy => '0', argValues => DEFAULT_ARG_VALUES);
+constant DEFAULT_SCHED_STATE: SchedulerState := (dummy => '0', argValues => DEFAULT_ARG_VALUES);
 																				
 type SchedulerEntrySlot is record
 	full: std_logic;

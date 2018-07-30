@@ -111,24 +111,6 @@ architecture Implem of SubunitIQBuffer is
 	signal qs0, qs1: TMP_queueState := TMP_defaultQueueState;
 
 	signal writtenTagsZ: PhysNameArray(0 to PIPE_WIDTH-1) := (others => (others => '0'));		
-			
-	function selectSending(arr: InstructionStateArray; mask: std_logic_vector; nextAccepting: std_logic)
-	return InstructionSlot is
-		constant LEN: integer := arr'length;
-		variable res: InstructionSlot;
-	begin
-		res.full := mask(LEN-1);
-		res.ins := arr(LEN-1);
-		
-		for i in 0 to LEN-1 loop
-			if mask(i) = '1' then
-				res.full := nextAccepting;
-				res.ins := arr(i);
-				exit;
-			end if;
-		end loop;
-		return res;
-	end function;
 	
 	-- Select item at first '1', or the last one if all zeros
 	function prioSelect(elems: SchedulerEntrySlotArray; selVec: std_logic_vector) return SchedulerEntrySlot is
@@ -171,28 +153,30 @@ architecture Implem of SubunitIQBuffer is
 
 			-- Set state markers: "zero" bit		
 			if isNonzero(res(i).ins.virtualArgSpec.args(0)(4 downto 0)) = '0' then
-				res(i).ins.argValues.zero(0) := '1';
+				res(i).state.argValues.zero(0) := '1';				
 			end if;
 			
 			if isNonzero(res(i).ins.virtualArgSpec.args(1)(4 downto 0)) = '0' then
-				res(i).ins.argValues.zero(1) := '1';
+				res(i).state.argValues.zero(1) := '1';
 			end if;
 
 			if isNonzero(res(i).ins.virtualArgSpec.args(2)(4 downto 0)) = '0' then
-				res(i).ins.argValues.zero(2) := '1';
+				res(i).state.argValues.zero(2) := '1';
 			end if;		
 				
 			-- Set 'missing' flags for non-const arguments
-			res(i).ins.argValues.missing := res(i).ins.physicalArgSpec.intArgSel and not res(i).ins.argValues.zero;
+			res(i).state.argValues.missing := res(i).ins.physicalArgSpec.intArgSel and not res(i).state.argValues.zero;
 			
 			-- Handle possible immediate arg
 			if res(i).ins.constantArgs.immSel = '1' then
-				res(i).ins.argValues.missing(1) := '0';
-				res(i).ins.argValues.immediate := '1';
-				res(i).ins.argValues.zero(1) := '0';
+				res(i).state.argValues.missing(1) := '0';
+				res(i).state.argValues.immediate := '1';
+				res(i).state.argValues.zero(1) := '0';
 				--res.data(i).argValues.arg1 := res.data(i).constantArgs.imm;					
 			end if;			
-
+			
+				res(i).ins.argValues := res(i).state.argValues; -- TEMP!
+		
 		end loop;
 		return res;
 	end function;
