@@ -194,31 +194,31 @@ function setArgStatus(insVec: StageDataMulti) return StageDataMulti is
 	variable res: StageDataMulti := insVec;
 begin
 	for i in insVec.fullMask'range loop	
-		-- Set state markers: "zero" bit		
-		if isNonzero(res.data(i).virtualArgSpec.args(0)(4 downto 0)) = '0' then
-			res.data(i).argValues.zero(0) := '1';
-		end if;
+--		-- Set state markers: "zero" bit		
+--		if isNonzero(res.data(i).virtualArgSpec.args(0)(4 downto 0)) = '0' then
+--			res.data(i).argValues.zero(0) := '1';
+--		end if;
+--		
+--		if isNonzero(res.data(i).virtualArgSpec.args(1)(4 downto 0)) = '0' then
+--			res.data(i).argValues.zero(1) := '1';
+--		end if;
+--
+--		if isNonzero(res.data(i).virtualArgSpec.args(2)(4 downto 0)) = '0' then
+--			res.data(i).argValues.zero(2) := '1';
+--		end if;		
+--			
+--		-- Set 'missing' flags for non-const arguments
+--		res.data(i).argValues.missing := res.data(i).physicalArgSpec.intArgSel and not res.data(i).argValues.zero;
+--		
+--		-- Handle possible immediate arg
+--		if res.data(i).constantArgs.immSel = '1' then
+--			res.data(i).argValues.missing(1) := '0';
+--			res.data(i).argValues.immediate := '1';
+--			res.data(i).argValues.zero(1) := '0';
+--			--res.data(i).argValues.arg1 := res.data(i).constantArgs.imm;					
+--		end if;
 		
-		if isNonzero(res.data(i).virtualArgSpec.args(1)(4 downto 0)) = '0' then
-			res.data(i).argValues.zero(1) := '1';
-		end if;
-
-		if isNonzero(res.data(i).virtualArgSpec.args(2)(4 downto 0)) = '0' then
-			res.data(i).argValues.zero(2) := '1';
-		end if;		
-			
-		-- Set 'missing' flags for non-const arguments
-		res.data(i).argValues.missing := res.data(i).physicalArgSpec.intArgSel and not res.data(i).argValues.zero;
-		
-		-- Handle possible immediate arg
-		if res.data(i).constantArgs.immSel = '1' then
-			res.data(i).argValues.missing(1) := '0';
-			res.data(i).argValues.immediate := '1';
-			res.data(i).argValues.zero(1) := '0';
-			res.data(i).argValues.arg1 := res.data(i).constantArgs.imm;					
-		end if;
-		
-		res.data(i).argValues.readyBefore := not res.data(i).argValues.missing;
+		--res.data(i).argValues.readyBefore := not res.data(i).argValues.missing;
 
 			res.data(i).controlInfo.completed := not res.data(i).classInfo.mainCluster;				
 			res.data(i).controlInfo.completed2 := not res.data(i).classInfo.secCluster;

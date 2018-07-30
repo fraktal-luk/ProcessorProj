@@ -168,6 +168,31 @@ architecture Implem of SubunitIQBuffer is
 	begin
 		for i in 0 to PIPE_WIDTH-1 loop
 			res(i).ins := insArr(i);
+
+			-- Set state markers: "zero" bit		
+			if isNonzero(res(i).ins.virtualArgSpec.args(0)(4 downto 0)) = '0' then
+				res(i).ins.argValues.zero(0) := '1';
+			end if;
+			
+			if isNonzero(res(i).ins.virtualArgSpec.args(1)(4 downto 0)) = '0' then
+				res(i).ins.argValues.zero(1) := '1';
+			end if;
+
+			if isNonzero(res(i).ins.virtualArgSpec.args(2)(4 downto 0)) = '0' then
+				res(i).ins.argValues.zero(2) := '1';
+			end if;		
+				
+			-- Set 'missing' flags for non-const arguments
+			res(i).ins.argValues.missing := res(i).ins.physicalArgSpec.intArgSel and not res(i).ins.argValues.zero;
+			
+			-- Handle possible immediate arg
+			if res(i).ins.constantArgs.immSel = '1' then
+				res(i).ins.argValues.missing(1) := '0';
+				res(i).ins.argValues.immediate := '1';
+				res(i).ins.argValues.zero(1) := '0';
+				--res.data(i).argValues.arg1 := res.data(i).constantArgs.imm;					
+			end if;			
+
 		end loop;
 		return res;
 	end function;
