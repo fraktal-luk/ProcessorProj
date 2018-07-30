@@ -97,6 +97,8 @@ architecture Implem of SubunitIQBuffer is
 				:= (others => DEFAULT_SCH_ENTRY_SLOT);
 	signal newContent: SchedulerEntrySlotArray(0 to PIPE_WIDTH-1) := (others => DEFAULT_SCH_ENTRY_SLOT);
 				
+	signal newSchedData: SchedulerEntrySlotArray(0 to PIPE_WIDTH-1) := (others => DEFAULT_SCH_ENTRY_SLOT);
+				
 	signal newDataU: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;												
 	signal sends: std_logic := '0';
 	signal dispatchDataNew: SchedulerEntrySlot := DEFAULT_SCH_ENTRY_SLOT;
@@ -160,6 +162,15 @@ architecture Implem of SubunitIQBuffer is
 		end loop;
 		return res;
 	end function;
+	
+	function getSchedData(insArr: InstructionStateArray) return SchedulerEntrySlotArray is
+		variable res: SchedulerEntrySlotArray(0 to PIPE_WIDTH-1) := (others => DEFAULT_SCH_ENTRY_SLOT);
+	begin
+		for i in 0 to PIPE_WIDTH-1 loop
+			res(i).ins := insArr(i);
+		end loop;
+		return res;
+	end function;
 begin
 	flowDriveQ.prevSending <= num2flow(countOnes(newData.fullMask)) when prevSendingOK = '1' else (others => '0');
 	flowDriveQ.kill <= num2flow(countOnes(killMask));
@@ -208,8 +219,10 @@ begin
 	dispatchDataNew <= TMP_clearDestIfEmpty(prioSelect(queueContentUpdatedSel, readyMask2), sends);
 		stayMask <= TMP_setUntil(readyMask_C, nextAccepting);
 
+			newSchedData <= getSchedData(newData.data);
+
 		newContent <= --updateForWaitingArray(newData.data, readyRegFlags, aiNew, '1');
-						  updateForWaitingArrayFNI(newData.data, readyRegFlags, fni, '1');
+						  updateForWaitingArrayFNI(newSchedData, readyRegFlags, fni, '1');
 			newDataU.fullMask <= newData.fullMask;
 			newDataU.data <= extractData(newContent);
 		
@@ -224,9 +237,9 @@ begin
 														prevSendingOK);
 					
 	queueContentUpdated <= --updateForWaitingArray(queueData, readyRegFlags, aiArray, '0');
-									updateForWaitingArrayFNI(queueData, readyRegFlags, fni, '0');
+									updateForWaitingArrayFNI(queueContent, readyRegFlags, fni, '0');
 	queueContentUpdatedSel <= --updateForSelectionArray(queueData, readyRegFlags, aiArray);
-									 updateForSelectionArrayFNI(queueData, readyRegFlags, fni);
+									 updateForSelectionArrayFNI(queueContent, readyRegFlags, fni);
 
 	readyMask2 <= extractReadyMaskNew(queueContentUpdatedSel);	
 	readyMask_C <= readyMask2 and livingMask;
