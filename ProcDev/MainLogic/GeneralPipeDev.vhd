@@ -165,25 +165,25 @@ end function;
 
 function getStoredArg1(ins: InstructionState) return Mword is
 begin
-	return ins.argValues.arg1;
+	return ins.result;
 end function;
 
 function getStoredArg2(ins: InstructionState) return Mword is
 begin
-	return ins.argValues.arg2;
+	return ins.target;
 end function;
 
 function setStoredArg1(ins: InstructionState; val: Mword) return InstructionState is
 	variable res: InstructionState := ins;
 begin
-	res.argValues.arg1 := val;
+	res.result := val;
 	return res;
 end function;
 
 function setStoredArg2(ins: InstructionState; val: Mword) return InstructionState is
 	variable res: InstructionState := ins;
 begin
-	res.argValues.arg2 := val;
+	res.target := val;
 	return res;
 end function;
 
@@ -853,7 +853,7 @@ begin
 		
 		-- TEMP: also clear unneeded data for all instructions
 		res.data(i).constantArgs := defaultConstantArgs; -- c0 needed for sysMtc if not using temp reg in Exec
-		res.data(i).argValues := defaultArgValues;
+		--res.data(i).argValues := defaultArgValues;
 		res.data(i).ip := (others => '0');
 		res.data(i).bits := (others => '0');
 	end loop;

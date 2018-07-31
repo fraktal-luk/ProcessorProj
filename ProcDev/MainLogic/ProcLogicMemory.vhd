@@ -294,7 +294,7 @@ end function;
 					
 						if receiving = '1' and receivingVec(i) = '1' then
 							res(i) := newContent;
-							res(i).argValues := DEFAULT_ARG_VALUES;	
+							--res(i).argValues := DEFAULT_ARG_VALUES;	
 							res(i).result := (others => '0');
 							res(i).constantArgs := DEFAULT_CONSTANT_ARGS;
 							res(i).virtualArgSpec := DEFAULT_ARG_SPEC;

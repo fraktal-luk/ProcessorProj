@@ -59,11 +59,11 @@ return SchedulerEntrySlotArray;
 function extractReadyMaskNew(entryVec: SchedulerEntrySlotArray) return std_logic_vector;
 
 
-function updateForWaiting(ins: InstructionState; readyRegFlags: std_logic_vector; ai: ArgStatusInfo; isNew: std_logic)
-return InstructionState;
+--function updateForWaiting(ins: InstructionState; readyRegFlags: std_logic_vector; ai: ArgStatusInfo; isNew: std_logic)
+--return InstructionState;
 									
-function updateForSelection(ins: InstructionState; readyRegFlags: std_logic_vector; ai: ArgStatusInfo)
-return InstructionState;
+--function updateForSelection(ins: InstructionState; readyRegFlags: std_logic_vector; ai: ArgStatusInfo)
+--return InstructionState;
 									
 function updateForWaitingArray(insArray: InstructionStateArray; readyRegFlags: std_logic_vector;
 										aia: ArgStatusInfoArray; isNew: std_logic)
@@ -304,7 +304,7 @@ begin
 	res.state.argValues := dispatchArgHistory(res.state.argValues);
 	-- pragma synthesis on
 	
-		res.ins.argValues := res.state.argValues; -- TEMP!
+	--	res.ins.argValues := res.state.argValues; -- TEMP!
 	return res;
 end function;
 
@@ -337,7 +337,7 @@ begin
 	res.state.argValues.arg1 := carg1;
 	res.state.argValues.arg2 := carg2;
 	
-	res.ins.argValues := res.state.argValues; -- TEMP!
+	--res.ins.argValues := res.state.argValues; -- TEMP!
 	
 	return res;
 end function;
@@ -419,8 +419,8 @@ return ArgStatusInfoArray is
 	variable res: ArgStatusInfoArray(data'range);
 begin
 	for i in res'range loop
-		res(i) := getForwardingStatusInfoD2(data(i).argValues, data(i).physicalArgSpec,
-														tags0, tags1, tags2, nextTags, writtenTags);
+		--res(i) := getForwardingStatusInfoD2(data(i).argValues, data(i).physicalArgSpec,
+			--											tags0, tags1, tags2, nextTags, writtenTags);
 	end loop;
 	return res;
 end function;
@@ -463,7 +463,7 @@ return InstructionSlotArray is
 begin
 	-- Important, new instrucitons in queue must be marked!
 	for i in 0 to PIPE_WIDTH-1 loop
-		dataNew.data(i).argValues.newInQueue := '1';
+		--dataNew.data(i).argValues.newInQueue := '1';
 	end loop;
 
 	xVec := queueData & dataNew.data; -- CAREFUL: What to append after queueData?
@@ -572,9 +572,9 @@ return SchedulerEntrySlotArray is
 begin
 	-- Important, new instrucitons in queue must be marked!
 	for i in 0 to PIPE_WIDTH-1 loop
-		dataNew.data(i).argValues.newInQueue := '1';
+		--dataNew.data(i).argValues.newInQueue := '1';
 		dataNewDataS(i).state.argValues.newInQueue := '1';
-		dataNewDataS(i).ins.argValues.newInQueue := '1'; -- TEMP!
+		--dataNewDataS(i).ins.argValues.newInQueue := '1'; -- TEMP!
 	end loop;
 
 	xVec := queueData & dataNew.data; -- CAREFUL: What to append after queueData?
@@ -662,85 +662,85 @@ begin
 	return res;
 end function;
 
-
-function updateForWaiting(ins: InstructionState; readyRegFlags: std_logic_vector; ai: ArgStatusInfo;
-									isNew: std_logic)
-return InstructionState is
-	variable res: InstructionState := ins;
-	variable tmp8: SmallNumber := (others => '0');
-	variable rrf: std_logic_vector(0 to 2) := (others => '0');
-begin	
-	res.argValues.readyNow := (others => '0'); 
-	res.argValues.readyNext := (others => '0');
-
-	-- 
-	if res.argValues.newInQueue = '1' then
-		tmp8 := getTagLowSN(res.tags.renameIndex);-- and i2slv(PIPE_WIDTH-1, SMALL_NUMBER_SIZE);
-		rrf := readyRegFlags(3*slv2u(tmp8) to 3*slv2u(tmp8) + 2);
-		res.argValues.missing := res.argValues.missing and not rrf;
-	end if;
-	
-	res.argValues.missing := res.argValues.missing and not ai.written;
-	res.argValues.missing := res.argValues.missing and not ai.ready;
-	res.argValues.missing := res.argValues.missing and not ai.nextReady;	
-	
-	-- CAREFUL! DEPREC statement?
-	res.argValues.newInQueue := isNew;
-	
-	res.ip := (others => '0');
-	return res;
-end function;
-
-
-function updateForSelection(ins: InstructionState; readyRegFlags: std_logic_vector; ai: ArgStatusInfo)
-return InstructionState is
-	variable res: InstructionState := ins;
-	variable tmp8: SmallNumber := (others => '0');
-	variable rrf: std_logic_vector(0 to 2) := (others => '0');
-begin	
-	res.argValues.readyNow := (others => '0'); 
-	res.argValues.readyNext := (others => '0');
-
-	-- Checking reg ready flags (only for new ops in queue)
-	-- CAREFUL! Which reg ready flags are for this instruction?
-	--				Use groupTag, because it identifies the slot in previous superscalar stage
-	if res.argValues.newInQueue = '1' then
-		tmp8 := getTagLowSN(res.tags.renameIndex);-- and i2slv(PIPE_WIDTH-1, SMALL_NUMBER_SIZE);
-		rrf := readyRegFlags(3*slv2u(tmp8) to 3*slv2u(tmp8) + 2);
-		res.argValues.missing := res.argValues.missing and not rrf;
-	end if;
-
-	-- pragma synthesis off				
-	res.argValues := beginHistory(res.argValues, ai.ready, ai.nextReady);
-	-- pragma synthesis on
-
-	res.argValues.missing := res.argValues.missing and not ai.nextReady;
-	res.argValues.readyNext := ai.nextReady;
-	-- CAREFUL, NOTE: updating 'missing' with ai.ready would increase delay, unneeded with full 'nextReady'
-	
-		res.argValues.missing := res.argValues.missing and not ai.ready;
-
-	res.argValues.readyNow := ai.ready;
-
-	res.argValues.locs := ai.locs;	
-	res.argValues.nextLocs := ai.nextLocs;
-
-	-- Clear unused fields
-	res.bits := (others => '0');
-	res.result := (others => '0');
-	res.target := (others => '0');		
---		
-	res.controlInfo.completed := '0';
-	res.controlInfo.completed2 := '0';
-	res.ip := (others => '0');
-
-	res.controlInfo.newEvent := '0';
-	res.controlInfo.hasInterrupt := '0';
-	res.controlInfo.hasReturn := '0';		
-	res.controlInfo.exceptionCode := (others => '0');
-
-	return res;
-end function;
+--
+--function updateForWaiting(ins: InstructionState; readyRegFlags: std_logic_vector; ai: ArgStatusInfo;
+--									isNew: std_logic)
+--return InstructionState is
+--	variable res: InstructionState := ins;
+--	variable tmp8: SmallNumber := (others => '0');
+--	variable rrf: std_logic_vector(0 to 2) := (others => '0');
+--begin	
+--	res.argValues.readyNow := (others => '0'); 
+--	res.argValues.readyNext := (others => '0');
+--
+--	-- 
+--	if res.argValues.newInQueue = '1' then
+--		tmp8 := getTagLowSN(res.tags.renameIndex);-- and i2slv(PIPE_WIDTH-1, SMALL_NUMBER_SIZE);
+--		rrf := readyRegFlags(3*slv2u(tmp8) to 3*slv2u(tmp8) + 2);
+--		res.argValues.missing := res.argValues.missing and not rrf;
+--	end if;
+--	
+--	res.argValues.missing := res.argValues.missing and not ai.written;
+--	res.argValues.missing := res.argValues.missing and not ai.ready;
+--	res.argValues.missing := res.argValues.missing and not ai.nextReady;	
+--	
+--	-- CAREFUL! DEPREC statement?
+--	res.argValues.newInQueue := isNew;
+--	
+--	res.ip := (others => '0');
+--	return res;
+--end function;
+--
+--
+--function updateForSelection(ins: InstructionState; readyRegFlags: std_logic_vector; ai: ArgStatusInfo)
+--return InstructionState is
+--	variable res: InstructionState := ins;
+--	variable tmp8: SmallNumber := (others => '0');
+--	variable rrf: std_logic_vector(0 to 2) := (others => '0');
+--begin	
+--	res.argValues.readyNow := (others => '0'); 
+--	res.argValues.readyNext := (others => '0');
+--
+--	-- Checking reg ready flags (only for new ops in queue)
+--	-- CAREFUL! Which reg ready flags are for this instruction?
+--	--				Use groupTag, because it identifies the slot in previous superscalar stage
+--	if res.argValues.newInQueue = '1' then
+--		tmp8 := getTagLowSN(res.tags.renameIndex);-- and i2slv(PIPE_WIDTH-1, SMALL_NUMBER_SIZE);
+--		rrf := readyRegFlags(3*slv2u(tmp8) to 3*slv2u(tmp8) + 2);
+--		res.argValues.missing := res.argValues.missing and not rrf;
+--	end if;
+--
+--	-- pragma synthesis off				
+--	res.argValues := beginHistory(res.argValues, ai.ready, ai.nextReady);
+--	-- pragma synthesis on
+--
+--	res.argValues.missing := res.argValues.missing and not ai.nextReady;
+--	res.argValues.readyNext := ai.nextReady;
+--	-- CAREFUL, NOTE: updating 'missing' with ai.ready would increase delay, unneeded with full 'nextReady'
+--	
+--		res.argValues.missing := res.argValues.missing and not ai.ready;
+--
+--	res.argValues.readyNow := ai.ready;
+--
+--	res.argValues.locs := ai.locs;	
+--	res.argValues.nextLocs := ai.nextLocs;
+--
+--	-- Clear unused fields
+--	res.bits := (others => '0');
+--	res.result := (others => '0');
+--	res.target := (others => '0');		
+----		
+--	res.controlInfo.completed := '0';
+--	res.controlInfo.completed2 := '0';
+--	res.ip := (others => '0');
+--
+--	res.controlInfo.newEvent := '0';
+--	res.controlInfo.hasInterrupt := '0';
+--	res.controlInfo.hasReturn := '0';		
+--	res.controlInfo.exceptionCode := (others => '0');
+--
+--	return res;
+--end function;
 
 
 
@@ -826,7 +826,7 @@ begin
 	-- CAREFUL! DEPREC statement?
 	res.state.argValues.newInQueue := isNew;
 	
-		res.ins.argValues := res.state.argValues; -- TEMP!
+	--	res.ins.argValues := res.state.argValues; -- TEMP!
 	
 	res.ins.ip := (others => '0');
 	return res;
@@ -910,7 +910,7 @@ begin
 	res.state.argValues.locs := locs;	
 	res.state.argValues.nextLocs := nextLocs;
 
-		res.ins.argValues := res.state.argValues;
+	--	res.ins.argValues := res.state.argValues;
 
 	-- Clear unused fields
 	res.ins.bits := (others => '0');
@@ -937,9 +937,9 @@ return SchedulerEntrySlotArray is
 	variable res: SchedulerEntrySlotArray(0 to insArray'length-1);-- := insArray;
 begin
 	for i in insArray'range loop	
-		res(i) := ('0',
-						updateForWaiting(insArray(i), readyRegFlags, aia(i), isNew),
-						DEFAULT_SCHED_STATE);
+--		res(i) := ('0',
+--						updateForWaiting(insArray(i), readyRegFlags, aia(i), isNew),
+--						DEFAULT_SCHED_STATE);
 	end loop;
 	return res;
 end function;
@@ -951,9 +951,9 @@ return SchedulerEntrySlotArray is
 	variable res: SchedulerEntrySlotArray(0 to insArray'length-1);-- := insArray;
 begin
 	for i in insArray'range loop
-		res(i) := ('0',
-						updateForSelection(insArray(i), readyRegFlags, aia(i)),
-						DEFAULT_SCHED_STATE);
+--		res(i) := ('0',
+--						updateForSelection(insArray(i), readyRegFlags, aia(i)),
+--						DEFAULT_SCHED_STATE);
 	end loop;	
 	return res;
 end function;

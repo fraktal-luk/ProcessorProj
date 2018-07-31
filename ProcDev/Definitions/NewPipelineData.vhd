@@ -234,7 +234,7 @@ type InstructionState is record
 	constantArgs: InstructionConstantArgs;
 	virtualArgSpec: InstructionArgSpec;
 	physicalArgSpec: InstructionArgSpec;
-	argValues: InstructionArgValues;
+	--argValues: InstructionArgValues;
 	result: Mword;
 	target: Mword;
 end record;
@@ -440,7 +440,7 @@ begin
 	res.constantArgs := defaultConstantArgs;
 	res.virtualArgSpec := DEFAULT_ARG_SPEC;
 	res.physicalArgSpec := DEFAULT_ARG_SPEC;
-	res.argValues := defaultArgValues;
+	--res.argValues := defaultArgValues;
 	res.result := (others => '0');
 	res.target := (others => '0');
 	return res;

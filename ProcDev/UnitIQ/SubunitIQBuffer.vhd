@@ -175,7 +175,7 @@ architecture Implem of SubunitIQBuffer is
 				--res.data(i).argValues.arg1 := res.data(i).constantArgs.imm;					
 			end if;			
 			
-				res(i).ins.argValues := res(i).state.argValues; -- TEMP!
+			--	res(i).ins.argValues := res(i).state.argValues; -- TEMP!
 		
 		end loop;
 		return res;

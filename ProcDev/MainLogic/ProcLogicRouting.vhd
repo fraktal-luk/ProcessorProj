@@ -174,7 +174,7 @@ function prepareForAGU(insVec: StageDataMulti) return StageDataMulti is
 	variable res: StageDataMulti := insVec;
 begin
 	for i in 0 to PIPE_WIDTH-1 loop
-		res.data(i).argValues.missing(2) := '0';
+		--res.data(i).argValues.missing(2) := '0';
 			--res.data(i).virtualArgSpec.intArgSel(2) := '0'; -- CAREFUL
 			--res.data(i).virtualArgSpec.floatArgSel(2) := '0'; -- CAREFUL
 			--res.data(i).physicalArgSpec.intArgSel(2) := '0'; -- CAREFUL

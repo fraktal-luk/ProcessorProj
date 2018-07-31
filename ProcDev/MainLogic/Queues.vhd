@@ -459,7 +459,7 @@ begin
 			res(i).operation := newContent(slv2u(tmpSN)).operation;
 			
 			if keepInputContent then
-				res(i).argValues := newContent(slv2u(tmpSN)).argValues;
+				--res(i).argValues := newContent(slv2u(tmpSN)).argValues;
 				
 					res(i) := setStoredArg1(res(i), getStoredArg1(newContent(slv2u(tmpSN))));
 					res(i) := setStoredArg2(res(i), getStoredArg2(newContent(slv2u(tmpSN))));

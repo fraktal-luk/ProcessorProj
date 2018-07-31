@@ -56,28 +56,28 @@ package body ProcLogicExec is
 	function passArg0(ins: InstructionState) return InstructionState is
 		variable res: InstructionState := ins;
 	begin
-		res.result := res.argValues.arg0;
+		--res.result := res.argValues.arg0;
 		return res;
 	end function;
 
 	function passArg1(ins: InstructionState) return InstructionState is
 		variable res: InstructionState := ins;
 	begin
-		res.result := res.argValues.arg1;
+		--res.result := res.argValues.arg1;
 		return res;
 	end function;
 
 	function execLogicOr(ins: InstructionState) return InstructionState is
 		variable res: InstructionState := ins;
 	begin
-		res.result := res.argValues.arg0 or res.argValues.arg1;
+		--res.result := res.argValues.arg0 or res.argValues.arg1;
 		return res;
 	end function;	
 
 	function execLogicXor(ins: InstructionState) return InstructionState is
 		variable res: InstructionState := ins;
 	begin
-		res.result := res.argValues.arg0 xor res.argValues.arg1;
+		--res.result := res.argValues.arg0 xor res.argValues.arg1;
 		return res;
 	end function;	
 
