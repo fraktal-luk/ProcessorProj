@@ -250,14 +250,15 @@ return SchedulerEntrySlot is
 	variable selected0, selected1: Mword := (others => '0');
 begin
 	res.ins := ins;
+	res.state := st;
 
-	res.ins.argValues.arg0 := vals(slv2u(res.ins.argValues.locs(0)));
+	res.state.argValues.arg0 := vals(slv2u(res.state.argValues.locs(0)));
 	
-	if res.ins.argValues.immediate = '1' and USE_IMM then
-		res.ins.argValues.arg1 := res.ins.constantArgs.imm;
-		res.ins.argValues.arg1(31 downto 17) := (others => res.ins.constantArgs.imm(16)); -- 16b + addditional sign bit
+	if res.state.argValues.immediate = '1' and USE_IMM then
+		res.state.argValues.arg1 := res.ins.constantArgs.imm;
+		res.state.argValues.arg1(31 downto 17) := (others => res.ins.constantArgs.imm(16)); -- 16b + addditional sign bit
 	else
-		res.ins.argValues.arg1 := vals(slv2u(res.ins.argValues.locs(1)));
+		res.state.argValues.arg1 := vals(slv2u(res.state.argValues.locs(1)));
 	end if;
 	
 ------ Different formulation for arg1 to use 2 LUTs rather than 3 per bit.
@@ -300,12 +301,13 @@ begin
 --	res.argValues.arg1 := selected1;
 ----------------------------------
 
-	res.ins.argValues.arg2 := vals(slv2u(res.ins.argValues.locs(2)));
+	res.state.argValues.arg2 := vals(slv2u(res.state.argValues.locs(2)));
 
 	-- pragma synthesis off
-	res.ins.argValues := dispatchArgHistory(res.ins.argValues);
+	res.state.argValues := dispatchArgHistory(res.state.argValues);
 	-- pragma synthesis on
 	
+		res.ins.argValues := res.state.argValues; -- TEMP!
 	return res;
 end function;
 
@@ -320,23 +322,26 @@ return SchedulerEntrySlot is
 	variable carg0, carg1, carg2: Mword;
 begin
 	res.ins := ins;
+	res.state := st;
 	
 	-- pragma synthesis off
-	res.ins.argValues := updateArgHistory(res.ins.argValues);
+	res.state.argValues := updateArgHistory(res.state.argValues);
 	-- pragma synthesis on
 
 -- readyNext && not zero -> next val, readyNow && not zero -> keep, else -> reg
 	-- Clear 'missing' flag where readyNext indicates.
-	res.ins.argValues.missing := res.ins.argValues.missing and not (res.ins.argValues.readyNext and not res.ins.argValues.zero);
+	res.state.argValues.missing := res.state.argValues.missing and not (res.state.argValues.readyNext and not res.state.argValues.zero);
 
-	carg0 := selectUpdatedArg(res.ins.argValues, 0, '0', res.ins.argValues.arg0, vals, regValues);	
-	carg1 := selectUpdatedArg(res.ins.argValues, 1, res.ins.argValues.immediate, res.ins.argValues.arg1, vals, regValues);	
-	carg2 := selectUpdatedArg(res.ins.argValues, 2, '0', res.ins.argValues.arg2, vals, regValues);	
+	carg0 := selectUpdatedArg(res.state.argValues, 0, '0', res.state.argValues.arg0, vals, regValues);	
+	carg1 := selectUpdatedArg(res.state.argValues, 1, res.state.argValues.immediate, res.state.argValues.arg1, vals, regValues);	
+	carg2 := selectUpdatedArg(res.state.argValues, 2, '0', res.state.argValues.arg2, vals, regValues);	
 
-	res.ins.argValues.arg0 := carg0;
-	res.ins.argValues.arg1 := carg1;
-	res.ins.argValues.arg2 := carg2;
-
+	res.state.argValues.arg0 := carg0;
+	res.state.argValues.arg1 := carg1;
+	res.state.argValues.arg2 := carg2;
+	
+	res.ins.argValues := res.state.argValues; -- TEMP!
+	
 	return res;
 end function;
 
