@@ -235,7 +235,8 @@ begin
 			newDataU.fullMask <= newData.fullMask;
 			newDataU.data <= extractData(newContent);
 		
-		queueContentNext <= iqContentNext4(queueContentUpdated, newDataU, 
+		queueContentNext <= iqContentNext4(queueContentUpdated, newDataU,
+																					newContent,
 														livingMask,
 														stayMask,--readyMask2, --_C,
 														sends,

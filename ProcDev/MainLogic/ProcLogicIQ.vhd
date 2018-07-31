@@ -49,7 +49,8 @@ function iqContentNext3(queueData, queueDataSel: InstructionStateArray; inputDat
 								 prevSendingOK: std_logic)
 return InstructionSlotArray;
 
-function iqContentNext4(queueContent: SchedulerEntrySlotArray; inputData: StageDataMulti; 
+function iqContentNext4(queueContent: SchedulerEntrySlotArray; inputData: StageDataMulti;
+																					inputDataS: SchedulerEntrySlotArray;
 								 livingMask,
 								 stayMask: std_logic_vector;
 								 sends: std_logic;
@@ -544,7 +545,8 @@ begin
 end function;
 
 
-function iqContentNext4(queueContent: SchedulerEntrySlotArray; inputData: StageDataMulti; 
+function iqContentNext4(queueContent: SchedulerEntrySlotArray; inputData: StageDataMulti;
+																					inputDataS: SchedulerEntrySlotArray;
 								 livingMask,
 								 stayMask: std_logic_vector;
 								 sends: std_logic;
@@ -555,13 +557,18 @@ return SchedulerEntrySlotArray is
 	constant QUEUE_SIZE: natural := queueContent'length;
 	variable res: SchedulerEntrySlotArray(0 to QUEUE_SIZE-1) := (others => DEFAULT_SCH_ENTRY_SLOT); 	
 	variable queueData: InstructionStateArray(0 to QUEUE_SIZE-1) := extractData(queueContent);
+		variable queueDataS: SchedulerEntrySlotArray(0 to QUEUE_SIZE-1) := queueContent;
 	variable dataNew: StageDataMulti := inputData;
+		variable dataNewDataS: SchedulerEntrySlotArray(0 to PIPE_WIDTH-1) := inputDataS;
 	
 	variable iqDataNext: InstructionStateArray(0 to QUEUE_SIZE - 1) := (others => defaultInstructionState);
+		variable iqDataNextS: SchedulerEntrySlotArray(0 to QUEUE_SIZE - 1) := (others => DEFAULT_SCH_ENTRY_SLOT);
 	variable iqFullMaskNext: std_logic_vector(0 to QUEUE_SIZE - 1) :=	(others => '0');
 				
 	variable xVec: InstructionStateArray(0 to QUEUE_SIZE + PIPE_WIDTH - 1);
 	variable yVec: InstructionStateArray(0 to QUEUE_SIZE + PIPE_WIDTH - 1);
+		variable xVecS: SchedulerEntrySlotArray(0 to QUEUE_SIZE + PIPE_WIDTH - 1);
+		variable yVecS: SchedulerEntrySlotArray(0 to QUEUE_SIZE + PIPE_WIDTH - 1);
 	variable yMask: std_logic_vector(0 to QUEUE_SIZE + PIPE_WIDTH-1)	:= (others => '0');
 	variable fullMaskSh: std_logic_vector(0 to QUEUE_SIZE-1) := livingMask; --fullMask;
 	variable nAfterSending: integer := living;
@@ -570,13 +577,18 @@ begin
 	-- Important, new instrucitons in queue must be marked!
 	for i in 0 to PIPE_WIDTH-1 loop
 		dataNew.data(i).argValues.newInQueue := '1';
+		dataNewDataS(i).state.argValues.newInQueue := '1';
+		dataNewDataS(i).ins.argValues.newInQueue := '1'; -- TEMP!
 	end loop;
 
 	xVec := queueData & dataNew.data; -- CAREFUL: What to append after queueData?
+		xVecS := queueDataS & dataNewDataS;
 	xVec(QUEUE_SIZE) := xVec(QUEUE_SIZE-1);
-				
+		xVecS(QUEUE_SIZE) := xVecS(QUEUE_SIZE-1);
+		
 	for k in 0 to yVec'right loop
 		yVec(k) := dataNew.data(k mod PIPE_WIDTH);
+			yVecS(k) := dataNewDataS(k mod PIPE_WIDTH);
 	end loop;	
 	
 	for k in 0 to PIPE_WIDTH-1 loop
@@ -624,23 +636,29 @@ begin
 
 	-- Now assign from x or y
 	iqDataNext := queueData;
+		iqDataNextS := queueDataS;
 	for i in 0 to QUEUE_SIZE-1 loop
 		iqFullMaskNext(i) := fullMaskSh(i) or (yMask(i) and prevSendingOK);
 		if fullMaskSh(i) = '1' then -- From x	
 			if stayMask(i) = '1' then
 				iqDataNext(i) := xVec(i);
+					iqDataNextS(i) := xVecS(i);
 			else
 				iqDataNext(i) := xVec(i + 1);
+					iqDataNextS(i) := xVecS(i + 1);
 			end if;
 		else -- From y
 			iqDataNext(i) := yVec(i);
+				iqDataNextS(i) := yVecS(i);
 		end if;
 	end loop;
 
 	-- Fill output array
 	for i in 0 to res'right loop
 		res(i).full := iqFullMaskNext(i);
-		res(i).ins := iqDataNext(i);
+		--res(i).ins := iqDataNext(i);
+			res(i).ins := iqDataNextS(i).ins;
+			res(i).state := iqDataNextS(i).state;
 	end loop;
 	--res(-1).full := sends;
 	--res(-1).ins := dispatchDataNew;
@@ -741,6 +759,7 @@ return SchedulerEntrySlot is
 	variable locs, nextLocs: SmallNumberArray(0 to 2) := (others=>(others=>'0'));
 begin
 	res.ins := ins;	
+	res.state := st;
 	
 	for i in fni.writtenTags'length-1 downto 0 loop
 		if fni.writtenTags(i)(PHYS_REG_BITS-1 downto 0) = ins.physicalArgSpec.args(0)(PHYS_REG_BITS-1 downto 0) then
@@ -793,22 +812,24 @@ begin
 		end if;			
 	end loop;
 	
-	res.ins.argValues.readyNow := (others => '0'); 
-	res.ins.argValues.readyNext := (others => '0');
+	res.state.argValues.readyNow := (others => '0'); 
+	res.state.argValues.readyNext := (others => '0');
 
 	-- 
-	if res.ins.argValues.newInQueue = '1' then
+	if res.state.argValues.newInQueue = '1' then
 		tmp8 := getTagLowSN(res.ins.tags.renameIndex);-- and i2slv(PIPE_WIDTH-1, SMALL_NUMBER_SIZE);
 		rrf := readyRegFlags(3*slv2u(tmp8) to 3*slv2u(tmp8) + 2);
-		res.ins.argValues.missing := res.ins.argValues.missing and not rrf;
+		res.state.argValues.missing := res.state.argValues.missing and not rrf;
 	end if;
 	
-	res.ins.argValues.missing := res.ins.argValues.missing and not written;
-	res.ins.argValues.missing := res.ins.argValues.missing and not ready;
-	res.ins.argValues.missing := res.ins.argValues.missing and not nextReady;	
+	res.state.argValues.missing := res.state.argValues.missing and not written;
+	res.state.argValues.missing := res.state.argValues.missing and not ready;
+	res.state.argValues.missing := res.state.argValues.missing and not nextReady;	
 	
 	-- CAREFUL! DEPREC statement?
-	res.ins.argValues.newInQueue := isNew;
+	res.state.argValues.newInQueue := isNew;
+	
+		res.ins.argValues := res.state.argValues; -- TEMP!
 	
 	res.ins.ip := (others => '0');
 	return res;
@@ -826,6 +847,7 @@ return SchedulerEntrySlot is
 	variable locs, nextLocs: SmallNumberArray(0 to 2) := (others=>(others=>'0'));
 begin
 	res.ins := ins;
+	res.state := st;
 	
 	-- Find where tag agrees with s0
 	for i in fni.resultTags'length-1 downto 0 loop		
@@ -864,32 +886,34 @@ begin
 		end if;			
 	end loop;
 	
-	res.ins.argValues.readyNow := (others => '0'); 
-	res.ins.argValues.readyNext := (others => '0');
+	res.state.argValues.readyNow := (others => '0'); 
+	res.state.argValues.readyNext := (others => '0');
 
 	-- Checking reg ready flags (only for new ops in queue)
 	-- CAREFUL! Which reg ready flags are for this instruction?
 	--				Use groupTag, because it identifies the slot in previous superscalar stage
-	if res.ins.argValues.newInQueue = '1' then
+	if res.state.argValues.newInQueue = '1' then
 		tmp8 := getTagLowSN(res.ins.tags.renameIndex);-- and i2slv(PIPE_WIDTH-1, SMALL_NUMBER_SIZE);
 		rrf := readyRegFlags(3*slv2u(tmp8) to 3*slv2u(tmp8) + 2);
-		res.ins.argValues.missing := res.ins.argValues.missing and not rrf;
+		res.state.argValues.missing := res.state.argValues.missing and not rrf;
 	end if;
 
 	-- pragma synthesis off				
-	res.ins.argValues := beginHistory(res.ins.argValues, ready, nextReady);
+	res.state.argValues := beginHistory(res.state.argValues, ready, nextReady);
 	-- pragma synthesis on
 
-	res.ins.argValues.missing := res.ins.argValues.missing and not nextReady;
-	res.ins.argValues.readyNext := nextReady;
+	res.state.argValues.missing := res.state.argValues.missing and not nextReady;
+	res.state.argValues.readyNext := nextReady;
 	-- CAREFUL, NOTE: updating 'missing' with ai.ready would increase delay, unneeded with full 'nextReady'
 	
-		res.ins.argValues.missing := res.ins.argValues.missing and not ready;
+		res.state.argValues.missing := res.state.argValues.missing and not ready;
 
-	res.ins.argValues.readyNow := ready;
+	res.state.argValues.readyNow := ready;
 
-	res.ins.argValues.locs := locs;	
-	res.ins.argValues.nextLocs := nextLocs;
+	res.state.argValues.locs := locs;	
+	res.state.argValues.nextLocs := nextLocs;
+
+		res.ins.argValues := res.state.argValues;
 
 	-- Clear unused fields
 	res.ins.bits := (others => '0');
