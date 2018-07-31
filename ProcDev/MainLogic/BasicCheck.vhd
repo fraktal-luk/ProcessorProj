@@ -464,7 +464,7 @@ begin
 
 			if storeValueInput.full = '1' then
 				report makeLogPath(storeAddressInput'path_name) & ": " &
-							"writing store value " & integer'image(slv2u(storeAddressInput.ins.argValues.arg2)) &
+							"writing store value " & integer'image(slv2u(getStoredArg2(storeAddressInput.ins))) &
 							" by " & integer'image(slv2u(storeAddressInput.ins.tags.renameIndex));
 			end if;
 			
@@ -503,7 +503,7 @@ begin
 
 			if selectedDataOutputSig.full = '1' then
 				report makeLogPath(compareAddressInput'path_name) & ": " &
-							"matched storeded value " & integer'image(slv2u(selectedDataOutputSig.ins.argValues.arg2)) &
+							"matched storeded value " & integer'image(slv2u(getStoredArg2(selectedDataOutputSig.ins))) &
 							" by " & integer'image(slv2u(selectedDataOutputSig.ins.tags.renameIndex));
 			end if;
 			

@@ -163,6 +163,30 @@ begin
 end function;
 
 
+function getStoredArg1(ins: InstructionState) return Mword is
+begin
+	return ins.argValues.arg1;
+end function;
+
+function getStoredArg2(ins: InstructionState) return Mword is
+begin
+	return ins.argValues.arg2;
+end function;
+
+function setStoredArg1(ins: InstructionState; val: Mword) return InstructionState is
+	variable res: InstructionState := ins;
+begin
+	res.argValues.arg1 := val;
+	return res;
+end function;
+
+function setStoredArg2(ins: InstructionState; val: Mword) return InstructionState is
+	variable res: InstructionState := ins;
+begin
+	res.argValues.arg2 := val;
+	return res;
+end function;
+
 
 function killByTag(before, ei, int: std_logic) return std_logic;
 	

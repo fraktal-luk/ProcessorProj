@@ -75,7 +75,7 @@ begin
 	enSig <= en or not HAS_EN;
 
 	cacheFill.full <= fillready;
-	cacheFill.ins.argValues.arg1 <= filladr;
+	cacheFill.ins <= setStoredArg1(DEFAULT_INSTRUCTION_STATE, filladr);
 
 	SEQUENCING_PART: entity work.UnitSequencer(Behavioral)
 	port map (
@@ -327,15 +327,17 @@ begin
 -----------------------------------------
 ----- Mem signals -----------------------
 	MEMORY_INTERFACE: block
+		signal sysStoreAddressW: Mword := (others => '0');
 	begin
-		memStoreAddress <= dataFromSB.argValues.arg1;
-		memStoreValue <= dataFromSB.argValues.arg2;
+		memStoreAddress <= getStoredArg1(dataFromSB);
+		memStoreValue <= getStoredArg2(dataFromSB);
 		memStoreAllow <= sbSending and isStore(dataFromSB);
 				
 		sysStoreAllow <= sbSending and isSysRegWrite(dataFromSB);
 
-		sysStoreAddress <= dataFromSB.argValues.arg1(4 downto 0);
-		sysStoreValue <= dataFromSB.argValues.arg2;				
+		sysStoreAddressW <= getStoredArg1(dataFromSB);
+		sysStoreAddress <= sysStoreAddressW(4 downto 0);
+		sysStoreValue <= getStoredArg2(dataFromSB);			
 
 		dadr <= memLoadAddress;
 		doutadr <= memStoreAddress;

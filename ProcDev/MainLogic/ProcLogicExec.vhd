@@ -81,7 +81,7 @@ package body ProcLogicExec is
 		return res;
 	end function;	
 
- 
+
 	function raiseExecException(ins: InstructionState) return InstructionState is
 		variable res: InstructionState := ins;
 	begin
@@ -139,7 +139,7 @@ package body ProcLogicExec is
 			res.controlInfo.hasReturn := '1';						
 			res.controlInfo.newEvent := '1';
 			--res.controlInfo.hasEvent := '1';
-				trueTarget := queueData.argValues.arg2; -- TODO: clean it up!
+				trueTarget := getStoredArg2(queueData); -- TODO: clean it up!
 		elsif res.controlInfo.hasBranch = '0' and branchTaken = '1' then				
 			res.controlInfo.hasReturn := '0';
 			--res.controlInfo.newBranch := '1';
@@ -149,19 +149,19 @@ package body ProcLogicExec is
 			if ins.constantArgs.immSel = '0' then -- if branch reg			
 				trueTarget := st.argValues.arg1;
 			else
-				trueTarget := queueData.argValues.arg1;
+				trueTarget := getStoredArg1(queueData);
 			end if;
 		elsif res.controlInfo.hasBranch = '0' and branchTaken = '0' then
 			
-			trueTarget := queueData.argValues.arg2; -- TODO: cleanup
+			trueTarget := getStoredArg2(queueData);
 		else -- taken -> taken
 			if ins.constantArgs.immSel = '0' then -- if branch reg
-				if queueData.argValues.arg1 /= st.argValues.arg1 then
+				if getStoredArg1(queueData) /= st.argValues.arg1 then
 					res.controlInfo.newEvent := '1';	-- Need to correct the target!				
 				end if;
 				trueTarget := st.argValues.arg1; -- reg destination
 			else
-				trueTarget := queueData.argValues.arg1;				
+				trueTarget := getStoredArg1(queueData);				
 			end if;
 		end if;
 
@@ -169,7 +169,7 @@ package body ProcLogicExec is
 							trueTarget;
 		-- Return address
 		res.result := --linkAddress;
-							queueData.argValues.arg2; -- Link address  TODO: cleanup!
+							getStoredArg2(queueData);
 							
 		return res;
 	end function;
@@ -266,7 +266,7 @@ package body ProcLogicExec is
 		-- Most positive byte count is 3, giving 3*8 + 7 = 31
 		
 		resultExt := addMwordFasterExt(arg0, argAddSub, carryIn);	
-		linkAdr := queueData.argValues.arg2;
+		linkAdr := getStoredArg2(queueData);
 
 --		if ins.operation.func = jump then
 --			result := linkAdr;

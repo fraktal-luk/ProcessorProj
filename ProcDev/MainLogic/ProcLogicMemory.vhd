@@ -102,7 +102,7 @@ begin
 	for i in 0 to res'length-1 loop
 		if 	 fullMask(i) = '1'
 			and content(i).controlInfo.completed = '1' -- Addressmust be already known!
-			and ins.argValues.arg1 = content(i).argValues.arg1 then
+			and getStoredArg1(ins) = getStoredArg1(content(i)) then
 			res(i) := '1';
 		end if;
 	end loop;
@@ -115,12 +115,14 @@ function compareAddressDLQ(content: InstructionStateArray; fullMask: std_logic_v
 								ins: InstructionState) return std_logic_vector is
 	variable res: std_logic_vector(0 to content'length-1) := (others => '0');
 	constant LOG2_CACHE_LINE_SIZE: integer := 6; -- TEMP! 2^6 = 64B
+	variable w1, w2: Mword;
 begin
 	for i in 0 to res'length-1 loop
+		w1 := getStoredArg1(ins);
+		w2 := getStoredArg1(content(i));
 		if 	 fullMask(i) = '1'
 			and content(i).controlInfo.completed = '1' -- Addressmust be already known!
-			and ins.argValues.arg1(MWORD_SIZE-1 downto LOG2_CACHE_LINE_SIZE)
-				= content(i).argValues.arg1(MWORD_SIZE-1 downto LOG2_CACHE_LINE_SIZE) then
+			and w1(MWORD_SIZE-1 downto LOG2_CACHE_LINE_SIZE) = w2(MWORD_SIZE-1 downto LOG2_CACHE_LINE_SIZE) then
 			res(i) := '1';
 		end if;
 	end loop;
@@ -374,7 +376,7 @@ end function;
 		-- TODO: remember about miss/hit status and reason of miss if relevant!
 		if storeForwardSending = '1' then
 			res := setDataCompleted(res, getDataCompleted(storeForwardIns));
-			res := setInsResult(res, storeForwardIns.argValues.arg2);
+			res := setInsResult(res, getStoredArg2(storeForwardIns));
 		elsif isSysRegRead(res) = '1' then
 			res := setDataCompleted(res, sysLoadReady);
 			res := setInsResult(res, sysLoadValue);		

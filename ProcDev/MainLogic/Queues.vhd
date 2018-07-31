@@ -460,6 +460,9 @@ begin
 			
 			if keepInputContent then
 				res(i).argValues := newContent(slv2u(tmpSN)).argValues;
+				
+					res(i) := setStoredArg1(res(i), getStoredArg1(newContent(slv2u(tmpSN))));
+					res(i) := setStoredArg2(res(i), getStoredArg2(newContent(slv2u(tmpSN))));
 			end if;
 			
 			if clearCompleted then
@@ -472,18 +475,12 @@ begin
 		end if;
 	
 		if (wrA and maskA(i)) = '1' then
-			res(i).--target 
-					argValues.arg1
-					:= insA.--result;
-								target;
+			res(i) := setStoredArg1(res(i), insA.target);
 			res(i).controlInfo.completed := '1';
 		end if;
 		
 		if (wrD and maskD(i)) = '1' then
-			res(i).--result
-					argValues.arg2
-					:= insD.--argValues.arg2;
-								result;
+			res(i) := setStoredArg2(res(i), insD.result);
 			res(i).controlInfo.completed2 := '1';						
 		end if;
 	end loop;

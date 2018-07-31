@@ -175,6 +175,10 @@ function prepareForAGU(insVec: StageDataMulti) return StageDataMulti is
 begin
 	for i in 0 to PIPE_WIDTH-1 loop
 		res.data(i).argValues.missing(2) := '0';
+			--res.data(i).virtualArgSpec.intArgSel(2) := '0'; -- CAREFUL
+			--res.data(i).virtualArgSpec.floatArgSel(2) := '0'; -- CAREFUL
+			--res.data(i).physicalArgSpec.intArgSel(2) := '0'; -- CAREFUL
+			--res.data(i).physicalArgSpec.floatArgSel(2) := '0'; -- CAREFUL
 		
 		res.data(i).virtualArgSpec.intArgSel(2) := '0';
 		res.data(i).physicalArgSpec.intArgSel(2) := '0';
@@ -208,10 +212,13 @@ end function;
 
 function trgForBQ(insVec: StageDataMulti) return StageDataMulti is
 	variable res: StageDataMulti := insVec;
+	variable result, target: Mword;
 begin
 	for i in 0 to PIPE_WIDTH-1 loop
-		res.data(i).argValues.arg1 := res.data(i).target;
-		res.data(i).argValues.arg2 := res.data(i).result;
+		target := res.data(i).target;
+		result := res.data(i).result;
+		res.data(i) := setStoredArg1(res.data(i), target);
+		res.data(i) := setStoredArg2(res.data(i), result);
 	end loop;
 	
 	return res;
