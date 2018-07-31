@@ -400,7 +400,7 @@ end function;
 	
 	function calcEffectiveAddress(ins: InstructionState; st: SchedulerState) return InstructionState is
 	begin
-		return setInstructionTarget(ins, addMwordFaster(ins.argValues.arg0, ins.argValues.arg1));
+		return setInstructionTarget(ins, addMwordFaster(st.argValues.arg0, st.argValues.arg1));
 	end function;
 
 end ProcLogicMemory;

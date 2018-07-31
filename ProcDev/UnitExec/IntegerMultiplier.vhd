@@ -171,8 +171,8 @@ begin
 	MP: entity work.NewMultiplierPipe(Behavioral)
 	port map(
 		clk => clk, reset => reset, en => en,
-		inA => input.ins.argValues.arg0,
-		inB => input.ins.argValues.arg1,
+		inA => input.state.argValues.arg0,
+		inB => input.state.argValues.arg1,
 		inC => (others => '0'),
 		result => multResult
 	);

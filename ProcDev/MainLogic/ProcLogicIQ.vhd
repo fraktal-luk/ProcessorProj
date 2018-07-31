@@ -35,10 +35,7 @@ return ArgStatusInfo;
 function getArgInfoArrayD2(data: InstructionStateArray; tags0, tags1, tags2, nextTags, writtenTags: PhysNameArray)
 return ArgStatusInfoArray;
 
-	
--- True if all args are ready
--- UNUSED?
-function readyForExec(ins: InstructionState) return std_logic;	
+
 
 function iqContentNext3(queueData, queueDataSel: InstructionStateArray; inputData: StageDataMulti; 
 								 fullMask,
@@ -427,19 +424,13 @@ begin
 	end loop;
 	return res;
 end function;
-
-
-function readyForExec(ins: InstructionState) return std_logic is
-	variable res: std_logic;
-begin
-	return not isNonzero(ins.argValues.missing);
-end function;	
+	
 
 function extractReadyMaskNew(entryVec: SchedulerEntrySlotArray) return std_logic_vector is
 	variable res: std_logic_vector(entryVec'range);
 begin	
 	for i in res'range loop
-		res(i) := not isNonzero(entryVec(i).ins.argValues.missing);
+		res(i) := not isNonzero(entryVec(i).state.argValues.missing);
 	end loop;
 	return res;
 end function;

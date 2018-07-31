@@ -131,7 +131,7 @@ package body ProcLogicExec is
 		-- storedReturn := res.result;
 		-- targetEqual := [if storedTarget = reg then '1' else '0'];
 
-		branchTaken := resolveBranchCondition(ins.argValues, ins.constantArgs);
+		branchTaken := resolveBranchCondition(st.argValues, ins.constantArgs);
 
 		if res.controlInfo.hasBranch = '1' and branchTaken = '0' then
 			res.controlInfo.hasBranch := '0';
@@ -139,7 +139,7 @@ package body ProcLogicExec is
 			res.controlInfo.hasReturn := '1';						
 			res.controlInfo.newEvent := '1';
 			--res.controlInfo.hasEvent := '1';
-				trueTarget := queueData.argValues.arg2;
+				trueTarget := queueData.argValues.arg2; -- TODO: clean it up!
 		elsif res.controlInfo.hasBranch = '0' and branchTaken = '1' then				
 			res.controlInfo.hasReturn := '0';
 			--res.controlInfo.newBranch := '1';
@@ -147,19 +147,19 @@ package body ProcLogicExec is
 			res.controlInfo.newEvent := '1';
 			--res.controlInfo.hasEvent := '1';
 			if ins.constantArgs.immSel = '0' then -- if branch reg			
-				trueTarget := ins.argValues.arg1;
+				trueTarget := st.argValues.arg1;
 			else
 				trueTarget := queueData.argValues.arg1;
 			end if;
 		elsif res.controlInfo.hasBranch = '0' and branchTaken = '0' then
 			
-			trueTarget := queueData.argValues.arg2;
+			trueTarget := queueData.argValues.arg2; -- TODO: cleanup
 		else -- taken -> taken
 			if ins.constantArgs.immSel = '0' then -- if branch reg
-				if queueData.argValues.arg1 /= ins.argValues.arg1 then
+				if queueData.argValues.arg1 /= st.argValues.arg1 then
 					res.controlInfo.newEvent := '1';	-- Need to correct the target!				
 				end if;
-				trueTarget := ins.argValues.arg1; -- reg destination
+				trueTarget := st.argValues.arg1; -- reg destination
 			else
 				trueTarget := queueData.argValues.arg1;				
 			end if;
@@ -169,7 +169,7 @@ package body ProcLogicExec is
 							trueTarget;
 		-- Return address
 		res.result := --linkAddress;
-							queueData.argValues.arg2; -- Link address
+							queueData.argValues.arg2; -- Link address  TODO: cleanup!
 							
 		return res;
 	end function;
@@ -215,9 +215,9 @@ package body ProcLogicExec is
 			variable tempBits: std_logic_vector(95 downto 0) := (others => '0'); -- TEMP! for 32b only
 			variable shiftedBytes: std_logic_vector(39 downto 0) := (others => '0');
 	begin
-		arg0 := ins.argValues.arg0;
-		arg1 := ins.argValues.arg1;
-		arg2 := ins.argValues.arg2;
+		arg0 := st.argValues.arg0;
+		arg1 := st.argValues.arg1;
+		arg2 := st.argValues.arg2;
 	
 		c0 := ins.constantArgs.c0;
 		c1 := ins.constantArgs.c1;	

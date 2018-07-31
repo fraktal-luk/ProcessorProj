@@ -91,6 +91,7 @@ begin
 	inputDataWithArgs <= getDispatchArgValues(input.ins, input.state, resultVals, USE_IMM);
 	stageDataM <= makeSDM((0 => (prevSending, inputDataWithArgs.ins)));
 	
+	-- not used now
 	BASIC_LOGIC: entity work.GenericStageMulti(Behavioral)
 	generic map(
 		COMPARE_TAG => '1'
@@ -143,7 +144,7 @@ begin
 
 	-- CAREFUL: this does nothing. To make it work:
 	--											nextAcceptingEffective <= nextAccepting and not lockSend
-	lockSend <= BLOCK_ISSUE_WHEN_MISSING and isNonzero(dispatchDataUpdated.ins.argValues.missing);
+	lockSend <= BLOCK_ISSUE_WHEN_MISSING and isNonzero(dispatchDataUpdated.st.argValues.missing);
 	output <= (sendingOut, dispatchDataUpdated.ins, dispatchDataUpdated.state);
 end Alternative;
 
