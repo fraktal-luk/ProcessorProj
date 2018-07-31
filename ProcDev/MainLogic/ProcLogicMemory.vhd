@@ -86,7 +86,7 @@ function findFirstFree(mask: std_logic_vector) return std_logic_vector;
 
 	function getSendingToDLQ(sendingAfterRW, sendingSelectedLQ: std_logic;
 									 lsResultData: InstructionState) return std_logic;	
-	function calcEffectiveAddress(ins: InstructionState) return InstructionState;
+	function calcEffectiveAddress(ins: InstructionState; st: SchedulerState) return InstructionState;
 
 end ProcLogicMemory;
 
@@ -398,7 +398,7 @@ end function;
 							or  sendingSelectedLQ; -- When store hits younger load and must get off the way	
 	end function;
 	
-	function calcEffectiveAddress(ins: InstructionState) return InstructionState is
+	function calcEffectiveAddress(ins: InstructionState; st: SchedulerState) return InstructionState is
 	begin
 		return setInstructionTarget(ins, addMwordFaster(ins.argValues.arg0, ins.argValues.arg1));
 	end function;

@@ -137,7 +137,7 @@ architecture Behavioral of UnitMemory is
 begin
 	eventSignal <= execOrIntEventSignalIn;	
 
-	inputDataC <= makeSDM((0 => (inputC.full, calcEffectiveAddress(inputC.ins))));
+	inputDataC <= makeSDM((0 => (inputC.full, calcEffectiveAddress(inputC.ins, inputC.state))));
 
 	STAGE_AGU: entity work.GenericStageMulti(Behavioral)
 	generic map(
@@ -263,7 +263,7 @@ begin
 		-- SQ inputs
 		storeAddressWrSig <= sendingAddressToSQSig;
 		storeValueWrSig <= inputE.full;
-				
+
 		-- SQ inputs
 		storeAddressDataSig <= addressingData; -- Mem unit interface
 		storeValueDataSig <= setInsResult(inputE.ins, inputE.ins.argValues.arg2); -- Mem unit interface		

@@ -637,6 +637,7 @@ begin
 
 	-- CAREFUL, TODO:	solve the issue with HDLCompiler:1827
 	yVec(shiftNum to yVec'length - 1) := yVec(0 to yVec'length - 1 - shiftNum);
+		yVecS(shiftNum to yVecS'length - 1) := yVecS(0 to yVecS'length - 1 - shiftNum);
 	yMask(shiftNum to yVec'length - 1) := yMask(0 to yVec'length - 1 - shiftNum);
 
 	-- Now assign from x or y

@@ -36,7 +36,8 @@ package ProcLogicExec is
 	
 	function resolveBranchCondition(av: InstructionArgValues; ca: InstructionConstantArgs) return std_logic;
 
-	function basicBranch(ins: InstructionState; queueData: InstructionState; qs: std_logic) return InstructionState;
+	function basicBranch(ins: InstructionState; st: SchedulerState; queueData: InstructionState; qs: std_logic)
+	return InstructionState;
 
 	function setExecState(ins: InstructionState;
 								result: Mword; carry: std_logic; exc: std_logic_vector(3 downto 0))
@@ -44,7 +45,7 @@ package ProcLogicExec is
 
 	function isBranch(ins: InstructionState) return std_logic;
 
-	function executeAlu(ins: InstructionState; queueData: InstructionState) return InstructionState;
+	function executeAlu(ins: InstructionState; st: SchedulerState; queueData: InstructionState) return InstructionState;
 	
 end ProcLogicExec;
 
@@ -109,7 +110,7 @@ package body ProcLogicExec is
 	end function;
 
 
-	function basicBranch(ins: InstructionState; queueData: InstructionState; qs: std_logic
+	function basicBranch(ins: InstructionState; st: SchedulerState; queueData: InstructionState; qs: std_logic
 									) return InstructionState is
 		variable res: InstructionState := ins;
 		variable branchTaken: std_logic := '0';
@@ -199,7 +200,8 @@ package body ProcLogicExec is
 	end function;
 	
 	
-	function executeAlu(ins: InstructionState; queueData: InstructionState) return InstructionState is
+	function executeAlu(ins: InstructionState; st: SchedulerState; queueData: InstructionState)
+	return InstructionState is
 		variable res: InstructionState := ins;
 		variable result, linkAdr: Mword := (others => '0');
 		variable arg0, arg1, arg2: Mword := (others => '0');

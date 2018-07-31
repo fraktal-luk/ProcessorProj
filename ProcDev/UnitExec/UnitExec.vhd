@@ -115,7 +115,7 @@ begin
 		resetSig <= reset and HAS_RESET_EXEC;
 		enSig <= en or not HAS_EN_EXEC; 
 
-		inputDataA <= makeSDM((0 => (inputA.full, executeAlu(inputA.ins, branchQueueSelectedOut))));
+		inputDataA <= makeSDM((0 => (inputA.full, executeAlu(inputA.ins, inputA.state, branchQueueSelectedOut))));
 
 		dataA0 <= outputDataA.data(0);
 		
@@ -163,6 +163,7 @@ begin
 ------------------------------------------------
 -- Branch
 		branchData <=  basicBranch(setInstructionTarget(inputA.ins, inputD.ins.constantArgs.imm),
+												inputA.state,
 											 branchQueueSelectedOut, branchQueueSelectedSending);					
 		
 		inputDataD <= makeSDM((0 => (inputA.full and isBranch(inputA.ins), branchData)));
