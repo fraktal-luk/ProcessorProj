@@ -181,7 +181,7 @@ begin
 		constant i: integer := character'pos(letter) - character'pos('A');
 	begin
 	
-		IQUEUE: entity work.UnitIQ
+		IQUEUE: entity work.SubunitIQBuffer(Implem)--UnitIQ
 		generic map(
 			IQ_SIZE => IQ_SIZES(i)
 		)
@@ -193,11 +193,11 @@ begin
 			newData => dataToQueuesArr(i),
 			fni => fni,
 			readyRegFlags => readyRegFlags,
-			issueAccepting => issueAcceptingArr(i),
+			nextAccepting => issueAcceptingArr(i),
 			execCausing => execCausing,
 			lateEventSignal => lateEventSignal,
 			execEventSignal => execEventSignal,
-			queueOutput => iqOutputArr(i)
+			schedulerOut => iqOutputArr(i)
 		);
 	end generate;
 

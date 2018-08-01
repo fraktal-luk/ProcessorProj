@@ -30,7 +30,7 @@ return SchedulerEntrySlot;
 
 
 function iqContentNext(queueContent: SchedulerEntrySlotArray; inputData: StageDataMulti;
-																					--inputMask:std_logic_vector;
+																					--inputMask: std_logic_vector;
 																					inputDataS: SchedulerEntrySlotArray;
 								 livingMask,
 								 stayMask: std_logic_vector;
@@ -322,7 +322,7 @@ end function;
 
 
 function iqContentNext(queueContent: SchedulerEntrySlotArray; inputData: StageDataMulti;
-																					--inputMask:std_logic_vector;
+																					--inputMask: std_logic_vector;
 																					inputDataS: SchedulerEntrySlotArray;
 								 livingMask,
 								 stayMask: std_logic_vector;
@@ -335,7 +335,7 @@ return SchedulerEntrySlotArray is
 	variable res: SchedulerEntrySlotArray(0 to QUEUE_SIZE-1) := (others => DEFAULT_SCH_ENTRY_SLOT); 	
 	variable queueDataS: SchedulerEntrySlotArray(0 to QUEUE_SIZE-1) := queueContent;
 	--variable dataNew: StageDataMulti := inputData;
-	variable newMask: std_logic_vector(0 to PIPE_WIDTH-1) := inputData.fullMask;--inputMask;
+	variable newMask: std_logic_vector(0 to PIPE_WIDTH-1) := inputData.fullMask;--
 	variable dataNewDataS: SchedulerEntrySlotArray(0 to PIPE_WIDTH-1) := inputDataS;
 	
 	variable iqDataNextS: SchedulerEntrySlotArray(0 to QUEUE_SIZE - 1) := (others => DEFAULT_SCH_ENTRY_SLOT);

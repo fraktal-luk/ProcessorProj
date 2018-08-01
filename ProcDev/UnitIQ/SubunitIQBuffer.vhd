@@ -141,19 +141,11 @@ architecture Implem of SubunitIQBuffer is
 		for i in 0 to PIPE_WIDTH-1 loop
 			res(i).ins := insArr(i);
 
-			-- Set state markers: "zero" bit		
-			if isNonzero(res(i).ins.virtualArgSpec.args(0)(4 downto 0)) = '0' then
-				res(i).state.argValues.zero(0) := '1';				
-			end if;
-			
-			if isNonzero(res(i).ins.virtualArgSpec.args(1)(4 downto 0)) = '0' then
-				res(i).state.argValues.zero(1) := '1';
-			end if;
+			-- Set state markers: "zero" bit
+			res(i).state.argValues.zero(0) := not isNonzero(res(i).ins.virtualArgSpec.args(0)(4 downto 0));
+			res(i).state.argValues.zero(1) := not isNonzero(res(i).ins.virtualArgSpec.args(1)(4 downto 0));
+			res(i).state.argValues.zero(2) := not isNonzero(res(i).ins.virtualArgSpec.args(2)(4 downto 0));
 
-			if isNonzero(res(i).ins.virtualArgSpec.args(2)(4 downto 0)) = '0' then
-				res(i).state.argValues.zero(2) := '1';
-			end if;		
-				
 			-- Set 'missing' flags for non-const arguments
 			res(i).state.argValues.missing := res(i).ins.physicalArgSpec.intArgSel and not res(i).state.argValues.zero;
 			
@@ -162,8 +154,7 @@ architecture Implem of SubunitIQBuffer is
 				res(i).state.argValues.missing(1) := '0';
 				res(i).state.argValues.immediate := '1';
 				res(i).state.argValues.zero(1) := '0';
-			end if;			
-		
+			end if;	
 		end loop;
 		return res;
 	end function;
@@ -192,10 +183,7 @@ begin
 											execEventSignal or execCausing.controlInfo.hasInterrupt);
 		
 	sendingMask <= getFirstOne(readyMask2 and livingMask) when nextAccepting = '1' else	(others => '0');
-		
-	--inputEnable <= getEnableForInput_Shifting(qs0, IQ_SIZE, flowDriveQ.nextAccepting, flowDriveQ.prevSending);
-	--inputIndices <= getQueueIndicesForInput_Shifting(qs0, IQ_SIZE, flowDriveQ.nextAccepting, PIPE_WIDTH);
-			
+
 	livingMask <= fullMask and not killMask;
 
 		fullMask <= extractFullMask(queueContent);
@@ -207,12 +195,12 @@ begin
 	dispatchDataNew <= TMP_clearDestIfEmpty(prioSelect(queueContentUpdatedSel, readyMask2), sends);
 		stayMask <= TMP_setUntil(readyMask_C, nextAccepting);
 
-			newSchedData <= getSchedData(newData.data);
+		newSchedData <= getSchedData(newData.data);
 
 		newContent <= updateForWaitingArrayFNI(newSchedData, readyRegFlags, fni);--, '1');
-			newDataU.fullMask <= newData.fullMask;
-			newDataU.data <= extractData(newContent);
-		
+			--newDataU.fullMask <= newData.fullMask;
+			--newDataU.data <= extractData(newContent);
+			newDataU <= newData;
 		queueContentNext <= iqContentNext(queueContentUpdated, newDataU,
 																				--	newData.fullMask,
 																					newContent,
@@ -225,6 +213,7 @@ begin
 														binFlowNum(flowDriveQ.prevSending),
 														prevSendingOK);
 					
+	-- TODO: below could be optimized because some code is shared (comparators!)
 	queueContentUpdated <= updateForWaitingArrayFNI(queueContent, readyRegFlags, fni);--, '0');
 	queueContentUpdatedSel <= updateForSelectionArrayFNI(queueContent, readyRegFlags, fni);
 
