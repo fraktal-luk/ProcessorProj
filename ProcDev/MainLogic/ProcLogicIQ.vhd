@@ -28,25 +28,9 @@ return SchedulerEntrySlot;
 function updateDispatchArgs(ins: InstructionState; st: SchedulerState; vals: MwordArray; regValues: MwordArray)
 return SchedulerEntrySlot;
 
-function getForwardingStatusInfoD2(av: in InstructionArgValues; pa: in InstructionArgSpec; 
-												tags0, tags1, tags2, nextTags, writtenTags: in PhysNameArray)
-return ArgStatusInfo;
 
-function getArgInfoArrayD2(data: InstructionStateArray; tags0, tags1, tags2, nextTags, writtenTags: PhysNameArray)
-return ArgStatusInfoArray;
-
-
-
-function iqContentNext3(queueData, queueDataSel: InstructionStateArray; inputData: StageDataMulti; 
-								 fullMask,
-								 livingMask,
-								 readyMask: std_logic_vector;
-								 nextAccepting: std_logic;
-								 living, sending, prevSending: integer;
-								 prevSendingOK: std_logic)
-return InstructionSlotArray;
-
-function iqContentNext4(queueContent: SchedulerEntrySlotArray; inputData: StageDataMulti;
+function iqContentNext(queueContent: SchedulerEntrySlotArray; inputData: StageDataMulti;
+																					--inputMask:std_logic_vector;
 																					inputDataS: SchedulerEntrySlotArray;
 								 livingMask,
 								 stayMask: std_logic_vector;
@@ -59,25 +43,9 @@ return SchedulerEntrySlotArray;
 function extractReadyMaskNew(entryVec: SchedulerEntrySlotArray) return std_logic_vector;
 
 
---function updateForWaiting(ins: InstructionState; readyRegFlags: std_logic_vector; ai: ArgStatusInfo; isNew: std_logic)
---return InstructionState;
-									
---function updateForSelection(ins: InstructionState; readyRegFlags: std_logic_vector; ai: ArgStatusInfo)
---return InstructionState;
-									
-function updateForWaitingArray(insArray: InstructionStateArray; readyRegFlags: std_logic_vector;
-										aia: ArgStatusInfoArray; isNew: std_logic)
-return SchedulerEntrySlotArray;
-									
-function updateForSelectionArray(insArray: InstructionStateArray; readyRegFlags: std_logic_vector;
-									aia: ArgStatusInfoArray)
-return SchedulerEntrySlotArray;	
-
-
-
 function updateForWaitingFNI(ins: InstructionState; st: SchedulerState;
-										readyRegFlags: std_logic_vector; fni: ForwardingInfo;
-									isNew: std_logic)
+										readyRegFlags: std_logic_vector; fni: ForwardingInfo)--;
+									--isNew: std_logic)
 return SchedulerEntrySlot;
 
 function updateForSelectionFNI(ins: InstructionState; st: SchedulerState;
@@ -86,7 +54,7 @@ return SchedulerEntrySlot;
 
 
 function updateForWaitingArrayFNI(insArray: SchedulerEntrySlotArray; readyRegFlags: std_logic_vector;
-									fni: ForwardingInfo; isNew: std_logic)
+									fni: ForwardingInfo)--; isNew: std_logic)
 return SchedulerEntrySlotArray;
 
 function updateForSelectionArrayFNI(insArray: SchedulerEntrySlotArray; readyRegFlags: std_logic_vector;
@@ -343,89 +311,6 @@ begin
 end function;
 
 
-function getForwardingStatusInfoD2(av: in InstructionArgValues; pa: in InstructionArgSpec; 
-										tags0, tags1, tags2, nextTags, writtenTags: in PhysNameArray)
-return ArgStatusInfo
-is		
-	variable stored, ready, nextReady, written: std_logic_vector(0 to 2) := (others=>'0');
-	variable locs, nextLocs: SmallNumberArray(0 to 2) := (others=>(others=>'0'));
-	variable res: ArgStatusInfo;
-begin
-	stored := not av.missing;	
-	
-	for i in writtenTags'length-1 downto 0 loop
-		if writtenTags(i)(PHYS_REG_BITS-1 downto 0) = pa.args(0)(PHYS_REG_BITS-1 downto 0) then
-			written(0) := '1';
-		end if;
-
-		if writtenTags(i)(PHYS_REG_BITS-1 downto 0) = pa.args(1)(PHYS_REG_BITS-1 downto 0) then
-			written(1) := '1';
-		end if;
-
-		if writtenTags(i)(PHYS_REG_BITS-1 downto 0) = pa.args(2)(PHYS_REG_BITS-1 downto 0) then
-			written(2) := '1';
-		end if;		
-	end loop;
-	
-	-- Find where tag agrees with s0
-	for i in tags0'length-1 downto 0 loop		
-		if tags0(i)(PHYS_REG_BITS-1 downto 0) = pa.args(0)(PHYS_REG_BITS-1 downto 0) then
-			ready(0) := '1';
-			locs(0) := i2slv(i, SMALL_NUMBER_SIZE);
-		end if;
-	end loop;
-		
-	for i in tags1'length-1 downto 0 loop				
-		if tags1(i)(PHYS_REG_BITS-1 downto 0) = pa.args(1)(PHYS_REG_BITS-1 downto 0) then
-			ready(1) := '1';
-			locs(1) := i2slv(i, SMALL_NUMBER_SIZE);
-		end if;
-	end loop;		
-		
-	for i in tags2'length-1 downto 0 loop				
-		if tags2(i)(PHYS_REG_BITS-1 downto 0) = pa.args(2)(PHYS_REG_BITS-1 downto 0) then
-			ready(2) := '1';
-			locs(2) := i2slv(i, SMALL_NUMBER_SIZE);
-		end if;
-	end loop;
-	
-	for i in nextTags'range loop
-		if nextTags(i)(PHYS_REG_BITS-1 downto 0) = pa.args(0)(PHYS_REG_BITS-1 downto 0) then
-			nextReady(0) := '1';
-			nextLocs(0) := i2slv(i, SMALL_NUMBER_SIZE);
-		end if;
-		if nextTags(i)(PHYS_REG_BITS-1 downto 0) = pa.args(1)(PHYS_REG_BITS-1 downto 0) then
-			nextReady(1) := '1';
-			nextLocs(1) := i2slv(i, SMALL_NUMBER_SIZE);
-		end if;
-		if nextTags(i)(PHYS_REG_BITS-1 downto 0) = pa.args(2)(PHYS_REG_BITS-1 downto 0) then
-			nextReady(2) := '1';
-			nextLocs(2) := i2slv(i, SMALL_NUMBER_SIZE);
-		end if;			
-	end loop;
-	
-	res.stored := stored;
-	res.written := written;
-	res.ready := ready;
-	res.locs := locs;
-	res.nextReady := nextReady;
-	res.nextLocs := nextLocs;
-	
-	return res;								
-end function;
-
-function getArgInfoArrayD2(data: InstructionStateArray; tags0, tags1, tags2, nextTags, writtenTags: PhysNameArray)
-return ArgStatusInfoArray is
-	variable res: ArgStatusInfoArray(data'range);
-begin
-	for i in res'range loop
-		--res(i) := getForwardingStatusInfoD2(data(i).argValues, data(i).physicalArgSpec,
-			--											tags0, tags1, tags2, nextTags, writtenTags);
-	end loop;
-	return res;
-end function;
-	
-
 function extractReadyMaskNew(entryVec: SchedulerEntrySlotArray) return std_logic_vector is
 	variable res: std_logic_vector(entryVec'range);
 begin	
@@ -436,112 +321,8 @@ begin
 end function;
 
 
-function iqContentNext3(queueData, queueDataSel: InstructionStateArray; inputData: StageDataMulti; 
-								 fullMask,
-								 livingMask,
-								 readyMask: std_logic_vector;
-								 nextAccepting: std_logic;
-								 living, sending, prevSending: integer;
-								 prevSendingOK: std_logic)
-return InstructionSlotArray is
-	constant QUEUE_SIZE: natural := queueData'length;
-	variable res: InstructionSlotArray(-1 to QUEUE_SIZE-1) := (others => DEFAULT_INSTRUCTION_SLOT); 	
-	variable dataNew: StageDataMulti := inputData;
-	
-	variable iqDataNext: InstructionStateArray(0 to QUEUE_SIZE - 1) := (others => defaultInstructionState);
-	variable iqFullMaskNext: std_logic_vector(0 to QUEUE_SIZE - 1) :=	(others => '0');
-	variable dispatchDataNew: InstructionState := defaultInstructionState;
-	variable sends, anyReady: std_logic := '0';
-				
-	variable xVec: InstructionStateArray(0 to QUEUE_SIZE + PIPE_WIDTH - 1);
-	variable yVec: InstructionStateArray(0 to QUEUE_SIZE + PIPE_WIDTH - 1);
-	variable yMask: std_logic_vector(0 to QUEUE_SIZE + PIPE_WIDTH-1)	:= (others => '0');
-	variable tempMask: std_logic_vector(0 to QUEUE_SIZE-1) := (others => '0');
-	variable fullMaskSh: std_logic_vector(0 to QUEUE_SIZE-1) := livingMask; --fullMask;
-	variable nAfterSending: integer := living;
-	variable shiftNum: integer := 0;			
-begin
-	-- Important, new instrucitons in queue must be marked!
-	for i in 0 to PIPE_WIDTH-1 loop
-		--dataNew.data(i).argValues.newInQueue := '1';
-	end loop;
-
-	xVec := queueData & dataNew.data; -- CAREFUL: What to append after queueData?
-	xVec(QUEUE_SIZE) := xVec(QUEUE_SIZE-1);
-				
-	for k in 0 to yVec'right loop
-		yVec(k) := dataNew.data(k mod PIPE_WIDTH);
-	end loop;	
-	
-	for k in 0 to PIPE_WIDTH-1 loop
-		yMask(k) := dataNew.fullMask(k); -- not wrapping mod k, to enable straight copying to new fullMask
-	end loop;
-		
-	-- Finding slots that are before first ready
-	dispatchDataNew := queueDataSel(0);
-	tempMask := (others => not nextAccepting);  -- CAREFUL! This because if not nextAccepting, nothing
-																	-- is send, so no shifting.
-	for i in 0 to tempMask'length-1 loop
-		dispatchDataNew := queueDataSel(i);	
-		if readyMask(i) = '1' then
-			anyReady := livingMask(i); -- and nextAccepting; 
-			exit;
-		end if;
-		tempMask(i) := '1';
-	end loop;
-
-	if (anyReady and nextAccepting) = '1' then
-		sends := '1';
-		nAfterSending := nAfterSending-1;
-		fullMaskSh(0 to QUEUE_SIZE-2) := livingMask(1 to QUEUE_SIZE-1);
-		fullMaskSh(QUEUE_SIZE-1) := '0';
-	end if;
-		
-	-- CAREFUL! When not dispatching, dispatch stage must signal no result, so clear it here
-	if sends = '0' then
-		dispatchDataNew.physicalArgSpec.dest := (others => '0');
-	end if;
-	
-	if nAfterSending < 0 then
-		nAfterSending := 0;
-	elsif nAfterSending > yVec'length then	
-		nAfterSending := yVec'length;
-	end if;
-
-	shiftNum := nAfterSending;
-	shiftNum := countOnes(fullMaskSh); -- CAREFUL: this seems to reduce some logic
-		
-	-- CAREFUL, TODO:	solve the issue with HDLCompiler:1827
-	yVec(shiftNum to yVec'length - 1) := yVec(0 to yVec'length - 1 - shiftNum);
-	yMask(shiftNum to yVec'length - 1) := yMask(0 to yVec'length - 1 - shiftNum);
-
-	-- Now assign from x or y
-	iqDataNext := queueData;
-	for i in 0 to QUEUE_SIZE-1 loop
-		iqFullMaskNext(i) := fullMaskSh(i) or (yMask(i) and prevSendingOK);
-		if fullMaskSh(i) = '1' then -- From x	
-			if tempMask(i) = '1' then
-				iqDataNext(i) := xVec(i);
-			else
-				iqDataNext(i) := xVec(i + 1);
-			end if;
-		else -- From y
-			iqDataNext(i) := yVec(i);
-		end if;
-	end loop;
-
-	-- Fill output array
-	for i in 0 to res'right loop
-		res(i).full := iqFullMaskNext(i);
-		res(i).ins := iqDataNext(i);
-	end loop;
-	res(-1).full := sends;
-	res(-1).ins := dispatchDataNew;
-	return res;
-end function;
-
-
-function iqContentNext4(queueContent: SchedulerEntrySlotArray; inputData: StageDataMulti;
+function iqContentNext(queueContent: SchedulerEntrySlotArray; inputData: StageDataMulti;
+																					--inputMask:std_logic_vector;
 																					inputDataS: SchedulerEntrySlotArray;
 								 livingMask,
 								 stayMask: std_logic_vector;
@@ -552,19 +333,16 @@ function iqContentNext4(queueContent: SchedulerEntrySlotArray; inputData: StageD
 return SchedulerEntrySlotArray is
 	constant QUEUE_SIZE: natural := queueContent'length;
 	variable res: SchedulerEntrySlotArray(0 to QUEUE_SIZE-1) := (others => DEFAULT_SCH_ENTRY_SLOT); 	
-	variable queueData: InstructionStateArray(0 to QUEUE_SIZE-1) := extractData(queueContent);
-		variable queueDataS: SchedulerEntrySlotArray(0 to QUEUE_SIZE-1) := queueContent;
-	variable dataNew: StageDataMulti := inputData;
-		variable dataNewDataS: SchedulerEntrySlotArray(0 to PIPE_WIDTH-1) := inputDataS;
+	variable queueDataS: SchedulerEntrySlotArray(0 to QUEUE_SIZE-1) := queueContent;
+	--variable dataNew: StageDataMulti := inputData;
+	variable newMask: std_logic_vector(0 to PIPE_WIDTH-1) := inputData.fullMask;--inputMask;
+	variable dataNewDataS: SchedulerEntrySlotArray(0 to PIPE_WIDTH-1) := inputDataS;
 	
-	variable iqDataNext: InstructionStateArray(0 to QUEUE_SIZE - 1) := (others => defaultInstructionState);
-		variable iqDataNextS: SchedulerEntrySlotArray(0 to QUEUE_SIZE - 1) := (others => DEFAULT_SCH_ENTRY_SLOT);
+	variable iqDataNextS: SchedulerEntrySlotArray(0 to QUEUE_SIZE - 1) := (others => DEFAULT_SCH_ENTRY_SLOT);
 	variable iqFullMaskNext: std_logic_vector(0 to QUEUE_SIZE - 1) :=	(others => '0');
-				
-	variable xVec: InstructionStateArray(0 to QUEUE_SIZE + PIPE_WIDTH - 1);
-	variable yVec: InstructionStateArray(0 to QUEUE_SIZE + PIPE_WIDTH - 1);
-		variable xVecS: SchedulerEntrySlotArray(0 to QUEUE_SIZE + PIPE_WIDTH - 1);
-		variable yVecS: SchedulerEntrySlotArray(0 to QUEUE_SIZE + PIPE_WIDTH - 1);
+
+	variable xVecS: SchedulerEntrySlotArray(0 to QUEUE_SIZE + PIPE_WIDTH - 1);
+	variable yVecS: SchedulerEntrySlotArray(0 to QUEUE_SIZE + PIPE_WIDTH - 1);
 	variable yMask: std_logic_vector(0 to QUEUE_SIZE + PIPE_WIDTH-1)	:= (others => '0');
 	variable fullMaskSh: std_logic_vector(0 to QUEUE_SIZE-1) := livingMask; --fullMask;
 	variable nAfterSending: integer := living;
@@ -572,181 +350,80 @@ return SchedulerEntrySlotArray is
 begin
 	-- Important, new instrucitons in queue must be marked!
 	for i in 0 to PIPE_WIDTH-1 loop
-		--dataNew.data(i).argValues.newInQueue := '1';
 		dataNewDataS(i).state.argValues.newInQueue := '1';
-		--dataNewDataS(i).ins.argValues.newInQueue := '1'; -- TEMP!
 	end loop;
 
-	xVec := queueData & dataNew.data; -- CAREFUL: What to append after queueData?
-		xVecS := queueDataS & dataNewDataS;
-	xVec(QUEUE_SIZE) := xVec(QUEUE_SIZE-1);
-		xVecS(QUEUE_SIZE) := xVecS(QUEUE_SIZE-1);
+	xVecS := queueDataS & dataNewDataS;
+	xVecS(QUEUE_SIZE) := xVecS(QUEUE_SIZE-1);
 		
-	for k in 0 to yVec'right loop
-		yVec(k) := dataNew.data(k mod PIPE_WIDTH);
-			yVecS(k) := dataNewDataS(k mod PIPE_WIDTH);
+	for k in 0 to yVecS'right loop
+		yVecS(k) := dataNewDataS(k mod PIPE_WIDTH);
 	end loop;	
-	
+
 	for k in 0 to PIPE_WIDTH-1 loop
-		yMask(k) := dataNew.fullMask(k); -- not wrapping mod k, to enable straight copying to new fullMask
+		yMask(k) := newMask(k); -- not wrapping mod k to enable simple copying to new fullMask
 	end loop;
 
 	if sends = '1' then
---			if nAfterSending = 0 then
---				nAfterSending := 0;
---			--elsif nAfterSending
---			else
-				nAfterSending := nAfterSending-1;
---			end if;
-			
---		fullMaskSh(0 to QUEUE_SIZE-2) := livingMask(1 to QUEUE_SIZE-1);
---		fullMaskSh(QUEUE_SIZE-1) := '0';
+		nAfterSending := nAfterSending-1;
 	end if;
 
-		for i in 0 to QUEUE_SIZE-2 loop
-			if livingMask(i) = '0' or (livingMask(i+1) = '0' and sends = '1') then
-				fullMaskSh(i) := '0';
-			else
-				fullMaskSh(i) := '1';
-			end if;
-		end loop;
+	for i in 0 to QUEUE_SIZE-2 loop
+		if livingMask(i) = '0' or (livingMask(i+1) = '0' and sends = '1') then
+			fullMaskSh(i) := '0';
+		else
+			fullMaskSh(i) := '1';
+		end if;
+	end loop;
 	
-			if livingMask(QUEUE_SIZE-1) = '0' or sends = '1' then
-				fullMaskSh(QUEUE_SIZE-1) := '0';
-			else
-				fullMaskSh(QUEUE_SIZE-1) := '1';
-			end if;
-	
-			if nAfterSending < 0 then
-				nAfterSending := 0;
-			elsif nAfterSending > yVec'length then	
-				nAfterSending := yVec'length;
-			end if;
+	if livingMask(QUEUE_SIZE-1) = '0' or sends = '1' then
+		fullMaskSh(QUEUE_SIZE-1) := '0';
+	else
+		fullMaskSh(QUEUE_SIZE-1) := '1';
+	end if;
+
+	if nAfterSending < 0 then
+		nAfterSending := 0;
+	elsif nAfterSending > yVecS'length then	
+		nAfterSending := yVecS'length;
+	end if;
 
 	shiftNum := nAfterSending;
 	shiftNum := countOnes(fullMaskSh); -- CAREFUL: this seems to reduce some logic
 
 	-- CAREFUL, TODO:	solve the issue with HDLCompiler:1827
-	yVec(shiftNum to yVec'length - 1) := yVec(0 to yVec'length - 1 - shiftNum);
-		yVecS(shiftNum to yVecS'length - 1) := yVecS(0 to yVecS'length - 1 - shiftNum);
-	yMask(shiftNum to yVec'length - 1) := yMask(0 to yVec'length - 1 - shiftNum);
+	yVecS(shiftNum to yVecS'length - 1) := yVecS(0 to yVecS'length - 1 - shiftNum);
+	yMask(shiftNum to yVecS'length - 1) := yMask(0 to yVecS'length - 1 - shiftNum);
 
 	-- Now assign from x or y
-	iqDataNext := queueData;
-		iqDataNextS := queueDataS;
+	iqDataNextS := queueDataS;
 	for i in 0 to QUEUE_SIZE-1 loop
 		iqFullMaskNext(i) := fullMaskSh(i) or (yMask(i) and prevSendingOK);
 		if fullMaskSh(i) = '1' then -- From x	
 			if stayMask(i) = '1' then
-				iqDataNext(i) := xVec(i);
-					iqDataNextS(i) := xVecS(i);
+				iqDataNextS(i) := xVecS(i);
 			else
-				iqDataNext(i) := xVec(i + 1);
-					iqDataNextS(i) := xVecS(i + 1);
+				iqDataNextS(i) := xVecS(i + 1);
 			end if;
 		else -- From y
-			iqDataNext(i) := yVec(i);
-				iqDataNextS(i) := yVecS(i);
+			iqDataNextS(i) := yVecS(i);
 		end if;
 	end loop;
 
 	-- Fill output array
 	for i in 0 to res'right loop
 		res(i).full := iqFullMaskNext(i);
-		--res(i).ins := iqDataNext(i);
-			res(i).ins := iqDataNextS(i).ins;
-			res(i).state := iqDataNextS(i).state;
+		res(i).ins := iqDataNextS(i).ins;
+		res(i).state := iqDataNextS(i).state;
 	end loop;
-	--res(-1).full := sends;
-	--res(-1).ins := dispatchDataNew;
+
 	return res;
 end function;
 
---
---function updateForWaiting(ins: InstructionState; readyRegFlags: std_logic_vector; ai: ArgStatusInfo;
---									isNew: std_logic)
---return InstructionState is
---	variable res: InstructionState := ins;
---	variable tmp8: SmallNumber := (others => '0');
---	variable rrf: std_logic_vector(0 to 2) := (others => '0');
---begin	
---	res.argValues.readyNow := (others => '0'); 
---	res.argValues.readyNext := (others => '0');
---
---	-- 
---	if res.argValues.newInQueue = '1' then
---		tmp8 := getTagLowSN(res.tags.renameIndex);-- and i2slv(PIPE_WIDTH-1, SMALL_NUMBER_SIZE);
---		rrf := readyRegFlags(3*slv2u(tmp8) to 3*slv2u(tmp8) + 2);
---		res.argValues.missing := res.argValues.missing and not rrf;
---	end if;
---	
---	res.argValues.missing := res.argValues.missing and not ai.written;
---	res.argValues.missing := res.argValues.missing and not ai.ready;
---	res.argValues.missing := res.argValues.missing and not ai.nextReady;	
---	
---	-- CAREFUL! DEPREC statement?
---	res.argValues.newInQueue := isNew;
---	
---	res.ip := (others => '0');
---	return res;
---end function;
---
---
---function updateForSelection(ins: InstructionState; readyRegFlags: std_logic_vector; ai: ArgStatusInfo)
---return InstructionState is
---	variable res: InstructionState := ins;
---	variable tmp8: SmallNumber := (others => '0');
---	variable rrf: std_logic_vector(0 to 2) := (others => '0');
---begin	
---	res.argValues.readyNow := (others => '0'); 
---	res.argValues.readyNext := (others => '0');
---
---	-- Checking reg ready flags (only for new ops in queue)
---	-- CAREFUL! Which reg ready flags are for this instruction?
---	--				Use groupTag, because it identifies the slot in previous superscalar stage
---	if res.argValues.newInQueue = '1' then
---		tmp8 := getTagLowSN(res.tags.renameIndex);-- and i2slv(PIPE_WIDTH-1, SMALL_NUMBER_SIZE);
---		rrf := readyRegFlags(3*slv2u(tmp8) to 3*slv2u(tmp8) + 2);
---		res.argValues.missing := res.argValues.missing and not rrf;
---	end if;
---
---	-- pragma synthesis off				
---	res.argValues := beginHistory(res.argValues, ai.ready, ai.nextReady);
---	-- pragma synthesis on
---
---	res.argValues.missing := res.argValues.missing and not ai.nextReady;
---	res.argValues.readyNext := ai.nextReady;
---	-- CAREFUL, NOTE: updating 'missing' with ai.ready would increase delay, unneeded with full 'nextReady'
---	
---		res.argValues.missing := res.argValues.missing and not ai.ready;
---
---	res.argValues.readyNow := ai.ready;
---
---	res.argValues.locs := ai.locs;	
---	res.argValues.nextLocs := ai.nextLocs;
---
---	-- Clear unused fields
---	res.bits := (others => '0');
---	res.result := (others => '0');
---	res.target := (others => '0');		
-----		
---	res.controlInfo.completed := '0';
---	res.controlInfo.completed2 := '0';
---	res.ip := (others => '0');
---
---	res.controlInfo.newEvent := '0';
---	res.controlInfo.hasInterrupt := '0';
---	res.controlInfo.hasReturn := '0';		
---	res.controlInfo.exceptionCode := (others => '0');
---
---	return res;
---end function;
-
-
 
 function updateForWaitingFNI(ins: InstructionState; st: SchedulerState;
-										readyRegFlags: std_logic_vector; fni: ForwardingInfo;
-									isNew: std_logic)
+										readyRegFlags: std_logic_vector; fni: ForwardingInfo)--;
+									--isNew: std_logic)
 return SchedulerEntrySlot is
 	variable res: SchedulerEntrySlot := DEFAULT_SCHEDULER_ENTRY_SLOT;
 	variable tmp8: SmallNumber := (others => '0');
@@ -824,7 +501,7 @@ begin
 	res.state.argValues.missing := res.state.argValues.missing and not nextReady;	
 	
 	-- CAREFUL! DEPREC statement?
-	res.state.argValues.newInQueue := isNew;
+	--res.state.argValues.newInQueue := isNew;
 	
 	--	res.ins.argValues := res.state.argValues; -- TEMP!
 	
@@ -929,47 +606,15 @@ begin
 	return res;
 end function;
 
-				
-									
-function updateForWaitingArray(insArray: InstructionStateArray; readyRegFlags: std_logic_vector;
-									aia: ArgStatusInfoArray; isNew: std_logic)
-return SchedulerEntrySlotArray is
-	variable res: SchedulerEntrySlotArray(0 to insArray'length-1);-- := insArray;
-begin
-	for i in insArray'range loop	
---		res(i) := ('0',
---						updateForWaiting(insArray(i), readyRegFlags, aia(i), isNew),
---						DEFAULT_SCHED_STATE);
-	end loop;
-	return res;
-end function;
-
-
-function updateForSelectionArray(insArray: InstructionStateArray; readyRegFlags: std_logic_vector;
-									aia: ArgStatusInfoArray)
-return SchedulerEntrySlotArray is
-	variable res: SchedulerEntrySlotArray(0 to insArray'length-1);-- := insArray;
-begin
-	for i in insArray'range loop
---		res(i) := ('0',
---						updateForSelection(insArray(i), readyRegFlags, aia(i)),
---						DEFAULT_SCHED_STATE);
-	end loop;	
-	return res;
-end function;
-
 
 
 function updateForWaitingArrayFNI(insArray: SchedulerEntrySlotArray; readyRegFlags: std_logic_vector;
-									fni: ForwardingInfo; isNew: std_logic)
+									fni: ForwardingInfo)--; isNew: std_logic)
 return SchedulerEntrySlotArray is
 	variable res: SchedulerEntrySlotArray(0 to insArray'length-1);-- := insArray;
 begin
 	for i in insArray'range loop	
-		res(i) := --('0',
-					--	updateForWaitingFNI(insArray(i), readyRegFlags, fni, isNew),
-					--	DEFAULT_SCHED_STATE);
-					updateForWaitingFNI(insArray(i).ins, insArray(i).state, readyRegFlags, fni, isNew);
+		res(i) := updateForWaitingFNI(insArray(i).ins, insArray(i).state, readyRegFlags, fni);
 	end loop;
 	return res;
 end function;
@@ -981,10 +626,7 @@ return SchedulerEntrySlotArray is
 	variable res: SchedulerEntrySlotArray(0 to insArray'length-1);-- := insArray;
 begin
 	for i in insArray'range loop
-		res(i) := --('0',
-					--	updateForSelectionFNI(insArray(i), readyRegFlags, fni),
-					--	DEFAULT_SCHED_STATE);
-					updateForSelectionFNI(insArray(i).ins, insArray(i).state, readyRegFlags, fni);
+		res(i) := updateForSelectionFNI(insArray(i).ins, insArray(i).state, readyRegFlags, fni);
 	end loop;	
 	return res;
 end function;
