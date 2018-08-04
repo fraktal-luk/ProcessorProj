@@ -166,7 +166,7 @@ begin
 		flowResponse => flowResponse
 	);
 
-	flowDrive.prevSending <= stageDataIn.full;--stageDataIn.fullMask(0);
+	flowDrive.prevSending <= prevSending;--stageDataIn.fullMask(0);
 	flowDrive.nextAccepting <= nextAccepting;
 	
 	--before <= '1';

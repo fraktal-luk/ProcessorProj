@@ -327,7 +327,7 @@ begin
 		execEventSignal => execOrIntEventSignal,
 		lateEventSignal => evtPhase0,		
 		execCausing => execOrIntCausing,
-		lockCommand => renameLockState		
+		lockCommand => '0'--renameLockState		
 	);
 
 	COMMON_STATE: block
@@ -494,7 +494,7 @@ begin
 	intAllowOut <= intAllow;
 	intAckOut <= intAck;
 	
-	renameAccepting <= acceptingOutRename;
+	renameAccepting <= acceptingOutRename and not renameLockState;
 	renamedDataLiving <= stageDataOutRename;
 	renamedSending <= sendingOutRename;
 	

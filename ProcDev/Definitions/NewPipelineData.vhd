@@ -210,7 +210,7 @@ type InstructionArgValues is record
 	newInQueue: std_logic;
 	immediate: std_logic;
 	zero: std_logic_vector(0 to 2);
-	readyBefore: std_logic_vector(0 to 2);
+	--readyBefore: std_logic_vector(0 to 2);
 	readyNow: std_logic_vector(0 to 2);
 	readyNext: std_logic_vector(0 to 2);
 	locs: SmallNumberArray(0 to 2);
@@ -332,19 +332,19 @@ constant DEFAULT_STAGE_DATA_MULTI: StageDataMulti := (fullMask=>(others=>'0'),
 																		);
 
 type StageDataMultiArray is array (integer range <>) of StageDataMulti;
-
-					
-type ArgStatusInfo is record
-	stored: std_logic_vector(0 to 2); -- those that were already present in prev cycle	
-	written: std_logic_vector(0 to 2);
-	ready: std_logic_vector(0 to 2);
-	locs: SmallNumberArray(0 to 2);
-	--vals: MwordArray(0 to 2);
-	nextReady: std_logic_vector(0 to 2);
-	nextLocs: SmallNumberArray(0 to 2);
-end record;
-
-type ArgStatusInfoArray is array(integer range <>) of ArgStatusInfo;
+--
+--					
+--type ArgStatusInfo is record
+--	stored: std_logic_vector(0 to 2); -- those that were already present in prev cycle	
+--	written: std_logic_vector(0 to 2);
+--	ready: std_logic_vector(0 to 2);
+--	locs: SmallNumberArray(0 to 2);
+--	--vals: MwordArray(0 to 2);
+--	nextReady: std_logic_vector(0 to 2);
+--	nextLocs: SmallNumberArray(0 to 2);
+--end record;
+--
+--type ArgStatusInfoArray is array(integer range <>) of ArgStatusInfo;
 
 end NewPipelineData;
 
@@ -411,7 +411,7 @@ begin
 	return (newInQueue => '0',
 			  immediate => '0',
 			  zero => (others => '0'),
-			  readyBefore => (others=>'0'),
+			  --readyBefore => (others=>'0'),
 			  readyNow => (others=>'0'),
 			  readyNext => (others=>'0'),
 			  locs => (others => (others => '0')),

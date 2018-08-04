@@ -54,7 +54,7 @@ entity IntegerMultiplier is
 		reset: in std_logic;
 		en: in std_logic;
 		
-		--prevSending: in std_logic;
+		prevSending: in std_logic;
 		nextAccepting: in std_logic;
 		input: in SchedulerEntrySlot;
 
@@ -97,7 +97,7 @@ begin
 	port map(
 		clk => clk, reset => reset, en => en,
 		
-		prevSending => '0',--prevSending,
+		prevSending => prevSending,
 		nextAccepting => acc1,
 		
 		stageDataIn => --inputData,

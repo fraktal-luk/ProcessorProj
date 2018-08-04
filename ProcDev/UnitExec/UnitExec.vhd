@@ -126,7 +126,7 @@ begin
 		port map(
 			clk => clk, reset => resetSig, en => enSig,
 			
-			prevSending => '0',
+			prevSending => inputA.full,
 			nextAccepting => whichAcceptedCQ(0),
 			
 			stageDataIn => inputDataA,
@@ -145,6 +145,8 @@ begin
 	SUBPIPE_B: entity work.IntegerMultiplier(Behavioral)
 	port map(
 		clk => clk, reset => resetSig, en => enSig,
+		
+		prevSending => inputB.full,
 		
 		nextAccepting => whichAcceptedCQ(1),
 		input => inputB,
@@ -177,7 +179,7 @@ begin
 		port map(
 			clk => clk, reset => resetSig, en => enSig,
 			
-			prevSending => '0',
+			prevSending => inputDataD.fullMask(0),
 			nextAccepting => '1',--whichAcceptedCQ(3),
 			
 			stageDataIn => inputDataD, 

@@ -112,13 +112,13 @@ begin
 		flowResponse => flowResponse
 	);
 
-	flowDrive.prevSending <= isNonzero(stageDataIn.fullMask);--stageDataIn.fullMask(0);
+	flowDrive.prevSending <= prevSending;--isNonzero(stageDataIn.fullMask);--stageDataIn.fullMask(0);
 	flowDrive.nextAccepting <= nextAccepting;
 	
 	--before <= '1';
 	before <= (not COMPARE_TAG) or CMP_tagBefore(execCausing.tags.renameIndex, stageData.data(0).tags.renameIndex);
 	flowDrive.kill <= (before and execEventSignal) or lateEventSignal;
-	flowDrive.lockAccept <= lockCommand;
+	--flowDrive.lockAccept <= lockCommand;
 
 	acceptingOut <= flowResponse.accepting;		
 	sendingOut <= flowResponse.sending;

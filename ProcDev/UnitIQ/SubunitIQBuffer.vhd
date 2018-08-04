@@ -69,7 +69,8 @@ entity SubunitIQBuffer is
 		readyRegFlags: in std_logic_vector(0 to 3*PIPE_WIDTH-1);
 		
 		acceptingVec: out std_logic_vector(0 to PIPE_WIDTH-1);
-		schedulerOut: out SchedulerEntrySlot
+		schedulerOut: out SchedulerEntrySlot;
+		sending: out std_logic
 	);
 end SubunitIQBuffer;
 
@@ -235,4 +236,5 @@ begin
 	killMask <= getKillMask(queueData, fullMask, execCausing, execEventSignal, lateEventSignal); 
 	acceptingVec <= not fullMask(IQ_SIZE-PIPE_WIDTH to IQ_SIZE-1);
 	schedulerOut <= (sends, dispatchDataNew.ins, dispatchDataNew.state);
+	sending <= sends;
 end Implem;

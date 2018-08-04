@@ -53,6 +53,7 @@ entity SubunitDispatch is
 		reset: in std_logic;
 		en: in std_logic;
 
+		prevSending: in std_logic;
 	 	nextAccepting: in std_logic;
 
 		input: in SchedulerEntrySlot;
@@ -76,7 +77,6 @@ architecture Alternative of SubunitDispatch is
 	signal inputDataWithArgs, dispatchDataUpdated: SchedulerEntrySlot := DEFAULT_SCH_ENTRY_SLOT;
 	signal lockSend: std_logic := '0';
 	
-	signal prevSending: std_logic := '0';		
 	signal stageDataIn: InstructionState := DEFAULT_INSTRUCTION_STATE; -- DEPREC
 	signal sendingOut: std_logic := '0';
 	signal stageDataOut: InstructionState := DEFAULT_INSTRUCTION_STATE;
@@ -85,7 +85,6 @@ architecture Alternative of SubunitDispatch is
 		signal ch0: std_logic := '0';
 		
 begin
-	prevSending <= input.full;
 	stageDataIn <= input.ins;
 
 	inputDataWithArgs <= getDispatchArgValues(input.ins, input.state, resultVals, USE_IMM);

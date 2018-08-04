@@ -129,6 +129,8 @@ architecture Behavioral of UnitMemory is
 
 	signal lqSelectedDataWithErr: InstructionState := DEFAULT_INSTRUCTION_STATE;
 	
+	signal sendingMem0, sendingMem1, sendingAGU: std_logic := '0';
+	
 	signal sendingAddressToSQSig, storeAddressWrSig, storeValueWrSig, sendingAddressing,
 			 sendingAddressingForLoad, sendingAddressingForMfc,
 			 sendingAddressingForStore, sendingAddressingForMtc: std_logic := '0';
@@ -151,7 +153,7 @@ begin
 		
 		stageDataIn => inputDataC, 
 		acceptingOut => execAcceptingCSig,
-		sendingOut => open,--sendingAGU,
+		sendingOut => sendingAGU,
 		stageDataOut => stageDataOutAGU,
 		
 		execEventSignal => eventSignal,
@@ -183,11 +185,11 @@ begin
 	port map(
 		clk => clk, reset => reset, en => en,
 		
-		prevSending => stageDataOutAGU.fullMask(0) or sendingFromDLQ,
+		prevSending => sendingAGU or sendingFromDLQ,
 		nextAccepting => acceptingMem1 and dlqAccepting, -- needs free slot in LMQ in case of miss!
 		stageDataIn => inputDataLoadUnit,
 		acceptingOut => acceptingLS,
-		sendingOut => open,--sendingMem0,
+		sendingOut => sendingMem0,
 		stageDataOut => stageDataOutMem0,
 		
 		execEventSignal => eventSignal,
@@ -213,12 +215,12 @@ begin
 	port map(
 		clk => clk, reset => reset, en => en,
 		
-		prevSending => '0',--sendingMem0,
+		prevSending => sendingMem0,
 		nextAccepting => whichAcceptedCQ(2),
 		
 		stageDataIn => stageDataToMem1,--dataM, 
 		acceptingOut => acceptingMem1,
-		sendingOut => open,--sendingMem1,
+		sendingOut => sendingMem1,
 		stageDataOut => dataAfterMem,
 		
 		execEventSignal => eventSignal,
@@ -230,7 +232,7 @@ begin
 	);
 
 	-- CAREFUL: when miss (incl. forwarding miss), no 'completed' signal.
-	addressUnitSendingSig <= (dataAfterMem.fullMask(0) and not sendingToDLQ) or lqSelectedOutput.full;
+	addressUnitSendingSig <= (sendingMem1 and not sendingToDLQ) or lqSelectedOutput.full;
 																									--??? -- because load exc to ROB
 	outputC <= (addressUnitSendingSig, clearTempControlInfoSimple(execResultData));
 	outputOpPreC <= DEFAULT_INS_STATE; -- CAREFUL: Don't show this because not supported
@@ -249,7 +251,7 @@ begin
 		lqSelectedDataWithErr <= setLoadException(lqSelectedOutput.ins);
 	
 		-- Sending to Delayed Load Queue: when load/store miss or selected from LQ (going to ROB)
-		sendingToDLQ <= getSendingToDLQ(dataAfterMem.fullMask(0), lqSelectedOutput.full, lsResultData); 
+		sendingToDLQ <= getSendingToDLQ(sendingMem1, lqSelectedOutput.full, lsResultData); 
 		dataToDLQ <= makeSDM((0 => (sendingToDLQ, lsResultData)));
 
 ------------------------------------------------------------------------------------------------

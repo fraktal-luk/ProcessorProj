@@ -121,7 +121,7 @@ begin
 		w1 := getStoredArg1(ins);
 		w2 := getStoredArg1(content(i));
 		if 	 fullMask(i) = '1'
-			and content(i).controlInfo.completed = '1' -- Addressmust be already known!
+			and content(i).controlInfo.completed = '1' -- Address must be already known!
 			and w1(MWORD_SIZE-1 downto LOG2_CACHE_LINE_SIZE) = w2(MWORD_SIZE-1 downto LOG2_CACHE_LINE_SIZE) then
 			res(i) := '1';
 		end if;
