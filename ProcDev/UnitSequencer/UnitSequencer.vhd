@@ -169,6 +169,12 @@ architecture Behavioral of UnitSequencer is
 	signal intPhase0, intPhase1, intPhase2, intWaiting, addDbEvent, intAllow, intAck: std_logic := '0';
 	signal dbtrapOn: std_logic := '0';
 
+	signal stageDataRenameInA, stageDataRenameOutA, stageDataCommitInA, stageDataCommitOutA:
+					InstructionSlotArray(0 to PIPE_WIDTH-1) := (others => DEFAULT_INSTRUCTION_SLOT);
+	
+	signal tmpPcOutA, stageDataLastEffectiveInA, stageDataLastEffectiveOutA:
+					InstructionSlotArray(0 to 0) := (others => DEFAULT_INSTRUCTION_SLOT);
+
 	constant HAS_RESET_SEQ: std_logic := '0';
 	constant HAS_EN_SEQ: std_logic := '0';
 begin	 
@@ -202,7 +208,7 @@ begin
 										-- CAREFUL: Because of the above, PC is not updated in phase2 of halt instruction,
 										--				so the PC of a halted logical processor is not defined.
 
-		tmpPcIn <= makeSDM((0 => (sendingToPC, stageDataToPC)));
+		--tmpPcIn <= makeSDM((0 => (sendingToPC, stageDataToPC)));
 
 		SUBUNIT_PC: entity work.GenericStageMulti(Behavioral) port map(
 			clk => clk, reset => resetSig, en => enSig,
@@ -212,10 +218,12 @@ begin
 			nextAccepting => '1', -- CAREFUL: front should always accet - if can't, there will be refetch not stall
 										 --	  		 In multithreaded implementation it should be '1' for selected thread 
 			stageDataIn => tmpPcIn,
+				stageDataIn2(0) => (sendingToPC, stageDataToPC),
 			
 			acceptingOut => acceptingOutPC,
 			sendingOut => sendingOutPC,
 			stageDataOut => tmpPcOut,
+				stageDataOut2 => tmpPcOutA,
 			
 			execEventSignal => gE_eventOccurred,
 			lateEventSignal => evtPhase0,
@@ -223,7 +231,7 @@ begin
 			lockCommand => '0'		
 		);			
 
-		stageDataOutPC.ip <= tmpPcOut.data(0).ip;
+		stageDataOutPC.ip <= tmpPcOutA(0).ins.ip;
 		stageDataOutPC.target <= pcNext; -- CAREFUL: Attaching next address from line predictor. Correct?
 
 	excInfoUpdate <= evtPhase1 and (lateCausingSig.controlInfo.hasException
@@ -241,7 +249,7 @@ begin
 		alias savedStateExc is sysRegArray(4);
 		alias savedStateInt is sysRegArray(5);
 	begin
-		linkInfo <= getLinkInfo(dataFromLastEffective2.data(0), currentState);
+		linkInfo <= getLinkInfo(stageDataLastEffectiveOutA(0).ins, currentState);
 	
 		CLOCKED: process(clk)
 		begin					
@@ -294,7 +302,7 @@ begin
 
 			NEW_eiCausing.fullMask(0) <= '1';
 			NEW_eiCausing.data(0) <= clearControlEvents(
-												setInstructionTarget(dataFromLastEffective2.data(0), lateTargetIns.ip));
+												setInstructionTarget(stageDataLastEffectiveOutA(0).ins, lateTargetIns.ip));
 		-------------------------------------------------------------------------------------
 		dbtrapOn <= currentState(25);
 	end block;
@@ -305,10 +313,12 @@ begin
 	-- Rename stage
 	stageDataRenameIn <= renameGroup(frontDataLastLiving, newPhysSourcesIn, newPhysDestsIn, renameCtr,
 														renameGroupCtrNext, newPhysDestPointerIn, dbtrapOn);
+		stageDataRenameInA <= makeSlotArray(stageDataRenameIn.data, stageDataRenameIn.fullMask);
 
 	SUBUNIT_RENAME: entity work.GenericStageMulti(Behavioral)--Renaming)
 	generic map(
-		USE_CLEAR => '0'
+		USE_CLEAR => '0',
+		WIDTH => PIPE_WIDTH
 	)
 	port map(
 		clk => clk, reset => resetSig, en => enSig,
@@ -316,12 +326,15 @@ begin
 		-- Interface with front
 		prevSending => frontLastSending,	
 		stageDataIn => stageDataRenameIn, --readyRegFlagsV),
+			stageDataIn2 => stageDataRenameInA,
+		
 		acceptingOut => acceptingOutRename,
 		
 		-- Interface with IQ
 		nextAccepting => iqAccepts,
 		sendingOut => sendingOutRename,
 		stageDataOut => stageDataOutRename,
+			stageDataOut2 => stageDataRenameOutA,
 		
 		-- Event interface
 		execEventSignal => execOrIntEventSignal,
@@ -376,18 +389,23 @@ begin
 
 	-- Commit stage: in order again				
 	SUBUNIT_COMMIT: entity work.GenericStageMulti(Behavioral)
+	generic map(
+		WIDTH => PIPE_WIDTH
+	)
 	port map(
 		clk => clk, reset => resetSig, en => enSig,
 		
 		-- Interface with CQ
 		prevSending => sendingToCommit,
 		stageDataIn => stageDataToCommit,
+			stageDataIn2 => stageDataCommitInA,
 		acceptingOut => open, -- unused but don't remove
 		
 		-- Interface with hypothetical further stage
 		nextAccepting => '1',
 		sendingOut => sendingOutCommit,
 		stageDataOut => stageDataOutCommit,
+			stageDataOut2 => stageDataCommitOutA,
 		
 		-- Event interface
 		execEventSignal => '0', -- CAREFUL: committed cannot be killed!
@@ -405,27 +423,35 @@ begin
 		--			When committing normal op -> increment by length of the op 
 		--			
 		--			The 'target' field will be used to update return address for exc/int
-		stageDataToCommit <= recreateGroup(robDataLiving, dataFromBQV, dataFromLastEffective2.data(0).target);
+		stageDataToCommit <= recreateGroup(robDataLiving, dataFromBQV, stageDataLastEffectiveOutA(0).ins.target);
+			stageDataCommitInA <= makeSlotArray(stageDataToCommit.data, stageDataToCommit.fullMask);
+		
 		insToLastEffective <= getLastEffective(stageDataToCommit);	
-		dataToLastEffective <= makeSDM((0 => (sendingToCommit, insToLastEffective)));
+		--dataToLastEffective <= makeSDM((0 => (sendingToCommit, insToLastEffective)));
 
-			lateCausingSig <= setInterrupt3(dataFromLastEffective2.data(0), intPhase1, start);
+			lateCausingSig <= setInterrupt3(stageDataLastEffectiveOutA(0).ins, intPhase1, start);
 
-			dataToLastEffective2 <= dataToLastEffective when (evtPhase1) = '0' else NEW_eiCausing;
+			--dataToLastEffective2 <= dataToLastEffective when (evtPhase1) = '0' else NEW_eiCausing;
 
+			stageDataLastEffectiveInA(0) <= --(dataToLastEffective2.fullMask(0), dataToLastEffective2.data(0));
+														(sendingToCommit, insToLastEffective) when evtPhase1 = '0'
+												else (NEW_eiCausing.fullMask(0), NEW_eiCausing.data(0));
 			LAST_EFFECTIVE_SLOT: entity work.GenericStageMulti(Behavioral)
 			port map(
 				clk => clk, reset => resetSig, en => enSig,
 				
 				-- Interface with CQ
 				prevSending => sendingToCommit or evtPhase1,
-				stageDataIn => dataToLastEffective2,-- TMPpre_lastEffective,
+				stageDataIn => DEFAULT_STAGE_DATA_MULTI,--dataToLastEffective2,-- TMPpre_lastEffective,
+					stageDataIn2 => stageDataLastEffectiveInA,
+				
 				acceptingOut => open, -- unused but don't remove
 				
 				-- Interface with hypothetical further stage
 				nextAccepting => '1',
 				sendingOut => open,
-				stageDataOut => dataFromLastEffective2,--TMP_lastEffective,
+				stageDataOut => open,--dataFromLastEffective2,--TMP_lastEffective,
+					stageDataOut2 => stageDataLastEffectiveOutA,
 				
 				-- Event interface
 				execEventSignal => '0', -- CAREFUL: committed cannot be killed!
@@ -441,11 +467,11 @@ begin
 				evtPhase1 <= (evtPhase0 and sbEmpty)
 							or  (evtWaiting and sbEmpty);
 
-				committingEvt <= sendingToCommit and dataToLastEffective2.data(0).controlInfo.newEvent;
+				committingEvt <= sendingToCommit and stageDataLastEffectiveInA(0).ins.controlInfo.newEvent;
 				-- CAREFUL: when committingEvt, it is forbidden to indicate interrupt in next cycle! 
 				
 				-- CAREFUL: probably not used, because dbtrap will be a normal exc, overridden by "real" exceptions
-				addDbEvent <= committingEvt and dataToLastEffective2.data(0).controlInfo.dbtrap;
+				addDbEvent <= committingEvt and stageDataLastEffectiveInA(0).ins.controlInfo.dbtrap;
 													-- Forces int controller to insert a DB interrupt and issue it ASAP 
 
 				intPhase0 <= intSignal;
@@ -495,7 +521,8 @@ begin
 	intAckOut <= intAck;
 	
 	renameAccepting <= acceptingOutRename and not renameLockState;
-	renamedDataLiving <= stageDataOutRename;
+	renamedDataLiving <= --stageDataOutRename;
+								makeSDM(stageDataRenameOutA);
 	renamedSending <= sendingOutRename;
 	
 	commitGroupCtrOut <= commitGroupCtr;
@@ -504,6 +531,7 @@ begin
 	renameLockEndOut <= renameLockEnd;
 	commitAccepting <= '1';
 	committedSending <= sendingOutCommit;
-	committedDataOut <= stageDataOutCommit;
+	committedDataOut <= --stageDataOutCommit;
+								makeSDM(stageDataCommitOutA);
 end Behavioral;
 

@@ -79,6 +79,9 @@ end IntegerMultiplier;
 architecture Behavioral of IntegerMultiplier is
 	signal inputData, outputData: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
 	signal data0, data1: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
+
+	signal data0a, data1a, outputDataA: InstructionSlotArray(0 to 0) := (others => DEFAULT_INSTRUCTION_SLOT);
+
 	signal sending0, sending1, acc1, acc2: std_logic := '0';
 	
 	signal dataM: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
@@ -102,10 +105,11 @@ begin
 		
 		stageDataIn => --inputData,
 								makeSDM((0 => (input.full, input.ins))),
+			stageDataIn2 => (0 => (input.full, input.ins)),
 		acceptingOut => acceptingOut,
 		sendingOut => sending0,
 		stageDataOut => data0,
-		
+			stageDataOut2 => data0a,
 		execEventSignal => execEventSignal,
 		lateEventSignal => lateEventSignal,
 		execCausing => eventCausing,
@@ -124,10 +128,12 @@ begin
 		prevSending => sending0,
 		nextAccepting => acc2, --flowResponseAPost.accepting,
 		
-		stageDataIn => data0, 
+		stageDataIn => data0,
+			stageDataIn2 => data0a,
 		acceptingOut => acc1,
 		sendingOut => sending1,
 		stageDataOut => data1,
+			stageDataOut2 => data1a,
 		
 		execEventSignal => execEventSignal,
 		lateEventSignal => lateEventSignal,
@@ -150,11 +156,12 @@ begin
 		prevSending => sending1,
 		nextAccepting => nextAccepting, --flowResponseAPost.accepting,
 		
-		stageDataIn => --dataM,
-							data1,
+		stageDataIn => data1,
+			stageDataIn2 => data1a,
 		acceptingOut => acc2,
 		sendingOut => sendingOut,
 		stageDataOut => outputData,
+			stageDataOut2 => outputDataA,
 		
 		execEventSignal => execEventSignal,
 		lateEventSignal => lateEventSignal,
@@ -164,8 +171,10 @@ begin
 		--stageEventsOut => open					
 	);		
 	
-	data1Prev <= data1.data(0);				
-	dataOut <= setInsResult(outputData.data(0), multResult(31 downto 0));
+	data1Prev <= --data1.data(0);
+					data1a(0).ins;
+	dataOut <= setInsResult(--outputData.data(0), multResult(31 downto 0));
+									 outputDataA(0).ins, multResult(31 downto 0));
 	
 	-- CAREFUL, TODO: implement individual CK EN for ultiplier stages or disallow stalling mul pipe!!
 	MP: entity work.NewMultiplierPipe(Behavioral)

@@ -139,6 +139,9 @@ architecture Behavioral of OutOfOrderBox is
 	signal dataToQueuesArr: StageDataMultiArray(0 to 4) := (others => DEFAULT_STAGE_DATA_MULTI);
 	signal regValsArr: MwordArray(0 to 3*5-1) := (others => (others => '0'));
 	
+	signal cqDataLivingOut2, stageDataAfterCQ2:
+				InstructionSlotArray(0 to 0) := (others => DEFAULT_INSTRUCTION_SLOT);
+	
 	signal theIssueView: IssueView := DEFAULT_ISSUE_VIEW;
 begin		
 	resetSig <= reset;
@@ -349,6 +352,7 @@ begin
 
 		anySendingFromCQ <= cqOutputSig(0).full; -- CAREFUL, only used for SINGLE_OUTPUT
 		cqDataLivingOut <= makeSDM((0 => (cqOutputSig(0).full, cqOutputSig(0).ins)));
+			cqDataLivingOut2(0) <= (cqOutputSig(0).full, cqOutputSig(0).ins);
 
 		-- CAREFUL! This stage is needed to keep result tags 1 for cycle when writing to reg file,
 		--				so that "black hole" of invisible readiness doesn't occur
@@ -361,16 +365,19 @@ begin
 			lateEventSignal => '0',
 			execCausing => execCausing,
 			stageDataIn => cqDataLivingOut,
+				stageDataIn2 => cqDataLivingOut2,
 			acceptingOut => open,
 			sendingOut => open,
 			stageDataOut => stageDataAfterCQ,
+				stageDataOut2 => stageDataAfterCQ2,
 			
 			lockCommand => '0'			
 		);
 
 		-- writtenTags indicate registers written to GPR file in last cycle, so they can be read from there
-		--		rather than from forw. network, but readyRegFlags are not available in the 1st cycle after WB.		
-		fni.writtenTags <= getPhysicalDests(stageDataAfterCQ) when CQ_SINGLE_OUTPUT else (others => (others => '0'));
+		--		rather than from forw. network, but readyRegFlags are not available in the 1st cycle after WB.
+		fni.writtenTags <= getPhysicalDests(makeSDM(stageDataAfterCQ2)) when CQ_SINGLE_OUTPUT
+						else (others => (others => '0'));
 		fni.resultTags <= getResultTags(execOutputs1, cqBufferOutputSig, DEFAULT_STAGE_DATA_MULTI);
 		fni.nextResultTags <= getNextResultTags(execOutputsPre, schedOutputArr);
 		fni.resultValues <= getResultValues(execOutputs1, cqBufferOutputSig, DEFAULT_STAGE_DATA_MULTI);

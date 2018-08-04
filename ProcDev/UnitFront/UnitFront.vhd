@@ -118,6 +118,13 @@ architecture Behavioral of UnitFront is
 
 	signal newDecoded, stageDataDecodeNew, stageDataDecodeOut: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
 
+	signal stageDataOutFetchA, stageDataoutFetch1a, earlyBranchDataOutA:
+				InstructionSlotArray(0 to 0) := (others => DEFAULT_INSTRUCTION_SLOT);
+
+	signal earlyBranchMultiDataInA,
+				earlyBranchMultiDataOutA, stageDataDecodeInA, stageDataDecodeOutA:
+						InstructionSlotArray(0 to PIPE_WIDTH-1) := (others => DEFAULT_INSTRUCTION_SLOT);
+
 	--	signal ch0: std_logic := '0'; 
 	constant HAS_RESET_FRONT: std_logic := '0';
 	constant HAS_EN_FRONT: std_logic := '0';	
@@ -134,22 +141,28 @@ begin
 	end generate;			
 	
 	-- Fetch stage				
-	STAGE_FETCH_0: block
-		signal f0input, f0output: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
-	begin
-		f0input.fullMask(0) <= pcSending;
-		f0input.data(0) <= pcDataLiving;
+--	STAGE_FETCH_0: block
+--		signal f0input, f0output: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
+--	begin
+--		f0input.fullMask(0) <= pcSending;
+--		f0input.data(0) <= pcDataLiving;
 	
-		SUBUNIT_FETCH_0: entity work.GenericStageMulti(Behavioral) port map(
+		SUBUNIT_FETCH_0: entity work.GenericStageMulti(Behavioral)
+		generic map(
+			WIDTH => 1 --PIPE_WIDTH
+		)
+		port map(
 			clk => clk, reset => resetSig, en => enSig,
 					
 			prevSending => pcSending,	
 			nextAccepting => acceptingForFetchFirst,
-			stageDataIn => f0input,
+			stageDataIn => DEFAULT_STAGE_DATA_MULTI,--f0input,
+				stageDataIn2(0) => (pcSending, pcDataLiving),
 			
 			acceptingOut => acceptingOutFetch,
 			sendingOut => sendingOutFetch,
-			stageDataOut => f0output,
+			stageDataOut => open,--f0output,
+				stageDataOut2 => stageDataOutFetchA,
 			
 			execEventSignal => killAll or frontKill,--killVector(1),
 			lateEventSignal => killAll,
@@ -157,8 +170,8 @@ begin
 			lockCommand => '0'		
 		);	
 		
-		stageDataOutFetch <= f0output.data(0);
-	end block;
+	--	stageDataOutFetch <= f0output.data(0);
+	--end block;
 			
 	FETCH_DELAY: process (clk)
 	begin
@@ -178,22 +191,27 @@ begin
 	
 	-- CAREFUL: this part must be bypassed (architecture Bypassed) when
 	--				FETCH_DELAYED is false. If true, this should be normal.		
-	STAGE_FETCH_1: block
-		signal f1input, f1output: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
-	begin
-		f1input.fullMask(0) <= sendingOutFetch;
-		f1input.data(0) <= stageDataOutFetch;
+--	STAGE_FETCH_1: block
+--		signal f1input, f1output: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
+--	begin
+--		f1input.fullMask(0) <= sendingOutFetch;
+--		f1input.data(0) <= stageDataOutFetch;
 	
-		SUBUNIT_FETCH_1: entity work.GenericStageMulti(Bypassed) port map(
+		SUBUNIT_FETCH_1: entity work.GenericStageMulti(Bypassed)
+		generic map(
+			WIDTH => 1 --PIPE_WIDTH
+		)
+		port map(
 			clk => clk, reset => resetSig, en => enSig,
 					
 			prevSending => sendingOutFetch,	
 			nextAccepting => earlyBranchAccepting,
-			stageDataIn => f1input,
-			
+			stageDataIn => DEFAULT_STAGE_DATA_MULTI,-- f1input,
+				stageDataIn2 => stageDataOutFetchA,
 			acceptingOut => acceptingOutFetch1,
 			sendingOut => sendingOutFetch1,
-			stageDataOut => f1output,
+			stageDataOut => open,--f1output,
+				stageDataOut2 => stageDataoutFetch1a,
 			
 			execEventSignal => killAll or frontKill, --killVector(1),
 			lateEventSignal => killAll,
@@ -201,8 +219,8 @@ begin
 			lockCommand => '0'		
 		);	
 		
-		stageDataOutFetch1 <= f1output.data(0);
-	end block;	
+--		stageDataOutFetch1 <= f1output.data(0);
+--	end block;	
 
 	stageDataOutFetchFinal <= stageDataOutFetch1;
 	sendingOutFetchFinal <= sendingOutFetch1;
@@ -210,7 +228,7 @@ begin
 	acceptingForFetchFirst <= acceptingOutFetch1;
 
 	earlyBranchDataIn.data(0) <= 
-				setInstructionIP(findEarlyTakenJump(stageDataOutFetchFinal, earlyBranchMultiDataIn), predictedAddress);
+		setInstructionIP(findEarlyTakenJump(stageDataOutFetch1a(0).ins, earlyBranchMultiDataIn), predictedAddress);
 
 	earlyBranchDataIn.fullMask(0) <= sendingOutFetchFinal;		
 	sendingToEarlyBranch <= sendingOutFetchFinal;
@@ -222,10 +240,12 @@ begin
 			prevSending => sendingToEarlyBranch,	
 			nextAccepting => '1',--acceptingOutHbuffer,
 			stageDataIn => earlyBranchDataIn,
-			
+				stageDataIn2(0) => (sendingOutFetchFinal, earlyBranchDataIn.data(0)),
+				
 			acceptingOut => earlyBranchAccepting,
 			sendingOut => earlyBranchSending,
 			stageDataOut => earlyBranchDataOut,
+				stageDataOut2 => earlyBranchDataOutA,
 			
 			execEventSignal => killAll, -- CAREFUL: not killing on stall, because is sent to void
 			lateEventSignal => killAll,
@@ -234,21 +254,27 @@ begin
 	);
 				
 	earlyBranchMultiDataIn <= getEarlyBranchMultiDataIn(predictedAddress,
-																		stageDataOutFetchFinal,
+																		stageDataOutFetch1a(0).ins,
 																		pcSendingDelayedFinal, ivalidFinal, '1',
 																		fetchBlockFinal);
+	earlyBranchMultiDataInA <= makeSlotArray(earlyBranchMultiDataIn.data, earlyBranchMultiDataIn.fullMask);
 	
 	SUBUNIT_EARLY_BRANCH_MULTI: entity work.GenericStageMulti(Behavioral)
+	generic map(
+		WIDTH => PIPE_WIDTH
+	)
 	port map(
 			clk => clk, reset => resetSig, en => enSig,
 					
 			prevSending => sendingToEarlyBranch,	
 			nextAccepting => '1',--acceptingOutHbuffer,
 			stageDataIn => earlyBranchMultiDataIn,
+				stageDataIn2 => earlyBranchMultiDataInA,
 			
 			acceptingOut => open,--earlyBranchAccepting,
 			sendingOut => earlyBranchMultiSending,
 			stageDataOut => earlyBranchMultiDataOut,
+				stageDataOut2 => earlyBranchMultiDataOutA,
 			
 			execEventSignal => killAll, -- CAREFUL: not killing on stall, because is sent to void
 			lateEventSignal => killAll,
@@ -259,7 +285,7 @@ begin
 	frontBranchEvent <= hbufferDataIn.controlInfo.newEvent;-- stage0Events.eventOccured;
 
 		stallEventSig <= fetchStall;
-		stallCausing <= setInstructionTarget(earlyBranchDataOut.data(0), earlyBranchDataOut.data(0).ip);
+		stallCausing <= setInstructionTarget(earlyBranchDataOutA(0).ins, earlyBranchDataOutA(0).ins.ip);
 		frontKill <= frontBranchEvent or fetchStall;
 		fetchStall <= earlyBranchSending and not acceptingOutHbuffer;
 	
@@ -279,7 +305,7 @@ begin
 		end process;
 	
 	-- Hword buffer
-	hbufferDataIn <= earlyBranchDataOut.data(0);
+	hbufferDataIn <= earlyBranchDataOutA(0).ins;
 	
 	SUBUNIT_HBUFFER: entity work.SubunitHbuffer(Implem)
 	port map(
@@ -288,7 +314,7 @@ begin
 		prevSending => earlyBranchSending and not fetchStall,
 		nextAccepting => acceptingOut0,
 		stageDataIn => hbufferDataIn,
-		stageDataInMulti => earlyBranchMultiDataOut,
+		stageDataInMulti => makeSDM(earlyBranchMultiDataOutA),
 		fetchBlock => fetchBlockBP,
 		
 		acceptingOut => acceptingOutHbuffer,
@@ -302,18 +328,25 @@ begin
 -- Decode stage
 	newDecoded <= decodeMulti(stageDataOutHbuffer);
 	stageDataDecodeNew <= fillTargetsAndLinks(newDecoded);
-							
+	
+	stageDataDecodeInA <= makeSlotArray(stageDataDecodeNew.data, stageDataDecodeNew.fullMask);
+	
 	SUBUNIT_DECODE: entity work.GenericStageMulti(Behavioral)
+		generic map(
+			WIDTH => PIPE_WIDTH
+		)
 		port map(
 		clk => clk, reset => resetSig, en => enSig,
 		
 		prevSending => sendingOutHbuffer,	
 		nextAccepting => renameAccepting,
 		stageDataIn => stageDataDecodeNew,
+			stageDataIn2 => stageDataDecodeInA,
 		
 		acceptingOut => acceptingOut0,
 		sendingOut => sendingOut0,
 		stageDataOut => stageDataDecodeOut,
+			stageDataOut2 => stageDataDecodeOutA,
 
 		execEventSignal => killAll,
 		lateEventSignal => killAll,
@@ -322,7 +355,7 @@ begin
 	);	
 	
 	-- from later stages
-	dataLastLiving <= clearTempControlInfoMulti(stageDataDecodeOut);
+	dataLastLiving <= clearTempControlInfoMulti(makeSDM(stageDataDecodeOutA));
 	lastSending <= sendingOut0;
 	
 	frontAccepting <= acceptingOutFetch;

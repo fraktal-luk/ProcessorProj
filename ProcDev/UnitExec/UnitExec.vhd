@@ -109,6 +109,9 @@ architecture Implem of UnitExec is
 	
 	signal bqSelectedOutput: InstructionSlot := DEFAULT_INSTRUCTION_SLOT;
 
+	signal inputDataA2, outputDataA2, inputDataD2, outputDataD2:
+			InstructionSlotArray(0 to 0) := (others => DEFAULT_INSTRUCTION_SLOT);
+
 	constant HAS_RESET_EXEC: std_logic := '1';
 	constant HAS_EN_EXEC: std_logic := '1';	
 begin		
@@ -116,8 +119,10 @@ begin
 		enSig <= en or not HAS_EN_EXEC; 
 
 		inputDataA <= makeSDM((0 => (inputA.full, executeAlu(inputA.ins, inputA.state, branchQueueSelectedOut))));
+		inputDataA2(0) <= (inputA.full, executeAlu(inputA.ins, inputA.state, branchQueueSelectedOut));
 
-		dataA0 <= outputDataA.data(0);
+		dataA0 <= --outputDataA.data(0);
+						outputDataA2(0).ins;
 		
 		SUBPIPE_A: entity work.GenericStageMulti(Behavioral)
 		generic map(
@@ -130,9 +135,11 @@ begin
 			nextAccepting => whichAcceptedCQ(0),
 			
 			stageDataIn => inputDataA,
+				stageDataIn2 => inputDataA2,
 			acceptingOut => execAcceptingASig,
 			sendingOut => execSendingA,
 			stageDataOut => outputDataA,
+				stageDataOut2 => outputDataA2,
 			
 			execEventSignal => eventSignal,
 			lateEventSignal => lateEventSignal,
@@ -169,8 +176,10 @@ begin
 											 branchQueueSelectedOut, branchQueueSelectedSending);					
 		
 		inputDataD <= makeSDM((0 => (inputA.full and isBranch(inputA.ins), branchData)));
+		inputDataD2(0) <= (inputA.full and isBranch(inputA.ins), branchData);
 		
-		dataD0 <= outputDataD.data(0);
+		dataD0 <=-- outputDataD.data(0);
+					outputDataD2(0).ins;
 		
 		SUBPIPE_D: entity work.GenericStageMulti(Behavioral)
 		generic map(
@@ -182,11 +191,12 @@ begin
 			prevSending => inputDataD.fullMask(0),
 			nextAccepting => '1',--whichAcceptedCQ(3),
 			
-			stageDataIn => inputDataD, 
+			stageDataIn => inputDataD,
+				stageDataIn2 => inputDataD2,
 			acceptingOut => execAcceptingDSig,
 			sendingOut => execSendingD,
 			stageDataOut => outputDataD,
-			
+				stageDataOut2 => outputDataD2,
 			execEventSignal => eventSignal,
 			lateEventSignal => lateEventSignal,
 			execCausing => execCausing,

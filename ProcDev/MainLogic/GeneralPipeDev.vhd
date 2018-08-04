@@ -95,9 +95,12 @@ function stageMultiNext(livingContent, newContent: StageDataMulti; full, sending
 return StageDataMulti;
 
 	function stageMultiNextCl(livingContent, newContent: StageDataMulti; full, sending, receiving: std_logic;
-										clearEmptySlots: boolean)
+										kill: std_logic; clearEmptySlots: boolean)
 	return StageDataMulti;
 
+	function stageArrayNext(livingContent, newContent: InstructionSlotArray; full, sending, receiving: std_logic;
+										kill: std_logic)
+	return InstructionSlotArray;
 
 function stageMultiHandleKill(content: StageDataMulti; 
 										killAll: std_logic) 
@@ -488,42 +491,61 @@ return StageDataMulti is
 	variable res: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
 		constant CLEAR_VACATED_SLOTS_GENERAL: boolean := false; 
 begin
-	return stageMultiNextCl(livingContent, newContent, full, sending, receiving, false);
+	--return stageMultiNextCl(livingContent, newContent, full, sending, receiving, false);
 end function;
 
 
 	function stageMultiNextCl(livingContent, newContent: StageDataMulti; full, sending, receiving: std_logic;
-										clearEmptySlots: boolean)
+										kill: std_logic; clearEmptySlots: boolean)
 	return StageDataMulti is 
 		variable res: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
-			constant CLEAR_VACATED_SLOTS_GENERAL: boolean := clearEmptySlots; 
+		--	constant CLEAR_VACATED_SLOTS_GENERAL: boolean := clearEmptySlots; 
 	begin
-		if not CLEAR_VACATED_SLOTS_GENERAL then
-			res := livingContent;
+		res := livingContent;
+		if kill = '1' then
+			res.fullMask := (others => '0');
 		end if;
 		
 		if receiving = '1' then -- take full
 			res := newContent;
-		elsif sending = '1' then -- take empty
-			if CLEAR_VACATED_SLOTS_GENERAL then
-				res := DEFAULT_STAGE_DATA_MULTI;
-			end if;	
-
+		elsif sending = '1' or full = '0' then -- take empty
 			-- CAREFUL: clearing result tags for empty slots
 			for i in 0 to PIPE_WIDTH-1 loop
 				res.data(i).physicalArgSpec.dest := (others => '0');
-					res.data(i).controlInfo.newEvent := '0';
+				res.data(i).controlInfo.newEvent := '0';
 			end loop;
-		else -- stall or killed (kill can be partial)
-			if full = '0' then
-				-- Do nothing
-				for i in 0 to PIPE_WIDTH-1 loop
-					res.data(i).physicalArgSpec.dest := (others => '0');
-						res.data(i).controlInfo.newEvent := '0';
+			res.fullMask := (others => '0');
+		end if;			
+			
+		return res;
+	end function;
+
+
+	function stageArrayNext(livingContent, newContent: InstructionSlotArray; full, sending, receiving: std_logic;
+										kill: std_logic)
+	return InstructionSlotArray is 
+		constant LEN: natural := livingContent'length;
+		variable res: InstructionSlotArray(0 to LEN-1) := (others => DEFAULT_INSTRUCTION_SLOT);
+		--	constant CLEAR_VACATED_SLOTS_GENERAL: boolean := clearEmptySlots; 
+	begin
+		res := livingContent;
+		if kill = '1' then
+			for i in 0 to LEN-1 loop
+				res(i).full := '0';
+			end loop;
+		end if;
+		
+		if receiving = '1' then -- take full
+			res := newContent;
+		elsif sending = '1' or full = '0' then -- take empty
+			-- CAREFUL: clearing result tags for empty slots
+			for i in 0 to LEN-1 loop
+				res(i).ins.physicalArgSpec.dest := (others => '0');
+				res(i).ins.controlInfo.newEvent := '0';
+			end loop;
+				for i in 0 to LEN-1 loop
+					res(i).full := '0';
 				end loop;
-			else
-				res := livingContent;
-			end if;
 		end if;			
 			
 		return res;
@@ -533,24 +555,25 @@ end function;
 function stageMultiHandleKill(content: StageDataMulti; 
 										killAll: std_logic) 
 										return StageDataMulti is
-	variable res: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
-		constant CLEAR_KILLED_SLOTS_GENERAL: boolean := false;
+	variable res: StageDataMulti := content;
+	--	constant CLEAR_KILLED_SLOTS_GENERAL: boolean := false;
 begin
-	if not CLEAR_KILLED_SLOTS_GENERAL then
-		res.data := content.data;
-	end if;
+--	if not CLEAR_KILLED_SLOTS_GENERAL then
+--		res.data := content.data;
+--	end if;
 	
 	if killAll = '1' then
 		res.fullMask := (others => '0');
-	else
-		res.fullMask := content.fullMask;-- and not killVec;
+		--res := DEFAULT_STAGE_DATA_MULTI;
+	--else
+	--	res.fullMask := content.fullMask;-- and not killVec;
 	end if;
 	
-	for i in res.data'range loop
-		if res.fullMask(i) = '1' then
-			res.data(i) := content.data(i);
-		end if;
-	end loop;
+--	for i in res.data'range loop
+--		if res.fullMask(i) = '1' then
+--			res.data(i) := content.data(i);
+--		end if;
+--	end loop;
 	return res;
 end function;
 

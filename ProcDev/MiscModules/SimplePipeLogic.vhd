@@ -75,8 +75,8 @@ architecture Behavioral of SimplePipeLogic is
 		signal fullSig: std_logic := '0';
 		signal livingSig: std_logic := '0';		
 		
-		signal canAccept: std_logic := '0';
-		signal wantSend: std_logic := '0';
+		--signal canAccept: std_logic := '0';
+		--signal wantSend: std_logic := '0';
 		signal acceptingSig: std_logic := '0';
 		signal sendingSig: std_logic := '0';	
 
@@ -85,31 +85,31 @@ architecture Behavioral of SimplePipeLogic is
 begin
 		livingSig <= fullSig and not flowDrive.kill; -- CHECK: killing mechanism correct?
 
-		canAccept <= not flowDrive.lockAccept;
-		wantSend <= livingSig and not flowDrive.lockSend;
+		--canAccept <= not flowDrive.lockAccept;
+		--wantSend <= livingSig and not flowDrive.lockSend;
 		
 		-- Determine what will be sent
-		sendingSig <= flowDrive.nextAccepting and wantSend;
+		sendingSig <= flowDrive.nextAccepting and livingSig;
 		afterSending <= livingSig and not sendingSig;
 
 		-- Determine what will be received
-		acceptingSig <= canAccept and not afterSending;	
+		acceptingSig <= not afterSending;	
 		afterReceiving <= afterSending or flowDrive.prevSending;
 				
 		CLOCKED: process(clk)
 		begin
 			if rising_edge(clk) then
-				if reset = '1' then
-					fullSig <= '0';
-					isNewSig <= '0';
-				elsif en = '1' then
+				--if reset = '1' then
+				--	fullSig <= '0';
+				--	isNewSig <= '0';
+				--elsif en = '1' then
 					assert (livingSig or not sendingSig) = '1' 
 							report "Try to send from empty?" severity warning;
 					assert (afterSending and flowDrive.prevSending) = '0' 
 							report "Trying to receive into full slot" severity warning;
 					fullSig <= afterReceiving;
 					isNewSig <= flowDrive.prevSending;					
-				end if;
+				--end if;
 			end if;
 		end process;
 		

@@ -91,26 +91,26 @@ begin
 	stageDataM <= makeSDM((0 => (prevSending, inputDataWithArgs.ins)));
 	
 	-- not used now
-	BASIC_LOGIC: entity work.GenericStageMulti(Behavioral)
-	generic map(
-		COMPARE_TAG => '1'
-	)
-	port map(
-		clk => clk, reset => reset, en => en,
-		
-		prevSending => prevSending,
-		nextAccepting => nextAccepting,
-		
-		stageDataIn => stageDataM,
-		acceptingOut => open,--acceptingOut,
-		sendingOut => open,--sendingOut,
-		stageDataOut => stageDataStored,
-		
-		execEventSignal => execEventSignal,
-		lateEventSignal => lateEventSignal,
-		execCausing => execCausing,
-		lockCommand => '0'
-	);
+--	BASIC_LOGIC: entity work.GenericStageMulti(Behavioral)
+--	generic map(
+--		COMPARE_TAG => '1'
+--	)
+--	port map(
+--		clk => clk, reset => reset, en => en,
+--		
+--		prevSending => prevSending,
+--		nextAccepting => nextAccepting,
+--		
+--		stageDataIn => stageDataM,
+--		acceptingOut => open,--acceptingOut,
+--		sendingOut => open,--sendingOut,
+--		stageDataOut => stageDataStored,
+--		
+--		execEventSignal => execEventSignal,
+--		lateEventSignal => lateEventSignal,
+--		execCausing => execCausing,
+--		lockCommand => '0'
+--	);
 
 			BASIC_LOGIC_SCH: entity work.SchedulerStage(Behavioral)
 			generic map(
