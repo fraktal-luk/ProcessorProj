@@ -48,7 +48,7 @@ use work.BasicCheck.all;
 entity TestCQPart0 is
 	generic(
 		INPUT_WIDTH: integer := 3;
-		QUEUE_SIZE: integer := 3;
+		QUEUE_SIZE: integer := 2;
 		OUTPUT_SIZE: integer := 1
 	);
 	port(
@@ -206,3 +206,64 @@ begin
 	end generate;
 	
 end Implem;
+
+
+architecture Implem2 of TestCQPart0 is
+	signal resetSig, enSig: std_logic := '0';
+	
+	signal stageDataCQ, stageDataCQNext: InstructionSlotArray(0 to 1) := (others => DEFAULT_INSTRUCTION_SLOT);
+
+	function cqDataNext(stageData: InstructionSlotArray; input: InstructionSlotArray) 
+	return InstructionSlotArray is
+		variable res: InstructionSlotArray(0 to 1) := (others => DEFAULT_INSTRUCTION_SLOT);
+	begin
+		--  Slot 0
+		if stageData(1).full = '1' then
+			res(0):= stageData(1);
+		elsif input(0).full = '1' then
+			res(0) := input(0);
+		elsif input(1).full = '1' then
+			res(0) := input(1);
+		else
+			res(0).full := '0';
+			res(0).ins.physicalArgSpec.dest := (others => '0');
+		end if;
+		
+		-- Slot 1
+		if stageData(1).full = '1' and input(1).full = '1' then
+			res(1):= input(1);
+		elsif input(2).full = '1' then
+			res(1) := input(2);
+		else
+			res(1).full := '0';
+			res(1).ins.physicalArgSpec.dest := (others => '0');
+		end if;
+		
+		return res;
+	end function;
+
+	constant HAS_RESET_CQ: std_logic := '0';
+	constant HAS_EN_CQ: std_logic := '0';
+begin
+	resetSig <= reset and HAS_RESET_CQ;
+	enSig <= en or not HAS_EN_CQ;
+
+	stageDataCQNext <= cqDataNext(stageDataCQ, input);
+
+	CQ_SYNCHRONOUS: process(clk)
+	begin
+		if rising_edge(clk) then	
+			stageDataCQ <= stageDataCQNext;
+				
+				--logBuffer(stageDataCQ.data, stageDataCQ.fullMask, livingMaskCQ,
+				--				flowResponseCQ);
+		end if;
+	end process;
+
+	cqOutput(0) <= stageDataCQ(0);
+	anySending <= stageDataCQ(0).full;
+
+	whichAcceptedCQ <= (others => '1');
+	
+	bufferOutput <= (0 => stageDataCQ(0), 1 => stageDataCQ(1), others => DEFAULT_INSTRUCTION_SLOT);
+end Implem2;

@@ -178,9 +178,9 @@ begin
 	--------------------------------
 	--- Out of order domain
 	OUTER_OOO_AREA: block
-		signal cqMaskOut: std_logic_vector(0 to INTEGER_WRITE_WIDTH-1) := (others => '0');
-		signal cqDataOut: InstructionStateArray(0 to INTEGER_WRITE_WIDTH-1) := (others => DEFAULT_INSTRUCTION_STATE);
-		signal cqOutput: InstructionSlotArray(0 to INTEGER_WRITE_WIDTH-1) := (others => DEFAULT_INSTRUCTION_SLOT);
+		signal cqMaskOut: std_logic_vector(0 to 0) := (others => '0');
+		signal cqDataOut: InstructionStateArray(0 to 0) := (others => DEFAULT_INSTRUCTION_STATE);
+		signal cqOutput: InstructionSlotArray(0 to 0) := (others => DEFAULT_INSTRUCTION_SLOT);
 		signal readyRegFlags: std_logic_vector(0 to 3*PIPE_WIDTH-1) := (others => '0');		
 		signal readyRegFlagsNext: std_logic_vector(0 to 3*PIPE_WIDTH-1) := (others => '0');					
 	begin
@@ -235,7 +235,7 @@ begin
 
 		INT_READY_TABLE: entity work.ReadyRegisterTable(Behavioral)
 		generic map(
-			WRITE_WIDTH => INTEGER_WRITE_WIDTH
+			WRITE_WIDTH => 1
 		)
 		port map(
 			clk => clk, reset => resetSig, en => enSig, 

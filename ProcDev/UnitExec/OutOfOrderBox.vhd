@@ -87,7 +87,7 @@ entity OutOfOrderBox is
 			
 			  readyRegFlags: in std_logic_vector(0 to 3*PIPE_WIDTH-1);		
 	
-			  cqOutput: out InstructionSlotArray(0 to INTEGER_WRITE_WIDTH-1);
+			  cqOutput: out InstructionSlotArray(0 to 0);
 				
 			  sqCommittedOutput: out InstructionSlot;
 			  sqCommittedEmpty: out std_logic
@@ -127,7 +127,7 @@ architecture Behavioral of OutOfOrderBox is
 	signal anySendingFromCQ: std_logic := '0';
 	--signal cqDataLivingOut: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
 
-	signal cqOutputSig: InstructionSlotArray(0 to INTEGER_WRITE_WIDTH-1) := (others => DEFAULT_INS_SLOT);
+	signal cqOutputSig: InstructionSlotArray(0 to 0) := (others => DEFAULT_INS_SLOT);
 	signal cqBufferOutputSig: InstructionSlotArray(0 to CQ_SIZE-1) := (others => DEFAULT_INSTRUCTION_SLOT);
 		
 	signal execOutputs1, execOutputs2, execOutputsPre: InstructionSlotArray(0 to 3) := (others => DEFAULT_INS_SLOT);
@@ -375,11 +375,11 @@ begin
 		execOutputs2 <= (		2 => outputE, 3 => outputD, others => DEFAULT_INSTRUCTION_SLOT); -- (-,-,E,D)! 
 		execOutputsPre <= (1 => ('0', outputOpPreB), --1 => ('0', outputOpPreC),
 																				others => DEFAULT_INSTRUCTION_SLOT);
-		COMMIT_QUEUE: entity work.TestCQPart0(Implem)
+		COMMIT_QUEUE: entity work.TestCQPart0(Implem2)
 		generic map(
 			INPUT_WIDTH => 3,
-			QUEUE_SIZE => CQ_SIZE,
-			OUTPUT_SIZE => INTEGER_WRITE_WIDTH
+			QUEUE_SIZE => 2,
+			OUTPUT_SIZE => 1
 		)
 		port map(
 			clk => clk, reset => resetSig, en => enSig,
@@ -387,7 +387,7 @@ begin
 			execEventSignal => '0',
 			execCausing => DEFAULT_INSTRUCTION_STATE,
 			input => execOutputs1(0 to 2),
-				
+
 			whichAcceptedCQ => whichAcceptedCQ,
 			anySending => open,--anySendingFromCQ,
 			cqOutput => cqOutputSig,
@@ -420,8 +420,8 @@ begin
 
 		-- writtenTags indicate registers written to GPR file in last cycle, so they can be read from there
 		--		rather than from forw. network, but readyRegFlags are not available in the 1st cycle after WB.
-		fni.writtenTags <= getPhysicalDests(makeSDM(stageDataAfterCQ2)) when CQ_SINGLE_OUTPUT
-						else (others => (others => '0'));
+		fni.writtenTags <= getPhysicalDests(makeSDM(stageDataAfterCQ2));-- when CQ_SINGLE_OUTPUT
+						--else (others => (others => '0'));
 		fni.resultTags <= getResultTags(execOutputs1, cqBufferOutputSig, DEFAULT_STAGE_DATA_MULTI);
 		fni.nextResultTags <= getNextResultTags(execOutputsPre, schedOutputArr);
 		fni.resultValues <= getResultValues(execOutputs1, cqBufferOutputSig, DEFAULT_STAGE_DATA_MULTI);
@@ -433,7 +433,7 @@ begin
 		regValsE(2) <= regValsCE(2);	
 
 		GPR_FILE_DISPATCH: entity work.RegisterFile0 (Behavioral)
-		generic map(WIDTH => 4, WRITE_WIDTH => INTEGER_WRITE_WIDTH)
+		generic map(WIDTH => 4, WRITE_WIDTH => 1)
 		port map(
 			clk => clk, reset => resetSig, en => enSig,
 				

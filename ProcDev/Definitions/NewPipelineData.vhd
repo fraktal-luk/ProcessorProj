@@ -50,7 +50,7 @@ package NewPipelineData is
 		end if;	
 	end function;
 	
-	constant INTEGER_WRITE_WIDTH: integer := getIntegerWriteWidth(CQ_SINGLE_OUTPUT);
+	constant INTEGER_WRITE_WIDTH: integer := 1;--getIntegerWriteWidth(CQ_SINGLE_OUTPUT);
 	
 	constant IQ_A_SIZE: natural := PIPE_WIDTH * 2;
 	constant IQ_B_SIZE: natural := PIPE_WIDTH * 2;
@@ -65,7 +65,7 @@ package NewPipelineData is
 	constant LMQ_SIZE: natural := 4; -- !!!
 	constant BQ_SIZE: natural := 4;
 	
-	constant CQ_SIZE: natural := PIPE_WIDTH * 3;
+	constant CQ_SIZE: natural := 2;
 	
 	constant SB_SIZE: natural := 4;
 	
