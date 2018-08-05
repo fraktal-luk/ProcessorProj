@@ -144,6 +144,9 @@ architecture Behavioral of OutOfOrderBox is
 				InstructionSlotArray(0 to 0) := (others => DEFAULT_INSTRUCTION_SLOT);
 	signal sendingFromDLQ: std_logic := '0';
 	
+	signal blockA, blockBC, blockC: std_logic := '0';
+	signal dlqAccepting, dlqAlmostFull: std_logic := '0';
+	
 	signal theIssueView: IssueView := DEFAULT_ISSUE_VIEW;
 begin		
 	resetSig <= reset;
@@ -239,15 +242,16 @@ begin
 				resultTags => fni.resultTags,
 				resultVals => fni.resultValues,
 				regValues => regValsArr(3*i to 3*i + 2),--
-				acceptingOut => issueAcceptingArr(i),
+				acceptingOut => open,--issueAcceptingArr(i),
 				output => schedOutputArr(i)
 			);			
 		end generate;
-			
+		
+		issueAcceptingArr <= (not blockA, not blockBC, not blockC, '0', '1');
+		
 	ISSUE_COUNTERS: block
 		signal issueA, issueB, issueC: std_logic := '0';
-		signal schedB, schedC, e0B, e0C, e1B, e1C: std_logic := '0';
-		signal blockA, blockBC, blockC, wasBlockedA: std_logic := '0';
+		signal schedB, schedC, e0B, e0C, e1B, e1C, wasBlockedA: std_logic := '0';
 	begin
 		issueA <= iqSending(0);
 		issueB <= iqSending(1);
@@ -272,7 +276,7 @@ begin
 		blockA <= e0B or e0C or (e1B and e1C);
 		-- e0B and e0C;
 		blockBC <= (schedB and schedC) or wasBlockedA;
-		blockC <= blockBC or sendingFromDLQ;
+		blockC <= blockBC or sendingFromDLQ or not dlqAccepting or (dlqAlmostFull and (schedC and e0C and e1C));
 	end block;
 
 		EXEC_BLOCK: entity work.UnitExec(Implem)
@@ -348,6 +352,7 @@ begin
 			dataOutSQ => dataOutSQ,
 
 			sbSending => sbSending,
+			blockDLQ => blockBC,
 									
 			lateEventSignal => lateEventSignal,	
 			execOrIntEventSignalIn => execEventSignal,
@@ -356,6 +361,9 @@ begin
 			cacheFillInput => cacheFillInput,
 			
 			sendingFromDLQOut => sendingFromDLQ,
+			
+			dlqAcceptingOut => dlqAccepting,
+			dlqAlmostFullOut => dlqAlmostFull,
 			
 			sqCommittedOutput => sqCommittedOutput,
 			sqCommittedEmpty => sqCommittedEmpty

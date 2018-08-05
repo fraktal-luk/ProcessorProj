@@ -84,6 +84,7 @@ entity UnitMemory is
 		dataOutSQ: out StageDataMulti;
 
 			sbSending: in std_logic;
+			blockDLQ: in std_logic;
 
 		lateEventSignal: in std_logic;	
 		execOrIntEventSignalIn: in std_logic;
@@ -92,6 +93,8 @@ entity UnitMemory is
 			cacheFillInput: in InstructionSlot;
 		
 		sendingFromDLQOut: out std_logic;
+		dlqAcceptingOut: out std_logic;
+		dlqAlmostFullOut: out std_logic;
 		
 			sqCommittedOutput: out InstructionSlot;
 			sqCommittedEmpty: out std_logic
@@ -114,7 +117,7 @@ architecture Behavioral of UnitMemory is
 	signal stageDataOutMem0, stageDataToMem1: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;			
 	signal acceptingMem1: std_logic := '0';
 		
-	signal dlqAccepting, sendingToDLQ, sendingFromDLQ: std_logic := '0';
+	signal dlqAccepting, dlqAlmostFull, sendingToDLQ, sendingFromDLQ: std_logic := '0';
 	signal dataToDLQ: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
 	
 	signal lsResultData, execResultData, dataFromDLQ: InstructionState := DEFAULT_INSTRUCTION_STATE;
@@ -158,7 +161,7 @@ begin
 		clk => clk, reset => reset, en => en,
 		
 		prevSending => inputC.full,
-		nextAccepting => acceptingLS and not sendingFromDLQDelay2,
+		nextAccepting => acceptingLS,-- and not sendingFromDLQDelay2,
 		
 		stageDataIn => inputDataC,
 			stageDataIn2 => inputDataC2,
@@ -198,7 +201,7 @@ begin
 		clk => clk, reset => reset, en => en,
 		
 		prevSending => sendingAGU or sendingFromDLQDelay2,
-		nextAccepting => acceptingMem1 and dlqAccepting, -- needs free slot in LMQ in case of miss!
+		nextAccepting => acceptingMem1,-- and dlqAccepting, -- needs free slot in LMQ in case of miss!
 		stageDataIn => inputDataLoadUnit,
 			stageDataIn2 => inputDataLoadUnitA,
 		acceptingOut => acceptingLS,
@@ -380,9 +383,11 @@ begin
 				execEventSignal => eventSignal,
 				execCausing => execCausing,
 				
-				nextAccepting => acceptingLS, -- TODO: when should it be allowed to send? Priorities!				
+				nextAccepting => not blockDLQ, --acceptingLS, -- TODO: when should it be allowed to send? Priorities!				
 				sendingSQOut => sendingFromDLQ,
 					dataOutV => stageDataMultiDLQ,
+					
+					almostFull => dlqAlmostFull,
 					
 					committedOutput => open,
 					committedEmpty => open
@@ -411,6 +416,9 @@ begin
 			sysLoadAllow <= sendingAddressingForMfc;	 
 				 
 			dataOutSQ <= dataOutSQV;
+			
+			dlqAcceptingOut <= dlqAccepting;
+			dlqAlmostFullOut <= dlqAlmostFull;
 			
 			sendingFromDLQOut <= sendingFromDLQ;
 end Behavioral;

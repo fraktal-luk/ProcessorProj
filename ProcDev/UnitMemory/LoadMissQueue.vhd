@@ -143,6 +143,8 @@ begin
 
 	killMask <=	getKillMask(extractData(content), fullMask, execCausing, execEventSignal, lateEventSignal);
 		
-	sendingSQOut <= sendingSQ;	
+	sendingSQOut <= sendingSQ;
+	
+	almostFull <= isNonzero(fullMask); -- TODO! Change to some option similar to 3 free slots or so
 end LoadMissQueue;
 

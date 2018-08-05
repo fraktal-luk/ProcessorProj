@@ -67,6 +67,8 @@ entity MemoryUnit is
 		en: in std_logic;
 
 		acceptingOut: out std_logic;
+			almostFull: out std_logic;
+		
 		prevSending: in std_logic;
 		dataIn: in StageDataMulti;
 
@@ -248,5 +250,6 @@ begin
 
 	selectedDataOutput <= selectedDataOutputSig when ACCESS_REG
 						 else  selectedDataSlot;
+	almostFull <= '0';
 end Behavioral;
 
