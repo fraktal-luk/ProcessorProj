@@ -91,6 +91,8 @@ entity UnitMemory is
 		
 			cacheFillInput: in InstructionSlot;
 		
+		sendingFromDLQOut: out std_logic;
+		
 			sqCommittedOutput: out InstructionSlot;
 			sqCommittedEmpty: out std_logic
 	);
@@ -139,6 +141,9 @@ architecture Behavioral of UnitMemory is
 	
 	signal stageDataToMem1a, dataAfterMemA, stageDataOutMem0a, inputDataLoadUnitA, inputDataC2,
 				stageDataOutAGU2: InstructionSlotArray(0 to 0) := (others => DEFAULT_INSTRUCTION_SLOT);
+				
+		signal sendingFromDLQDelay, sendingFromDLQDelay2: std_logic := '0';
+		signal dataFromDLQDelay, dataFromDLQDelay2: InstructionState := DEFAULT_INSTRUCTION_STATE;
 begin
 	eventSignal <= execOrIntEventSignalIn;	
 
@@ -153,7 +158,7 @@ begin
 		clk => clk, reset => reset, en => en,
 		
 		prevSending => inputC.full,
-		nextAccepting => acceptingLS and not sendingFromDLQ,
+		nextAccepting => acceptingLS and not sendingFromDLQDelay2,
 		
 		stageDataIn => inputDataC,
 			stageDataIn2 => inputDataC2,
@@ -174,8 +179,8 @@ begin
 
 	outputE <= (inputE.full, inputE.ins);
 
-	dataToMemPipe <= dataFromDLQ when sendingFromDLQ = '1' else stageDataOutAGU2(0).ins;--.data(0);
-	sendingToMemPipe <= sendingAGU or sendingFromDLQ;
+	dataToMemPipe <= dataFromDLQDelay2 when sendingFromDLQDelay2 = '1' else stageDataOutAGU2(0).ins;--.data(0);
+	sendingToMemPipe <= sendingAGU or sendingFromDLQDelay2;
 	-- CAREFUL, At this point probably "completed" bits must be cleared, because they will be set (or not)
 	--						based on the success or failure of translation and cache access
 
@@ -192,7 +197,7 @@ begin
 	port map(
 		clk => clk, reset => reset, en => en,
 		
-		prevSending => sendingAGU or sendingFromDLQ,
+		prevSending => sendingAGU or sendingFromDLQDelay2,
 		nextAccepting => acceptingMem1 and dlqAccepting, -- needs free slot in LMQ in case of miss!
 		stageDataIn => inputDataLoadUnit,
 			stageDataIn2 => inputDataLoadUnitA,
@@ -389,6 +394,11 @@ begin
 			begin
 				if rising_edge(clk) then
 					sendingFromSysReg <= sendingAddressingForMfc;
+					
+					sendingFromDLQDelay <= sendingFromDLQ;
+					sendingFromDLQDelay2 <= sendingFromDLQDelay;
+					dataFromDLQDelay <= dataFromDLQ;
+					dataFromDLQDelay2 <= dataFromDLQDelay;
 				end if;
 			end process;
 
@@ -401,4 +411,6 @@ begin
 			sysLoadAllow <= sendingAddressingForMfc;	 
 				 
 			dataOutSQ <= dataOutSQV;
+			
+			sendingFromDLQOut <= sendingFromDLQ;
 end Behavioral;

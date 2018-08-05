@@ -117,7 +117,7 @@ architecture Behavioral of OutOfOrderBox is
 					:= (others => (others => '0'));	
 	signal fni: ForwardingInfo := DEFAULT_FORWARDING_INFO;
 
-	signal stageDataAfterCQ: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
+	--signal stageDataAfterCQ: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
 
 	signal outputA, outputB, outputC, outputD, outputE: InstructionSlot := DEFAULT_INSTRUCTION_SLOT;
 	signal outputOpPreB, outputOpPreC: InstructionState := DEFAULT_INSTRUCTION_STATE;
@@ -125,7 +125,7 @@ architecture Behavioral of OutOfOrderBox is
 	-- back end interfaces
 	signal whichAcceptedCQ: std_logic_vector(0 to 3) := (others=>'0');	
 	signal anySendingFromCQ: std_logic := '0';
-	signal cqDataLivingOut: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
+	--signal cqDataLivingOut: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
 
 	signal cqOutputSig: InstructionSlotArray(0 to INTEGER_WRITE_WIDTH-1) := (others => DEFAULT_INS_SLOT);
 	signal cqBufferOutputSig: InstructionSlotArray(0 to CQ_SIZE-1) := (others => DEFAULT_INSTRUCTION_SLOT);
@@ -133,7 +133,8 @@ architecture Behavioral of OutOfOrderBox is
 	signal execOutputs1, execOutputs2, execOutputsPre: InstructionSlotArray(0 to 3) := (others => DEFAULT_INS_SLOT);
 
 	signal iqAcceptingVecArr: SLVA(0 to 4) := (others => (others => '0'));	
-	signal iqSending, issueAcceptingArr, execAcceptingArr: std_logic_vector(0 to 4) := (others => '0');
+	signal iqSending, issueAcceptingArr, execAcceptingArr, iqReadyArr:
+				std_logic_vector(0 to 4) := (others => '0');
 	signal queueDataArr, schedDataArr: InstructionStateArray(0 to 4) := (others => DEFAULT_INS_STATE);
 	signal iqOutputArr, schedOutputArr: SchedulerEntrySlotArray(0 to 4) := (others => DEFAULT_SCH_ENTRY_SLOT);
 	signal dataToQueuesArr: StageDataMultiArray(0 to 4) := (others => DEFAULT_STAGE_DATA_MULTI);
@@ -141,6 +142,7 @@ architecture Behavioral of OutOfOrderBox is
 	
 	signal cqDataLivingOut2, stageDataAfterCQ2:
 				InstructionSlotArray(0 to 0) := (others => DEFAULT_INSTRUCTION_SLOT);
+	signal sendingFromDLQ: std_logic := '0';
 	
 	signal theIssueView: IssueView := DEFAULT_ISSUE_VIEW;
 begin		
@@ -200,6 +202,7 @@ begin
 			execCausing => execCausing,
 			lateEventSignal => lateEventSignal,
 			execEventSignal => execEventSignal,
+			anyReady => iqReadyArr(i),
 			schedulerOut => iqOutputArr(i),
 			sending => iqSending(i)
 		);
@@ -241,6 +244,37 @@ begin
 			);			
 		end generate;
 			
+	ISSUE_COUNTERS: block
+		signal issueA, issueB, issueC: std_logic := '0';
+		signal schedB, schedC, e0B, e0C, e1B, e1C: std_logic := '0';
+		signal blockA, blockBC, blockC, wasBlockedA: std_logic := '0';
+	begin
+		issueA <= iqSending(0);
+		issueB <= iqSending(1);
+		issueC <= iqSending(2);
+		
+		process(clk)
+		begin
+			if rising_edge(clk) then
+				schedB <= issueB;
+				schedC <= issueC;
+			
+				e0B <= schedB;
+				e0C <= schedC;
+				e1B <= e0B;
+				e1C <= e0C;
+				
+				wasBlockedA <= blockA and iqReadyArr(0);
+			end if;
+		end process;
+		
+		-- 
+		blockA <= e0B or e0C or (e1B and e1C);
+		-- e0B and e0C;
+		blockBC <= (schedB and schedC) or wasBlockedA;
+		blockC <= blockBC or sendingFromDLQ;
+	end block;
+
 		EXEC_BLOCK: entity work.UnitExec(Implem)
 		port map(
 			clk => clk, reset => resetSig, en => enSig,
@@ -321,6 +355,8 @@ begin
 			
 			cacheFillInput => cacheFillInput,
 			
+			sendingFromDLQOut => sendingFromDLQ,
+			
 			sqCommittedOutput => sqCommittedOutput,
 			sqCommittedEmpty => sqCommittedEmpty
 		);
@@ -351,7 +387,7 @@ begin
 		);
 
 		anySendingFromCQ <= cqOutputSig(0).full; -- CAREFUL, only used for SINGLE_OUTPUT
-		cqDataLivingOut <= makeSDM((0 => (cqOutputSig(0).full, cqOutputSig(0).ins)));
+		--cqDataLivingOut <= makeSDM((0 => (cqOutputSig(0).full, cqOutputSig(0).ins)));
 			cqDataLivingOut2(0) <= (cqOutputSig(0).full, cqOutputSig(0).ins);
 
 		-- CAREFUL! This stage is needed to keep result tags 1 for cycle when writing to reg file,
@@ -364,11 +400,11 @@ begin
 			execEventSignal => '0',
 			lateEventSignal => '0',
 			execCausing => execCausing,
-			stageDataIn => cqDataLivingOut,
+			stageDataIn => DEFAULT_STAGE_DATA_MULTI, --cqDataLivingOut,
 				stageDataIn2 => cqDataLivingOut2,
 			acceptingOut => open,
 			sendingOut => open,
-			stageDataOut => stageDataAfterCQ,
+			stageDataOut => open,--stageDataAfterCQ,
 				stageDataOut2 => stageDataAfterCQ2,
 			
 			lockCommand => '0'			
