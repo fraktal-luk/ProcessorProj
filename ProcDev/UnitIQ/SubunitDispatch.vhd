@@ -73,71 +73,80 @@ end SubunitDispatch;
 
 
 architecture Alternative of SubunitDispatch is
-	signal stageDataM, stageDataStored: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
+	--signal stageDataM, stageDataStored: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
 	signal inputDataWithArgs, dispatchDataUpdated: SchedulerEntrySlot := DEFAULT_SCH_ENTRY_SLOT;
 	signal lockSend: std_logic := '0';
 	
-	signal stageDataIn: InstructionState := DEFAULT_INSTRUCTION_STATE; -- DEPREC
+	--signal stageDataIn: InstructionState := DEFAULT_INSTRUCTION_STATE; -- DEPREC
 	signal sendingOut: std_logic := '0';
-	signal stageDataOut: InstructionState := DEFAULT_INSTRUCTION_STATE;
-		signal stageDataOut_C: SchedulerEntrySlot := DEFAULT_SCH_ENTRY_SLOT;
+	--signal stageDataOut: InstructionState := DEFAULT_INSTRUCTION_STATE;
+	signal stageDataSaved: InstructionSlot := DEFAULT_INSTRUCTION_SLOT;	
+	--	signal stageDataOut_C: SchedulerEntrySlot := DEFAULT_SCH_ENTRY_SLOT;
 
-		signal ch0: std_logic := '0';
+	signal argState: SchedulerState := DEFAULT_SCHEDULER_STATE;
+	--	signal ch0: std_logic := '0';
 		
 begin
-	stageDataIn <= input.ins;
+	--stageDataIn <= input.ins;
 
 	inputDataWithArgs <= getDispatchArgValues(input.ins, input.state, resultVals, USE_IMM);
-	stageDataM <= makeSDM((0 => (prevSending, inputDataWithArgs.ins)));
+	--stageDataM <= makeSDM((0 => (prevSending, inputDataWithArgs.ins)));
 	
-	-- not used now
---	BASIC_LOGIC: entity work.GenericStageMulti(Behavioral)
---	generic map(
---		COMPARE_TAG => '1'
---	)
---	port map(
---		clk => clk, reset => reset, en => en,
---		
---		prevSending => prevSending,
---		nextAccepting => nextAccepting,
---		
---		stageDataIn => stageDataM,
---		acceptingOut => open,--acceptingOut,
---		sendingOut => open,--sendingOut,
---		stageDataOut => stageDataStored,
---		
---		execEventSignal => execEventSignal,
---		lateEventSignal => lateEventSignal,
---		execCausing => execCausing,
---		lockCommand => '0'
---	);
+	BASIC_LOGIC: entity work.GenericStageMulti(Behavioral)
+	generic map(
+		COMPARE_TAG => '1'
+	)
+	port map(
+		clk => clk, reset => reset, en => en,
+		
+		prevSending => prevSending,
+		nextAccepting => nextAccepting,
+		
+		stageDataIn2(0) => (prevSending, inputDataWithArgs.ins),
+		acceptingOut => acceptingOut,
+		sendingOut => sendingOut,
+		stageDataOut2(0) => stageDataSaved,
+		
+		execEventSignal => execEventSignal,
+		lateEventSignal => lateEventSignal,
+		execCausing => execCausing
+		--lockCommand => '0'
+	);
 
-			BASIC_LOGIC_SCH: entity work.SchedulerStage(Behavioral)
-			generic map(
-				COMPARE_TAG => '1'
-			)
-			port map(
-				clk => clk, reset => reset, en => en,
-				
-				prevSending => prevSending,
-				nextAccepting => nextAccepting,
-				
-				stageDataIn => (prevSending, inputDataWithArgs.ins, inputDataWithArgs.state),
-				acceptingOut => acceptingOut,
-				sendingOut => sendingOut,
-				stageDataOut => stageDataOut_C,--stageDataStored,
-				
-				execEventSignal => execEventSignal,
-				lateEventSignal => lateEventSignal,
-				execCausing => execCausing,
-				lockCommand => '0'
-			);
+--			BASIC_LOGIC_SCH: entity work.SchedulerStage(Behavioral)
+--			generic map(
+--				COMPARE_TAG => '1'
+--			)
+--			port map(
+--				clk => clk, reset => reset, en => en,
+--				
+--				prevSending => prevSending,
+--				nextAccepting => nextAccepting,
+--				
+--				stageDataIn => (prevSending, inputDataWithArgs.ins, inputDataWithArgs.state),
+--				acceptingOut => open,--acceptingOut,
+--				sendingOut => open,--sendingOut,
+--				stageDataOut => stageDataOut_C,--stageDataStored,
+--				
+--				execEventSignal => execEventSignal,
+--				lateEventSignal => lateEventSignal,
+--				execCausing => execCausing,
+--				lockCommand => '0'
+--			);
+--
+--		ch0 <= bool2std(stageDataOut_C.state = argState);
+		
+	SAVE_SCH_STATE: process(clk)
+	begin
+		if rising_edge(clk) then
+			argState <= inputDataWithArgs.state; 
+		end if;
+	end process;
 
-		--ch0 <= bool2std(stageDataOut_C.ins = stageDataStored.data(0));
 
 	dispatchDataUpdated <= --updateDispatchArgs(stageDataStored.data(0), resultVals(0 to N_NEXT_RES_TAGS-1),
 									--						regValues);
-									updateDispatchArgs(stageDataOut_C.ins, stageDataOut_C.state,
+									updateDispatchArgs(stageDataSaved.ins, argState,
 															resultVals(0 to N_NEXT_RES_TAGS-1),
 															regValues);
 

@@ -65,18 +65,18 @@ entity GenericStageMulti is
 		nextAccepting: in std_logic;
 
 
-		stageDataIn: in StageDataMulti;
+		--stageDataIn: in StageDataMulti;
 		stageDataIn2: in InstructionSlotArray(0 to WIDTH-1);
 		
 		acceptingOut: out std_logic;
 		sendingOut: out std_logic;
-		stageDataOut: out StageDataMulti;
+		--stageDataOut: out StageDataMulti;
 		stageDataOut2: out InstructionSlotArray(0 to WIDTH-1);
 
 		execEventSignal: in std_logic;
 		lateEventSignal: in std_logic;
-		execCausing: in InstructionState;
-		lockCommand: in std_logic		
+		execCausing: in InstructionState
+		--lockCommand: in std_logic		
 	);
 end GenericStageMulti;
 
@@ -85,19 +85,19 @@ end GenericStageMulti;
 architecture Behavioral of GenericStageMulti is
 	signal flowDrive: FlowDriveSimple := (others=>'0');
 	signal flowResponse, flowResponse_C: FlowResponseSimple := (others=>'0');		
-	signal st, stNext, stageData, stageDataLiving, stageDataNext, stageDataNew:
+	signal st, stNext: --, stageData, stageDataLiving, stageDataNext, stageDataNew:
 														StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
-	signal partialKillMask: std_logic_vector(0 to PIPE_WIDTH-1) := (others => '0');		
+	--signal partialKillMask: std_logic_vector(0 to PIPE_WIDTH-1) := (others => '0');		
 	--signal contentState, contentStateNext: ContentStateSimple := DEFAULT_CS_SIMPLE;
 	signal before: std_logic := '0';
 	
 	signal stageData2, stageDataNext2: InstructionSlotArray(0 to WIDTH-1) := (others => DEFAULT_INSTRUCTION_SLOT);
 begin
-	stageDataNew <= stageDataIn;										
-	stageDataNext <= stageMultiNextCl(stageDataLiving, stageDataNew,
-								flowResponse.living, flowResponse.sending, flowDrive.prevSending,
-								flowDrive.kill and USE_CLEAR, false);			
-	stageDataLiving <= stageData; --stageMultiHandleKill(stageData, flowDrive.kill and USE_CLEAR);
+	--stageDataNew <= stageDataIn;										
+	--stageDataNext <= stageMultiNextCl(stageDataLiving, stageDataNew,
+	--							flowResponse.living, flowResponse.sending, flowDrive.prevSending,
+	--							flowDrive.kill and USE_CLEAR, false);			
+	--stageDataLiving <= stageData; --stageMultiHandleKill(stageData, flowDrive.kill and USE_CLEAR);
 
 	stageDataNext2 <= stageArrayNext(stageData2, stageDataIn2,
 								flowResponse.living, flowResponse.sending, flowDrive.prevSending,
@@ -113,7 +113,7 @@ begin
 	begin
 		if rising_edge(clk) then
 		--	contentState <= contentStateNext;		
-			stageData <= stageDataNext;
+		--	stageData <= stageDataNext;
 			stageData2 <= stageDataNext2;
 
 			logMulti(--stageData.data, stageData.fullMask, stageDataLiving.fullMask, flowResponse);
@@ -139,7 +139,7 @@ begin
 
 	acceptingOut <= flowResponse.accepting;		
 	sendingOut <= flowResponse.sending;
-	stageDataOut <= stageDataLiving;--.data <= stageDataLiving.data;
+	--stageDataOut <= stageDataLiving;--.data <= stageDataLiving.data;
 	--stageDataOut.fullMask <= stageDataLiving.fullMask when flowResponse.sending = '1' else (others => '0');
 	stageDataOut2 <= stageData2;	
 end Behavioral;
@@ -149,6 +149,6 @@ architecture Bypassed of GenericStageMulti is
 begin
 	acceptingOut <= nextAccepting;		
 	sendingOut <= prevSending;
-	stageDataOut <= stageDataIn; -- TODO: clear temp ctrl info?	
-		stageDataOut2 <= stageDataIn2;
+	--stageDataOut <= stageDataIn; -- TODO: clear temp ctrl info?	
+	stageDataOut2 <= stageDataIn2;
 end Bypassed;

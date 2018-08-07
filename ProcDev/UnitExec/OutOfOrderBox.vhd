@@ -408,14 +408,14 @@ begin
 			execEventSignal => '0',
 			lateEventSignal => '0',
 			execCausing => execCausing,
-			stageDataIn => DEFAULT_STAGE_DATA_MULTI, --cqDataLivingOut,
-				stageDataIn2 => cqDataLivingOut2,
+			--stageDataIn => DEFAULT_STAGE_DATA_MULTI, --cqDataLivingOut,
+			stageDataIn2 => cqDataLivingOut2,
 			acceptingOut => open,
 			sendingOut => open,
-			stageDataOut => open,--stageDataAfterCQ,
-				stageDataOut2 => stageDataAfterCQ2,
+			--stageDataOut => open,--stageDataAfterCQ,
+			stageDataOut2 => stageDataAfterCQ2
 			
-			lockCommand => '0'			
+			--lockCommand => '0'			
 		);
 
 		-- writtenTags indicate registers written to GPR file in last cycle, so they can be read from there

@@ -103,17 +103,17 @@ begin
 		prevSending => prevSending,
 		nextAccepting => acc1,
 		
-		stageDataIn => --inputData,
-								makeSDM((0 => (input.full, input.ins))),
-			stageDataIn2 => (0 => (input.full, input.ins)),
+		--stageDataIn => --inputData,
+		--						makeSDM((0 => (input.full, input.ins))),
+		stageDataIn2 => (0 => (input.full, input.ins)),
 		acceptingOut => acceptingOut,
 		sendingOut => sending0,
-		stageDataOut => data0,
-			stageDataOut2 => data0a,
+		--stageDataOut => data0,
+		stageDataOut2 => data0a,
 		execEventSignal => execEventSignal,
 		lateEventSignal => lateEventSignal,
-		execCausing => eventCausing,
-		lockCommand => '0'
+		execCausing => eventCausing
+		--lockCommand => '0'
 		
 		--stageEventsOut => open					
 	);
@@ -128,17 +128,17 @@ begin
 		prevSending => sending0,
 		nextAccepting => acc2, --flowResponseAPost.accepting,
 		
-		stageDataIn => data0,
-			stageDataIn2 => data0a,
+		--stageDataIn => data0,
+		stageDataIn2 => data0a,
 		acceptingOut => acc1,
 		sendingOut => sending1,
-		stageDataOut => data1,
-			stageDataOut2 => data1a,
+		--stageDataOut => data1,
+		stageDataOut2 => data1a,
 		
 		execEventSignal => execEventSignal,
 		lateEventSignal => lateEventSignal,
-		execCausing => eventCausing,
-		lockCommand => '0'
+		execCausing => eventCausing
+		--lockCommand => '0'
 		
 		--stageEventsOut => open					
 	);
@@ -156,17 +156,17 @@ begin
 		prevSending => sending1,
 		nextAccepting => nextAccepting, --flowResponseAPost.accepting,
 		
-		stageDataIn => data1,
-			stageDataIn2 => data1a,
+		--stageDataIn => data1,
+		stageDataIn2 => data1a,
 		acceptingOut => acc2,
 		sendingOut => sendingOut,
-		stageDataOut => outputData,
-			stageDataOut2 => outputDataA,
+		--stageDataOut => outputData,
+		stageDataOut2 => outputDataA,
 		
 		execEventSignal => execEventSignal,
 		lateEventSignal => lateEventSignal,
-		execCausing => eventCausing,
-		lockCommand => '0'
+		execCausing => eventCausing
+		--lockCommand => '0'
 		
 		--stageEventsOut => open					
 	);		

@@ -96,8 +96,8 @@ architecture Implem of UnitExec is
 	signal execSendingA, execSendingB, execSendingD: std_logic := '0';
 	signal execAcceptingASig, execAcceptingBSig, execAcceptingDSig: std_logic := '0';
 	--signal eventsD: StageMultiEventInfo;
-	signal inputDataA, outputDataA: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
-	signal inputDataD, outputDataD: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
+	--signal inputDataA, outputDataA: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
+	signal inputDataD: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
 
 	signal branchData: InstructionState := DEFAULT_INSTRUCTION_STATE;
 	
@@ -118,7 +118,7 @@ begin
 		resetSig <= reset and HAS_RESET_EXEC;
 		enSig <= en or not HAS_EN_EXEC; 
 
-		inputDataA <= makeSDM((0 => (inputA.full, executeAlu(inputA.ins, inputA.state, branchQueueSelectedOut))));
+		--inputDataA <= makeSDM((0 => (inputA.full, executeAlu(inputA.ins, inputA.state, branchQueueSelectedOut))));
 		inputDataA2(0) <= (inputA.full, executeAlu(inputA.ins, inputA.state, branchQueueSelectedOut));
 
 		dataA0 <= --outputDataA.data(0);
@@ -134,17 +134,17 @@ begin
 			prevSending => inputA.full,
 			nextAccepting => whichAcceptedCQ(0),
 			
-			stageDataIn => inputDataA,
-				stageDataIn2 => inputDataA2,
+			--stageDataIn => inputDataA,
+			stageDataIn2 => inputDataA2,
 			acceptingOut => execAcceptingASig,
 			sendingOut => execSendingA,
-			stageDataOut => outputDataA,
-				stageDataOut2 => outputDataA2,
+			--stageDataOut => outputDataA,
+			stageDataOut2 => outputDataA2,
 			
 			execEventSignal => eventSignal,
 			lateEventSignal => lateEventSignal,
-			execCausing => execCausing,
-			lockCommand => '0'
+			execCausing => execCausing
+			--lockCommand => '0'
 			
 			--stageEventsOut => open
 		);
@@ -175,7 +175,7 @@ begin
 												inputA.state,
 											 branchQueueSelectedOut, branchQueueSelectedSending);					
 		
-		inputDataD <= makeSDM((0 => (inputA.full and isBranch(inputA.ins), branchData)));
+		--inputDataD <= makeSDM((0 => (inputA.full and isBranch(inputA.ins), branchData)));
 		inputDataD2(0) <= (inputA.full and isBranch(inputA.ins), branchData);
 		
 		dataD0 <=-- outputDataD.data(0);
@@ -188,19 +188,19 @@ begin
 		port map(
 			clk => clk, reset => resetSig, en => enSig,
 			
-			prevSending => inputDataD.fullMask(0),
+			prevSending => inputDataD2(0).full, --fullMask(0),
 			nextAccepting => '1',--whichAcceptedCQ(3),
 			
-			stageDataIn => inputDataD,
-				stageDataIn2 => inputDataD2,
+			--stageDataIn => inputDataD,
+			stageDataIn2 => inputDataD2,
 			acceptingOut => execAcceptingDSig,
 			sendingOut => execSendingD,
-			stageDataOut => outputDataD,
-				stageDataOut2 => outputDataD2,
+			--stageDataOut => outputDataD,
+			stageDataOut2 => outputDataD2,
 			execEventSignal => eventSignal,
 			lateEventSignal => lateEventSignal,
-			execCausing => execCausing,
-			lockCommand => '0'
+			execCausing => execCausing
+			--lockCommand => '0'
 			
 			--stageEventsOut => open-- eventsD						
 		);	

@@ -156,18 +156,18 @@ begin
 					
 			prevSending => pcSending,	
 			nextAccepting => acceptingForFetchFirst,
-			stageDataIn => DEFAULT_STAGE_DATA_MULTI,--f0input,
-				stageDataIn2(0) => (pcSending, pcDataLiving),
+			--stageDataIn => DEFAULT_STAGE_DATA_MULTI,--f0input,
+			stageDataIn2(0) => (pcSending, pcDataLiving),
 			
 			acceptingOut => acceptingOutFetch,
 			sendingOut => sendingOutFetch,
-			stageDataOut => open,--f0output,
-				stageDataOut2 => stageDataOutFetchA,
+			--stageDataOut => open,--f0output,
+			stageDataOut2 => stageDataOutFetchA,
 			
 			execEventSignal => killAll or frontKill,--killVector(1),
 			lateEventSignal => killAll,
-			execCausing => DEFAULT_INSTRUCTION_STATE,
-			lockCommand => '0'		
+			execCausing => DEFAULT_INSTRUCTION_STATE
+			--lockCommand => '0'		
 		);	
 		
 	--	stageDataOutFetch <= f0output.data(0);
@@ -206,17 +206,17 @@ begin
 					
 			prevSending => sendingOutFetch,	
 			nextAccepting => earlyBranchAccepting,
-			stageDataIn => DEFAULT_STAGE_DATA_MULTI,-- f1input,
-				stageDataIn2 => stageDataOutFetchA,
+			--stageDataIn => DEFAULT_STAGE_DATA_MULTI,-- f1input,
+			stageDataIn2 => stageDataOutFetchA,
 			acceptingOut => acceptingOutFetch1,
 			sendingOut => sendingOutFetch1,
-			stageDataOut => open,--f1output,
-				stageDataOut2 => stageDataoutFetch1a,
+			--stageDataOut => open,--f1output,
+			stageDataOut2 => stageDataoutFetch1a,
 			
 			execEventSignal => killAll or frontKill, --killVector(1),
 			lateEventSignal => killAll,
-			execCausing => DEFAULT_INSTRUCTION_STATE,
-			lockCommand => '0'		
+			execCausing => DEFAULT_INSTRUCTION_STATE
+			--lockCommand => '0'		
 		);	
 		
 --		stageDataOutFetch1 <= f1output.data(0);
@@ -239,18 +239,18 @@ begin
 					
 			prevSending => sendingToEarlyBranch,	
 			nextAccepting => '1',--acceptingOutHbuffer,
-			stageDataIn => earlyBranchDataIn,
-				stageDataIn2(0) => (sendingOutFetchFinal, earlyBranchDataIn.data(0)),
+			--stageDataIn => earlyBranchDataIn,
+			stageDataIn2(0) => (sendingOutFetchFinal, earlyBranchDataIn.data(0)),
 				
 			acceptingOut => earlyBranchAccepting,
 			sendingOut => earlyBranchSending,
-			stageDataOut => earlyBranchDataOut,
-				stageDataOut2 => earlyBranchDataOutA,
+			--stageDataOut => earlyBranchDataOut,
+			stageDataOut2 => earlyBranchDataOutA,
 			
 			execEventSignal => killAll, -- CAREFUL: not killing on stall, because is sent to void
 			lateEventSignal => killAll,
-			execCausing => DEFAULT_INSTRUCTION_STATE,
-			lockCommand => '0'
+			execCausing => DEFAULT_INSTRUCTION_STATE
+			--lockCommand => '0'
 	);
 				
 	earlyBranchMultiDataIn <= getEarlyBranchMultiDataIn(predictedAddress,
@@ -268,18 +268,18 @@ begin
 					
 			prevSending => sendingToEarlyBranch,	
 			nextAccepting => '1',--acceptingOutHbuffer,
-			stageDataIn => earlyBranchMultiDataIn,
-				stageDataIn2 => earlyBranchMultiDataInA,
+			--stageDataIn => earlyBranchMultiDataIn,
+			stageDataIn2 => earlyBranchMultiDataInA,
 			
 			acceptingOut => open,--earlyBranchAccepting,
 			sendingOut => earlyBranchMultiSending,
-			stageDataOut => earlyBranchMultiDataOut,
-				stageDataOut2 => earlyBranchMultiDataOutA,
+			--stageDataOut => earlyBranchMultiDataOut,
+			stageDataOut2 => earlyBranchMultiDataOutA,
 			
 			execEventSignal => killAll, -- CAREFUL: not killing on stall, because is sent to void
 			lateEventSignal => killAll,
-			execCausing => DEFAULT_INSTRUCTION_STATE,
-			lockCommand => '0'
+			execCausing => DEFAULT_INSTRUCTION_STATE
+			--lockCommand => '0'
 	);
 
 	frontBranchEvent <= hbufferDataIn.controlInfo.newEvent;-- stage0Events.eventOccured;
@@ -340,18 +340,18 @@ begin
 		
 		prevSending => sendingOutHbuffer,	
 		nextAccepting => renameAccepting,
-		stageDataIn => stageDataDecodeNew,
-			stageDataIn2 => stageDataDecodeInA,
+		--stageDataIn => stageDataDecodeNew,
+		stageDataIn2 => stageDataDecodeInA,
 		
 		acceptingOut => acceptingOut0,
 		sendingOut => sendingOut0,
-		stageDataOut => stageDataDecodeOut,
-			stageDataOut2 => stageDataDecodeOutA,
+		--stageDataOut => stageDataDecodeOut,
+		stageDataOut2 => stageDataDecodeOutA,
 
 		execEventSignal => killAll,
 		lateEventSignal => killAll,
-		execCausing => DEFAULT_INSTRUCTION_STATE,
-		lockCommand => '0'
+		execCausing => DEFAULT_INSTRUCTION_STATE
+		--lockCommand => '0'
 	);	
 	
 	-- from later stages

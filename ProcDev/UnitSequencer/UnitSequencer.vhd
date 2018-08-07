@@ -155,8 +155,8 @@ architecture Behavioral of UnitSequencer is
 	
 	signal renameLockCommand, renameLockRelease, renameLockState, renameLockEnd: std_logic := '0';	
 				
-	signal dataToLastEffective, dataToLastEffective2, dataFromLastEffective, dataFromLastEffective2, NEW_eiCausing:
-														StageDataMulti := DEFAULT_STAGE_DATA_MULTI;	
+	signal --dataToLastEffective, dataToLastEffective2, dataFromLastEffective, dataFromLastEffective2, 
+				NEW_eiCausing: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;	
 	signal insToLastEffective: InstructionState := DEFAULT_INSTRUCTION_STATE;	
 
 	signal lateCausingSig: InstructionState := DEFAULT_INSTRUCTION_STATE;
@@ -196,7 +196,6 @@ begin
 		execOrIntCausingOut <= execOrIntCausing; -- $MODULE_OUT
 	end block;
 
-	pcNext <= getNextPC(stageDataOutPC.ip, (others => '0'), '0');
 
 	stageDataToPC <= newPCData(evtPhase2, lateCausingSig,
 										execEventSignal, execCausing,
@@ -217,25 +216,27 @@ begin
 
 			nextAccepting => '1', -- CAREFUL: front should always accet - if can't, there will be refetch not stall
 										 --	  		 In multithreaded implementation it should be '1' for selected thread 
-			stageDataIn => tmpPcIn,
-				stageDataIn2(0) => (sendingToPC, stageDataToPC),
+			--stageDataIn => tmpPcIn,
+			stageDataIn2(0) => (sendingToPC, stageDataToPC),
 			
 			acceptingOut => acceptingOutPC,
 			sendingOut => sendingOutPC,
-			stageDataOut => tmpPcOut,
-				stageDataOut2 => tmpPcOutA,
+			--stageDataOut => tmpPcOut,
+			stageDataOut2 => tmpPcOutA,
 			
 			execEventSignal => gE_eventOccurred,
 			lateEventSignal => evtPhase0,
-			execCausing => DEFAULT_INSTRUCTION_STATE,
-			lockCommand => '0'		
+			execCausing => DEFAULT_INSTRUCTION_STATE
+			--lockCommand => '0'		
 		);			
 
 		stageDataOutPC.ip <= tmpPcOutA(0).ins.ip;
 		stageDataOutPC.target <= pcNext; -- CAREFUL: Attaching next address from line predictor. Correct?
 
-	excInfoUpdate <= evtPhase1 and (lateCausingSig.controlInfo.hasException
-												or lateCausingSig.controlInfo.dbtrap);
+	pcNext <= getNextPC(stageDataOutPC.ip, (others => '0'), '0');
+
+
+	excInfoUpdate <= evtPhase1 and (lateCausingSig.controlInfo.hasException or lateCausingSig.controlInfo.dbtrap);
 	intInfoUpdate <= evtPhase1 and lateCausingSig.controlInfo.hasInterrupt;
 	
 	----------------------------------------------------------------------
@@ -293,7 +294,7 @@ begin
 			end if;	
 		end process;
 
-		
+	
 		-- CAREFUL: this counts at phase1 --------------------------------------------------
 		lateTargetIns <= getLatePCData(lateCausingSig,
 													currentState,
@@ -325,22 +326,22 @@ begin
 		
 		-- Interface with front
 		prevSending => frontLastSending,	
-		stageDataIn => stageDataRenameIn, --readyRegFlagsV),
-			stageDataIn2 => stageDataRenameInA,
+		--stageDataIn => stageDataRenameIn, --readyRegFlagsV),
+		stageDataIn2 => stageDataRenameInA,
 		
 		acceptingOut => acceptingOutRename,
 		
 		-- Interface with IQ
 		nextAccepting => iqAccepts,
 		sendingOut => sendingOutRename,
-		stageDataOut => stageDataOutRename,
-			stageDataOut2 => stageDataRenameOutA,
+		--stageDataOut => stageDataOutRename,
+		stageDataOut2 => stageDataRenameOutA,
 		
 		-- Event interface
 		execEventSignal => execOrIntEventSignal,
 		lateEventSignal => evtPhase0,		
-		execCausing => execOrIntCausing,
-		lockCommand => '0'--renameLockState		
+		execCausing => execOrIntCausing
+		--lockCommand => '0'--renameLockState		
 	);
 
 	COMMON_STATE: block
@@ -397,22 +398,22 @@ begin
 		
 		-- Interface with CQ
 		prevSending => sendingToCommit,
-		stageDataIn => stageDataToCommit,
-			stageDataIn2 => stageDataCommitInA,
+		--stageDataIn => stageDataToCommit,
+		stageDataIn2 => stageDataCommitInA,
 		acceptingOut => open, -- unused but don't remove
 		
 		-- Interface with hypothetical further stage
 		nextAccepting => '1',
 		sendingOut => sendingOutCommit,
-		stageDataOut => stageDataOutCommit,
-			stageDataOut2 => stageDataCommitOutA,
+		--stageDataOut => stageDataOutCommit,
+		stageDataOut2 => stageDataCommitOutA,
 		
 		-- Event interface
 		execEventSignal => '0', -- CAREFUL: committed cannot be killed!
 		lateEventSignal => '0',	
-		execCausing => execOrIntCausing,		
+		execCausing => execOrIntCausing
 
-		lockCommand => '0'
+		--lockCommand => '0'
 	);
 
 		-- Tracking of target:
@@ -442,23 +443,23 @@ begin
 				
 				-- Interface with CQ
 				prevSending => sendingToCommit or evtPhase1,
-				stageDataIn => DEFAULT_STAGE_DATA_MULTI,--dataToLastEffective2,-- TMPpre_lastEffective,
-					stageDataIn2 => stageDataLastEffectiveInA,
+				--stageDataIn => DEFAULT_STAGE_DATA_MULTI,--dataToLastEffective2,-- TMPpre_lastEffective,
+				stageDataIn2 => stageDataLastEffectiveInA,
 				
 				acceptingOut => open, -- unused but don't remove
 				
 				-- Interface with hypothetical further stage
 				nextAccepting => '1',
 				sendingOut => open,
-				stageDataOut => open,--dataFromLastEffective2,--TMP_lastEffective,
-					stageDataOut2 => stageDataLastEffectiveOutA,
+				--stageDataOut => open,--dataFromLastEffective2,--TMP_lastEffective,
+				stageDataOut2 => stageDataLastEffectiveOutA,
 				
 				-- Event interface
 				execEventSignal => '0', -- CAREFUL: committed cannot be killed!
 				lateEventSignal => '0',	
-				execCausing => DEFAULT_INSTRUCTION_STATE,--interruptCause,		
+				execCausing => DEFAULT_INSTRUCTION_STATE --interruptCause,		
 
-				lockCommand => '0'
+				--lockCommand => '0'
 			);
 
 			EV_PHASES: block

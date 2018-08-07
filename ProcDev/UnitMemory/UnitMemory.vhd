@@ -163,17 +163,17 @@ begin
 		prevSending => inputC.full,
 		nextAccepting => acceptingLS,-- and not sendingFromDLQDelay2,
 		
-		stageDataIn => inputDataC,
-			stageDataIn2 => inputDataC2,
+		--stageDataIn => inputDataC,
+		stageDataIn2 => inputDataC2,
 		acceptingOut => execAcceptingCSig,
 		sendingOut => sendingAGU,
-		stageDataOut => stageDataOutAGU,
-			stageDataOut2 => stageDataOutAGU2,
+		--stageDataOut => stageDataOutAGU,
+		stageDataOut2 => stageDataOutAGU2,
 		
 		execEventSignal => eventSignal,
 		lateEventSignal => lateEventSignal,
-		execCausing => execCausing,
-		lockCommand => '0'
+		execCausing => execCausing
+		--lockCommand => '0'
 		
 		--stageEventsOut => open
 	);
@@ -202,17 +202,17 @@ begin
 		
 		prevSending => sendingAGU or sendingFromDLQDelay2,
 		nextAccepting => acceptingMem1,-- and dlqAccepting, -- needs free slot in LMQ in case of miss!
-		stageDataIn => inputDataLoadUnit,
-			stageDataIn2 => inputDataLoadUnitA,
+		--stageDataIn => inputDataLoadUnit,
+		stageDataIn2 => inputDataLoadUnitA,
 		acceptingOut => acceptingLS,
 		sendingOut => sendingMem0,
-		stageDataOut => stageDataOutMem0,
-			stageDataOut2 => stageDataOutMem0a,
+		--stageDataOut => stageDataOutMem0,
+		stageDataOut2 => stageDataOutMem0a,
 		
 		execEventSignal => eventSignal,
 		lateEventSignal => lateEventSignal,					
-		execCausing => execCausing,
-		lockCommand => '0'
+		execCausing => execCausing
+		--lockCommand => '0'
 		
 		--stageEventsOut => open					
 	);
@@ -236,17 +236,17 @@ begin
 		prevSending => sendingMem0,
 		nextAccepting => whichAcceptedCQ(2),
 		
-		stageDataIn => stageDataToMem1,--dataM, 
-			stageDataIn2 => stageDataToMem1a,
+		--stageDataIn => stageDataToMem1,--dataM, 
+		stageDataIn2 => stageDataToMem1a,
 		acceptingOut => acceptingMem1,
 		sendingOut => sendingMem1,
-		stageDataOut => dataAfterMem,
-			stageDataOut2 => dataAfterMemA,
+		--stageDataOut => dataAfterMem,
+		stageDataOut2 => dataAfterMemA,
 		
 		execEventSignal => eventSignal,
 		lateEventSignal => lateEventSignal,
-		execCausing => execCausing,
-		lockCommand => '0'
+		execCausing => execCausing
+		--lockCommand => '0'
 		
 		--stageEventsOut => open					
 	);
