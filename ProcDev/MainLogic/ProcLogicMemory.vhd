@@ -76,7 +76,7 @@ function findFirstFree(mask: std_logic_vector) return std_logic_vector;
 	function TMP_cmpTagsAfter(content: InstructionStateArray; tag: InsTag)
 	return std_logic_vector;
 
-	function setLoadException(ins: InstructionState) return InstructionState;
+	function setLoadException(ins: InstructionState; exc: std_logic) return InstructionState;
 	
 	function getLSResultData(ins: InstructionState;
 									  memLoadReady: std_logic; memLoadValue: Mword;
@@ -86,7 +86,9 @@ function findFirstFree(mask: std_logic_vector) return std_logic_vector;
 
 	function getSendingToDLQ(sendingAfterRW, sendingSelectedLQ: std_logic;
 									 lsResultData: InstructionState) return std_logic;	
-	function calcEffectiveAddress(ins: InstructionState; st: SchedulerState) return InstructionState;
+	function calcEffectiveAddress(ins: InstructionState; st: SchedulerState;
+											fromDLQ: std_logic; dlqData: InstructionState)
+	return InstructionState;
 
 end ProcLogicMemory;
 
@@ -359,10 +361,12 @@ end function;
 		return res;
 	end function;
 
-	function setLoadException(ins: InstructionState) return InstructionState is
+	function setLoadException(ins: InstructionState; exc: std_logic) return InstructionState is
 		variable res: InstructionState := ins;
 	begin
-		res.controlInfo.hasException := '1';
+		if exc = '1' then
+			res.controlInfo.hasException := '1';
+		end if;
 		return res;
 	end function;
 	
@@ -400,9 +404,15 @@ end function;
 							or  sendingSelectedLQ; -- When store hits younger load and must get off the way	
 	end function;
 	
-	function calcEffectiveAddress(ins: InstructionState; st: SchedulerState) return InstructionState is
+	function calcEffectiveAddress(ins: InstructionState; st: SchedulerState;
+											fromDLQ: std_logic; dlqData: InstructionState)
+	return InstructionState is
 	begin
-		return setInstructionTarget(ins, addMwordFaster(st.argValues.arg0, st.argValues.arg1));
+		if fromDLQ = '1' then
+			return dlqData;
+		else
+			return setInstructionTarget(ins, addMwordFaster(st.argValues.arg0, st.argValues.arg1));
+		end if;
 	end function;
 
 end ProcLogicMemory;

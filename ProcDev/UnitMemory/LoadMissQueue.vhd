@@ -105,11 +105,11 @@ begin
 			dataD <= storeValueInput.ins;
 					
 			sendingSQ <= isNonzero(firstReadyVec) and nextAccepting;
-				dataOutV.fullMask(0) <= sendingSq;
+				dataOutV.fullMask(0) <= sendingSQ;
 				dataOutV.data(0) <= chooseIns(extractData(content), firstReadyVec);
 
 			contentData <= extractData(content);
-								
+
 			process (clk)
 			begin
 				if rising_edge(clk) then			
@@ -138,7 +138,7 @@ begin
 
 	bufferDrive.prevSending <= num2flow(countOnes(dataIn.fullMask)) when prevSending = '1' else (others => '0');
 	bufferDrive.kill <= num2flow(countOnes(killMask));
-	bufferDrive.nextAccepting <= num2flow(1) when sendingSq = '1' else num2flow(0);
+	bufferDrive.nextAccepting <= num2flow(1) when sendingSQ = '1' else num2flow(0);
 	acceptingOut <= not fullMask(QUEUE_SIZE-PIPE_WIDTH);
 
 	killMask <=	getKillMask(extractData(content), fullMask, execCausing, execEventSignal, lateEventSignal);

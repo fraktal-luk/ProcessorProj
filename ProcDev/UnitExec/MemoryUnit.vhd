@@ -129,7 +129,10 @@ architecture Behavioral of MemoryUnit is
 		signal TMP_commSending: std_logic := '0';
 		signal TMP_commSendData: InstructionState := DEFAULT_INSTRUCTION_STATE;
 		signal TMP_committedFrontW: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
-begin				
+	signal compareAddressIns: InstructionState := DEFAULT_INSTRUCTION_STATE;
+begin
+		compareAddressIns <= storeAddressInput.ins;
+	
 			TMP_committedEmpty <= not isNonzero(qs0c.nFull);
 
 			TMP_num(0) <= not TMP_committedEmpty; -- nextAccepting;
@@ -187,13 +190,13 @@ begin
 
 	sqOutData <= TMP_sendingData;
 
-		cmpMask <=	compareAddress(TMP_content, fullOrCommMask, compareAddressInput.ins) when MODE = store
-				else	compareAddress(TMP_content, TMP_mask, compareAddressInput.ins);
+		cmpMask <=	compareAddress(TMP_content, fullOrCommMask, compareAddressIns) when MODE = store
+				else	compareAddress(TMP_content, TMP_mask, compareAddressIns);
 		-- TEMP selection of hit checking mechanism 
 		matchedSlot <= --findNewestMatch(TMP_content, cmpMask, qs0.pStart, compareAddressInput.ins)
-							findNewestMatch(TMP_content, cmpMask, qs0c.pStart, compareAddressInput.ins)
+							findNewestMatch(TMP_content, cmpMask, qs0c.pStart, compareAddressIns)
 																										when MODE = store
-					else	findOldestMatch(TMP_content, cmpMask, qs0.pStart, compareAddressInput.ins)
+					else	findOldestMatch(TMP_content, cmpMask, qs0.pStart, compareAddressIns)
 																										when MODE = load
 					else  findMatching(makeSlotArray(TMP_content, TMP_mask), compareAddressInput.ins)
 																										when MODE = branch
@@ -219,7 +222,7 @@ begin
 			checkBuffer(contentView, maskView, contentNextView, maskNextView, bufferDrive, bufferResponse);
 			
 				reportWriting(storeAddressInput, storeValueInput, MODE);
-				reportForwarding(compareAddressInput, selectedDataSlot, MODE);
+				reportForwarding(storeAddressInput, selectedDataSlot, MODE);
 		end if;
 	end process;
 			

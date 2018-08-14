@@ -147,11 +147,14 @@ architecture Behavioral of UnitMemory is
 				
 		signal sendingFromDLQDelay, sendingFromDLQDelay2: std_logic := '0';
 		signal dataFromDLQDelay, dataFromDLQDelay2: InstructionState := DEFAULT_INSTRUCTION_STATE;
+		
+		constant USE_PRECISE_LS_TRAP: boolean := false;
 begin
 	eventSignal <= execOrIntEventSignalIn;	
 
 	--inputDataC <= makeSDM((0 => (inputC.full, calcEffectiveAddress(inputC.ins, inputC.state))));
-	inputDataC2(0) <= (inputC.full, calcEffectiveAddress(inputC.ins, inputC.state));
+	inputDataC2(0) <= (inputC.full or sendingFromDLQDelay,
+								calcEffectiveAddress(inputC.ins, inputC.state, sendingFromDLQDelay, dataFromDLQDelay));
 
 	STAGE_AGU: entity work.GenericStageMulti(Behavioral)
 	generic map(
@@ -182,8 +185,10 @@ begin
 
 	outputE <= (inputE.full, inputE.ins);
 
-	dataToMemPipe <= dataFromDLQDelay2 when sendingFromDLQDelay2 = '1' else stageDataOutAGU2(0).ins;--.data(0);
-	sendingToMemPipe <= sendingAGU or sendingFromDLQDelay2;
+	dataToMemPipe <= --dataFromDLQDelay2 when sendingFromDLQDelay2 = '1' else stageDataOutAGU2(0).ins;
+							stageDataOutAGU2(0).ins;
+	sendingToMemPipe <= --sendingAGU or sendingFromDLQDelay2;
+							sendingAGU;
 	-- CAREFUL, At this point probably "completed" bits must be cleared, because they will be set (or not)
 	--						based on the success or failure of translation and cache access
 
@@ -252,7 +257,8 @@ begin
 	);
 
 	-- CAREFUL: when miss (incl. forwarding miss), no 'completed' signal.
-	addressUnitSendingSig <= (sendingMem1 and not sendingToDLQ) or lqSelectedOutput.full;
+	addressUnitSendingSig <= (sendingMem1 and not sendingToDLQ)
+								 or (bool2std(USE_PRECISE_LS_TRAP) and lqSelectedOutput.full);
 																									--??? -- because load exc to ROB
 	outputC <= (addressUnitSendingSig, clearTempControlInfoSimple(execResultData));
 	outputOpPreC <= DEFAULT_INS_STATE; -- CAREFUL: Don't show this because not supported
@@ -266,12 +272,19 @@ begin
 		--						OFC it is simpler never to stall the mem subpipe.
 		lsResultData <= getLSResultData(dataAfterMemA(0).ins, memLoadReady, memLoadValue,
 										sendingFromSysReg, sysLoadVal, sqSelectedOutput.full, sqSelectedOutput.ins);
-		execResultData <= lqSelectedDataWithErr when lqSelectedOutput.full = '1' else lsResultData;
-	
-		lqSelectedDataWithErr <= setLoadException(lqSelectedOutput.ins);
+
+		PRECISE_LS_TRAP: if USE_PRECISE_LS_TRAP generate
+			execResultData <= lqSelectedDataWithErr when lqSelectedOutput.full = '1' else lsResultData;
+			lqSelectedDataWithErr <= setLoadException(lqSelectedOutput.ins, '1');
+		end generate;
+			
+		IMPRECISE_LS_TRAP: if not USE_PRECISE_LS_TRAP generate
+			execResultData <= setLoadException(lsResultData, lqSelectedOutput.full);
+		end generate;
 	
 		-- Sending to Delayed Load Queue: when load/store miss or selected from LQ (going to ROB)
-		sendingToDLQ <= getSendingToDLQ(sendingMem1, lqSelectedOutput.full, lsResultData); 
+		sendingToDLQ <= getSendingToDLQ(sendingMem1, bool2std( USE_PRECISE_LS_TRAP) and lqSelectedOutput.full,
+										lsResultData); 
 		dataToDLQ <= makeSDM((0 => (sendingToDLQ, lsResultData)));
 
 ------------------------------------------------------------------------------------------------
@@ -304,7 +317,7 @@ begin
 
 				storeAddressInput => (storeAddressWrSig, storeAddressDataSig),
 				storeValueInput => (storeValueWrSig, storeValueDataSig),
-				compareAddressInput => (sendingAddressingForLoad or sendingAddressingForMfc, addressingData),
+				compareAddressInput => (sendingAddressingForLoad or sendingAddressingForMfc, DEFAULT_INS_STATE),
 					
 				selectedDataOutput => sqSelectedOutput,
 
@@ -338,7 +351,7 @@ begin
 
 				storeAddressInput => (sendingAddressingForLoad or sendingAddressingForMfc, addressingData),
 				storeValueInput => (sendingAddressingForLoad or sendingAddressingForMfc, DEFAULT_INS_STATE),
-				compareAddressInput => (storeAddressWrSig, storeAddressDataSig),
+				compareAddressInput => (storeAddressWrSig, DEFAULT_INS_STATE),
 					
 				selectedDataOutput => lqSelectedOutput,
 			
@@ -374,7 +387,7 @@ begin
 					storeValueInput => cacheFillInput,--('0', DEFAULT_INSTRUCTION_STATE),
 					compareAddressInput => ('0', DEFAULT_INSTRUCTION_STATE),
 					
-					selectedDataOutput => lmqSelectedOutput,
+					selectedDataOutput => open,--lmqSelectedOutput,
 		
 					committing => committing,
 					groupCtrInc => (others => '0'),
@@ -401,9 +414,9 @@ begin
 					sendingFromSysReg <= sendingAddressingForMfc;
 					
 					sendingFromDLQDelay <= sendingFromDLQ;
-					sendingFromDLQDelay2 <= sendingFromDLQDelay;
+					--sendingFromDLQDelay2 <= sendingFromDLQDelay;
 					dataFromDLQDelay <= dataFromDLQ;
-					dataFromDLQDelay2 <= dataFromDLQDelay;
+					--dataFromDLQDelay2 <= dataFromDLQDelay;
 				end if;
 			end process;
 
