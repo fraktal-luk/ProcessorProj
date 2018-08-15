@@ -153,8 +153,8 @@ begin
 	eventSignal <= execOrIntEventSignalIn;	
 
 	--inputDataC <= makeSDM((0 => (inputC.full, calcEffectiveAddress(inputC.ins, inputC.state))));
-	inputDataC2(0) <= (inputC.full or sendingFromDLQDelay,
-								calcEffectiveAddress(inputC.ins, inputC.state, sendingFromDLQDelay, dataFromDLQDelay));
+	inputDataC2(0) <= (inputC.full or sendingFromDLQ,--Delay,
+								calcEffectiveAddress(inputC.ins, inputC.state, sendingFromDLQDelay, dataFromDLQ));--Delay));
 
 	STAGE_AGU: entity work.GenericStageMulti(Behavioral)
 	generic map(

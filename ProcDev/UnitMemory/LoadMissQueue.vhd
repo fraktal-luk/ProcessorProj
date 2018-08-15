@@ -54,8 +54,8 @@ use work.BasicCheck.all;
 architecture LoadMissQueue of MemoryUnit is
 	constant zeroMask: std_logic_vector(0 to PIPE_WIDTH-1) := (others => '0');
 
-	signal wrAddress, wrData, sendingSQ: std_logic := '0';
-	signal dataA, dataD: InstructionState := DEFAULT_INSTRUCTION_STATE;
+	signal wrAddress, wrData, sendingSQ, sendingSQ_D: std_logic := '0';
+	signal dataA, dataD, chosenIns: InstructionState := DEFAULT_INSTRUCTION_STATE;
 							
 	signal fullMask, livingMask, killMask: std_logic_vector(0 to QUEUE_SIZE-1) := (others => '0');
 
@@ -63,7 +63,8 @@ architecture LoadMissQueue of MemoryUnit is
 					InstructionSlotArray(0 to QUEUE_SIZE-1) := (others => DEFAULT_INSTRUCTION_SLOT);
 	signal contentData: InstructionStateArray(0 to QUEUE_SIZE-1) := (others => DEFAULT_INSTRUCTION_STATE);					
 	signal contentDataNext: InstructionStateArray(0 to QUEUE_SIZE-1) := (others => DEFAULT_INSTRUCTION_STATE);
-	signal contentMaskNext, matchingA, matchingD, matchingShA, matchingShD, firstReadyVec, sendingVec, receivingVec,
+	signal contentMaskNext, matchingA, matchingD, matchingShA, matchingShD, firstReadyVec, firstReadyVec_D,
+				sendingVec, receivingVec,
 				newFilled
 				: std_logic_vector(0 to QUEUE_SIZE-1) := (others => '0');
 
@@ -105,8 +106,15 @@ begin
 			dataD <= storeValueInput.ins;
 					
 			sendingSQ <= isNonzero(firstReadyVec) and nextAccepting;
-				dataOutV.fullMask(0) <= sendingSQ;
-				dataOutV.data(0) <= chooseIns(extractData(content), firstReadyVec);
+				dataOutV.fullMask(0) <= sendingSQ_D;
+				
+				sendingSQ_D <=	isNonzero(firstReadyVec_D and livingMask);
+				
+				dataOutV.data(0) <= chooseIns(extractData(content), firstReadyVec_D);
+											--chosenIns;	-- Option with more logic, if timing improvment needed
+
+				-- CAREFUL: if op is killed after selection, sending_D must be suppresses!
+				--			So check if isNonzero(firstReadyVec_D and livingMask)
 
 			contentData <= extractData(content);
 
@@ -114,6 +122,9 @@ begin
 			begin
 				if rising_edge(clk) then			
 					content <= contentNext;
+					
+						firstReadyVec_D <= firstReadyVec;					
+						chosenIns <= chooseIns(extractData(content), firstReadyVec);
 					
 					--logBuffer(contentData, fullMask, livingMask, bufferResponse);	
 					-- NOTE: below has no info about flow constraints. It just checks data against
@@ -138,12 +149,12 @@ begin
 
 	bufferDrive.prevSending <= num2flow(countOnes(dataIn.fullMask)) when prevSending = '1' else (others => '0');
 	bufferDrive.kill <= num2flow(countOnes(killMask));
-	bufferDrive.nextAccepting <= num2flow(1) when sendingSQ = '1' else num2flow(0);
+	bufferDrive.nextAccepting <= num2flow(1) when sendingSQ_D = '1' else num2flow(0);
 	acceptingOut <= not fullMask(QUEUE_SIZE-PIPE_WIDTH);
 
 	killMask <=	getKillMask(extractData(content), fullMask, execCausing, execEventSignal, lateEventSignal);
 		
-	sendingSQOut <= sendingSQ;
+	sendingSQOut <= sendingSQ_D;
 	
 	almostFull <= isNonzero(fullMask); -- TODO! Change to some option similar to 3 free slots or so
 end LoadMissQueue;
