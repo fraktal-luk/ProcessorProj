@@ -48,10 +48,10 @@ function getFrontEventMulti(predictedAddress: Mword;
 return StageDataMulti;
 
 
-function getEarlyBranchMultiDataIn(predictedAddress: Mword;
-							  ins: InstructionState; receiving: std_logic; valid: std_logic;
-							  hbuffAccepting: std_logic; fetchBlock: HwordArray(0 to FETCH_BLOCK_SIZE-1))
-return StageDataMulti;
+--function getEarlyBranchMultiDataIn(predictedAddress: Mword;
+--							  ins: InstructionState; receiving: std_logic; valid: std_logic;
+--							  hbuffAccepting: std_logic; fetchBlock: HwordArray(0 to FETCH_BLOCK_SIZE-1))
+--return StageDataMulti;
 
 function countFullNonSkipped(insVec: StageDataMulti) return integer;
 
@@ -245,6 +245,7 @@ return StageDataMulti is
 	variable targets: MwordArray(0 to PIPE_WIDTH-1) := (others => (others => '0'));
 	variable fullOut, full, branchIns, predictedTaken: std_logic_vector(0 to PIPE_WIDTH-1) := (others => '0');
 	variable nSkippedIns: integer := 0;
+	variable regularJump, longJump: std_logic := '0';
 begin
 	-- receiving, valid, accepting	-> good
 	-- receiving, valid, not accepting -> refetch
@@ -266,22 +267,32 @@ begin
 		-- Calculate target for each instruction, even if it's to be skipped
 		for i in 0 to PIPE_WIDTH-1 loop
 			thisIP := ins.ip(MWORD_SIZE-1 downto ALIGN_BITS) & i2slv(i*4, ALIGN_BITS);
-		
+			
+			regularJump := '0';
+			longJump := '0';
+			
 			if 	fetchBlock(2*i)(15 downto 10) = opcode2slv(jl) 
 				or fetchBlock(2*i)(15 downto 10) = opcode2slv(jz) 
 				or fetchBlock(2*i)(15 downto 10) = opcode2slv(jnz)
 			then
-				branchIns(i) := '1';
+				regularJump := '1';				
 				predictedTaken(i) := fetchBlock(2*i)(4);		-- CAREFUL, TODO: temporary predicted taken iff backwards
-				tempOffset := (others => fetchBlock(2*i)(4));
-				tempOffset(20 downto 0) := fetchBlock(2*i)(4 downto 0) & fetchBlock(2*i + 1);
 			elsif fetchBlock(2*i)(15 downto 10) = opcode2slv(j) -- Long jump instruction
 			then
-				branchIns(i) := '1';
+				longJump := '1';				
 				predictedTaken(i) := '1'; -- Long jump is unconditional (no space for register encoding!)
+			end if;
+			
+			branchIns(i) := regularJump or longJump;
+			
+			if longJump = '1' then
 				tempOffset := (others => fetchBlock(2*i)(9));
 				tempOffset(25 downto 0) := fetchBlock(2*i)(9 downto 0) & fetchBlock(2*i + 1);
+			else --elsif regularJump = '1' then
+				tempOffset := (others => fetchBlock(2*i)(4));
+				tempOffset(20 downto 0) := fetchBlock(2*i)(4 downto 0) & fetchBlock(2*i + 1);				
 			end if;
+
 			targets(i) := addMwordFaster(thisIP, tempOffset);
 			
 			-- Now applying the skip!
@@ -293,7 +304,7 @@ begin
 		-- Find if any branch predicted
 		for i in 0 to PIPE_WIDTH-1 loop
 			fullOut(i) := full(i);
-			res.data(i).bits := fetchBlock(2*i) & fetchBlock(2*i+1);
+			--res.data(i).bits := fetchBlock(2*i) & fetchBlock(2*i+1);
 			if full(i) = '1' and branchIns(i) = '1' and predictedTaken(i) = '1' then
 				-- Here check if the next line from line predictor agress with the target predicted now.
 				--	If so, don't cause the event but set invalidation mask that next line will use.
@@ -305,18 +316,23 @@ begin
 					-- Raise event
 					res.data(i).controlInfo.newEvent := '1';
 					res.data(i).controlInfo.hasBranch := '1';
-					res.data(i).target := targets(i);
+					--res.data(i).target := targets(i);
 				end if;
 				
 				-- CAREFUL: When not using line predictor, branches predicted taken must always be done here 
 				if not USE_LINE_PREDICTOR then
 					res.data(i).controlInfo.newEvent := '1';
 					res.data(i).controlInfo.hasBranch := '1';
-					res.data(i).target := targets(i);
+					--res.data(i).target := targets(i);
 				end if;
 
 				exit;
 			end if;
+		end loop;
+		
+		for i in 0 to PIPE_WIDTH-1 loop
+			res.data(i).bits := fetchBlock(2*i) & fetchBlock(2*i+1);
+			res.data(i).target := targets(i);
 		end loop;
 	end if;
 	
@@ -325,15 +341,15 @@ begin
 end function;
 
 
-function getEarlyBranchMultiDataIn(predictedAddress: Mword;
-							  ins: InstructionState; receiving: std_logic; valid: std_logic;
-							  hbuffAccepting: std_logic; fetchBlock: HwordArray(0 to FETCH_BLOCK_SIZE-1))
-return StageDataMulti is
-	variable res: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
-begin
-	res := getFrontEventMulti(predictedAddress, ins, receiving, valid, hbuffAccepting, fetchBlock);
-	return res;
-end function;
+--function getEarlyBranchMultiDataIn(predictedAddress: Mword;
+--							  ins: InstructionState; receiving: std_logic; valid: std_logic;
+--							  hbuffAccepting: std_logic; fetchBlock: HwordArray(0 to FETCH_BLOCK_SIZE-1))
+--return StageDataMulti is
+--	variable res: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
+--begin
+--	res := getFrontEventMulti(predictedAddress, ins, receiving, valid, hbuffAccepting, fetchBlock);
+--	return res;
+--end function;
 
 function countFullNonSkipped(insVec: StageDataMulti) return integer is 
 	variable res: integer := 0;

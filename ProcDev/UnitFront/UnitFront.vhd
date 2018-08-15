@@ -107,13 +107,13 @@ architecture Behavioral of UnitFront is
 
 	signal frontBranchEvent, killAll, frontKill, stallEventSig: std_logic := '0';
 
-	signal earlyBranchDataIn, earlyBranchDataOut: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
+	--signal earlyBranchDataIn: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
 	signal earlyBranchMultiDataIn, earlyBranchMultiDataOut: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
 
 	signal sendingToEarlyBranch, stallAtFetchLast, fetchStall: std_logic := '0'; 
 	signal pcSendingDelayed0, pcSendingDelayed1, pcSendingDelayedFinal: std_logic := '0';
 	
-	signal frontCausingSig: InstructionState := DEFAULT_INSTRUCTION_STATE;
+	signal frontCausingSig, earlyBranchIn, earlyBranchDataOut: InstructionState := DEFAULT_INSTRUCTION_STATE;
 	signal predictedAddress: Mword := (others => '0');
 
 	signal newDecoded, stageDataDecodeNew, stageDataDecodeOut: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
@@ -227,33 +227,9 @@ begin
 	
 	acceptingForFetchFirst <= acceptingOutFetch1;
 
-	earlyBranchDataIn.data(0) <= 
-		setInstructionIP(findEarlyTakenJump(stageDataOutFetch1a(0).ins, earlyBranchMultiDataIn), predictedAddress);
-
-	earlyBranchDataIn.fullMask(0) <= sendingOutFetchFinal;		
 	sendingToEarlyBranch <= sendingOutFetchFinal;
-										
-	SUBUNIT_EARLY_BRANCH: entity work.GenericStageMulti(Behavioral)
-	port map(
-			clk => clk, reset => resetSig, en => enSig,
-					
-			prevSending => sendingToEarlyBranch,	
-			nextAccepting => '1',--acceptingOutHbuffer,
-			--stageDataIn => earlyBranchDataIn,
-			stageDataIn2(0) => (sendingOutFetchFinal, earlyBranchDataIn.data(0)),
 				
-			acceptingOut => earlyBranchAccepting,
-			sendingOut => earlyBranchSending,
-			--stageDataOut => earlyBranchDataOut,
-			stageDataOut2 => earlyBranchDataOutA,
-			
-			execEventSignal => killAll, -- CAREFUL: not killing on stall, because is sent to void
-			lateEventSignal => killAll,
-			execCausing => DEFAULT_INSTRUCTION_STATE
-			--lockCommand => '0'
-	);
-				
-	earlyBranchMultiDataIn <= getEarlyBranchMultiDataIn(predictedAddress,
+	earlyBranchMultiDataIn <= getFrontEventMulti(predictedAddress,
 																		stageDataOutFetch1a(0).ins,
 																		pcSendingDelayedFinal, ivalidFinal, '1',
 																		fetchBlockFinal);
@@ -282,10 +258,34 @@ begin
 			--lockCommand => '0'
 	);
 
-	frontBranchEvent <= hbufferDataIn.controlInfo.newEvent;-- stage0Events.eventOccured;
+	earlyBranchIn <=
+		setInstructionIP(findEarlyTakenJump(stageDataOutFetch1a(0).ins, earlyBranchMultiDataIn), predictedAddress);
+										
+	SUBUNIT_EARLY_BRANCH: entity work.GenericStageMulti(Behavioral)
+	port map(
+			clk => clk, reset => resetSig, en => enSig,
+					
+			prevSending => sendingToEarlyBranch,	
+			nextAccepting => '1',--acceptingOutHbuffer,
+			--stageDataIn => earlyBranchDataIn,
+			stageDataIn2(0) => (sendingOutFetchFinal, earlyBranchIn),
+				
+			acceptingOut => earlyBranchAccepting,
+			sendingOut => earlyBranchSending,
+			--stageDataOut => earlyBranchDataOut,
+			stageDataOut2 => earlyBranchDataOutA,
+			
+			execEventSignal => killAll, -- CAREFUL: not killing on stall, because is sent to void
+			lateEventSignal => killAll,
+			execCausing => DEFAULT_INSTRUCTION_STATE
+			--lockCommand => '0'
+	);
+
+	earlyBranchDataOut <= earlyBranchDataOutA(0).ins;
+	frontBranchEvent <= earlyBranchDataOut.controlInfo.newEvent;-- stage0Events.eventOccured;
 
 		stallEventSig <= fetchStall;
-		stallCausing <= setInstructionTarget(earlyBranchDataOutA(0).ins, earlyBranchDataOutA(0).ins.ip);
+		stallCausing <= setInstructionTarget(earlyBranchDataOut, earlyBranchDataOut.ip);
 		frontKill <= frontBranchEvent or fetchStall;
 		fetchStall <= earlyBranchSending and not acceptingOutHbuffer;
 	
@@ -299,13 +299,13 @@ begin
 				elsif (stallEventSig or frontBranchEvent) = '1' then -- CAREFUL: must equal frontEventSignal
 					predictedAddress <= frontCausingSig.target; -- ?
 				elsif sendingToEarlyBranch = '1' then
-					predictedAddress <= earlyBranchDataIn.data(0).target; -- ??
+					predictedAddress <= earlyBranchIn.target; -- ??
 				end if;
 			end if;
 		end process;
 	
 	-- Hword buffer
-	hbufferDataIn <= earlyBranchDataOutA(0).ins;
+	hbufferDataIn <= earlyBranchDataOut;
 	
 	SUBUNIT_HBUFFER: entity work.SubunitHbuffer(Implem)
 	port map(
@@ -361,7 +361,7 @@ begin
 	frontAccepting <= acceptingOutFetch;
 	
 	frontEventSignal <= stallEventSig or frontBranchEvent;
-	frontCausingSig <= stallCausing when stallEventSig = '1' else hbufferDataIn; --stage0Events.causing;
+	frontCausingSig <= stallCausing when stallEventSig = '1' else earlyBranchDataOut;
 	frontCausing <= frontCausingSig;
 end Behavioral;
 
