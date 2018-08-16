@@ -109,12 +109,8 @@ architecture Behavioral of UnitMemory is
 	
 	signal dataOutSQV: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
 
-	signal stageDataOutAGU, dataAfterMem: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
-
-	signal inputDataLoadUnit: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
 	signal dataToMemPipe: InstructionState := DEFAULT_INSTRUCTION_STATE;
 	signal sendingToMemPipe: std_logic := '0';
-	signal stageDataOutMem0, stageDataToMem1: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;			
 	signal acceptingMem1: std_logic := '0';
 		
 	signal dlqAccepting, dlqAlmostFull, sendingToDLQ, sendingFromDLQ: std_logic := '0';
@@ -122,13 +118,8 @@ architecture Behavioral of UnitMemory is
 	
 	signal lsResultData, execResultData, dataFromDLQ: InstructionState := DEFAULT_INSTRUCTION_STATE;
 	signal stageDataMultiDLQ: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
-					
-	signal sendingAfterRead: std_logic := '0';
-	signal dataAfterRead: InstructionState := DEFAULT_INSTRUCTION_STATE;
 	
-	signal execAcceptingCSig, execAcceptingESig: std_logic := '0';	
-	signal inputDataC: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
-	
+	signal execAcceptingCSig, execAcceptingESig: std_logic := '0';		
 	signal acceptingLS, sendingFromSysReg: std_logic := '0';	
 	signal addressingData: InstructionState := DEFAULT_INSTRUCTION_STATE;
 
@@ -145,16 +136,15 @@ architecture Behavioral of UnitMemory is
 	signal stageDataToMem1a, dataAfterMemA, stageDataOutMem0a, inputDataLoadUnitA, inputDataC2,
 				stageDataOutAGU2: InstructionSlotArray(0 to 0) := (others => DEFAULT_INSTRUCTION_SLOT);
 				
-		signal sendingFromDLQDelay, sendingFromDLQDelay2: std_logic := '0';
-		signal dataFromDLQDelay, dataFromDLQDelay2: InstructionState := DEFAULT_INSTRUCTION_STATE;
+		signal sendingFromDLQDelay: std_logic := '0';
+		signal dataFromDLQDelay: InstructionState := DEFAULT_INSTRUCTION_STATE;
 		
 		constant USE_PRECISE_LS_TRAP: boolean := false;
 begin
 	eventSignal <= execOrIntEventSignalIn;	
 
-	--inputDataC <= makeSDM((0 => (inputC.full, calcEffectiveAddress(inputC.ins, inputC.state))));
-	inputDataC2(0) <= (inputC.full or sendingFromDLQ,--Delay,
-								calcEffectiveAddress(inputC.ins, inputC.state, sendingFromDLQDelay, dataFromDLQ));--Delay));
+	inputDataC2(0) <= (inputC.full or sendingFromDLQ,
+								calcEffectiveAddress(inputC.ins, inputC.state, sendingFromDLQ, dataFromDLQ));
 
 	STAGE_AGU: entity work.GenericStageMulti(Behavioral)
 	generic map(
@@ -162,40 +152,29 @@ begin
 	)
 	port map(
 		clk => clk, reset => reset, en => en,
+
+		prevSending => inputC.full or sendingFromDLQ,
+		nextAccepting => acceptingLS,
 		
-		prevSending => inputC.full,
-		nextAccepting => acceptingLS,-- and not sendingFromDLQDelay2,
-		
-		--stageDataIn => inputDataC,
 		stageDataIn2 => inputDataC2,
 		acceptingOut => execAcceptingCSig,
 		sendingOut => sendingAGU,
-		--stageDataOut => stageDataOutAGU,
 		stageDataOut2 => stageDataOutAGU2,
 		
 		execEventSignal => eventSignal,
 		lateEventSignal => lateEventSignal,
 		execCausing => execCausing
-		--lockCommand => '0'
-		
-		--stageEventsOut => open
 	);
 
 	SUBPIPE_E: block begin end block; -- Block empty
 
 	outputE <= (inputE.full, inputE.ins);
 
-	dataToMemPipe <= --dataFromDLQDelay2 when sendingFromDLQDelay2 = '1' else stageDataOutAGU2(0).ins;
-							stageDataOutAGU2(0).ins;
-	sendingToMemPipe <= --sendingAGU or sendingFromDLQDelay2;
-							sendingAGU;
+	dataToMemPipe <= stageDataOutAGU2(0).ins;
+	sendingToMemPipe <= sendingAGU;
+
 	-- CAREFUL, At this point probably "completed" bits must be cleared, because they will be set (or not)
 	--						based on the success or failure of translation and cache access
-
---	inputDataLoadUnit <= makeSDM((0 => (sendingToMemPipe, 
---														setDataCompleted(setAddressCompleted(dataToMemPipe, '0'), '0')
---													))
---											);
 	inputDataLoadUnitA(0) <= (sendingToMemPipe, setDataCompleted(setAddressCompleted(dataToMemPipe, '0'), '0'));
 
 	STAGE_MEM0: entity work.GenericStageMulti(Behavioral)
@@ -205,31 +184,23 @@ begin
 	port map(
 		clk => clk, reset => reset, en => en,
 		
-		prevSending => sendingAGU or sendingFromDLQDelay2,
-		nextAccepting => acceptingMem1,-- and dlqAccepting, -- needs free slot in LMQ in case of miss!
-		--stageDataIn => inputDataLoadUnit,
+		prevSending => sendingAGU,
+		nextAccepting => acceptingMem1, -- Also needs free slot in LMQ in case of miss!
 		stageDataIn2 => inputDataLoadUnitA,
 		acceptingOut => acceptingLS,
 		sendingOut => sendingMem0,
-		--stageDataOut => stageDataOutMem0,
 		stageDataOut2 => stageDataOutMem0a,
 		
 		execEventSignal => eventSignal,
 		lateEventSignal => lateEventSignal,					
-		execCausing => execCausing
-		--lockCommand => '0'
-		
-		--stageEventsOut => open					
+		execCausing => execCausing		
 	);
-
-	-- CAREFUL, TODO: after mem0 set "addressCompleted" according to success or failure of translation?
 
 	sendingAddressing <= sendingMem0; -- After translation
 	addressingData	<= stageDataOutMem0a(0).ins;
 	
 	-- TEMP: setting address always completed (simulating TLB always hitting)
-	--stageDataToMem1 <= makeSDM( (0 =>  (sendingMem0, setAddressCompleted(stageDataOutMem0.data(0), '1'))) );
-		stageDataToMem1a(0) <= (sendingMem0, setAddressCompleted(stageDataOutMem0a(0).ins, '1'));
+	stageDataToMem1a(0) <= (sendingMem0, setAddressCompleted(stageDataOutMem0a(0).ins, '1'));
 	
 	STAGE_MEM1: entity work.GenericStageMulti(Behavioral)
 	generic map(
@@ -241,19 +212,14 @@ begin
 		prevSending => sendingMem0,
 		nextAccepting => whichAcceptedCQ(2),
 		
-		--stageDataIn => stageDataToMem1,--dataM, 
 		stageDataIn2 => stageDataToMem1a,
 		acceptingOut => acceptingMem1,
 		sendingOut => sendingMem1,
-		--stageDataOut => dataAfterMem,
 		stageDataOut2 => dataAfterMemA,
 		
 		execEventSignal => eventSignal,
 		lateEventSignal => lateEventSignal,
-		execCausing => execCausing
-		--lockCommand => '0'
-		
-		--stageEventsOut => open					
+		execCausing => execCausing				
 	);
 
 	-- CAREFUL: when miss (incl. forwarding miss), no 'completed' signal.
@@ -263,13 +229,6 @@ begin
 	outputC <= (addressUnitSendingSig, clearTempControlInfoSimple(execResultData));
 	outputOpPreC <= DEFAULT_INS_STATE; -- CAREFUL: Don't show this because not supported
 
-		-- CAREFUL, TODO: if mem subpipe can be locked, then memLoadReady will expire while the
-		--						corresponding load is stalled, and it will go to LMQ. In such case
-		--						it has to be clear that the load has status "ready for reexec" because
-		--						the cache location won't be refiled as it is already full!
-		--						So there would be a need to distinguish "missed" from "not received"
-		--						as the latter would go to LMQ as "ready" from the start.
-		--						OFC it is simpler never to stall the mem subpipe.
 		lsResultData <= getLSResultData(dataAfterMemA(0).ins, memLoadReady, memLoadValue,
 										sendingFromSysReg, sysLoadVal, sqSelectedOutput.full, sqSelectedOutput.ins);
 
@@ -283,7 +242,7 @@ begin
 		end generate;
 	
 		-- Sending to Delayed Load Queue: when load/store miss or selected from LQ (going to ROB)
-		sendingToDLQ <= getSendingToDLQ(sendingMem1, bool2std( USE_PRECISE_LS_TRAP) and lqSelectedOutput.full,
+		sendingToDLQ <= getSendingToDLQ(sendingMem1, bool2std(USE_PRECISE_LS_TRAP) and lqSelectedOutput.full,
 										lsResultData); 
 		dataToDLQ <= makeSDM((0 => (sendingToDLQ, lsResultData)));
 
@@ -384,10 +343,10 @@ begin
 				dataIn => dataToDLQ,
 				
 					storeAddressInput => ('0', DEFAULT_INSTRUCTION_STATE),
-					storeValueInput => cacheFillInput,--('0', DEFAULT_INSTRUCTION_STATE),
+					storeValueInput => cacheFillInput,
 					compareAddressInput => ('0', DEFAULT_INSTRUCTION_STATE),
 					
-					selectedDataOutput => open,--lmqSelectedOutput,
+					selectedDataOutput => open,
 		
 					committing => committing,
 					groupCtrInc => (others => '0'),
@@ -396,7 +355,7 @@ begin
 				execEventSignal => eventSignal,
 				execCausing => execCausing,
 				
-				nextAccepting => not blockDLQ, --acceptingLS, -- TODO: when should it be allowed to send? Priorities!				
+				nextAccepting => not blockDLQ,			
 				sendingSQOut => sendingFromDLQ,
 					dataOutV => stageDataMultiDLQ,
 					
@@ -414,9 +373,7 @@ begin
 					sendingFromSysReg <= sendingAddressingForMfc;
 					
 					sendingFromDLQDelay <= sendingFromDLQ;
-					--sendingFromDLQDelay2 <= sendingFromDLQDelay;
 					dataFromDLQDelay <= dataFromDLQ;
-					--dataFromDLQDelay2 <= dataFromDLQDelay;
 				end if;
 			end process;
 
