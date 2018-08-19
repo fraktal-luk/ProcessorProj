@@ -118,7 +118,7 @@ architecture Behavioral of OutOfOrderBox is
 	signal fni: ForwardingInfo := DEFAULT_FORWARDING_INFO;
 
 	signal outputA, outputB, outputC, outputD, outputE: InstructionSlot := DEFAULT_INSTRUCTION_SLOT;
-	signal outputOpPreB, outputOpPreC: InstructionState := DEFAULT_INSTRUCTION_STATE;
+	signal outputOpPreB, outputOpPreC, outputM2B, outputM2C: InstructionState := DEFAULT_INSTRUCTION_STATE;
 
 	-- back end interfaces
 	--signal whichAcceptedCQ: std_logic_vector(0 to 3) := (others=>'0');	
@@ -299,6 +299,7 @@ begin
 			outputD => outputD,
 				
 			outputOpPreB => outputOpPreB,
+			outputM2B => outputM2B,
 
 			whichAcceptedCQ => (others => '1'),--whichAcceptedCQ,
 			
@@ -338,6 +339,7 @@ begin
 			outputE => outputE,
 				
 			outputOpPreC => outputOpPreC,
+			outputM2C => outputM2C,
 
 			whichAcceptedCQ => (others => '1'),--whichAcceptedCQ,
 			
@@ -420,6 +422,7 @@ begin
 		fni.writtenTags <= getPhysicalDests(makeSDM(stageDataAfterCQ2));
 		fni.resultTags <= getResultTags(execOutputs1, cqBufferOutputSig, DEFAULT_STAGE_DATA_MULTI);
 		fni.nextResultTags <= getNextResultTags(execOutputsPre, schedOutputArr);
+		fni.nextTagsM2 <= (outputM2B.physicalArgSpec.dest, outputM2C.physicalArgSpec.dest);
 		fni.resultValues <= getResultValues(execOutputs1, cqBufferOutputSig, DEFAULT_STAGE_DATA_MULTI);
 		
 		-- TODO:

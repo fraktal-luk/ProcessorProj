@@ -64,6 +64,7 @@ entity IntegerMultiplier is
 		
 			dataOut: out InstructionState;	
 			data1Prev: out InstructionState; -- stage before last
+			data1PrevM2: out InstructionState; -- 2 before last
 		
 			lateEventSignal: in std_logic;
 		execEventSignal: in std_logic;
@@ -171,6 +172,7 @@ begin
 		--stageEventsOut => open					
 	);		
 	
+	data1PrevM2 <= data0a(0).ins;
 	data1Prev <= --data1.data(0);
 					data1a(0).ins;
 	dataOut <= setInsResult(--outputData.data(0), multResult(31 downto 0));

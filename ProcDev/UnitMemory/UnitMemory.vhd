@@ -65,6 +65,7 @@ entity UnitMemory is
 		outputC: out InstructionSlot;
 		outputE: out InstructionSlot;
 		outputOpPreC: out InstructionState;
+		outputM2C: out InstructionState;
 
 		whichAcceptedCQ: in std_logic_vector(0 to 3);
 
@@ -228,6 +229,7 @@ begin
 																									--??? -- because load exc to ROB
 	outputC <= (addressUnitSendingSig, clearTempControlInfoSimple(execResultData));
 	outputOpPreC <= DEFAULT_INS_STATE; -- CAREFUL: Don't show this because not supported
+	outputM2C <= stageDataOutAGU2(0).ins;
 
 		lsResultData <= getLSResultData(dataAfterMemA(0).ins, memLoadReady, memLoadValue,
 										sendingFromSysReg, sysLoadVal, sqSelectedOutput.full, sqSelectedOutput.ins);

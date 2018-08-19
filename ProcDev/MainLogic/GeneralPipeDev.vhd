@@ -51,6 +51,7 @@ type ForwardingInfo is record
 	writtenTags: PhysNameArray(0 to PIPE_WIDTH-1);
 	resultTags: PhysNameArray(0 to N_RES_TAGS-1);
 	nextResultTags: PhysNameArray(0 to N_NEXT_RES_TAGS-1);
+	nextTagsM2:	PhysNameArray(0 to 1); -- TEMP?
 	resultValues: MwordArray(0 to N_RES_TAGS-1);
 end record;
 
@@ -58,6 +59,7 @@ constant DEFAULT_FORWARDING_INFO: ForwardingInfo := (
 	writtenTags => (others => (others => '0')),
 	resultTags => (others => (others => '0')),
 	nextResultTags => (others => (others => '0')),
+	nextTagsM2=> (others => (others => '0')),
 	resultValues => (others => (others => '0'))
 );
 

@@ -77,7 +77,8 @@ entity UnitExec is
 		outputD: out InstructionSlot;
 			
 		outputOpPreB: out InstructionState;
-
+		outputM2B: out InstructionState;
+	
 		execEvent: out std_logic;
 		execCausingOut: out InstructionState;
 		
@@ -151,6 +152,7 @@ begin
 		
 		dataOut => dataB2,
 		data1Prev => dataB1,
+		data1PrevM2=> dataB0,
 		
 		lateEventSignal => lateEventSignal,
 		execEventSignal => execEventSignal,
@@ -244,7 +246,8 @@ begin
 		outputD <= (execSendingD, clearTempControlInfoSimple(dataD0));
 		
 		outputOpPreB <= dataB1;
-				
+		outputM2B <= dataB0;
+		
 	execEvent <= execEventSignal;
 	execCausingOut <= execCausing;
 end Implem;
