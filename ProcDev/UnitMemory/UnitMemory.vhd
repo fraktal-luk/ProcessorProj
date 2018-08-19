@@ -52,8 +52,8 @@ entity UnitMemory is
 		inputC: in SchedulerEntrySlot;
 		inputE: in SchedulerEntrySlot;			
 
-		execAcceptingC: out std_logic;
-		execAcceptingE: out std_logic; -- Store data
+		--execAcceptingC: out std_logic;
+		--execAcceptingE: out std_logic; -- Store data
 			
 		acceptingNewSQ: out std_logic;
 		acceptingNewLQ: out std_logic;
@@ -377,8 +377,8 @@ begin
 				end if;
 			end process;
 
-			execAcceptingC <= execAcceptingCSig;
-			execAcceptingE <= '1';
+			--execAcceptingC <= execAcceptingCSig;
+			--execAcceptingE <= '1';
 			
 			-- Mem interface
 			memLoadAddress <= addressingData.target;

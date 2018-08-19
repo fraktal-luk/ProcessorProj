@@ -57,9 +57,9 @@ entity UnitExec is
 		inputB: in SchedulerEntrySlot;
 		inputD: in SchedulerEntrySlot;	
 
-		execAcceptingA: out std_logic;
-		execAcceptingB: out std_logic;
-		execAcceptingD: out std_logic;
+		--execAcceptingA: out std_logic;
+		--execAcceptingB: out std_logic;
+		--execAcceptingD: out std_logic;
 			
 			acceptingNewBQ: out std_logic;
 				dataOutBQV: out StageDataMulti;
@@ -88,7 +88,7 @@ end UnitExec;
 
 architecture Implem of UnitExec is
 	signal resetSig, enSig: std_logic := '0';
-	signal execEventSignal, eventSignal: std_logic := '0';
+	signal execEventSignal: std_logic := '0';
 	signal execCausing: InstructionState := DEFAULT_INSTRUCTION_STATE;
 
 	signal dataA0, dataB0, dataB1, dataB2, dataD0: InstructionState := DEFAULT_INSTRUCTION_STATE;
@@ -133,7 +133,7 @@ begin
 			sendingOut => execSendingA,
 			stageDataOut2 => outputDataA2,
 			
-			execEventSignal => eventSignal,
+			execEventSignal => '0',--execEventSignal,
 			lateEventSignal => lateEventSignal,
 			execCausing => execCausing
 		);
@@ -153,7 +153,7 @@ begin
 		data1Prev => dataB1,
 		
 		lateEventSignal => lateEventSignal,
-		execEventSignal => eventSignal,
+		execEventSignal => execEventSignal,
 		execCausing => execCausing,
 		lockCommand => '0'					
 	);
@@ -181,7 +181,7 @@ begin
 			acceptingOut => execAcceptingDSig,
 			sendingOut => execSendingD,
 			stageDataOut2 => outputDataD2,
-			execEventSignal => eventSignal,
+			execEventSignal => '0',--execEventSignal,
 			lateEventSignal => lateEventSignal,
 			execCausing => execCausing					
 		);	
@@ -215,7 +215,7 @@ begin
 				groupCtrInc => groupCtrInc,
 						
 				lateEventSignal => lateEventSignal,
-				execEventSignal => eventSignal,
+				execEventSignal => execEventSignal,
 				execCausing => execCausing,
 				
 				nextAccepting => '1',
@@ -233,11 +233,11 @@ begin
 		execEventSignal <= dataD0.controlInfo.newEvent;
 		execCausing <= dataD0;
 
-		eventSignal <= execOrIntEventSignalIn;	
+		--eventSignal <= execOrIntEventSignalIn;	
 
-		execAcceptingA <= execAcceptingASig;
-		execAcceptingB <= execAcceptingBSig;
-		execAcceptingD <= execAcceptingDSig;
+		--execAcceptingA <= execAcceptingASig;
+		--execAcceptingB <= execAcceptingBSig;
+		--execAcceptingD <= execAcceptingDSig;
 
 		outputA <= (execSendingA, clearTempControlInfoSimple(dataA0));
 		outputB <= (execSendingB, clearTempControlInfoSimple(dataB2));

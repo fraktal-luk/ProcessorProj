@@ -52,6 +52,11 @@ entity SubunitIssueRouting is
 		--acceptingVecD: in std_logic_vector(0 to PIPE_WIDTH-1);
 		acceptingVecE: in std_logic_vector(0 to PIPE_WIDTH-1);
 		
+		acceptingA: in std_logic;
+		acceptingB: in std_logic;
+		acceptingC: in std_logic;
+		acceptingE: in std_logic;
+		
 		acceptingROB: in std_logic;
 		acceptingSQ: in std_logic;
 		acceptingLQ: in std_logic;
@@ -126,7 +131,8 @@ begin
 	--iqAcceptingD <= not isNonzero(not invD);
 	iqAcceptingE <= not isNonzero(not invE);
 		
-	iqAccepts <= iqAcceptingA and iqAcceptingB and iqAcceptingC and iqAcceptingE
+	iqAccepts <= --iqAcceptingA and iqAcceptingB and iqAcceptingC and iqAcceptingE
+						acceptingA and acceptingB and acceptingC and acceptingE
 						and acceptingROB and acceptingSQ and acceptingLQ and acceptingBQ;
 
 	dataOutA <= dataToA;

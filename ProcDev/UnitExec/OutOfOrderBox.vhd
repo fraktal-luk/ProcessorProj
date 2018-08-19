@@ -104,7 +104,7 @@ architecture Behavioral of OutOfOrderBox is
 	signal robSending: std_logic := '0';
 	signal memLoadAddress: Mword := (others => '0');
 
-	signal execAcceptingA, execAcceptingB, execAcceptingC, execAcceptingD, execAcceptingE: std_logic := '0';
+	--signal execAcceptingA, execAcceptingB, execAcceptingC, execAcceptingD, execAcceptingE: std_logic := '0';
 	signal compactedToSQ, compactedToLQ, compactedToBQ: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
 
 	signal acceptingNewSQ, acceptingNewLQ, acceptingNewBQ: std_logic := '0';
@@ -117,15 +117,12 @@ architecture Behavioral of OutOfOrderBox is
 					:= (others => (others => '0'));	
 	signal fni: ForwardingInfo := DEFAULT_FORWARDING_INFO;
 
-	--signal stageDataAfterCQ: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
-
 	signal outputA, outputB, outputC, outputD, outputE: InstructionSlot := DEFAULT_INSTRUCTION_SLOT;
 	signal outputOpPreB, outputOpPreC: InstructionState := DEFAULT_INSTRUCTION_STATE;
 
 	-- back end interfaces
-	signal whichAcceptedCQ: std_logic_vector(0 to 3) := (others=>'0');	
-	signal anySendingFromCQ: std_logic := '0';
-	--signal cqDataLivingOut: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
+	--signal whichAcceptedCQ: std_logic_vector(0 to 3) := (others=>'0');	
+	--signal anySendingFromCQ: std_logic := '0';
 
 	signal cqOutputSig: InstructionSlotArray(0 to 0) := (others => DEFAULT_INS_SLOT);
 	signal cqBufferOutputSig: InstructionSlotArray(0 to CQ_SIZE-1) := (others => DEFAULT_INSTRUCTION_SLOT);
@@ -133,15 +130,14 @@ architecture Behavioral of OutOfOrderBox is
 	signal execOutputs1, execOutputs2, execOutputsPre: InstructionSlotArray(0 to 3) := (others => DEFAULT_INS_SLOT);
 
 	signal iqAcceptingVecArr: SLVA(0 to 4) := (others => (others => '0'));	
-	signal iqSending, issueAcceptingArr, execAcceptingArr, iqReadyArr:
-				std_logic_vector(0 to 4) := (others => '0');
+	signal iqAcceptingArr: std_logic_vector(0 to 4) := (others => '0');
+	signal iqSending, issueAcceptingArr, execAcceptingArr, iqReadyArr: std_logic_vector(0 to 4) := (others => '0');
 	signal queueDataArr, schedDataArr: InstructionStateArray(0 to 4) := (others => DEFAULT_INS_STATE);
 	signal iqOutputArr, schedOutputArr: SchedulerEntrySlotArray(0 to 4) := (others => DEFAULT_SCH_ENTRY_SLOT);
 	signal dataToQueuesArr: StageDataMultiArray(0 to 4) := (others => DEFAULT_STAGE_DATA_MULTI);
 	signal regValsArr: MwordArray(0 to 3*5-1) := (others => (others => '0'));
 	
-	signal cqDataLivingOut2, stageDataAfterCQ2:
-				InstructionSlotArray(0 to 0) := (others => DEFAULT_INSTRUCTION_SLOT);
+	signal cqDataLivingOut2, stageDataAfterCQ2: InstructionSlotArray(0 to 0) := (others => DEFAULT_INSTRUCTION_SLOT);
 	signal sendingFromDLQ: std_logic := '0';
 	
 	signal blockA, blockBC, blockC: std_logic := '0';
@@ -163,7 +159,12 @@ begin
 		acceptingVecC => iqAcceptingVecArr(2),
 		--acceptingVecD => (others => '1'),--iqAcceptingVecArr(3),
 		acceptingVecE => iqAcceptingVecArr(4),
-
+		
+		acceptingA => iqAcceptingArr(0),
+		acceptingB => iqAcceptingArr(1),
+		acceptingC => iqAcceptingArr(2),
+		acceptingE => iqAcceptingArr(4),
+		
 		acceptingROB => robAccepting,
 		acceptingSQ => acceptingNewSQ,
 		acceptingLQ => acceptingNewLQ,
@@ -196,7 +197,8 @@ begin
 		port map(
 			clk => clk, reset => resetSig, en => enSig,
 
-			acceptingVec => iqAcceptingVecArr(i),
+			acceptingVec => open,--iqAcceptingVecArr(i),
+			acceptingOut => iqAcceptingArr(i),
 			prevSendingOK => renamedSending,
 			newData => dataToQueuesArr(i),
 			fni => fni,
@@ -221,7 +223,8 @@ begin
 		regsSelE <= getPhysicalSources(iqOutputArr(4).ins);
 
 		regValsArr <= regValsA & regValsB & regValsC & regValsD & regValsE;
-		execAcceptingArr <= (execAcceptingA, execAcceptingB, execAcceptingC,	execAcceptingD, execAcceptingE);
+		execAcceptingArr <= --(execAcceptingA, execAcceptingB, execAcceptingC,	execAcceptingD, execAcceptingE);
+									(others => '1');--
 
 		ISSUE_STAGES: for letter in 'A' to 'E' generate
 			constant i: integer := character'pos(letter) - character'pos('A');
@@ -249,43 +252,43 @@ begin
 		
 		issueAcceptingArr <= (not blockA, not blockBC, not blockC, '0', '1');
 		
-	ISSUE_COUNTERS: block
-		signal issueA, issueB, issueC: std_logic := '0';
-		signal schedB, schedC, e0B, e0C, e1B, e1C, wasBlockedA: std_logic := '0';
-	begin
-		issueA <= iqSending(0);
-		issueB <= iqSending(1);
-		issueC <= iqSending(2);
-		
-		process(clk)
+		ISSUE_COUNTERS: block
+			signal issueA, issueB, issueC: std_logic := '0';
+			signal schedB, schedC, e0B, e0C, e1B, e1C, wasBlockedA: std_logic := '0';
 		begin
-			if rising_edge(clk) then
-				schedB <= issueB;
-				schedC <= issueC;
+			issueA <= iqSending(0);
+			issueB <= iqSending(1);
+			issueC <= iqSending(2);
 			
-				e0B <= schedB;
-				e0C <= schedC;
-				e1B <= e0B;
-				e1C <= e0C;
+			process(clk)
+			begin
+				if rising_edge(clk) then
+					schedB <= issueB;
+					schedC <= issueC;
 				
-				wasBlockedA <= blockA and iqReadyArr(0);
-			end if;
-		end process;
-		
-		-- 
-		blockA <= e0B or e0C or (e1B and e1C);
-		-- e0B and e0C;
-		blockBC <= (schedB and schedC) or wasBlockedA;
-		blockC <= blockBC or sendingFromDLQ or not dlqAccepting or (dlqAlmostFull and (schedC and e0C and e1C));
-	end block;
+					e0B <= schedB;
+					e0C <= schedC;
+					e1B <= e0B;
+					e1C <= e0C;
+					
+					wasBlockedA <= blockA and iqReadyArr(0);
+				end if;
+			end process;
+			
+			-- 
+			blockA <= e0B or e0C or (e1B and e1C);
+			-- e0B and e0C;
+			blockBC <= (schedB and schedC) or wasBlockedA;
+			blockC <= blockBC or sendingFromDLQ or not dlqAccepting or (dlqAlmostFull and (schedC and e0C and e1C));
+		end block;
 
 		EXEC_BLOCK: entity work.UnitExec(Implem)
 		port map(
 			clk => clk, reset => resetSig, en => enSig,
 
-			execAcceptingA => execAcceptingA,
-			execAcceptingB => execAcceptingB,				
-			execAcceptingD => execAcceptingD,
+			--execAcceptingA => execAcceptingA,
+			--execAcceptingB => execAcceptingB,				
+			--execAcceptingD => execAcceptingD,
 
 			inputA => schedOutputArr(0),
 			inputB => schedOutputArr(1),
@@ -297,7 +300,7 @@ begin
 				
 			outputOpPreB => outputOpPreB,
 
-			whichAcceptedCQ => whichAcceptedCQ,
+			whichAcceptedCQ => (others => '1'),--whichAcceptedCQ,
 			
 			acceptingNewBQ => acceptingNewBQ,
 			dataOutBQV => dataOutBQV,
@@ -318,8 +321,8 @@ begin
 		port map(
 			clk => clk, reset => reset, en => en,
 
-			execAcceptingC => execAcceptingC,
-			execAcceptingE => execAcceptingE,
+			--execAcceptingC => execAcceptingC,
+			--execAcceptingE => execAcceptingE,
 
 			inputC => schedOutputArr(2),
 			inputE => schedOutputArr(4),
@@ -336,7 +339,7 @@ begin
 				
 			outputOpPreC => outputOpPreC,
 
-			whichAcceptedCQ => whichAcceptedCQ,
+			whichAcceptedCQ => (others => '1'),--whichAcceptedCQ,
 			
 			memLoadAddress => memLoadAddress,
 			memLoadAllow => memLoadAllow,
@@ -372,9 +375,8 @@ begin
 		sysRegReadSel <= memLoadAddress(4 downto 0);
 
 		execOutputs1 <= (0 => outputA, 1 => outputB, 2 => outputC, others => DEFAULT_INSTRUCTION_SLOT);
-		execOutputs2 <= (		2 => outputE, 3 => outputD, others => DEFAULT_INSTRUCTION_SLOT); -- (-,-,E,D)! 
-		execOutputsPre <= (1 => ('0', outputOpPreB), --1 => ('0', outputOpPreC),
-																				others => DEFAULT_INSTRUCTION_SLOT);
+		execOutputs2 <= (		2 => outputE, 3 => outputD, others => DEFAULT_INSTRUCTION_SLOT); -- (-,-,E,D)!
+		execOutputsPre <= (1 => ('0', outputOpPreB), 	others => DEFAULT_INSTRUCTION_SLOT);
 		COMMIT_QUEUE: entity work.TestCQPart0(Implem2)
 		generic map(
 			INPUT_WIDTH => 3,
@@ -388,44 +390,42 @@ begin
 			execCausing => DEFAULT_INSTRUCTION_STATE,
 			input => execOutputs1(0 to 2),
 
-			whichAcceptedCQ => whichAcceptedCQ,
-			anySending => open,--anySendingFromCQ,
+			whichAcceptedCQ => open,--whichAcceptedCQ,
+			anySending => open,
 			cqOutput => cqOutputSig,
 			bufferOutput => cqBufferOutputSig
 		);
 
-		anySendingFromCQ <= cqOutputSig(0).full; -- CAREFUL, only used for SINGLE_OUTPUT
-		--cqDataLivingOut <= makeSDM((0 => (cqOutputSig(0).full, cqOutputSig(0).ins)));
-			cqDataLivingOut2(0) <= (cqOutputSig(0).full, cqOutputSig(0).ins);
+		--anySendingFromCQ <= cqOutputSig(0).full;
+		cqDataLivingOut2(0) <= (cqOutputSig(0).full, cqOutputSig(0).ins);
 
 		-- CAREFUL! This stage is needed to keep result tags 1 for cycle when writing to reg file,
 		--				so that "black hole" of invisible readiness doesn't occur
 		AFTER_CQ: entity work.GenericStageMulti(Behavioral) port map(
 			clk => clk, reset => resetSig, en => enSig,
 			
-			prevSending => anySendingFromCQ,
+			prevSending => cqOutputSig(0).full,
 			nextAccepting => '1',
 			execEventSignal => '0',
 			lateEventSignal => '0',
-			execCausing => execCausing,
-			--stageDataIn => DEFAULT_STAGE_DATA_MULTI, --cqDataLivingOut,
+			execCausing => DEFAULT_INSTRUCTION_STATE,--execCausing,
 			stageDataIn2 => cqDataLivingOut2,
 			acceptingOut => open,
 			sendingOut => open,
-			--stageDataOut => open,--stageDataAfterCQ,
-			stageDataOut2 => stageDataAfterCQ2
-			
-			--lockCommand => '0'			
+			stageDataOut2 => stageDataAfterCQ2		
 		);
 
 		-- writtenTags indicate registers written to GPR file in last cycle, so they can be read from there
 		--		rather than from forw. network, but readyRegFlags are not available in the 1st cycle after WB.
-		fni.writtenTags <= getPhysicalDests(makeSDM(stageDataAfterCQ2));-- when CQ_SINGLE_OUTPUT
-						--else (others => (others => '0'));
+		fni.writtenTags <= getPhysicalDests(makeSDM(stageDataAfterCQ2));
 		fni.resultTags <= getResultTags(execOutputs1, cqBufferOutputSig, DEFAULT_STAGE_DATA_MULTI);
 		fni.nextResultTags <= getNextResultTags(execOutputsPre, schedOutputArr);
 		fni.resultValues <= getResultValues(execOutputs1, cqBufferOutputSig, DEFAULT_STAGE_DATA_MULTI);
-					
+		
+		-- TODO:
+		--fni <= getForwardingInfo(execOutput1, execOutputs2, execOutputsPre, schedOutputArray, stageDataAfterCQ2,
+		--									cqBufferOutputSig);
+		
 		-- Int register block
 		regsSelCE(0 to 1) <= regsSelC(0 to 1);
 		regsSelCE(2) <= regsSelE(2);

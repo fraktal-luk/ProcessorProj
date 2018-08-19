@@ -338,9 +338,9 @@ begin
 		stageDataOut2 => stageDataRenameOutA,
 		
 		-- Event interface
-		execEventSignal => execOrIntEventSignal,
-		lateEventSignal => evtPhase0,		
-		execCausing => execOrIntCausing
+		execEventSignal => '0',--execOrIntEventSignal,
+		lateEventSignal => evtPhase0 or execEventSignal, -- bcause Exec is always older than Rename 	
+		execCausing => execCausing-- execOrIntCausing
 		--lockCommand => '0'--renameLockState		
 	);
 
@@ -411,7 +411,7 @@ begin
 		-- Event interface
 		execEventSignal => '0', -- CAREFUL: committed cannot be killed!
 		lateEventSignal => '0',	
-		execCausing => execOrIntCausing
+		execCausing => execCausing--execOrIntCausing
 
 		--lockCommand => '0'
 	);
