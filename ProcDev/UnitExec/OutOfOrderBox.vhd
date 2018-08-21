@@ -378,7 +378,7 @@ begin
 
 		execOutputs1 <= (0 => outputA, 1 => outputB, 2 => outputC, others => DEFAULT_INSTRUCTION_SLOT);
 		execOutputs2 <= (		2 => outputE, 3 => outputD, others => DEFAULT_INSTRUCTION_SLOT); -- (-,-,E,D)!
-		execOutputsPre <= (1 => ('0', outputOpPreB), 	others => DEFAULT_INSTRUCTION_SLOT);
+		execOutputsPre <= (1 => ('0', outputOpPreB), 2 => ('0', outputOpPreC),	others => DEFAULT_INSTRUCTION_SLOT);
 		COMMIT_QUEUE: entity work.TestCQPart0(Implem2)
 		generic map(
 			INPUT_WIDTH => 3,
@@ -422,7 +422,7 @@ begin
 		fni.writtenTags <= getPhysicalDests(makeSDM(stageDataAfterCQ2));
 		fni.resultTags <= getResultTags(execOutputs1, cqBufferOutputSig, DEFAULT_STAGE_DATA_MULTI);
 		fni.nextResultTags <= getNextResultTags(execOutputsPre, schedOutputArr);
-		fni.nextTagsM2 <= (outputM2B.physicalArgSpec.dest, outputM2C.physicalArgSpec.dest);
+		fni.nextTagsM2 <= ((others => '0'), outputM2B.physicalArgSpec.dest, outputM2C.physicalArgSpec.dest);
 		fni.resultValues <= getResultValues(execOutputs1, cqBufferOutputSig, DEFAULT_STAGE_DATA_MULTI);
 		
 		-- TODO:

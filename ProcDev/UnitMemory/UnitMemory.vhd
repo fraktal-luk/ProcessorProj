@@ -228,7 +228,7 @@ begin
 								 or (bool2std(USE_PRECISE_LS_TRAP) and lqSelectedOutput.full);
 																									--??? -- because load exc to ROB
 	outputC <= (addressUnitSendingSig, clearTempControlInfoSimple(execResultData));
-	outputOpPreC <= DEFAULT_INS_STATE; -- CAREFUL: Don't show this because not supported
+	outputOpPreC <= stageDataOutMem0a(0).ins;-- DEFAULT_INS_STATE; -- CAREFUL: Don't show this because not supported
 	outputM2C <= stageDataOutAGU2(0).ins;
 
 		lsResultData <= getLSResultData(dataAfterMemA(0).ins, memLoadReady, memLoadValue,

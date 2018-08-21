@@ -79,7 +79,7 @@ package NewPipelineData is
 		
 	constant N_RES_TAGS: natural := 4-1 + CQ_SIZE;
 						-- Above: num subpipe results + CQ slots + max commited slots + pre-IQ red ports
-	constant N_NEXT_RES_TAGS: natural := 2; 
+	constant N_NEXT_RES_TAGS: natural := 3;--2; 
 	------
 
 	-- TODO: move config info to general config file included in higher level definition files?
@@ -213,8 +213,10 @@ type InstructionArgValues is record
 	--readyBefore: std_logic_vector(0 to 2);
 	readyNow: std_logic_vector(0 to 2);
 	readyNext: std_logic_vector(0 to 2);
+	readyM2:	std_logic_vector(0 to 2);
 	locs: SmallNumberArray(0 to 2);
 	nextLocs: SmallNumberArray(0 to 2);
+	locsM2: SmallNumberArray(0 to 2);
 	missing: std_logic_vector(0 to 2);
 	arg0: Mword;
 	arg1: Mword;
@@ -413,8 +415,10 @@ begin
 			  --readyBefore => (others=>'0'),
 			  readyNow => (others=>'0'),
 			  readyNext => (others=>'0'),
+			  readyM2 => (others => '0'),
 			  locs => (others => (others => '0')),
 			  nextLocs => (others => (others => '0')),
+			  locsM2 => (others => (others => '0')),
 			  missing => (others=>'0'),
 			  arg0 => (others=>'0'),
 			  arg1 => (others=>'0'),

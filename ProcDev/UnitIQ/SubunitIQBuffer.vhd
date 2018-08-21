@@ -92,9 +92,10 @@ architecture Implem of SubunitIQBuffer is
 
 	signal queueContent, queueContentNext: SchedulerEntrySlotArray(0 to IQ_SIZE-1)
 				:= (others => DEFAULT_SCH_ENTRY_SLOT);
-	signal queueContentUpdated, queueContentUpdatedSel: SchedulerEntrySlotArray(0 to IQ_SIZE-1)
+	signal queueContentUpdated, queueContentUpdatedSel, queueContentUpdated_T, queueContentUpdatedSel_T:
+							SchedulerEntrySlotArray(0 to IQ_SIZE-1)
 				:= (others => DEFAULT_SCH_ENTRY_SLOT);
-	signal newContent: SchedulerEntrySlotArray(0 to PIPE_WIDTH-1) := (others => DEFAULT_SCH_ENTRY_SLOT);
+	signal newContent, newContent_T: SchedulerEntrySlotArray(0 to PIPE_WIDTH-1) := (others => DEFAULT_SCH_ENTRY_SLOT);
 				
 	signal newSchedData: SchedulerEntrySlotArray(0 to PIPE_WIDTH-1) := (others => DEFAULT_SCH_ENTRY_SLOT);
 				
@@ -162,6 +163,8 @@ architecture Implem of SubunitIQBuffer is
 		end loop;
 		return res;
 	end function;
+
+			signal ch0, ch1, ch2: std_logic := '0';
 begin
 	flowDriveQ.prevSending <= num2flow(countOnes(newData.fullMask)) when prevSendingOK = '1' else (others => '0');
 	flowDriveQ.kill <= num2flow(countOnes(killMask));
@@ -201,7 +204,9 @@ begin
 
 		newSchedData <= getSchedData(newData.data);
 
-		newContent <= updateForWaitingArrayFNI(newSchedData, readyRegFlags, fni);--, '1');
+		newContent <= --updateForWaitingArrayFNI(newSchedData, readyRegFlags, fni);--, '1');
+				--newContent_T <= 
+							updateForWaitingArrayNewFNI(newSchedData, readyRegFlags, fni);
 			--newDataU.fullMask <= newData.fullMask;
 			--newDataU.data <= extractData(newContent);
 			newDataU <= newData;
@@ -218,8 +223,16 @@ begin
 														prevSendingOK);
 					
 	-- TODO: below could be optimized because some code is shared (comparators!)
-	queueContentUpdated <= updateForWaitingArrayFNI(queueContent, readyRegFlags, fni);--, '0');
-	queueContentUpdatedSel <= updateForSelectionArrayFNI(queueContent, readyRegFlags, fni);
+	--queueContentUpdated <= updateForWaitingArrayFNI(queueContent, readyRegFlags, fni);--, '0');
+	--queueContentUpdatedSel <= updateForSelectionArrayFNI(queueContent, readyRegFlags, fni);
+
+		queueContentUpdated <= updateForWaitingArrayFNI2(queueContent, readyRegFlags, fni);--, '0');
+		queueContentUpdatedSel <= updateForSelectionArrayFNI2(queueContent, readyRegFlags, fni);
+
+			ch0 <= '1' when queueContentUpdatedSel(0).ins = queueContentUpdatedSel_T(0).ins else '0';
+			ch1 <= '1' when queueContentUpdatedSel(0).state.argValues.missing = 
+									queueContentUpdatedSel_T(0).state.argValues.missing else '0';
+
 
 	readyMask2 <= extractReadyMaskNew(queueContentUpdatedSel);	
 	readyMask_C <= readyMask2 and livingMask;

@@ -74,7 +74,8 @@ end SubunitDispatch;
 
 architecture Alternative of SubunitDispatch is
 	--signal stageDataM, stageDataStored: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
-	signal inputDataWithArgs, dispatchDataUpdated: SchedulerEntrySlot := DEFAULT_SCH_ENTRY_SLOT;
+	signal inputDataWithArgs, dispatchDataUpdated, inputDataWithArgs_T, dispatchDataUpdated_T:
+						SchedulerEntrySlot := DEFAULT_SCH_ENTRY_SLOT;
 	signal lockSend: std_logic := '0';
 	
 	--signal stageDataIn: InstructionState := DEFAULT_INSTRUCTION_STATE; -- DEPREC
@@ -89,7 +90,9 @@ architecture Alternative of SubunitDispatch is
 begin
 	--stageDataIn <= input.ins;
 
-	inputDataWithArgs <= getDispatchArgValues(input.ins, input.state, resultVals, USE_IMM);
+	--inputDataWithArgs <= getDispatchArgValues(input.ins, input.state, resultVals, USE_IMM);
+		inputDataWithArgs <= getDispatchArgValues2(input.ins, input.state, resultTags, resultVals, USE_IMM);
+
 	--stageDataM <= makeSDM((0 => (prevSending, inputDataWithArgs.ins)));
 	
 	BASIC_LOGIC: entity work.GenericStageMulti(Behavioral)
@@ -144,10 +147,11 @@ begin
 	end process;
 
 
-	dispatchDataUpdated <= --updateDispatchArgs(stageDataStored.data(0), resultVals(0 to N_NEXT_RES_TAGS-1),
-									--						regValues);
-									updateDispatchArgs(stageDataSaved.ins, argState,
-															resultVals(0 to N_NEXT_RES_TAGS-1),
+	--dispatchDataUpdated <= updateDispatchArgs(stageDataSaved.ins, argState,
+	--														resultVals(0 to N_NEXT_RES_TAGS-1),
+	--														regValues);
+		dispatchDataUpdated <= updateDispatchArgs2(stageDataSaved.ins, argState,
+															resultVals(0 to 2),--N_NEXT_RES_TAGS-1),
 															regValues);
 
 	-- CAREFUL: this does nothing. To make it work:
