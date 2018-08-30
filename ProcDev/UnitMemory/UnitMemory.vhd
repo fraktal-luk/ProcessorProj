@@ -274,7 +274,9 @@ begin
 				
 				acceptingOut => acceptingNewSQ,
 				prevSending => prevSendingToSQ,
+					prevSendingBr => '0',
 				dataIn => dataNewToSQ,
+					dataInBr => DEFAULT_STAGE_DATA_MULTI,				
 
 				storeAddressInput => (storeAddressWrSig, storeAddressDataSig),
 				storeValueInput => (storeValueWrSig, storeValueDataSig),
@@ -308,7 +310,9 @@ begin
 				
 				acceptingOut => acceptingNewLQ,
 				prevSending => prevSendingToLQ,
+					prevSendingBr => '0',
 				dataIn => dataNewToLQ,
+					dataInBr => DEFAULT_STAGE_DATA_MULTI,				
 
 				storeAddressInput => (sendingAddressingForLoad or sendingAddressingForMfc, addressingData),
 				storeValueInput => (sendingAddressingForLoad or sendingAddressingForMfc, DEFAULT_INS_STATE),
@@ -342,7 +346,9 @@ begin
 				
 				acceptingOut => dlqAccepting,
 				prevSending => sendingToDLQ,
+					prevSendingBr => '0',
 				dataIn => dataToDLQ,
+					dataInBr => DEFAULT_STAGE_DATA_MULTI,				
 				
 					storeAddressInput => ('0', DEFAULT_INSTRUCTION_STATE),
 					storeValueInput => cacheFillInput,
@@ -392,5 +398,5 @@ begin
 			dlqAcceptingOut <= dlqAccepting;
 			dlqAlmostFullOut <= dlqAlmostFull;
 			
-			sendingFromDLQOut <= sendingFromDLQ;
+			sendingFromDLQOut <= sendingFromDLQ;			
 end Behavioral;

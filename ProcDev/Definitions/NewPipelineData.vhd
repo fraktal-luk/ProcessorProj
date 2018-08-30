@@ -63,7 +63,7 @@ package NewPipelineData is
 	constant SQ_SIZE: natural := 4;
 	constant LQ_SIZE: natural := 4;
 	constant LMQ_SIZE: natural := 4; -- !!!
-	constant BQ_SIZE: natural := 4;
+	constant BQ_SIZE: natural := 4 + 4;
 	
 	constant CQ_SIZE: natural := 2;
 	

@@ -10,6 +10,10 @@ architecture Behavioral5 of NewCore0 is
 	signal frontDataLastLiving: StageDataMulti;
 	signal frontLastSending, renameAccepting: std_logic := '0';
 
+	signal bpAccepting: std_logic := '0';
+	signal bpSending: std_logic := '0';
+	signal bpData: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
+
 	signal frontEventSignal: std_logic := '0';
 	signal frontCausing: InstructionState := DEFAULT_INSTRUCTION_STATE;
 
@@ -160,6 +164,10 @@ begin
 		pcSending => pcSendingSig,	
 		frontAccepting => acceptingOutFront,
 
+		bpAccepting => bpAccepting,
+		bpSending => bpSending,
+		bpData => bpData,
+
 		renameAccepting => renameAccepting,			
 		dataLastLiving => frontDataLastLiving,
 		lastSending => frontLastSending,
@@ -188,6 +196,10 @@ begin
 		OOO_BOX: entity work.OutOfOrderBox(Behavioral)
 		port map(
 		   clk => clk, reset => resetSig, en => enSig,
+			
+			bpAccepting => bpAccepting,
+			bpSending => bpSending,
+			bpData => bpData,
 		
 		   renamedDataLiving => renamedDataLiving,--: in StageDataMulti;	-- INPUT			
 		   renamedSending => renamedSending,--: in std_logic;

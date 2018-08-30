@@ -70,7 +70,9 @@ entity MemoryUnit is
 			almostFull: out std_logic;
 		
 		prevSending: in std_logic;
+			prevSendingBr: in std_logic;
 		dataIn: in StageDataMulti;
+			dataInBr: in StageDataMulti;
 
 		storeAddressInput: in InstructionSlot;
 		storeValueInput: in InstructionSlot;

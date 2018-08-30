@@ -62,6 +62,10 @@ entity UnitFront is
 		pcSending: in std_logic;
 		frontAccepting: out std_logic;
 
+		bpAccepting: in std_logic;
+		bpSending: out std_logic;
+		bpData: out StageDataMulti;
+
 		-- Interface front to renaming
 		renameAccepting: in std_logic;		
 		dataLastLiving: out StageDataMulti; 
@@ -196,6 +200,8 @@ begin
 																pcSendingDelayedFinal, ivalidFinal, '1', fetchBlockFinal);
 	earlyBranchMultiDataInA <= makeSlotArray(earlyBranchMultiDataIn.data, earlyBranchMultiDataIn.fullMask);
 	
+		-- TODO: compact earlyBranchMultidataIn, excluding those not on predicted path, and send to BQ
+	
 	SUBUNIT_EARLY_BRANCH_MULTI: entity work.GenericStageMulti(Behavioral)
 	generic map(
 		WIDTH => PIPE_WIDTH
@@ -242,7 +248,7 @@ begin
 	stallEventSig <= fetchStall;
 	stallCausing <= setInstructionTarget(earlyBranchDataOut, earlyBranchDataOut.ip);
 	frontKill <= frontBranchEvent or fetchStall;
-	fetchStall <= earlyBranchSending and not acceptingOutHbuffer;
+	fetchStall <= earlyBranchSending and (not acceptingOutHbuffer or not bpAccepting);
 
 	SAVE_PRED_TARGET: process(clk)
 	begin
@@ -315,5 +321,7 @@ begin
 	frontEventSignal <= stallEventSig or frontBranchEvent;
 	frontCausingSig <= stallCausing when stallEventSig = '1' else earlyBranchDataOut;
 	frontCausing <= frontCausingSig;
+	
+	bpSending <= earlyBranchSending and not fetchStall;
 end Behavioral;
 

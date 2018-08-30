@@ -49,6 +49,10 @@ entity OutOfOrderBox is
            reset : in  STD_LOGIC;
            en : in  STD_LOGIC;
 			  		  
+			  bpAccepting: out std_logic;
+			  bpSending: in std_logic;
+			  bpData: in StageDataMulti;
+					  
 			  renamedDataLiving: in StageDataMulti;	-- INPUT			
 			  renamedSending: in std_logic;
 			  
@@ -302,6 +306,10 @@ begin
 			outputM2B => outputM2B,
 
 			whichAcceptedCQ => (others => '1'),--whichAcceptedCQ,
+			
+			bpAccepting => bpAccepting,
+			bpSending => bpSending,
+			bpData => bpData,
 			
 			acceptingNewBQ => acceptingNewBQ,
 			dataOutBQV => dataOutBQV,

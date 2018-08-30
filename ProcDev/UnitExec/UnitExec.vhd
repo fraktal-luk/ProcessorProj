@@ -60,6 +60,9 @@ entity UnitExec is
 		--execAcceptingA: out std_logic;
 		--execAcceptingB: out std_logic;
 		--execAcceptingD: out std_logic;
+		bpAccepting: out std_logic;
+		bpSending: in std_logic;
+		bpData: in StageDataMulti;
 			
 			acceptingNewBQ: out std_logic;
 				dataOutBQV: out StageDataMulti;
@@ -136,7 +139,7 @@ begin
 			
 			execEventSignal => '0',--execEventSignal,
 			lateEventSignal => lateEventSignal,
-			execCausing => execCausing
+			execCausing => DEFAULT_INSTRUCTION_STATE--execCausing
 		);
 
 	SUBPIPE_B: entity work.IntegerMultiplier(Behavioral)
@@ -185,7 +188,7 @@ begin
 			stageDataOut2 => outputDataD2,
 			execEventSignal => '0',--execEventSignal,
 			lateEventSignal => lateEventSignal,
-			execCausing => execCausing					
+			execCausing => DEFAULT_INSTRUCTION_STATE-- execCausing					
 		);	
 
 		storeTargetDataSig <= dataD0;
@@ -205,7 +208,9 @@ begin
 				
 				acceptingOut => acceptingNewBQ,
 				prevSending => prevSendingToBQ,
+					prevSendingBr => bpSending,
 				dataIn => dataNewToBQ,
+					dataInBr => bpData,				
 				
 					storeAddressInput => (storeTargetWrSig, storeTargetDataSig),
 					storeValueInput => (storeTargetWrSig, DEFAULT_INSTRUCTION_STATE),
@@ -250,4 +255,6 @@ begin
 		
 	execEvent <= execEventSignal;
 	execCausingOut <= execCausing;
+	
+	bpAccepting <= '1'; -- TEMP!!
 end Implem;
