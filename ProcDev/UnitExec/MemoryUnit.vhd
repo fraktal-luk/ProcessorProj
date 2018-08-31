@@ -105,7 +105,11 @@ architecture Behavioral of MemoryUnit is
 	signal TMP_mask, TMP_ckEnForInput, TMP_sendingMask, TMP_killMask, TMP_livingMask,
 			 TMP_maskNext,	TMP_maskA, TMP_maskD,	committedMask, committedMaskNext, drainingMask, fullOrCommMask
 								: std_logic_vector(0 to QUEUE_SIZE-1) := (others => '0'); 
-	signal sqOutData, TMP_frontW, TMP_preFrontW, TMP_sendingData, TMP_preCommittedW: StageDataMulti 
+
+	signal predictedMaskNext,	predictedMask, predictedLivingMask, predictedNewMask, predictedKillMask
+								: std_logic_vector(0 to QUEUE_SIZE-1) := (others => '0');
+
+	signal sqOutData, TMP_frontW, TMP_preFrontW, TMP_preFrontWBr, TMP_sendingData, TMP_preCommittedW: StageDataMulti 
 																				:= DEFAULT_STAGE_DATA_MULTI;
 
 	signal bufferDrive: FlowDriveBuffer := (killAll => '0', lockAccept => '0', lockSend => '0',
@@ -114,12 +118,13 @@ architecture Behavioral of MemoryUnit is
 	
 	signal qs0, qs1: TMP_queueState := TMP_defaultQueueState;
 		signal qs0c, qs1c: TMP_queueState := TMP_defaultQueueState;
+		signal qs0p, qs1p: TMP_queueState := TMP_defaultQueueState;
 
 	signal contentView, contentNextView, TMP_sqView:
 					InstructionStateArray(0 to QUEUE_SIZE-1) := (others => DEFAULT_INSTRUCTION_STATE);
 	signal maskView, liveMaskView, maskNextView: std_logic_vector(0 to QUEUE_SIZE-1) := (others => '0');
 		
-	signal inputIndices: SmallNumberArray(0 to QUEUE_SIZE-1) := (others => (others => '0'));
+	signal inputIndices, inputIndicesBr: SmallNumberArray(0 to QUEUE_SIZE-1) := (others => (others => '0'));
 
 	signal cmpMask, matchedSlot: std_logic_vector(0 to QUEUE_SIZE-1) := (others => '0');
 
@@ -132,6 +137,8 @@ architecture Behavioral of MemoryUnit is
 		signal TMP_commSendData: InstructionState := DEFAULT_INSTRUCTION_STATE;
 		signal TMP_committedFrontW: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
 	signal compareAddressIns: InstructionState := DEFAULT_INSTRUCTION_STATE;
+	
+	signal numPrevBr: SmallNumber := (others => '0');
 begin
 		compareAddressIns <= storeAddressInput.ins;
 	
@@ -148,6 +155,18 @@ begin
 
 			committedOutput <= (TMP_commSending, TMP_commSendData);
 			committedEmpty <= TMP_committedEmpty;
+------------------------------
+	qs1p <= TMP_change(qs0p, bufferDrive.nextAccepting, numPrevBr,
+							predictedMask, predictedKillMask, lateEventSignal or execEventSignal, predictedMaskNext);
+	
+		predictedNewMask <= getQueueEnableForInput(qs0p, QUEUE_SIZE, numPrevBr);
+		predictedMaskNext <= (predictedLivingMask and not TMP_sendingMask) or predictedNewMask;
+		predictedLivingMask <= predictedMask and not predictedKillMask;
+		predictedKillMask <= 
+				  TMP_killMask or (predictedMask and not TMP_mask) when (execEventSignal or lateEventSignal) = '1'
+			else (others => '0');
+
+		numPrevBr <= num2flow(countOnes(dataInBr.fullMask)) when prevSendingBr = '1' else (others => '0');
 ------------------------------
 	qs1 <= TMP_change(qs0, bufferDrive.nextAccepting, bufferDrive.prevSending,
 							TMP_mask, TMP_killMask, lateEventSignal or execEventSignal, TMP_maskNext);
@@ -187,6 +206,9 @@ begin
 	TMP_preFrontW <= getQueuePreFrontWindow(qs0, TMP_content, TMP_mask);
 	TMP_sendingData <= findCommittingSQ(TMP_frontW.data, TMP_frontW.fullMask, groupCtrInc, committing);
 
+		TMP_preFrontWBr <= getQueuePreFrontWindow(qs0p, TMP_content, predictedMask); -- may include more mask bits
+
+
 			fullOrCommMask <= TMP_mask or committedMask;
 			TMP_preCommittedW <= getQueuePreFrontWindow(qs0c, TMP_content, fullOrCommMask); -- CAREFUL!
 
@@ -214,6 +236,9 @@ begin
 			TMP_content <= TMP_contentNext;
 				committedMask <= committedMaskNext;
 				qs0c <= qs1c;
+			
+				predictedMask <= predictedMaskNext;
+				qs0p <= qs1p;
 			
 			selectedDataOutputSig <= selectedDataSlot;--(selectedSendingSig, selectedData);
 			
@@ -248,7 +273,8 @@ begin
 	sendingSQ <= isNonzero(sqOutData.fullMask);
 	dataOutV <= sqOutData;
 	
-	acceptingOut <= 		not TMP_preCommittedW.fullMask(0) when MODe = store -- CAREFUL!
+	acceptingOut <= 		not TMP_preCommittedW.fullMask(0) when MODE = store -- CAREFUL!
+					-- else  not TMP_preFrontWBr.fullMask(0) when  MODE = branch
 						else	not TMP_preFrontW.fullMask(0);
 	
 	sendingSQOut <= sendingSQ;

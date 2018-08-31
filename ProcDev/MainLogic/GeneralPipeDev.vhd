@@ -65,6 +65,8 @@ constant DEFAULT_FORWARDING_INFO: ForwardingInfo := (
 
 
 function makeSDM(arr: InstructionSlotArray) return StageDataMulti;
+function squeezeSD(sd: StageDataMulti; srcVec: std_logic_vector) return StageDataMulti;
+
 function makeSlotArray(insVec: InstructionStateArray; mask: std_logic_vector) return InstructionSlotArray;
 
 function extractFullMask(queueContent: InstructionSlotArray) return std_logic_vector;
@@ -321,6 +323,80 @@ begin
 	
 	return res;
 end function;
+
+function squeezeSD(sd: StageDataMulti; srcVec: std_logic_vector) return StageDataMulti is
+	variable res: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
+	variable k: natural := 0;
+		constant CLEAR_EMPTY_SLOTS_IQ_ROUTING: boolean := false;
+begin
+	if not CLEAR_EMPTY_SLOTS_IQ_ROUTING then
+		res.data := sd.data;
+	end if;
+
+	for i in sd.fullMask'range loop
+		-- Fill with input(j) where j is index of i-th '1' in srcVec
+		-- For output(0):
+		--	"0000" -> 3?
+		-- "0001" -> 3
+		-- "0010" -> 2
+		-- "0011" -> 2
+		-- "0100" -> 1
+		-- "0101" -> 1
+		-- "0110" -> 1 etc.
+		--		 ^ last bit is neutral for data, only matters for 'full' bit
+		-- For output(1):
+		-- "0000" -> 3?
+		-- "0001" -> 3?
+		-- "0010" -> 3?
+		-- "0011" -> 3
+		-- "0100" -> 3? 2?
+		-- "0101" -> 3
+		-- "0110" -> 2
+		-- "0111" -> 2
+		-- "1000" -> 1? 2? 3? 
+		-- "1001" -> 3
+		-- "1010" -> 2
+		-- "1011" -> 2
+		-- "1100" -> 1
+		-- "1101" -> 1
+		-- "1110" -> 1
+		-- "1111" -> 1
+		-- 	 ^ last bit is neutral, penult is not
+		--			Formula: 1 + ofs, ofs = 0 when "11__", 1 when "101_" or "011_", else 2 ??
+		-- For output(2):
+		-- "0000" -> ?
+		-- "0001" -> ?
+		-- "0010" -> ?
+		-- "0011" -> ?
+		-- "0100" -> ?
+		-- "0101" -> ?
+		-- "0110" -> ?
+		-- "0111" -> 3
+		-- "1000" -> ?
+		-- "1001" -> ?
+		-- "1010" -> ?
+		-- "1011" -> 3
+		-- "1100" -> ?
+		-- "1101" -> 3
+		-- "1110" -> 2
+		-- "1111" -> 2
+		-- 	^ last bit neutral. 2 when "111_", 3 when "110_"
+		--		formula": 2 + ofs, ofs = 0 when "111_", else 1
+		
+		-- Idea: separate the logic for each output. index(0) = f0(mask), index(1) = f1(mask) etc.
+		-- So in this place make inner loop with each possible mux index
+		for j in 0 to PIPE_WIDTH-1 loop
+			-- Select route input(j)->output(i) if condition met
+			res.data(i) := sd.data(j);
+			if countOnes(srcVec(0 to j-1)) = i and srcVec(j) = '1' then
+				res.fullMask(i) := '1';
+				exit;
+			end if;
+		end loop;
+	end loop;
+	return res;
+end function;
+
 
 function makeSlotArray(insVec: InstructionStateArray; mask: std_logic_vector) return InstructionSlotArray is
 	variable res: InstructionSlotArray(0 to insVec'length-1) := (others => DEFAULT_INSTRUCTION_SLOT);

@@ -122,6 +122,7 @@ architecture Behavioral of UnitFront is
 
 	signal earlyBranchMultiDataInA, earlyBranchMultiDataOutA, stageDataDecodeInA, stageDataDecodeOutA:
 								InstructionSlotArray(0 to PIPE_WIDTH-1) := (others => DEFAULT_INSTRUCTION_SLOT);
+	signal branchMask: std_logic_vector(0 to PIPE_WIDTH-1) := (others => '0');
 
 	constant HAS_RESET_FRONT: std_logic := '0';
 	constant HAS_EN_FRONT: std_logic := '0';	
@@ -200,8 +201,6 @@ begin
 																pcSendingDelayedFinal, ivalidFinal, '1', fetchBlockFinal);
 	earlyBranchMultiDataInA <= makeSlotArray(earlyBranchMultiDataIn.data, earlyBranchMultiDataIn.fullMask);
 	
-		-- TODO: compact earlyBranchMultidataIn, excluding those not on predicted path, and send to BQ
-	
 	SUBUNIT_EARLY_BRANCH_MULTI: entity work.GenericStageMulti(Behavioral)
 	generic map(
 		WIDTH => PIPE_WIDTH
@@ -244,6 +243,12 @@ begin
 
 	earlyBranchDataOut <= earlyBranchDataOutA(0).ins;
 	frontBranchEvent <= earlyBranchDataOut.controlInfo.newEvent;
+
+		-- TODO: compact earlyBranchMultidataIn, excluding those not on predicted path, and send to BQ
+		--bpSending is handled elsewhere
+	branchMask <= getBranchMask(makeSDM(earlyBranchMultiDataOutA));
+	bpData <= squeezeSD(makeSDM(earlyBranchMultiDataOutA), branchMask);
+
 
 	stallEventSig <= fetchStall;
 	stallCausing <= setInstructionTarget(earlyBranchDataOut, earlyBranchDataOut.ip);

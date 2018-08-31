@@ -57,6 +57,8 @@ function countFullNonSkipped(insVec: StageDataMulti) return integer;
 
 function findEarlyTakenJump(ins: InstructionState; insVec: StageDataMulti) return InstructionState;
 
+function getBranchMask(insVec: StageDataMulti) return std_logic_vector;
+
 end ProcLogicFront;
 
 
@@ -294,6 +296,8 @@ begin
 			end if;
 
 			targets(i) := addMwordFaster(thisIP, tempOffset);
+
+			res.data(i).classInfo.branchCond := branchIns(i); -- Mark as ins of type branch
 			
 			-- Now applying the skip!
 			if res.data(i).controlInfo.skipped = '1' then
@@ -379,5 +383,18 @@ begin
 	return res;
 end function;
 
+function getBranchMask(insVec: StageDataMulti) return std_logic_vector is
+	variable res: std_logic_vector(0 to PIPE_WIDTH-1) := (others => '0');
+begin
+	for i in 0 to PIPE_WIDTH-1 loop
+		if 		insVec.fullMask(i) = '1' and insVec.data(i).controlInfo.skipped = '0'
+			and 	insVec.data(i).classInfo.branchCond = '1'
+		then
+			res(i) := '1';
+		end if;
+	end loop;
+	
+	return res;
+end function;
 
 end ProcLogicFront;
