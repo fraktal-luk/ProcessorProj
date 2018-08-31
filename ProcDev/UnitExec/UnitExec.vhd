@@ -207,6 +207,8 @@ begin
 				en => en,
 				
 				acceptingOut => acceptingNewBQ,
+				
+					acceptingBr => bpAccepting,
 				prevSending => prevSendingToBQ,
 					prevSendingBr => bpSending,
 				dataIn => dataNewToBQ,
@@ -256,5 +258,5 @@ begin
 	execEvent <= execEventSignal;
 	execCausingOut <= execCausing;
 	
-	bpAccepting <= '1'; -- TEMP!!
+	--bpAccepting <= '1'; -- TEMP!!
 end Implem;

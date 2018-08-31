@@ -247,7 +247,7 @@ return StageDataMulti is
 	variable targets: MwordArray(0 to PIPE_WIDTH-1) := (others => (others => '0'));
 	variable fullOut, full, branchIns, predictedTaken: std_logic_vector(0 to PIPE_WIDTH-1) := (others => '0');
 	variable nSkippedIns: integer := 0;
-	variable regularJump, longJump: std_logic := '0';
+	variable regularJump, longJump, regJump: std_logic := '0';
 begin
 	-- receiving, valid, accepting	-> good
 	-- receiving, valid, not accepting -> refetch
@@ -272,6 +272,7 @@ begin
 			
 			regularJump := '0';
 			longJump := '0';
+			regJump := '0';
 			
 			if 	fetchBlock(2*i)(15 downto 10) = opcode2slv(jl) 
 				or fetchBlock(2*i)(15 downto 10) = opcode2slv(jz) 
@@ -283,9 +284,14 @@ begin
 			then
 				longJump := '1';				
 				predictedTaken(i) := '1'; -- Long jump is unconditional (no space for register encoding!)
+			elsif  fetchBlock(2*i)(15 downto 10) = opcode2slv(ext1) 
+				and (fetchBlock(2*i + 1)(15 downto 10) = opcont2slv(ext1, jzR)
+						or fetchBlock(2*i + 1)(15 downto 10) = opcont2slv(ext1, jnzR)) then
+				regJump := '1';
+				predictedTaken(i) := '0'; -- TEMP: register jumps predicted not taken
 			end if;
 			
-			branchIns(i) := regularJump or longJump;
+			branchIns(i) := regularJump or longJump or regJump;
 			
 			if longJump = '1' then
 				tempOffset := (others => fetchBlock(2*i)(9));

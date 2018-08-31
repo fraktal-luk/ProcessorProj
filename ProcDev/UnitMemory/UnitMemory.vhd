@@ -273,6 +273,7 @@ begin
 				clk => clk, reset => reset, en => en,
 				
 				acceptingOut => acceptingNewSQ,
+					acceptingBr => open,
 				prevSending => prevSendingToSQ,
 					prevSendingBr => '0',
 				dataIn => dataNewToSQ,
@@ -309,6 +310,7 @@ begin
 				clk => clk, reset => reset, en => en,
 				
 				acceptingOut => acceptingNewLQ,
+					acceptingBr => open,
 				prevSending => prevSendingToLQ,
 					prevSendingBr => '0',
 				dataIn => dataNewToLQ,
@@ -345,6 +347,7 @@ begin
 				clk => clk, reset => reset, en => en,
 				
 				acceptingOut => dlqAccepting,
+					acceptingBr => open,
 				prevSending => sendingToDLQ,
 					prevSendingBr => '0',
 				dataIn => dataToDLQ,

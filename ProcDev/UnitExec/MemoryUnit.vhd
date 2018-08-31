@@ -69,6 +69,8 @@ entity MemoryUnit is
 		acceptingOut: out std_logic;
 			almostFull: out std_logic;
 		
+		acceptingBr: out std_logic;
+		
 		prevSending: in std_logic;
 			prevSendingBr: in std_logic;
 		dataIn: in StageDataMulti;
@@ -274,8 +276,11 @@ begin
 	dataOutV <= sqOutData;
 	
 	acceptingOut <= 		not TMP_preCommittedW.fullMask(0) when MODE = store -- CAREFUL!
-					-- else  not TMP_preFrontWBr.fullMask(0) when  MODE = branch
+					   else  '1' when  MODE = branch
 						else	not TMP_preFrontW.fullMask(0);
+
+	acceptingBr <=  not TMP_preFrontWBr.fullMask(0);
+
 	
 	sendingSQOut <= sendingSQ;
 
