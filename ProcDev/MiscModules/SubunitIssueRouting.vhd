@@ -40,11 +40,15 @@ use work.GeneralPipeDev.all;
 use work.ProcLogicRenaming.all;
 use work.TEMP_DEV.all;
 use work.ProcLogicRouting.all;
+use work.ProcLogicIQ.all;
 
 
 entity SubunitIssueRouting is
 	port(
 		renamedDataLiving: in StageDataMulti;
+
+		fni: ForwardingInfo;
+		readyRegFlags: in std_logic_vector(0 to 3*PIPE_WIDTH-1);
 
 		acceptingVecA: in std_logic_vector(0 to PIPE_WIDTH-1);
 		acceptingVecB: in std_logic_vector(0 to PIPE_WIDTH-1);
@@ -72,7 +76,13 @@ entity SubunitIssueRouting is
 		dataOutC: out StageDataMulti;
 		--dataOutD: out StageDataMulti;
 		dataOutE: out StageDataMulti;
-		
+
+			arrOutA: out SchedulerEntrySlotArray(0 to PIPE_WIDTH-1);
+			arrOutB: out SchedulerEntrySlotArray(0 to PIPE_WIDTH-1);
+			arrOutC: out SchedulerEntrySlotArray(0 to PIPE_WIDTH-1);
+			--dataOutD: out StageDataMulti;
+			arrOutE: out SchedulerEntrySlotArray(0 to PIPE_WIDTH-1);
+
 		dataOutSQ: out StageDataMulti;
 		dataOutLQ: out StageDataMulti;
 		dataOutBQ: out StageDataMulti
@@ -89,6 +99,7 @@ architecture Behavioral of SubunitIssueRouting is
 	signal dataToA, dataToB, dataToC, dataToE, dataToSQ: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
 	signal renamedSending: std_logic := '0';
 	signal invA, invB, invC, invE: std_logic_vector(0 to PIPE_WIDTH-1) := (others => '0');
+	signal schedArray: SchedulerEntrySlotArray(0 to PIPE_WIDTH-1) := (others => DEFAULT_SCH_ENTRY_SLOT);
 begin	
 	renamedSending <= renamedSendingIn;
 
@@ -107,6 +118,9 @@ begin
 	srcVecC <= (findByNumber(issueRouteVec, 2) or storeVec or loadVec) and renamedDataLiving.fullMask;
 	srcVecD <= findByNumber(issueRouteVec, 3) and not storeVec and not loadVec and renamedDataLiving.fullMask;
 	srcVecE <= storeVec and renamedDataLiving.fullMask;
+
+		schedArray <= updateForWaitingArrayNewFNI(getSchedData(renamedDataLiving.data, renamedDataLiving.fullMask),
+																	readyRegFlags, fni);
 
 	dataToA <= routeToIQ(renamedDataLiving, srcVecA);
 	dataToB <= routeToIQ(renamedDataLiving, srcVecB);

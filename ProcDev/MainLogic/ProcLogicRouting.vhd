@@ -34,6 +34,8 @@ function findLoads(insv: StageDataMulti) return std_logic_vector;
 function prepareForAGU(insVec: StageDataMulti) return StageDataMulti;
 function prepareForStoreData(insVec: StageDataMulti) return StageDataMulti;
 
+	function getSchedData(insArr: InstructionStateArray; fullMask: std_logic_vector) return SchedulerEntrySlotArray;
+
 end ProcLogicRouting;
 
 
@@ -142,6 +144,31 @@ begin
 	end loop;
 	return res;
 end function;
+
+	function getSchedData(insArr: InstructionStateArray; fullMask: std_logic_vector) return SchedulerEntrySlotArray is
+		variable res: SchedulerEntrySlotArray(0 to PIPE_WIDTH-1) := (others => DEFAULT_SCH_ENTRY_SLOT);
+	begin
+		for i in 0 to PIPE_WIDTH-1 loop
+			res(i).ins := insArr(i);
+			res(i).full := fullMask(i);
+
+			-- Set state markers: "zero" bit
+			res(i).state.argValues.zero(0) := not isNonzero(res(i).ins.virtualArgSpec.args(0)(4 downto 0));
+			res(i).state.argValues.zero(1) := not isNonzero(res(i).ins.virtualArgSpec.args(1)(4 downto 0));
+			res(i).state.argValues.zero(2) := not isNonzero(res(i).ins.virtualArgSpec.args(2)(4 downto 0));
+
+			-- Set 'missing' flags for non-const arguments
+			res(i).state.argValues.missing := res(i).ins.physicalArgSpec.intArgSel and not res(i).state.argValues.zero;
+			
+			-- Handle possible immediate arg
+			if res(i).ins.constantArgs.immSel = '1' then
+				res(i).state.argValues.missing(1) := '0';
+				res(i).state.argValues.immediate := '1';
+				res(i).state.argValues.zero(1) := '0';
+			end if;	
+		end loop;
+		return res;
+	end function;
 
 
 end ProcLogicRouting;

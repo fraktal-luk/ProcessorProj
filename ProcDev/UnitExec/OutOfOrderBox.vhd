@@ -147,6 +147,9 @@ architecture Behavioral of OutOfOrderBox is
 	signal blockA, blockBC, blockC: std_logic := '0';
 	signal dlqAccepting, dlqAlmostFull: std_logic := '0';
 	
+	type SchArray2D is array (integer range <>) of SchedulerEntrySlotArray(0 to PIPE_WIDTH-1);
+	signal schArrays: SchArray2D(0 to 4) := (others => (others => DEFAULT_SCH_ENTRY_SLOT));
+	
 	signal theIssueView: IssueView := DEFAULT_ISSUE_VIEW;
 begin		
 	resetSig <= reset;
@@ -157,7 +160,10 @@ begin
 	ISSUE_ROUTING: entity work.SubunitIssueRouting(Behavioral)
 	port map(
 		renamedDataLiving => renamedDataLiving,
-
+		
+		readyRegFlags => readyRegFlags,
+		fni => fni,
+		
 		acceptingVecA => iqAcceptingVecArr(0),
 		acceptingVecB => iqAcceptingVecArr(1),
 		acceptingVecC => iqAcceptingVecArr(2),
@@ -185,6 +191,11 @@ begin
 		--dataOutD => --dataToQueuesArr(3),--dataToD,
 		dataOutE => dataToQueuesArr(4),--dataToE,
 		
+			arrOutA => schArrays(0),
+			arrOutB => schArrays(1),
+			arrOutC => schArrays(2),
+			arrOutE => schArrays(4),
+
 		dataOutSQ => compactedToSQ,
 		dataOutLQ => compactedToLQ,
 		dataOutBQ => compactedToBQ
@@ -205,6 +216,7 @@ begin
 			acceptingOut => iqAcceptingArr(i),
 			prevSendingOK => renamedSending,
 			newData => dataToQueuesArr(i),
+				newArr => schArrays(i),
 			fni => fni,
 			readyRegFlags => readyRegFlags,
 			nextAccepting => issueAcceptingArr(i),
@@ -290,10 +302,6 @@ begin
 		port map(
 			clk => clk, reset => resetSig, en => enSig,
 
-			--execAcceptingA => execAcceptingA,
-			--execAcceptingB => execAcceptingB,				
-			--execAcceptingD => execAcceptingD,
-
 			inputA => schedOutputArr(0),
 			inputB => schedOutputArr(1),
 			inputD => DEFAULT_SCH_ENTRY_SLOT,--schedOutputArr(3),
@@ -329,9 +337,6 @@ begin
 		NEW_MEM_UNIT: entity work.UnitMemory(Behavioral)
 		port map(
 			clk => clk, reset => reset, en => en,
-
-			--execAcceptingC => execAcceptingC,
-			--execAcceptingE => execAcceptingE,
 
 			inputC => schedOutputArr(2),
 			inputE => schedOutputArr(4),
@@ -406,7 +411,6 @@ begin
 			bufferOutput => cqBufferOutputSig
 		);
 
-		--anySendingFromCQ <= cqOutputSig(0).full;
 		cqDataLivingOut2(0) <= (cqOutputSig(0).full, cqOutputSig(0).ins);
 
 		-- CAREFUL! This stage is needed to keep result tags 1 for cycle when writing to reg file,

@@ -48,6 +48,7 @@ use work.ProcComponents.all;
 use work.BasicCheck.all;
 
 use work.Queues.all;
+	use work.ProcLogicRouting.all;
 
 
 entity SubunitIQBuffer is
@@ -61,6 +62,7 @@ entity SubunitIQBuffer is
 		
 		prevSendingOK: in std_logic;
 		newData: in StageDataMulti;
+			newArr: in SchedulerEntrySlotArray(0 to PIPE_WIDTH-1);
 		nextAccepting: in std_logic;
 		lateEventSignal: in std_logic;
 		execEventSignal: in std_logic;
@@ -139,30 +141,6 @@ architecture Implem of SubunitIQBuffer is
 		end loop;
 		return res;
 	end function;
-	
-	function getSchedData(insArr: InstructionStateArray) return SchedulerEntrySlotArray is
-		variable res: SchedulerEntrySlotArray(0 to PIPE_WIDTH-1) := (others => DEFAULT_SCH_ENTRY_SLOT);
-	begin
-		for i in 0 to PIPE_WIDTH-1 loop
-			res(i).ins := insArr(i);
-
-			-- Set state markers: "zero" bit
-			res(i).state.argValues.zero(0) := not isNonzero(res(i).ins.virtualArgSpec.args(0)(4 downto 0));
-			res(i).state.argValues.zero(1) := not isNonzero(res(i).ins.virtualArgSpec.args(1)(4 downto 0));
-			res(i).state.argValues.zero(2) := not isNonzero(res(i).ins.virtualArgSpec.args(2)(4 downto 0));
-
-			-- Set 'missing' flags for non-const arguments
-			res(i).state.argValues.missing := res(i).ins.physicalArgSpec.intArgSel and not res(i).state.argValues.zero;
-			
-			-- Handle possible immediate arg
-			if res(i).ins.constantArgs.immSel = '1' then
-				res(i).state.argValues.missing(1) := '0';
-				res(i).state.argValues.immediate := '1';
-				res(i).state.argValues.zero(1) := '0';
-			end if;	
-		end loop;
-		return res;
-	end function;
 
 			signal ch0, ch1, ch2: std_logic := '0';
 begin
@@ -202,7 +180,7 @@ begin
 	dispatchDataNew <= TMP_clearDestIfEmpty(prioSelect(queueContentUpdatedSel, readyMask2), sends);
 		stayMask <= TMP_setUntil(readyMask_C, nextAccepting);
 
-		newSchedData <= getSchedData(newData.data);
+		newSchedData <= getSchedData(newData.data, newData.fullMask);
 
 		newContent <= --updateForWaitingArrayFNI(newSchedData, readyRegFlags, fni);--, '1');
 				--newContent_T <= 
