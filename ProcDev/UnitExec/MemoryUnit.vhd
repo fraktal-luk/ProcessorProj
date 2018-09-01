@@ -168,6 +168,8 @@ begin
 				  TMP_killMask or (predictedMask and not TMP_mask) when (execEventSignal or lateEventSignal) = '1'
 			else (others => '0');
 
+		inputIndicesBr <= getQueueIndicesForInput(qs0p, QUEUE_SIZE, PIPE_WIDTH);
+
 		numPrevBr <= num2flow(countOnes(dataInBr.fullMask)) when prevSendingBr = '1' else (others => '0');
 ------------------------------
 	qs1 <= TMP_change(qs0, bufferDrive.nextAccepting, bufferDrive.prevSending,
@@ -183,6 +185,13 @@ begin
 	TMP_maskNext <= (TMP_livingMask and not TMP_sendingMask) or TMP_ckEnForInput;
 	-- in shifting queue generated from (i < nFullNext)
 	TMP_contentNext <=
+				TMP_getNewContentUpdateBr(TMP_content, dataIn.data, dataInBr.data,
+												TMP_ckEnForInput, predictedNewMask, inputIndices, inputIndicesBr,
+												TMP_maskA, TMP_maskD,
+												storeAddressInput.full, storeValueInput.full,
+												storeAddressInput.ins, storeValueInput.ins,
+												CLEAR_COMPLETED, false) when MODE = branch
+			else
 				TMP_getNewContentUpdate(TMP_content, dataIn.data, TMP_ckEnForInput, inputIndices,
 												TMP_maskA, TMP_maskD,
 												storeAddressInput.full, storeValueInput.full,

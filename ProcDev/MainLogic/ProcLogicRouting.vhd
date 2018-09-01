@@ -34,9 +34,6 @@ function findLoads(insv: StageDataMulti) return std_logic_vector;
 function prepareForAGU(insVec: StageDataMulti) return StageDataMulti;
 function prepareForStoreData(insVec: StageDataMulti) return StageDataMulti;
 
--- Description: arg1 := target
-function trgForBQ(insVec: StageDataMulti) return StageDataMulti;
-
 end ProcLogicRouting;
 
 
@@ -146,18 +143,5 @@ begin
 	return res;
 end function;
 
-function trgForBQ(insVec: StageDataMulti) return StageDataMulti is
-	variable res: StageDataMulti := insVec;
-	variable result, target: Mword;
-begin
-	for i in 0 to PIPE_WIDTH-1 loop
-		target := res.data(i).target;
-		result := res.data(i).result;
-		res.data(i) := setStoredArg1(res.data(i), target);
-		res.data(i) := setStoredArg2(res.data(i), result);
-	end loop;
-	
-	return res;
-end function;
 
 end ProcLogicRouting;

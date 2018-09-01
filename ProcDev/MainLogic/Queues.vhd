@@ -487,6 +487,66 @@ begin
 	return res;
 end function;
 
+
+function TMP_getNewContentUpdateBr(content: InstructionStateArray; newContent, newContentBr: InstructionStateArray;
+									cken, newMask: std_logic_vector; indices, indicesBr: SmallNumberArray;
+									maskA, maskD: std_logic_vector; wrA, wrD: std_logic;
+									insA, insD: InstructionState;
+									clearCompleted, keepInputContent: boolean)
+return InstructionStateArray is
+	constant LEN: integer := content'length;
+	constant ILEN: integer := newContent'length;
+	constant MASK_NUM: SmallNumber := i2slv(ILEN-1, SMALL_NUMBER_SIZE);
+	variable res: InstructionStateArray(0 to LEN-1) := content;
+	variable tmpSN, tmpSNBr: SmallNumber := (others => '0');
+begin
+	for i in 0 to LEN-1 loop
+		tmpSN := indices(i) and MASK_NUM;
+		tmpSNBr := indicesBr(i) and MASK_NUM;
+		--		Also: write only needed entires: for D -> result, completed2; for A -> target, completed 
+
+		if cken(i) = '1' then -- cken is for new input
+			-- CAREFUL: write only those fields that have to be written:
+			--				groupTag, operation, completed = 0, completed2 = 0
+			-- res(i) := newContent(slv2u(tmpSN));
+			res(i).tags.renameIndex := newContent(slv2u(tmpSN)).tags.renameIndex;
+			res(i).operation := newContent(slv2u(tmpSN)).operation;
+			
+			if keepInputContent then -- TODO: set keepInputContent to false
+				--res(i).argValues := newContent(slv2u(tmpSN)).argValues;
+				
+					res(i) := setStoredArg1(res(i), getStoredArg1(newContent(slv2u(tmpSN))));
+					res(i) := setStoredArg2(res(i), getStoredArg2(newContent(slv2u(tmpSN))));
+			end if;
+			
+			if clearCompleted then
+				res(i).controlInfo.completed := '0';
+				res(i).controlInfo.completed2 := '0';
+			else
+				res(i).controlInfo.completed := newContent(slv2u(tmpSN)).controlInfo.completed;
+				res(i).controlInfo.completed2 := newContent(slv2u(tmpSN)).controlInfo.completed2;				
+			end if;
+		end if;
+	
+		if newMask(i) = '1' then
+			-- TODO: fill target and result here!
+			res(i) := setStoredArg1(res(i), getStoredArg1(newContentBr(slv2u(tmpSNBr))));
+			res(i) := setStoredArg2(res(i), getStoredArg2(newContentBr(slv2u(tmpSNBr))));		
+		end if;
+		
+		if (wrA and maskA(i)) = '1' then
+			res(i) := setStoredArg1(res(i), insA.target);
+			res(i).controlInfo.completed := '1';
+		end if;
+		
+		if (wrD and maskD(i)) = '1' then
+			res(i) := setStoredArg2(res(i), insD.result);
+			res(i).controlInfo.completed2 := '1';						
+		end if;
+	end loop;
+	return res;
+end function;
+
 end Queues;
 
 

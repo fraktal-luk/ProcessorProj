@@ -247,7 +247,7 @@ begin
 		-- TODO: compact earlyBranchMultidataIn, excluding those not on predicted path, and send to BQ
 		--bpSending is handled elsewhere
 	branchMask <= getBranchMask(makeSDM(earlyBranchMultiDataOutA));
-	bpData <= squeezeSD(makeSDM(earlyBranchMultiDataOutA), branchMask);
+	bpData <= trgForBQ(squeezeSD(makeSDM(earlyBranchMultiDataOutA), branchMask));
 
 
 	stallEventSig <= fetchStall;
@@ -293,7 +293,8 @@ begin
 
 -- Decode stage
 	newDecoded <= decodeMulti(stageDataOutHbuffer);
-	stageDataDecodeNew <= fillTargetsAndLinks(newDecoded);
+	stageDataDecodeNew <= --fillTargetsAndLinks(newDecoded);
+								 newDecoded;
 	
 	stageDataDecodeInA <= makeSlotArray(stageDataDecodeNew.data, stageDataDecodeNew.fullMask);
 	

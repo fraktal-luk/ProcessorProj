@@ -343,8 +343,12 @@ begin
 		for i in 0 to PIPE_WIDTH-1 loop
 			res.data(i).bits := fetchBlock(2*i) & fetchBlock(2*i+1);
 			res.data(i).target := targets(i);
+			
+			res.data(i).result := thisIP;
+			res.data(i).result(ALIGN_BITS-1 downto 0) := i2slv((i+1)*4, ALIGN_BITS); -- CAREFUL: not for short ins
 		end loop;
 	end if;
+	res.data(PIPE_WIDTH-1).result := addMwordBasic(thisIP, PC_INC);
 	
 	res.fullMask := fullOut;
 	return res;
