@@ -32,7 +32,12 @@ function findStores(insv: StageDataMulti) return std_logic_vector;
 function findLoads(insv: StageDataMulti) return std_logic_vector;
 
 function prepareForAGU(insVec: StageDataMulti) return StageDataMulti;
+
+function prepareSSAForAGU(sa: SchedulerEntrySlotArray) return SchedulerEntrySlotArray;
+
 function prepareForStoreData(insVec: StageDataMulti) return StageDataMulti;
+
+function prepareForStoreSSA(sa: SchedulerEntrySlotArray) return SchedulerEntrySlotArray;
 
 	function getSchedData(insArr: InstructionStateArray; fullMask: std_logic_vector) return SchedulerEntrySlotArray;
 
@@ -124,6 +129,25 @@ begin
 	return res;
 end function;
 
+function prepareSSAForAGU(sa: SchedulerEntrySlotArray) return SchedulerEntrySlotArray is
+	variable res: SchedulerEntrySlotArray(0 to sa'length-1) := sa;
+begin
+	for i in 0 to PIPE_WIDTH-1 loop
+		--res.data(i).argValues.missing(2) := '0';
+			--res.data(i).virtualArgSpec.intArgSel(2) := '0'; -- CAREFUL
+			--res.data(i).virtualArgSpec.floatArgSel(2) := '0'; -- CAREFUL
+			--res.data(i).physicalArgSpec.intArgSel(2) := '0'; -- CAREFUL
+			--res.data(i).physicalArgSpec.floatArgSel(2) := '0'; -- CAREFUL
+		
+		res(i).ins.virtualArgSpec.intArgSel(2) := '0';
+		res(i).ins.physicalArgSpec.intArgSel(2) := '0';
+		
+		res(i).ins.controlInfo.completed := '0';
+		res(i).ins.controlInfo.completed2 := '0';
+	end loop;
+	return res;
+end function;
+
 
 function prepareForStoreData(insVec: StageDataMulti) return StageDataMulti is
 	variable res: StageDataMulti := insVec;
@@ -144,6 +168,28 @@ begin
 	end loop;
 	return res;
 end function;
+
+
+function prepareForStoreSSA(sa: SchedulerEntrySlotArray) return SchedulerEntrySlotArray is
+	variable res: SchedulerEntrySlotArray(0 to sa'length-1) := sa;--(others => DEFAULT_SCH_ENTRY_SLOT);
+begin
+	for i in 0 to PIPE_WIDTH-1 loop	
+		res(i).ins.constantArgs.immSel := '0';
+
+		res(i).ins.virtualArgSpec.intArgSel(0) := '0';
+		res(i).ins.virtualArgSpec.intArgSel(1) := '0';
+		res(i).ins.virtualArgSpec.intDestSel := '0';			
+
+		res(i).ins.physicalArgSpec.intArgSel(0) := '0';
+		res(i).ins.physicalArgSpec.intArgSel(1) := '0';
+		res(i).ins.physicalArgSpec.intDestSel := '0';
+		
+		res(i).ins.controlInfo.completed := '0';
+		res(i).ins.controlInfo.completed2 := '0';
+	end loop;
+	return res;
+end function;
+
 
 	function getSchedData(insArr: InstructionStateArray; fullMask: std_logic_vector) return SchedulerEntrySlotArray is
 		variable res: SchedulerEntrySlotArray(0 to PIPE_WIDTH-1) := (others => DEFAULT_SCH_ENTRY_SLOT);

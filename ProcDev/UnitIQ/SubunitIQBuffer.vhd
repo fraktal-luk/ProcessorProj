@@ -184,7 +184,9 @@ begin
 
 		newContent <= --updateForWaitingArrayFNI(newSchedData, readyRegFlags, fni);--, '1');
 				--newContent_T <= 
-							updateForWaitingArrayNewFNI(newSchedData, readyRegFlags, fni);
+							--updateForWaitingArrayNewFNI(newSchedData, readyRegFlags, fni);
+							newArr;
+							
 			--newDataU.fullMask <= newData.fullMask;
 			--newDataU.data <= extractData(newContent);
 			newDataU <= newData;

@@ -122,6 +122,11 @@ begin
 		schedArray <= updateForWaitingArrayNewFNI(getSchedData(renamedDataLiving.data, renamedDataLiving.fullMask),
 																	readyRegFlags, fni);
 
+		arrOutA <= squeezeSSA(schedArray, srcVecA);
+		arrOutB <= squeezeSSA(schedArray, srcVecB);
+		arrOutC <= prepareSSAForAGU(squeezeSSA(schedArray, srcVecC));
+			arrOutE <= prepareForStoreSSA(squeezeSSA(schedArray, storeVec));
+
 	dataToA <= routeToIQ(renamedDataLiving, srcVecA);
 	dataToB <= routeToIQ(renamedDataLiving, srcVecB);
 	dataToC <= routeToIQ(prepareForAGU(renamedDataLiving), srcVecC);
