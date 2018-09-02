@@ -71,11 +71,11 @@ entity SubunitIssueRouting is
 		renamedSendingOut: out std_logic; -- Forward to IQ's
 		iqAccepts: out std_logic;
 
-		dataOutA: out StageDataMulti;
-		dataOutB: out StageDataMulti;
-		dataOutC: out StageDataMulti;
+		--dataOutA: out StageDataMulti;
+		--dataOutB: out StageDataMulti;
+		--dataOutC: out StageDataMulti;
 		--dataOutD: out StageDataMulti;
-		dataOutE: out StageDataMulti;
+		--dataOutE: out StageDataMulti;
 
 			arrOutA: out SchedulerEntrySlotArray(0 to PIPE_WIDTH-1);
 			arrOutB: out SchedulerEntrySlotArray(0 to PIPE_WIDTH-1);
@@ -94,12 +94,15 @@ architecture Behavioral of SubunitIssueRouting is
 	signal srcVecA, srcVecB, srcVecC, srcVecD, srcVecE: std_logic_vector(0 to PIPE_WIDTH-1) := (others => '0');
 	signal storeVec, loadVec: std_logic_vector(0 to PIPE_WIDTH-1) := (others => '0');
 	signal issueRouteVec: IntArray(0 to PIPE_WIDTH-1) := (others => 0);
+		
+		signal arrOutA_2: SchedulerEntrySlotArray(0 to PIPE_WIDTH-1) := (others => DEFAULT_SCH_ENTRY_SLOT);
+		signal ch0, ch1, ch2: std_logic := '0';
 
 	signal iqAcceptingA, iqAcceptingB, iqAcceptingC, iqAcceptingE: std_logic := '0';
 	signal dataToA, dataToB, dataToC, dataToE, dataToSQ: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
 	signal renamedSending: std_logic := '0';
 	signal invA, invB, invC, invE: std_logic_vector(0 to PIPE_WIDTH-1) := (others => '0');
-	signal schedArray: SchedulerEntrySlotArray(0 to PIPE_WIDTH-1) := (others => DEFAULT_SCH_ENTRY_SLOT);
+	signal schedArray, arrE: SchedulerEntrySlotArray(0 to PIPE_WIDTH-1) := (others => DEFAULT_SCH_ENTRY_SLOT);
 begin	
 	renamedSending <= renamedSendingIn;
 
@@ -120,12 +123,29 @@ begin
 	srcVecE <= storeVec and renamedDataLiving.fullMask;
 
 		schedArray <= updateForWaitingArrayNewFNI(getSchedData(renamedDataLiving.data, renamedDataLiving.fullMask),
-																	readyRegFlags, fni);
+																	readyRegFlags xor readyRegFlags, --readyRegFlags, 
+																	fni);
 
-		arrOutA <= squeezeSSA(schedArray, srcVecA);
-		arrOutB <= squeezeSSA(schedArray, srcVecB);
-		arrOutC <= prepareSSAForAGU(squeezeSSA(schedArray, srcVecC));
-			arrOutE <= prepareForStoreSSA(squeezeSSA(schedArray, storeVec));
+	--	arrOutA <= squeezeSSA(schedArray, srcVecA);
+	--	arrOutB <= squeezeSSA(schedArray, srcVecB);
+	--	arrOutC <= prepareSSAForAGU(squeezeSSA(schedArray, srcVecC));
+	--		arrE <= prepareForStoreSSA(squeezeSSA(schedArray, storeVec));
+
+--	arrOutE <= arrE;
+		ch0 <= bool2std(squeezeSSA(schedArray, srcVecA) = arrOutA_2);
+
+		arrOutA <= updateForWaitingArrayNewFNI(getSchedData(dataToA.data, dataToA.fullMask),
+																	readyRegFlags xor readyRegFlags, --readyRegFlags, 
+																	fni);
+		arrOutB <= updateForWaitingArrayNewFNI(getSchedData(dataToB.data, dataToB.fullMask),
+																	readyRegFlags xor readyRegFlags, --readyRegFlags, 
+																	fni);
+		arrOutC <= updateForWaitingArrayNewFNI(getSchedData(dataToC.data, dataToC.fullMask),
+																	readyRegFlags xor readyRegFlags, --readyRegFlags, 
+																	fni);
+		arrOutE <= updateForWaitingArrayNewFNI(getSchedData(dataToE.data, dataToE.fullMask),
+																	readyRegFlags xor readyRegFlags, --readyRegFlags, 
+																	fni);
 
 	dataToA <= routeToIQ(renamedDataLiving, srcVecA);
 	dataToB <= routeToIQ(renamedDataLiving, srcVecB);
@@ -135,6 +155,12 @@ begin
 
 	dataOutSQ <= dataToSQ;
 	dataToSQ <= routeToIQ(renamedDataLiving, storeVec);
+	--	dataToSQ.data <= extractData(arrE);
+	--	dataToSQ.fullMask <= extractFullMask(arrE);
+	
+	--dataOutLQ.data <= extractData(squeezeSSA(schedArray, loadVec));
+	--dataOutLQ.fullMask <= extractFullMask(squeezeSSA(schedArray, loadVec));
+	
 	dataOutLQ <= routeToIQ(renamedDataLiving, loadVec);	
 	dataOutBQ <= trgForBQ(routeToIQ(renamedDataLiving, srcVecD)); -- TEMP! Contains system instructions!
 
@@ -154,11 +180,11 @@ begin
 						acceptingA and acceptingB and acceptingC and acceptingE
 						and acceptingROB and acceptingSQ and acceptingLQ and acceptingBQ;
 
-	dataOutA <= dataToA;
-	dataOutB <= dataToB;
-	dataOutC <= dataToC;
+	--dataOutA <= dataToA;
+	--dataOutB <= dataToB;
+	--dataOutC <= dataToC;
 	--dataOutD <= dataToD;
-	dataOutE <= dataToE;
+	--dataOutE <= dataToE;
 	
 	renamedSendingOut <= renamedSending;
 end Behavioral;

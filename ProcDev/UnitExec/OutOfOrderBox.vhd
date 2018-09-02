@@ -185,11 +185,11 @@ begin
 		renamedSendingOut => open, -- DEPREC??
 		iqAccepts => iqAccepts,		
 		
-		dataOutA => dataToQueuesArr(0),--dataToA,
-		dataOutB => dataToQueuesArr(1),--dataToB,
-		dataOutC => dataToQueuesArr(2),--dataToC,
+		--dataOutA => dataToQueuesArr(0),--dataToA,
+		--dataOutB => dataToQueuesArr(1),--dataToB,
+		--dataOutC => dataToQueuesArr(2),--dataToC,
 		--dataOutD => --dataToQueuesArr(3),--dataToD,
-		dataOutE => dataToQueuesArr(4),--dataToE,
+		--dataOutE => dataToQueuesArr(4),--dataToE,
 		
 			arrOutA => schArrays(0),
 			arrOutB => schArrays(1),
@@ -215,7 +215,7 @@ begin
 			acceptingVec => open,--iqAcceptingVecArr(i),
 			acceptingOut => iqAcceptingArr(i),
 			prevSendingOK => renamedSending,
-			newData => dataToQueuesArr(i),
+			--newData => dataToQueuesArr(i),
 				newArr => schArrays(i),
 			fni => fni,
 			readyRegFlags => readyRegFlags,

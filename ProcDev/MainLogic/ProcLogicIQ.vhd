@@ -37,7 +37,7 @@ return SchedulerEntrySlot;
 
 
 
-function iqContentNext(queueContent: SchedulerEntrySlotArray; inputData: StageDataMulti;
+function iqContentNext(queueContent: SchedulerEntrySlotArray;-- inputData: StageDataMulti;
 																					--inputMask: std_logic_vector;
 																					inputDataS: SchedulerEntrySlotArray;
 								 livingMask,
@@ -490,7 +490,7 @@ begin
 end function;
 
 
-function iqContentNext(queueContent: SchedulerEntrySlotArray; inputData: StageDataMulti;
+function iqContentNext(queueContent: SchedulerEntrySlotArray;-- inputData: StageDataMulti;
 																					--inputMask: std_logic_vector;
 																					inputDataS: SchedulerEntrySlotArray;
 								 livingMask,
@@ -504,7 +504,7 @@ return SchedulerEntrySlotArray is
 	variable res: SchedulerEntrySlotArray(0 to QUEUE_SIZE-1) := (others => DEFAULT_SCH_ENTRY_SLOT); 	
 	variable queueDataS: SchedulerEntrySlotArray(0 to QUEUE_SIZE-1) := queueContent;
 	--variable dataNew: StageDataMulti := inputData;
-	variable newMask: std_logic_vector(0 to PIPE_WIDTH-1) := inputData.fullMask;--
+	variable newMask: std_logic_vector(0 to PIPE_WIDTH-1) := extractFullMask(inputDataS);--inputData.fullMask;--
 	variable dataNewDataS: SchedulerEntrySlotArray(0 to PIPE_WIDTH-1) := inputDataS;
 	
 	variable iqDataNextS: SchedulerEntrySlotArray(0 to QUEUE_SIZE - 1) := (others => DEFAULT_SCH_ENTRY_SLOT);
@@ -1110,6 +1110,7 @@ return SchedulerEntrySlotArray is
 begin
 	for i in insArray'range loop	
 		res(i) := updateForWaitingNewFNI(insArray(i).ins, insArray(i).state, readyRegFlags, fni);
+			res(i).full := (insArray(i).full);
 	end loop;
 	return res;
 end function;

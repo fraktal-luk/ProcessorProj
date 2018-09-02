@@ -61,7 +61,7 @@ entity SubunitIQBuffer is
 		en: in std_logic;
 		
 		prevSendingOK: in std_logic;
-		newData: in StageDataMulti;
+		--newData: in StageDataMulti;
 			newArr: in SchedulerEntrySlotArray(0 to PIPE_WIDTH-1);
 		nextAccepting: in std_logic;
 		lateEventSignal: in std_logic;
@@ -144,7 +144,7 @@ architecture Implem of SubunitIQBuffer is
 
 			signal ch0, ch1, ch2: std_logic := '0';
 begin
-	flowDriveQ.prevSending <= num2flow(countOnes(newData.fullMask)) when prevSendingOK = '1' else (others => '0');
+	flowDriveQ.prevSending <= num2flow(countOnes(extractFullMask(newArr))) when prevSendingOK = '1' else (others => '0');
 	flowDriveQ.kill <= num2flow(countOnes(killMask));
 	flowDriveQ.nextAccepting <=  num2flow(1) when sends = '1' else num2flow(0);															
 
@@ -180,7 +180,7 @@ begin
 	dispatchDataNew <= TMP_clearDestIfEmpty(prioSelect(queueContentUpdatedSel, readyMask2), sends);
 		stayMask <= TMP_setUntil(readyMask_C, nextAccepting);
 
-		newSchedData <= getSchedData(newData.data, newData.fullMask);
+		--newSchedData <= getSchedData(newData.data, newData.fullMask);
 
 		newContent <= --updateForWaitingArrayFNI(newSchedData, readyRegFlags, fni);--, '1');
 				--newContent_T <= 
@@ -189,8 +189,8 @@ begin
 							
 			--newDataU.fullMask <= newData.fullMask;
 			--newDataU.data <= extractData(newContent);
-			newDataU <= newData;
-		queueContentNext <= iqContentNext(queueContentUpdated, newDataU,
+		--	newDataU <= newData;
+		queueContentNext <= iqContentNext(queueContentUpdated,-- newDataU,
 																				--	newData.fullMask,
 																					newContent,
 														livingMask,
