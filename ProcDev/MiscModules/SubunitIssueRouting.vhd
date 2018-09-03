@@ -122,17 +122,31 @@ begin
 	srcVecD <= findByNumber(issueRouteVec, 3) and not storeVec and not loadVec and renamedDataLiving.fullMask;
 	srcVecE <= storeVec and renamedDataLiving.fullMask;
 
-		schedArray <= updateForWaitingArrayNewFNI(getSchedData(renamedDataLiving.data, renamedDataLiving.fullMask),
-																	readyRegFlags xor readyRegFlags, --readyRegFlags, 
-																	fni);
+	ARGS_COMMON: if true generate -- Route after checking args
+			schedArray <= updateForWaitingArrayNewFNI(getSchedData(renamedDataLiving.data, renamedDataLiving.fullMask),
+																		readyRegFlags xor readyRegFlags, --readyRegFlags, 
+																		fni);
 
-	--	arrOutA <= squeezeSSA(schedArray, srcVecA);
-	--	arrOutB <= squeezeSSA(schedArray, srcVecB);
-	--	arrOutC <= prepareSSAForAGU(squeezeSSA(schedArray, srcVecC));
-	--		arrE <= prepareForStoreSSA(squeezeSSA(schedArray, storeVec));
+			arrOutA <= squeezeSSA(schedArray, srcVecA);
+			arrOutB <= squeezeSSA(schedArray, srcVecB);
+			arrOutC <= prepareSSAForAGU(squeezeSSA(schedArray, srcVecC));
+				arrE <= prepareForStoreSSA(squeezeSSA(schedArray, storeVec));
 
---	arrOutE <= arrE;
-		ch0 <= bool2std(squeezeSSA(schedArray, srcVecA) = arrOutA_2);
+			arrOutE <= arrE;
+			
+			dataToSQ.data <= extractData(arrE);
+			dataToSQ.fullMask <= extractFullMask(arrE);
+			
+			dataOutLQ.data <= extractData(squeezeSSA(schedArray, loadVec));
+			dataOutLQ.fullMask <= extractFullMask(squeezeSSA(schedArray, loadVec));
+	end generate;
+--		ch0 <= bool2std(squeezeSSA(schedArray, srcVecA) = arrOutA_2);
+
+	ARGS_PER_IQ: if false generate -- Check args for ech IQ after routing
+		dataToA <= routeToIQ(renamedDataLiving, srcVecA);
+		dataToB <= routeToIQ(renamedDataLiving, srcVecB);
+		dataToC <= routeToIQ(prepareForAGU(renamedDataLiving), srcVecC);
+		dataToE <= prepareForStoreData(dataToSQ);
 
 		arrOutA <= updateForWaitingArrayNewFNI(getSchedData(dataToA.data, dataToA.fullMask),
 																	readyRegFlags xor readyRegFlags, --readyRegFlags, 
@@ -147,21 +161,13 @@ begin
 																	readyRegFlags xor readyRegFlags, --readyRegFlags, 
 																	fni);
 
-	dataToA <= routeToIQ(renamedDataLiving, srcVecA);
-	dataToB <= routeToIQ(renamedDataLiving, srcVecB);
-	dataToC <= routeToIQ(prepareForAGU(renamedDataLiving), srcVecC);
-
-	dataToE <= prepareForStoreData(dataToSQ);
+		dataToSQ <= routeToIQ(renamedDataLiving, storeVec);
+		
+		dataOutLQ <= routeToIQ(renamedDataLiving, loadVec);	
+		
+	end generate;
 
 	dataOutSQ <= dataToSQ;
-	dataToSQ <= routeToIQ(renamedDataLiving, storeVec);
-	--	dataToSQ.data <= extractData(arrE);
-	--	dataToSQ.fullMask <= extractFullMask(arrE);
-	
-	--dataOutLQ.data <= extractData(squeezeSSA(schedArray, loadVec));
-	--dataOutLQ.fullMask <= extractFullMask(squeezeSSA(schedArray, loadVec));
-	
-	dataOutLQ <= routeToIQ(renamedDataLiving, loadVec);	
 	dataOutBQ <= trgForBQ(routeToIQ(renamedDataLiving, srcVecD)); -- TEMP! Contains system instructions!
 
 	invA <= invertVec(acceptingVecA);

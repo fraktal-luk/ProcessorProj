@@ -406,6 +406,7 @@ function squeezeSSA(sd: SchedulerEntrySlotArray; srcVec: std_logic_vector) retur
 	variable k: natural := 0;
 		constant CLEAR_EMPTY_SLOTS_IQ_ROUTING: boolean := false;
 begin
+
 	for i in sd'range loop
 		res(i).full := '0'; -- Need to clear 'full' bits!
 		-- Fill with input(j) where j is index of i-th '1' in srcVec
@@ -462,6 +463,7 @@ begin
 		for j in 0 to PIPE_WIDTH-1 loop
 			-- Select route input(j)->output(i) if condition met
 			res(i) := sd(j);
+			res(i).full := '0'; -- Set full mask only if proper!
 			if countOnes(srcVec(0 to j-1)) = i and srcVec(j) = '1' then
 				res(i).full := '1';
 				exit;
