@@ -152,6 +152,8 @@ type InstructionClassInfo is record
 		mainCluster: std_logic;
 		secCluster: std_logic;
 	branchCond: std_logic;
+	
+	pipeA, pipeB, pipeC, load, store, branchIns: std_logic;
 end record;
 
 
@@ -377,7 +379,13 @@ begin
 	return InstructionClassInfo'( short => '0',
 											mainCluster => '0',
 											secCluster => '0',
-											branchCond => '0'
+											branchCond => '0',
+											pipeA => '0',
+											pipeB => '0',
+											pipeC => '0',
+											load => '0',
+											store => '0',
+											branchIns => '0'
 											);	
 end function;
 

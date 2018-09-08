@@ -24,6 +24,14 @@ package ProcLogicRouting is
 
 -- Gives queue number based on functional unit
 function unit2queue(unit: ExecUnit) return integer;
+
+function getSrcVecA(sd: StagedataMulti) return std_logic_vector; 
+function getSrcVecB(sd: StagedataMulti) return std_logic_vector;
+function getSrcVecC(sd: StagedataMulti) return std_logic_vector;
+function getSrcVecD(sd: StagedataMulti) return std_logic_vector;
+function getLoadVec(sd: StagedataMulti) return std_logic_vector;
+function getStoreVec(sd: StagedataMulti) return std_logic_vector;
+
 function routeToIQ(sd: StageDataMulti; srcVec: std_logic_vector) return StageDataMulti;	
 
 function findForALU(iv: InstructionStateArray) return std_logic_vector;
@@ -60,6 +68,60 @@ begin
 		when others => return -1;
 	end case;
 end function;
+
+function getSrcVecA(sd: StagedataMulti) return std_logic_vector is
+	variable res: std_logic_vector(0 to PIPE_WIDTH-1) := (others => '0');
+begin
+	for i in 0 to PIPE_WIDTH-1 loop
+		res(i) := sd.data(i).classInfo.pipeA and sd.fullMask(i);
+	end loop;
+	return res;
+end function; 
+
+function getSrcVecB(sd: StagedataMulti) return std_logic_vector is
+	variable res: std_logic_vector(0 to PIPE_WIDTH-1) := (others => '0');
+begin
+	for i in 0 to PIPE_WIDTH-1 loop
+		res(i) := sd.data(i).classInfo.pipeB and sd.fullMask(i);
+	end loop;
+	return res;
+end function; 
+
+function getSrcVecC(sd: StagedataMulti) return std_logic_vector is
+	variable res: std_logic_vector(0 to PIPE_WIDTH-1) := (others => '0');
+begin
+	for i in 0 to PIPE_WIDTH-1 loop
+		res(i) := sd.data(i).classInfo.pipeC and sd.fullMask(i);
+	end loop;
+	return res;
+end function; 
+
+function getSrcVecD(sd: StagedataMulti) return std_logic_vector is
+	variable res: std_logic_vector(0 to PIPE_WIDTH-1) := (others => '0');
+begin
+	for i in 0 to PIPE_WIDTH-1 loop
+		res(i) := sd.data(i).classInfo.branchIns and sd.fullMask(i);
+	end loop;
+	return res;
+end function;
+
+function getLoadVec(sd: StagedataMulti) return std_logic_vector is
+	variable res: std_logic_vector(0 to PIPE_WIDTH-1) := (others => '0');
+begin
+	for i in 0 to PIPE_WIDTH-1 loop
+		res(i) := sd.data(i).classInfo.load and sd.fullMask(i);
+	end loop;
+	return res;
+end function;
+
+function getStoreVec(sd: StagedataMulti) return std_logic_vector is
+	variable res: std_logic_vector(0 to PIPE_WIDTH-1) := (others => '0');
+begin
+	for i in 0 to PIPE_WIDTH-1 loop
+		res(i) := sd.data(i).classInfo.store and sd.fullMask(i);
+	end loop;
+	return res;
+end function; 
 
 
 function routeToIQ(sd: StageDataMulti; srcVec: std_logic_vector) return StageDataMulti is
@@ -211,7 +273,13 @@ end function;
 				res(i).state.argValues.missing(1) := '0';
 				res(i).state.argValues.immediate := '1';
 				res(i).state.argValues.zero(1) := '0';
-			end if;	
+			end if;
+
+			res(i).ins.ip := (others => '0');			
+			res(i).ins.target := (others => '0');
+			res(i).ins.result := (others => '0');
+			res(i).ins.bits := (others => '0');
+
 		end loop;
 		return res;
 	end function;

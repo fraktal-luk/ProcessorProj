@@ -92,7 +92,11 @@ end SubunitIssueRouting;
 
 architecture Behavioral of SubunitIssueRouting is	
 	signal srcVecA, srcVecB, srcVecC, srcVecD, srcVecE: std_logic_vector(0 to PIPE_WIDTH-1) := (others => '0');
+	signal srcVecA2, srcVecB2, srcVecC2, srcVecD2, srcVecE2: std_logic_vector(0 to PIPE_WIDTH-1) := (others => '0');
+
 	signal storeVec, loadVec: std_logic_vector(0 to PIPE_WIDTH-1) := (others => '0');
+	signal storeVec2, loadVec2: std_logic_vector(0 to PIPE_WIDTH-1) := (others => '0');
+
 	signal issueRouteVec: IntArray(0 to PIPE_WIDTH-1) := (others => 0);
 		
 		signal arrOutA_2: SchedulerEntrySlotArray(0 to PIPE_WIDTH-1) := (others => DEFAULT_SCH_ENTRY_SLOT);
@@ -106,9 +110,6 @@ architecture Behavioral of SubunitIssueRouting is
 begin	
 	renamedSending <= renamedSendingIn;
 
-	storeVec <= findStores(renamedDataLiving) and renamedDataLiving.fullMask;
-	loadVec <= findLoads(renamedDataLiving) and renamedDataLiving.fullMask;
-
 	-- Routing to queues
 	ROUTE_VEC_GEN: for i in 0 to PIPE_WIDTH-1 generate
 		issueRouteVec(i) <= unit2queue(renamedDataLiving.data(i).operation.unit);		 
@@ -116,13 +117,26 @@ begin
 
 -- New concept for IQ routing.  {renamedData, srcVec*} -> (StageDataMulti){A,B,C,D}
 -- Based on "push left" of each destination type, generating "New" StageDataMulti data for each one
-	srcVecA <= (findByNumber(issueRouteVec, 0) or srcVecD) and renamedDataLiving.fullMask;
-	srcVecB <= findByNumber(issueRouteVec, 1) and renamedDataLiving.fullMask;
-	srcVecC <= (findByNumber(issueRouteVec, 2) or storeVec or loadVec) and renamedDataLiving.fullMask;
-	srcVecD <= findByNumber(issueRouteVec, 3) and not storeVec and not loadVec and renamedDataLiving.fullMask;
-	srcVecE <= storeVec and renamedDataLiving.fullMask;
+	ROUTE_CALC: if true generate
+		srcVecA <= (findByNumber(issueRouteVec, 0) or srcVecD) and renamedDataLiving.fullMask;
+		srcVecB <= findByNumber(issueRouteVec, 1) and renamedDataLiving.fullMask;
+		srcVecC <= (findByNumber(issueRouteVec, 2) or storeVec or loadVec) and renamedDataLiving.fullMask;
+		srcVecD <= findByNumber(issueRouteVec, 3) and renamedDataLiving.fullMask;
+		srcVecE <= storeVec and renamedDataLiving.fullMask;
+		storeVec <= findStores(renamedDataLiving) and renamedDataLiving.fullMask;
+		loadVec <= findLoads(renamedDataLiving) and renamedDataLiving.fullMask;
+	end generate;
+	
+	ROUTE_SAVED: if false generate
+		srcVecA <= getSrcVecA(renamedDataLiving);
+		srcVecB <= getSrcVecB(renamedDataLiving);
+		srcVecC <= getSrcVecC(renamedDataLiving);
+		srcVecD <= getSrcVecD(renamedDataLiving);
+		loadVec <= getLoadVec(renamedDataLiving);
+		storeVec <= getStoreVec(renamedDataLiving);
+	end generate;
 
-	ARGS_COMMON: if true generate -- Route after checking args
+	ARGS_COMMON: if false generate -- Route after checking args
 			schedArray <= updateForWaitingArrayNewFNI(getSchedData(renamedDataLiving.data, renamedDataLiving.fullMask),
 																		readyRegFlags xor readyRegFlags, --readyRegFlags, 
 																		fni);
@@ -142,7 +156,7 @@ begin
 	end generate;
 --		ch0 <= bool2std(squeezeSSA(schedArray, srcVecA) = arrOutA_2);
 
-	ARGS_PER_IQ: if false generate -- Check args for ech IQ after routing
+	ARGS_PER_IQ: if true generate -- Check args for ech IQ after routing
 		dataToA <= routeToIQ(renamedDataLiving, srcVecA);
 		dataToB <= routeToIQ(renamedDataLiving, srcVecB);
 		dataToC <= routeToIQ(prepareForAGU(renamedDataLiving), srcVecC);
@@ -168,7 +182,7 @@ begin
 	end generate;
 
 	dataOutSQ <= dataToSQ;
-	dataOutBQ <= trgForBQ(routeToIQ(renamedDataLiving, srcVecD)); -- TEMP! Contains system instructions!
+	dataOutBQ <= trgForBQ(routeToIQ(renamedDataLiving, srcVecD));
 
 	invA <= invertVec(acceptingVecA);
 	invB <= invertVec(acceptingVecB);

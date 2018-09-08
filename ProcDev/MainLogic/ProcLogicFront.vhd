@@ -72,17 +72,25 @@ begin
 				-- CAREFUL, TODO: make it more regular and clear!
 				ci.mainCluster := '1';
 				if ins.operation = (Memory, store) then
+					ci.store := '1';
 					ci.secCluster := '1';
 				end if;
 				
+				if ins.operation = (Memory, load) or ins.operation = (System, sysMFC) then
+					ci.load := '1';
+				end if;
+				
 				if ins.operation.unit = Jump then
+					ci.branchIns := '1';
+				
 					ci.secCluster := '1';
 					-- TODO: remove this distinction because no longer used!
 					-- For branch with link main cluster for destination write
-					if isNonzero(ins.virtualArgSpec.dest(4 downto 0)) = '0' then						
-						ci.mainCluster := '0';
-					end if;
+					--if isNonzero(ins.virtualArgSpec.dest(4 downto 0)) = '0' then						
+					--	ci.mainCluster := '0';
+					--end if;
 				elsif ins.operation = (System, sysMtc) then
+					ci.store := '1';
 					ci.secCluster := '1';
 				elsif	(ins.operation.unit = System and ins.operation.func /= sysMfc) then
 					ci.mainCluster := '0';
@@ -100,7 +108,17 @@ begin
 			elsif (ins.operation.func = jump and ins.constantArgs.c1 /= COND_NONE) then 
 				ci.branchCond := '1';	
 			end if;
-				
+			
+		if ins.operation.unit = ALU or ins.operation.unit = Jump then
+			ci.pipeA := '1';
+		end if;
+		
+		if ins.operation.unit = MAC then
+			ci.pipeB := '1';
+		end if;
+		
+		ci.pipeC := ci.load or ci.store;
+		
 	return ci;
 end function;
 
