@@ -199,13 +199,13 @@ begin
 	end block;
 
 
-	stageDataToPC <= newPCData(evtPhase2, lateCausingSig,
+	stageDataToPC <= newPCData(evtPhase2, lateCausingReg,
 										execEventSignal, execCausing,
 										frontEventSignal, frontCausing,
 										pcNext);
 			
 	sendingToPC <= 
-			sendingOutPC or (gE_eventOccurred and not gE_killPC) or (evtPhase2 and not isHalt(lateCausingSig));
+			sendingOutPC or (gE_eventOccurred and not gE_killPC) or (evtPhase2 and not isHalt(lateCausingReg));
 										-- CAREFUL: Because of the above, PC is not updated in phase2 of halt instruction,
 										--				so the PC of a halted logical processor is not defined.
 
