@@ -522,6 +522,7 @@ begin
 			if clearCompleted then
 				res(i).controlInfo.completed := '0';
 				res(i).controlInfo.completed2 := '0';
+					res(i).controlInfo.hasBranch := '0'; -- ??
 			else
 				res(i).controlInfo.completed := newContent(slv2u(tmpSN)).controlInfo.completed;
 				res(i).controlInfo.completed2 := newContent(slv2u(tmpSN)).controlInfo.completed2;				
@@ -537,6 +538,7 @@ begin
 		if (wrA and maskA(i)) = '1' then
 			res(i) := setStoredArg1(res(i), insA.target);
 			res(i).controlInfo.completed := '1';
+				res(i).controlInfo.hasBranch := insA.controlInfo.hasBranch;
 		end if;
 		
 		if (wrD and maskD(i)) = '1' then

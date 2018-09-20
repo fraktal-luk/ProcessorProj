@@ -204,7 +204,7 @@ begin
 	acceptingOut <= not getBitFromROBMaskPre(TMP_stageData, qs0.pStart);
 								
 	outputData.data <= TMP_frontCircular.data;
-	outputData.fullMask <= TMP_frontCircular.fullMask when isSending = '1' else (others => '0');
+	outputData.fullMask <= TMP_frontCircular.fullMask;-- when isSending = '1' else (others => '0');
 
 	sendingOut <= isSending;
 end Implem;

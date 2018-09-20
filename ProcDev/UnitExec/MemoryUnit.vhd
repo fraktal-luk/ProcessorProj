@@ -215,7 +215,7 @@ begin
 
 	TMP_frontW <= getQueueFrontWindow(qs0, TMP_content, TMP_mask);
 	TMP_preFrontW <= getQueuePreFrontWindow(qs0, TMP_content, TMP_mask);
-	TMP_sendingData <= findCommittingSQ(TMP_frontW.data, TMP_frontW.fullMask, groupCtrInc, committing);
+	TMP_sendingData <= findCommittingSQ(TMP_frontW.data, TMP_frontW.fullMask, groupCtrInc, '1');
 
 		TMP_preFrontWBr <= getQueuePreFrontWindow(qs0p, TMP_content, predictedMask); -- may include more mask bits
 
@@ -278,7 +278,7 @@ begin
 
 	bufferDrive.prevSending <= num2flow(countOnes(dataIn.fullMask)) when prevSending = '1' else (others => '0');
 	bufferDrive.kill <= num2flow(countOnes(TMP_killMask));
-	bufferDrive.nextAccepting <= num2flow(countOnes(sqOutData.fullMask));
+	bufferDrive.nextAccepting <= num2flow(countOnes(sqOutData.fullMask)) when committing = '1' else (others => '0');
 
 
 	sendingSQ <= isNonzero(sqOutData.fullMask);

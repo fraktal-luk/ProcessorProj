@@ -242,9 +242,9 @@ end function;
 								if (content(i).tags.renameIndex(TAG_SIZE-1 downto LOG2_PIPE_WIDTH)
 									= committingTag(TAG_SIZE-1 downto LOG2_PIPE_WIDTH))
 									and (livingMask(i) = '1') and (send = '1')
-								then	
+								then
 									res.fullMask(i) := '1';
-								end if;	
+								end if;
 							end loop;
 
 							return res;

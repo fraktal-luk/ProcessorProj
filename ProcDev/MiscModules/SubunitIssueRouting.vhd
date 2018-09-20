@@ -136,7 +136,7 @@ begin
 		storeVec <= getStoreVec(renamedDataLiving);
 	end generate;
 
-	ARGS_COMMON: if false generate -- Route after checking args
+	ARGS_COMMON: if true generate -- Route after checking args
 			schedArray <= updateForWaitingArrayNewFNI(getSchedData(renamedDataLiving.data, renamedDataLiving.fullMask),
 																		readyRegFlags xor readyRegFlags, --readyRegFlags, 
 																		fni);
@@ -156,7 +156,7 @@ begin
 	end generate;
 --		ch0 <= bool2std(squeezeSSA(schedArray, srcVecA) = arrOutA_2);
 
-	ARGS_PER_IQ: if true generate -- Check args for ech IQ after routing
+	ARGS_PER_IQ: if false generate -- Check args for ech IQ after routing
 		dataToA <= routeToIQ(renamedDataLiving, srcVecA);
 		dataToB <= routeToIQ(renamedDataLiving, srcVecB);
 		dataToC <= routeToIQ(prepareForAGU(renamedDataLiving), srcVecC);

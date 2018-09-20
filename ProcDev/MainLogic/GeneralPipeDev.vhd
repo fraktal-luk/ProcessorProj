@@ -36,6 +36,7 @@ function clearLowBits(vec: std_logic_vector; n: integer) return std_logic_vector
 function getLowBits(vec: std_logic_vector; n: integer) return std_logic_vector;
 
 constant INITIAL_GROUP_TAG: InsTag := (others => '0');
+constant INITIAL_GROUP_TAG_INC: InsTag := i2slv(PIPE_WIDTH, TAG_SIZE);
 
 constant DEFAULT_DATA_PC: InstructionState := defaultInstructionState;
 constant DEFAULT_ANNOTATED_HWORD: InstructionState := defaultInstructionState;
@@ -934,12 +935,13 @@ end function;
 			if 	newContent.data(i).controlInfo.hasException = '1'
 				or newContent.data(i).controlInfo.specialAction = '1'	-- CAREFUL! This also breaks flow!
 				or newContent.data(i).controlInfo.dbtrap = '1'
-			then 
+			then
 				res.controlInfo.newEvent := '1'; -- Announce that event is to happen now!
 				exit;
 			end if;
 			
 		end loop;
+		
 		return res;
 	end function;
 

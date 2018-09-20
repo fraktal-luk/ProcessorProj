@@ -58,6 +58,14 @@ function setInterrupt3(ins: InstructionState; intSignal, start: std_logic) retur
 
 function clearControlEvents(ins: InstructionState) return InstructionState;
 
+function getNewEffective(sendingToCommit: std_logic; robDataLiving, dataFromBQV: StageDataMulti;
+								 lastEffectiveIns,lateTargetIns: InstructionState;
+								 linkAddressInt, linkAddressExc: Mword;
+								 --evtPhase1, intPhase1, start: std_logic)
+								 evtPhase2: std_logic)
+
+return InstructionSlot;
+
 end ProcLogicSequence;
 
 
@@ -236,6 +244,92 @@ begin
 	res.controlInfo.hasInterrupt := '0';
 	res.controlInfo.hasException := '0';	
 	res.controlInfo.specialAction := '0';
+	return res;
+end function;
+
+
+function getNewEffective(sendingToCommit: std_logic; robDataLiving, dataFromBQV: StageDataMulti;
+								 lastEffectiveIns, lateTargetIns: InstructionState;
+								 linkAddressInt, linkAddressExc: Mword;
+								 --evtPhase1, intPhase1, start: std_logic)
+								 evtPhase2: std_logic)
+return InstructionSlot is
+	variable res: InstructionSlot := DEFAULT_INSTRUCTION_SLOT;
+	variable sdToCommit: StageDataMulti;
+	variable insToLastEffective: InstructionState;
+	
+	variable effectiveVec, takenBranchVec, bqTakenBranchVec, differenceVec:
+					std_logic_vector(0 to PIPE_WIDTH-1) := (others => '0');
+	variable branchTarget: Mword := lastEffectiveIns.target;
+	variable ind: std_logic_vector(LOG2_PIPE_WIDTH-1 downto 0) := (others => '0');
+	variable targetInc: Mword := (others => '0');
+begin
+	sdToCommit := recreateGroup(robDataLiving, dataFromBQV, lastEffectiveIns.target);	
+	insToLastEffective := getLastEffective(sdToCommit);
+	
+--	lateTargetIns := getLatePCData(setInterrupt3(lastEffectiveIns, intPhase1, start),
+--							(others => '0'), linkAddressExc, linkAddressInt, (others => '0'), (others => '0'));
+	
+	if evtPhase2 = '1' then
+		res := ('1', lateTargetIns);--clearControlEvents(setInstructionTarget(lastEffectiveIns, lateTargetIns.ip)));
+	else
+	--if true then
+		res := (sendingToCommit, insToLastEffective);
+
+		-- Find taken jumps in ROB entry and last effective index
+		for i in robDataLiving.fullMask'range loop		
+			if robDataLiving.fullMask(i) = '1' then
+				effectiveVec(i) := '1';
+				if robDataLiving.data(i).controlInfo.hasBranch = '1' then
+					takenBranchVec(i) := '1'; -- Taken branches don't need to finish the group, unlike special events! 
+				end if;
+			else
+				exit;
+			end if;
+			
+			-- If this one has an event, following ones don't count
+			if 	robDataLiving.data(i).controlInfo.hasException = '1'
+				or robDataLiving.data(i).controlInfo.specialAction = '1'	-- CAREFUL! This also breaks flow!
+				or robDataLiving.data(i).controlInfo.dbtrap = '1'
+			then
+				--res.controlInfo.newEvent := '1'; -- Announce that event is to happen now!
+				exit;
+			end if;
+			
+		end loop;		
+		
+		-- Find taken jumps in BQ group and select last as target
+		branchTarget := lastEffectiveIns.target;
+							--	getStoredArg1(dataFromBQV.data(0));
+		for i in 0 to PIPE_WIDTH-1 loop
+			ind := dataFromBQV.data(i).tags.renameIndex(LOG2_PIPE_WIDTH-1 downto 0);
+			-- Corresponding ROB entry musu be effective effective, otherwise branch doesn't happen!
+			-- But if not effective, BQ entry would've be killed, so no need to check
+			if dataFromBQV.fullMask(i) = '1' then -- 
+														--and effectiveVec(slv2u(ind)) = '1' then
+				if dataFromBQV.data(i).controlInfo.hasBranch = '1' then
+					bqTakenBranchVec(i) := '1';
+					branchTarget := getStoredArg1(dataFromBQV.data(i));
+				end if;
+			else
+				exit;
+			end if;
+		end loop;		
+		
+		-- Find number of effective instructions after the jump
+		for i in PIPE_WIDTH-1 downto 0 loop
+			if takenBranchVec(i) = '1' then
+				exit;
+			elsif effectiveVec(i) = '1' then
+				differenceVec(i) := '1';
+			end if;
+		end loop;
+		-- CAREFUL: works only for 32b instructions
+		targetInc(LOG2_PIPE_WIDTH + 2 downto 2) := i2slv(countOnes(differenceVec), LOG2_PIPE_WIDTH+1);
+		
+		res.ins.target := addMwordFaster(branchTarget, targetInc);
+	end if; 
+	
 	return res;
 end function;
 
