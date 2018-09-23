@@ -421,7 +421,7 @@ begin
 		stageDataToCommit <= recreateGroup(robDataLiving, dataFromBQV, stageDataLastEffectiveOutA_C(0).ins.target);
 			stageDataCommitInA <= makeSlotArray(stageDataToCommit.data, stageDataToCommit.fullMask);
 		
-		insToLastEffective <= getLastEffective(stageDataToCommit);	
+	--	insToLastEffective <= getLastEffective(stageDataToCommit);	
 
 			lateCausingSig <= setInterrupt3(stageDataLastEffectiveOutA(0).ins, intPhase1, start);
 			lateCausingSig_C <= setInterrupt3(stageDataLastEffectiveOutA_C(0).ins, intPhase1, start);
@@ -430,8 +430,8 @@ begin
 			NEW_eiCausing.data(0) <= clearControlEvents(
 												setInstructionTarget(stageDataLastEffectiveOutA_C(0).ins, lateTargetIns.ip));
 
-			stageDataLastEffectiveInA(0) <= (sendingToCommit, insToLastEffective) when evtPhase1 = '0'
-												else (NEW_eiCausing.fullMask(0), NEW_eiCausing.data(0));
+			--stageDataLastEffectiveInA(0) <= (sendingToCommit, insToLastEffective) when evtPhase1 = '0'
+			--									else (NEW_eiCausing.fullMask(0), NEW_eiCausing.data(0));
 				
 			stageDataLastEffectiveInA_C(0) <= getNewEffective(sendingToCommit, robDataLiving, dataFromBQV,
 															stageDataLastEffectiveOutA_C(0).ins, 
@@ -500,11 +500,11 @@ begin
 				evtPhase1 <= (evtPhase0 and sbEmpty)
 							or  (evtWaiting and sbEmpty);
 
-				committingEvt <= sendingToCommit and stageDataLastEffectiveInA(0).ins.controlInfo.newEvent;
+				committingEvt <= sendingToCommit and stageDataLastEffectiveInA_C(0).ins.controlInfo.newEvent;
 				-- CAREFUL: when committingEvt, it is forbidden to indicate interrupt in next cycle! 
 				
 				-- CAREFUL: probably not used, because dbtrap will be a normal exc, overridden by "real" exceptions
-				addDbEvent <= committingEvt and stageDataLastEffectiveInA(0).ins.controlInfo.dbtrap;
+				addDbEvent <= committingEvt and stageDataLastEffectiveInA_C(0).ins.controlInfo.dbtrap;
 													-- Forces int controller to insert a DB interrupt and issue it ASAP 
 
 				intPhase0 <= intSignal;
