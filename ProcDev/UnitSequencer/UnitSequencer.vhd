@@ -158,7 +158,7 @@ architecture Behavioral of UnitSequencer is
 	signal NEW_eiCausing: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;	
 	signal insToLastEffective: InstructionState := DEFAULT_INSTRUCTION_STATE;	
 
-	signal lateCausingSig, lateCausingReg: InstructionState := DEFAULT_INSTRUCTION_STATE;
+	signal lateCausingSig, lateCausingSig_C, lateCausingReg: InstructionState := DEFAULT_INSTRUCTION_STATE;
 			
 	signal lateTargetIns: InstructionState := DEFAULT_INSTRUCTION_STATE;		
 			
@@ -191,8 +191,9 @@ begin
 			lateEventOut <= evtPhase0;
 			lateEventSetPC <= evtPhase2;
 		execOrIntEventSignal <= evtPhase0 or execEventSignal;
-		execOrIntCausing <= lateCausingSig when evtPhase0 = '1' else execCausing;
-		lateCausing <= lateCausingSig;
+		execOrIntCausing <= lateCausingSig_C when evtPhase0 = '1' else execCausing;
+		lateCausing <= --lateCausingSig;
+							lateCausingReg;
 
 		execOrIntEventSignalOut <= execOrIntEventSignal;	-- $MODULE_OUT
 		execOrIntCausingOut <= execOrIntCausing; -- $MODULE_OUT
@@ -233,8 +234,8 @@ begin
 	pcNext <= getNextPC(stageDataOutPC.ip, (others => '0'), '0');
 
 
-	excInfoUpdate <= evtPhase1 and (lateCausingSig.controlInfo.hasException or lateCausingSig.controlInfo.dbtrap);
-	intInfoUpdate <= evtPhase1 and lateCausingSig.controlInfo.hasInterrupt;
+	excInfoUpdate <= evtPhase1 and (lateCausingSig_C.controlInfo.hasException or lateCausingSig_C.controlInfo.dbtrap);
+	intInfoUpdate <= evtPhase1 and lateCausingSig_C.controlInfo.hasInterrupt;
 	
 	----------------------------------------------------------------------
 	
@@ -247,8 +248,8 @@ begin
 		alias savedStateExc is sysRegArray(4);
 		alias savedStateInt is sysRegArray(5);
 	begin
-		linkInfo <= getLinkInfo(stageDataLastEffectiveOutA(0).ins, currentState);
-			linkInfo_C <= getLinkInfo(stageDataLastEffectiveOutA_C(0).ins, currentState);
+		linkInfo_C <= getLinkInfo(stageDataLastEffectiveOutA(0).ins, currentState);
+			linkInfo <= getLinkInfo(stageDataLastEffectiveOutA_C(0).ins, currentState);
 	
 		CLOCKED: process(clk)
 		begin					
@@ -294,7 +295,7 @@ begin
 
 	
 		-- CAREFUL: this counts at phase1 --------------------------------------------------
-		lateTargetIns <= getLatePCData(lateCausingSig,
+		lateTargetIns <= getLatePCData(lateCausingSig_C,
 													currentState,
 													linkRegExc, linkRegInt,
 													savedStateExc, savedStateInt);
@@ -417,12 +418,13 @@ begin
 		--			When committing normal op -> increment by length of the op
 		--			
 		--			The 'target' field will be used to update return address for exc/int
-		stageDataToCommit <= recreateGroup(robDataLiving, dataFromBQV, stageDataLastEffectiveOutA(0).ins.target);
+		stageDataToCommit <= recreateGroup(robDataLiving, dataFromBQV, stageDataLastEffectiveOutA_C(0).ins.target);
 			stageDataCommitInA <= makeSlotArray(stageDataToCommit.data, stageDataToCommit.fullMask);
 		
 		insToLastEffective <= getLastEffective(stageDataToCommit);	
 
 			lateCausingSig <= setInterrupt3(stageDataLastEffectiveOutA(0).ins, intPhase1, start);
+			lateCausingSig_C <= setInterrupt3(stageDataLastEffectiveOutA_C(0).ins, intPhase1, start);
 
 			NEW_eiCausing.fullMask(0) <= '1';
 			NEW_eiCausing.data(0) <= clearControlEvents(
@@ -462,7 +464,7 @@ begin
 				-- Interface with hypothetical further stage
 				nextAccepting => '1',
 				sendingOut => open,
-				stageDataOut2 => stageDataLastEffectiveOutA,
+				stageDataOut2 => open,--stageDataLastEffectiveOutA,
 				
 				-- Event interface
 				execEventSignal => '0', -- CAREFUL: committed cannot be killed!
