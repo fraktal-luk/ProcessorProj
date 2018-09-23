@@ -362,11 +362,12 @@ begin
 			res.data(i).bits := fetchBlock(2*i) & fetchBlock(2*i+1);
 			res.data(i).target := targets(i);
 			
-			res.data(i).result := thisIP;
+			res.data(i).result := ins.ip;
 			res.data(i).result(ALIGN_BITS-1 downto 0) := i2slv((i+1)*4, ALIGN_BITS); -- CAREFUL: not for short ins
 		end loop;
 	end if;
-	res.data(PIPE_WIDTH-1).result := addMwordBasic(thisIP, PC_INC);
+	res.data(PIPE_WIDTH-1).result := ins.ip(MWORD_SIZE-1 downto ALIGN_BITS) & i2slv(0, ALIGN_BITS);
+	res.data(PIPE_WIDTH-1).result := addMwordBasic(res.data(PIPE_WIDTH-1).result, PC_INC);
 	
 	res.fullMask := fullOut;
 	return res;

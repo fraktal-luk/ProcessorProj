@@ -142,7 +142,7 @@ package ProgramCode4 is
 			232 => insRET, -- return
 			
 			-- Store registers in mem (word*)0:31
-			-- @940
+			-- @960
 			240 => ins6556X(ext1, r0, r0, store, 4*0),
 			241 => ins6556X(ext1, r1, r0, store, 4*1),
 			242 => ins6556X(ext1, r2, r0, store, 4*2),
