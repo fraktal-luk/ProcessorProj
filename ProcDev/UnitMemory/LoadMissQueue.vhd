@@ -68,6 +68,10 @@ architecture LoadMissQueue of MemoryUnit is
 				newFilled
 				: std_logic_vector(0 to QUEUE_SIZE-1) := (others => '0');
 
+	signal selectedIns, selectedIns_D: InstructionState := DEFAULT_INSTRUCTION_STATE;
+	signal selectedRenameTag, selectedRenameTag_D: InsTag := (others => '0');
+	signal killSelectedIns, selectedFull, selectedFull_D: std_logic := '0';
+
 	signal bufferDrive: FlowDriveBuffer := (killAll => '0', lockAccept => '0', lockSend => '0',
 																others=>(others=>'0'));
 	signal bufferResponse: FlowResponseBuffer := (others=>(others=>'0'));	
@@ -98,6 +102,12 @@ begin
 		contentNext <= contentUpdated;
 		
 			firstReadyVec <= findFirstFilled(extractData(content), livingMask, nextAccepting);
+				selectedIns <= chooseIns(extractData(content), firstReadyVec);
+				selectedFull <= isNonzero(firstReadyVec) and nextAccepting;
+				selectedRenameTag <= selectedIns.tags.renameIndex;
+				
+				killSelectedIns <= killByTag(CMP_tagBefore(execCausing.tags.renameIndex, selectedRenameTag_D),
+									execEventSignal, lateEventSignal);
 				
 			wrAddress <= storeAddressInput.full;
 			wrData <= storeValueInput.full;
@@ -105,10 +115,11 @@ begin
 			dataA <= storeAddressInput.ins;
 			dataD <= storeValueInput.ins;
 					
-			sendingSQ <= isNonzero(firstReadyVec) and nextAccepting;
+			--sendingSQ <= isNonzero(firstReadyVec) and nextAccepting;
 				dataOutV.fullMask(0) <= sendingSQ_D;
 				
-				sendingSQ_D <=	isNonzero(firstReadyVec_D and livingMask);
+				sendingSQ_D <=	--isNonzero(firstReadyVec_D and livingMask);
+									selectedFull_D and not killSelectedIns;
 				
 				dataOutV.data(0) <= chooseIns(extractData(content), firstReadyVec_D);
 											--chosenIns;	-- Option with more logic, if timing improvment needed
@@ -125,6 +136,10 @@ begin
 					
 						firstReadyVec_D <= firstReadyVec;					
 						chosenIns <= chooseIns(extractData(content), firstReadyVec);
+					   -- CAREFUL: redundant with chosenIns (?)
+						selectedIns_D <= selectedIns;
+						selectedRenameTag_D <= selectedRenameTag;
+						selectedFull_D <= selectedFull;
 					
 					--logBuffer(contentData, fullMask, livingMask, bufferResponse);	
 					-- NOTE: below has no info about flow constraints. It just checks data against
@@ -150,7 +165,7 @@ begin
 	bufferDrive.prevSending <= num2flow(countOnes(dataIn.fullMask)) when prevSending = '1' else (others => '0');
 	bufferDrive.kill <= num2flow(countOnes(killMask));
 	bufferDrive.nextAccepting <= num2flow(1) when sendingSQ_D = '1' else num2flow(0);
-	acceptingOut <= not fullMask(QUEUE_SIZE-PIPE_WIDTH);
+	acceptingOut <= not fullMask(QUEUE_SIZE-PIPE_WIDTH); -- TODO: make sth more sensible
 
 	killMask <=	getKillMask(extractData(content), fullMask, execCausing, execEventSignal, lateEventSignal);
 		

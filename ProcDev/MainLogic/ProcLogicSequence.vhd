@@ -114,6 +114,7 @@ function getLatePCData(commitCausing: InstructionState;
 return InstructionState is
 	variable res: InstructionState := DEFAULT_INSTRUCTION_STATE;-- content;
 	variable newPC: Mword := (others=>'0');
+	constant MINUS_4: Mword := i2slv(-4, MWORD_SIZE);
 begin	
 		if commitCausing.controlInfo.hasInterrupt = '1' then
 			if commitCausing.controlInfo.hasReset = '1' then
@@ -138,7 +139,8 @@ begin
 				if commitCausing.operation.func = sysSync then
 					res.ip := commitCausing.target;
 				elsif commitCausing.operation.func = sysReplay then
-					res.ip := commitCausing.ip;
+					res.ip := --commitCausing.ip;
+							addMwordFaster(commitCausing.target, MINUS_4); -- CAREFUL: wouldn't work if branch or short
 				elsif commitCausing.operation.func = sysHalt then
 					res.ip := commitCausing.target; -- ???
 				elsif commitCausing.operation.func = sysRetI then

@@ -283,6 +283,8 @@ begin
 
 	sendingSQ <= isNonzero(sqOutData.fullMask);
 	dataOutV <= sqOutData;
+	--	dataOutV.data <= TMP_content(0 to 3);
+	--	dataOutV.fullMask <= TMP_mask(0 to 3);
 	
 	acceptingOut <= 		not TMP_preCommittedW.fullMask(0) when MODE = store -- CAREFUL!
 					   else  '1' when  MODE = branch

@@ -111,13 +111,46 @@ architecture Implem of SubunitIQBuffer is
 	
 	-- Select item at first '1', or the last one if all zeros
 	function prioSelect(elems: SchedulerEntrySlotArray; selVec: std_logic_vector) return SchedulerEntrySlot is
+		variable ind, ind0, ind1: std_logic_vector(2 downto 0) := "000";
+		variable ch0, ch1: SchedulerEntrySlot;
 	begin	
-		for i in 0 to elems'length-1 loop
-			if selVec(i) = '1' then
-				return elems(i);
-			end if;
-		end loop;
-		return elems(elems'length-1);
+		--for i in 0 to elems'length-1 loop
+		--	if selVec(i) = '1' then
+		--		return elems(i);
+		--	end if;
+		--end loop;
+		--return elems(elems'length-1);
+		if selVec(0 to 3) = "0000" then
+			ind(2) := '1';
+		else
+			ind(2) := '0';
+		end if;
+		
+		if selVec(0) = '1' then
+			ch0 := elems(0);
+		elsif selVec(1) = '1' then
+			ch0 := elems(1);
+		elsif selVec(2) = '1' then
+			ch0 := elems(2);
+		else
+			ch0 := elems(3);
+		end if;
+
+		if selVec(4) = '1' then
+			ch1 := elems(4);
+		elsif selVec(5) = '1' then
+			ch1 := elems(5);
+		elsif selVec(6) = '1' then
+			ch1 := elems(6);
+		else
+			ch1 := elems(7);
+		end if;
+
+		if ind(2) = '0' then
+			return ch0;
+		else
+			return ch1;
+		end if;
 	end function;
 	
 	function TMP_clearDestIfEmpty(elem: SchedulerEntrySlot; sends: std_logic) return SchedulerEntrySlot is

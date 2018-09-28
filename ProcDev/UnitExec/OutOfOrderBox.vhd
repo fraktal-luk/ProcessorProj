@@ -270,7 +270,7 @@ begin
 		
 		ISSUE_COUNTERS: block
 			signal issueA, issueB, issueC: std_logic := '0';
-			signal schedB, schedC, e0B, e0C, e1B, e1C, wasBlockedA: std_logic := '0';
+			signal schedB, schedC, e0B, e0C, e1B, e1C, wasBlockedA, dlqFilling: std_logic := '0';
 		begin
 			issueA <= iqSending(0);
 			issueB <= iqSending(1);
@@ -287,6 +287,8 @@ begin
 					e1B <= e0B;
 					e1C <= e0C;
 					
+					  dlqFilling <= issueC and schedC and e0C;
+					
 					wasBlockedA <= blockA and iqReadyArr(0);
 				end if;
 			end process;
@@ -295,7 +297,9 @@ begin
 			blockA <= e0B or e0C or (e1B and e1C);
 			-- e0B and e0C;
 			blockBC <= (schedB and schedC) or wasBlockedA;
-			blockC <= blockBC or sendingFromDLQ or not dlqAccepting or (dlqAlmostFull and (schedC and e0C and e1C));
+			blockC <= blockBC or sendingFromDLQ or not dlqAccepting 
+															--or (dlqAlmostFull and (schedC and e0C and e1C));
+															or (dlqAlmostFull and dlqFilling);
 		end block;
 
 		EXEC_BLOCK: entity work.UnitExec(Implem)
