@@ -568,7 +568,8 @@ begin
 	iqDataNextS := queueDataS;
 	for i in 0 to QUEUE_SIZE-1 loop
 		iqFullMaskNext(i) := fullMaskSh(i) or (yMask(i) and prevSendingOK);
-		if fullMaskSh(i) = '1' then -- From x	
+		if --yMask(i) = '0' then -- 
+			fullMaskSh(i) = '1' then -- From x	
 			if stayMask(i) = '1' then
 				iqDataNextS(i) := xVecS(i);
 			else

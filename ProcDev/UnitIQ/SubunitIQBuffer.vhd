@@ -48,7 +48,7 @@ use work.ProcComponents.all;
 use work.BasicCheck.all;
 
 use work.Queues.all;
-	use work.ProcLogicRouting.all;
+use work.ProcLogicRouting.all;
 
 
 entity SubunitIQBuffer is
@@ -61,8 +61,7 @@ entity SubunitIQBuffer is
 		en: in std_logic;
 		
 		prevSendingOK: in std_logic;
-		--newData: in StageDataMulti;
-			newArr: in SchedulerEntrySlotArray(0 to PIPE_WIDTH-1);
+		newArr: in SchedulerEntrySlotArray(0 to PIPE_WIDTH-1);
 		nextAccepting: in std_logic;
 		lateEventSignal: in std_logic;
 		execEventSignal: in std_logic;
@@ -85,7 +84,8 @@ architecture Implem of SubunitIQBuffer is
 	signal queueDataNext: InstructionStateArray(0 to IQ_SIZE-1) -- For view
 								:= (others=>defaultInstructionState);		
 	signal fullMask, fullMaskNext, killMask, livingMask, readyMask, readyMask2, readyMask_C, stayMask,
-				inputEnable, sendingMask: std_logic_vector(0 to IQ_SIZE-1) := (others=>'0');	
+				inputEnable:--, sendingMask: 
+									std_logic_vector(0 to IQ_SIZE-1) := (others=>'0');	
 
 	signal inputIndices: SmallNumberArray(0 to IQ_SIZE-1) := (others => (others => '0'));
 								
@@ -94,9 +94,8 @@ architecture Implem of SubunitIQBuffer is
 
 	signal queueContent, queueContentNext: SchedulerEntrySlotArray(0 to IQ_SIZE-1)
 				:= (others => DEFAULT_SCH_ENTRY_SLOT);
-	signal queueContentUpdated, queueContentUpdatedSel, queueContentUpdated_T, queueContentUpdatedSel_T:
-							SchedulerEntrySlotArray(0 to IQ_SIZE-1)
-				:= (others => DEFAULT_SCH_ENTRY_SLOT);
+	signal queueContentUpdated, queueContentUpdatedSel: SchedulerEntrySlotArray(0 to IQ_SIZE-1)
+																													:= (others => DEFAULT_SCH_ENTRY_SLOT);
 	signal newContent, newContent_T: SchedulerEntrySlotArray(0 to PIPE_WIDTH-1) := (others => DEFAULT_SCH_ENTRY_SLOT);
 				
 	signal newSchedData: SchedulerEntrySlotArray(0 to PIPE_WIDTH-1) := (others => DEFAULT_SCH_ENTRY_SLOT);
@@ -113,13 +112,7 @@ architecture Implem of SubunitIQBuffer is
 	function prioSelect(elems: SchedulerEntrySlotArray; selVec: std_logic_vector) return SchedulerEntrySlot is
 		variable ind, ind0, ind1: std_logic_vector(2 downto 0) := "000";
 		variable ch0, ch1: SchedulerEntrySlot;
-	begin	
-		--for i in 0 to elems'length-1 loop
-		--	if selVec(i) = '1' then
-		--		return elems(i);
-		--	end if;
-		--end loop;
-		--return elems(elems'length-1);
+	begin
 		if selVec(0 to 3) = "0000" then
 			ind(2) := '1';
 		else
@@ -200,7 +193,7 @@ begin
 											fullMask, killMask,
 											execEventSignal or execCausing.controlInfo.hasInterrupt);
 		
-	sendingMask <= getFirstOne(readyMask2 and livingMask) when nextAccepting = '1' else	(others => '0');
+	--sendingMask <= getFirstOne(readyMask2 and livingMask) when nextAccepting = '1' else	(others => '0');
 
 	livingMask <= fullMask and not killMask;
 
@@ -211,21 +204,12 @@ begin
 	queueDataNext <= extractData(queueContentNext);	
 	sends <= isNonzero(readyMask_C) and nextAccepting;
 	dispatchDataNew <= TMP_clearDestIfEmpty(prioSelect(queueContentUpdatedSel, readyMask2), sends);
-		stayMask <= TMP_setUntil(readyMask_C, nextAccepting);
+		stayMask <= TMP_setUntil(readyMask2, nextAccepting);
 
-		--newSchedData <= getSchedData(newData.data, newData.fullMask);
+		newContent <= newArr;
 
-		newContent <= --updateForWaitingArrayFNI(newSchedData, readyRegFlags, fni);--, '1');
-				--newContent_T <= 
-							--updateForWaitingArrayNewFNI(newSchedData, readyRegFlags, fni);
-							newArr;
-							
-			--newDataU.fullMask <= newData.fullMask;
-			--newDataU.data <= extractData(newContent);
-		--	newDataU <= newData;
-		queueContentNext <= iqContentNext(queueContentUpdated,-- newDataU,
-																				--	newData.fullMask,
-																					newContent,
+		queueContentNext <= iqContentNext(queueContentUpdated,
+														newContent,
 														livingMask,
 														stayMask,--readyMask2, --_C,
 														sends,
@@ -236,16 +220,8 @@ begin
 														prevSendingOK);
 					
 	-- TODO: below could be optimized because some code is shared (comparators!)
-	--queueContentUpdated <= updateForWaitingArrayFNI(queueContent, readyRegFlags, fni);--, '0');
-	--queueContentUpdatedSel <= updateForSelectionArrayFNI(queueContent, readyRegFlags, fni);
-
-		queueContentUpdated <= updateForWaitingArrayFNI2(queueContent, readyRegFlags, fni);--, '0');
+		queueContentUpdated <= updateForWaitingArrayFNI2(queueContent, readyRegFlags, fni);
 		queueContentUpdatedSel <= updateForSelectionArrayFNI2(queueContent, readyRegFlags, fni);
-
-			ch0 <= '1' when queueContentUpdatedSel(0).ins = queueContentUpdatedSel_T(0).ins else '0';
-			ch1 <= '1' when queueContentUpdatedSel(0).state.argValues.missing = 
-									queueContentUpdatedSel_T(0).state.argValues.missing else '0';
-
 
 	readyMask2 <= extractReadyMaskNew(queueContentUpdatedSel);	
 	readyMask_C <= readyMask2 and livingMask;
