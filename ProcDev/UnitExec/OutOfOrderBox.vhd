@@ -294,7 +294,7 @@ begin
 			end process;
 			
 			-- 
-			blockA <= e0B or e0C or e1C;
+			blockA <= e0B or e1C;
 			-- e0B and e0C;
 			blockBC <= (schedB and schedC) or wasBlockedA;
 			blockC <= blockBC or sendingFromDLQ or not dlqAccepting 
