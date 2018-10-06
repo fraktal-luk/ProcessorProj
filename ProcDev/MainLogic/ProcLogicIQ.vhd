@@ -514,13 +514,16 @@ return SchedulerEntrySlotArray is
 	variable nAfterSending: integer := living;
 	variable shiftNum: integer := 0;			
 begin
-	-- Important, new instrucitons in queue must be marked!
+	-- Important, new instrucitons in queue must be marked!	
 	for i in 0 to PIPE_WIDTH-1 loop
 		dataNewDataS(i).state.argValues.newInQueue := '1';
 	end loop;
 
 	xVecS := queueDataS & dataNewDataS;
 	xVecS(QUEUE_SIZE) := xVecS(QUEUE_SIZE-1);
+	for i in 0 to QUEUE_SIZE + PIPE_WIDTH - 1 loop
+		xVecS(i).state.argValues.newInQueue := '0';
+	end loop;
 		
 	for k in 0 to yVecS'right loop
 		yVecS(k) := dataNewDataS(k mod PIPE_WIDTH);
@@ -570,7 +573,7 @@ begin
 --	end if;
 --
 --	shiftNum := nAfterSending;
-	shiftNum := countOnes(livingMaskSh); -- CAREFUL: this seems to reduce some logic
+	shiftNum := countOnes(fullMaskSh); -- CAREFUL: this seems to reduce some logic
 
 	-- CAREFUL, TODO:	solve the issue with HDLCompiler:1827
 	yVecS(shiftNum to yVecS'length - 1) := yVecS(0 to yVecS'length - 1 - shiftNum);
@@ -581,7 +584,7 @@ begin
 	for i in 0 to QUEUE_SIZE-1 loop
 		iqFullMaskNext(i) := livingMaskSh(i) or (yMask(i) and prevSendingOK);
 		if --yMask(i) = '0' then -- 
-			livingMaskSh(i) = '1' then -- From x	
+			fullMaskSh(i) = '1' then -- From x	
 			if stayMask(i) = '1' then
 				iqDataNextS(i) := xVecS(i);
 			else

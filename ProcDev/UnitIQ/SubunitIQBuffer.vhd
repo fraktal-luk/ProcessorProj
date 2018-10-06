@@ -202,7 +202,7 @@ begin
 	fullMaskNext <= extractFullMask(queueContentNext);
 	queueDataNext <= extractData(queueContentNext);	
 	sends <= anyReadyLive and nextAccepting;
-	sendPossible <= anyReadyFull and nextAccepting; -- Includesops tht would send but are killed
+	sendPossible <= anyReadyFull and nextAccepting; -- Includes ops that would send but are killed
 	
 	dispatchDataNew <= TMP_clearDestIfEmpty(prioSelect(queueContentUpdatedSel, readyMask), sends);
 		stayMask <= TMP_setUntil(readyMask, nextAccepting);
@@ -226,7 +226,7 @@ begin
 		queueContentUpdated <= updateForWaitingArrayFNI2(queueContent, readyRegFlags, fni);
 		queueContentUpdatedSel <= updateForSelectionArrayFNI2(queueContent, readyRegFlags, fni);
 
-	readyMask <= extractReadyMaskNew(queueContentUpdatedSel);	
+	readyMask <= extractReadyMaskNew(queueContentUpdatedSel) and fullMask;	
 	readyMaskLive <= readyMask and livingMask;
 			
 	SLOTS_IQ: entity work.BufferPipeLogic(BehavioralIQ) -- IQ)
