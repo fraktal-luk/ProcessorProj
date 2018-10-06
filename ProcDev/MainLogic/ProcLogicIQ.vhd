@@ -509,7 +509,8 @@ return SchedulerEntrySlotArray is
 	variable xVecS: SchedulerEntrySlotArray(0 to QUEUE_SIZE + PIPE_WIDTH - 1);
 	variable yVecS: SchedulerEntrySlotArray(0 to QUEUE_SIZE + PIPE_WIDTH - 1);
 	variable yMask: std_logic_vector(0 to QUEUE_SIZE + PIPE_WIDTH-1)	:= (others => '0');
-	variable fullMaskSh: std_logic_vector(0 to QUEUE_SIZE-1) := livingMask; --fullMask;
+	variable fullMaskSh: std_logic_vector(0 to QUEUE_SIZE-1) := fullMask;
+	variable livingMaskSh: std_logic_vector(0 to QUEUE_SIZE-1) := livingMask;
 	variable nAfterSending: integer := living;
 	variable shiftNum: integer := 0;			
 begin
@@ -535,26 +536,41 @@ begin
 
 	for i in 0 to QUEUE_SIZE-2 loop
 		if livingMask(i) = '0' or (livingMask(i+1) = '0' and sends = '1') then
+			livingMaskSh(i) := '0';
+		else
+			livingMaskSh(i) := '1';
+		end if;
+	end loop;
+	
+	if livingMask(QUEUE_SIZE-1) = '0' or sends = '1' then
+		livingMaskSh(QUEUE_SIZE-1) := '0';
+	else
+		livingMaskSh(QUEUE_SIZE-1) := '1';
+	end if;
+
+	for i in 0 to QUEUE_SIZE-2 loop
+		if fullMask(i) = '0' or (fullMask(i+1) = '0' and sendPossible = '1') then
 			fullMaskSh(i) := '0';
 		else
 			fullMaskSh(i) := '1';
 		end if;
 	end loop;
 	
-	if livingMask(QUEUE_SIZE-1) = '0' or sends = '1' then
+	if fullMask(QUEUE_SIZE-1) = '0' or sendPossible = '1' then
 		fullMaskSh(QUEUE_SIZE-1) := '0';
 	else
 		fullMaskSh(QUEUE_SIZE-1) := '1';
 	end if;
 
-	if nAfterSending < 0 then
-		nAfterSending := 0;
-	elsif nAfterSending > yVecS'length then	
-		nAfterSending := yVecS'length;
-	end if;
 
-	shiftNum := nAfterSending;
-	shiftNum := countOnes(fullMaskSh); -- CAREFUL: this seems to reduce some logic
+--	if nAfterSending < 0 then
+--		nAfterSending := 0;
+--	elsif nAfterSending > yVecS'length then	
+--		nAfterSending := yVecS'length;
+--	end if;
+--
+--	shiftNum := nAfterSending;
+	shiftNum := countOnes(livingMaskSh); -- CAREFUL: this seems to reduce some logic
 
 	-- CAREFUL, TODO:	solve the issue with HDLCompiler:1827
 	yVecS(shiftNum to yVecS'length - 1) := yVecS(0 to yVecS'length - 1 - shiftNum);
@@ -563,9 +579,9 @@ begin
 	-- Now assign from x or y
 	iqDataNextS := queueDataS;
 	for i in 0 to QUEUE_SIZE-1 loop
-		iqFullMaskNext(i) := fullMaskSh(i) or (yMask(i) and prevSendingOK);
+		iqFullMaskNext(i) := livingMaskSh(i) or (yMask(i) and prevSendingOK);
 		if --yMask(i) = '0' then -- 
-			fullMaskSh(i) = '1' then -- From x	
+			livingMaskSh(i) = '1' then -- From x	
 			if stayMask(i) = '1' then
 				iqDataNextS(i) := xVecS(i);
 			else
