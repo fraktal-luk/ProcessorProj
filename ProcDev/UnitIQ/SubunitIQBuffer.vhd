@@ -83,9 +83,8 @@ architecture Implem of SubunitIQBuffer is
 	signal queueData: InstructionStateArray(0 to IQ_SIZE-1)  := (others=>defaultInstructionState);
 	signal queueDataNext: InstructionStateArray(0 to IQ_SIZE-1) -- For view
 								:= (others=>defaultInstructionState);		
-	signal fullMask, fullMaskNext, killMask, livingMask, readyMask, readyMask2, readyMask_C, stayMask,
-				inputEnable:--, sendingMask: 
-									std_logic_vector(0 to IQ_SIZE-1) := (others=>'0');	
+	signal fullMask, fullMaskNext, killMask, livingMask, readyMask, readyMaskLive, stayMask:
+				std_logic_vector(0 to IQ_SIZE-1) := (others=>'0');	
 
 	signal inputIndices: SmallNumberArray(0 to IQ_SIZE-1) := (others => (others => '0'));
 								
@@ -101,7 +100,7 @@ architecture Implem of SubunitIQBuffer is
 	signal newSchedData: SchedulerEntrySlotArray(0 to PIPE_WIDTH-1) := (others => DEFAULT_SCH_ENTRY_SLOT);
 				
 	signal newDataU: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;												
-	signal sends: std_logic := '0';
+	signal anyReadyFull, anyReadyLive, sends, sendPossible: std_logic := '0';
 	signal dispatchDataNew: SchedulerEntrySlot := DEFAULT_SCH_ENTRY_SLOT;
 	
 	signal TMP_sendingWin: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
@@ -193,7 +192,7 @@ begin
 											fullMask, killMask,
 											execEventSignal or execCausing.controlInfo.hasInterrupt);
 		
-	--sendingMask <= getFirstOne(readyMask2 and livingMask) when nextAccepting = '1' else	(others => '0');
+	--sendingMask <= getFirstOne(readyMask and livingMask) when nextAccepting = '1' else	(others => '0');
 
 	livingMask <= fullMask and not killMask;
 
@@ -202,16 +201,20 @@ begin
 			
 	fullMaskNext <= extractFullMask(queueContentNext);
 	queueDataNext <= extractData(queueContentNext);	
-	sends <= isNonzero(readyMask_C) and nextAccepting;
-	dispatchDataNew <= TMP_clearDestIfEmpty(prioSelect(queueContentUpdatedSel, readyMask2), sends);
-		stayMask <= TMP_setUntil(readyMask2, nextAccepting);
+	sends <= anyReadyLive and nextAccepting;
+	sendPossible <= anyReadyFull and nextAccepting; -- Includesops tht would send but are killed
+	
+	dispatchDataNew <= TMP_clearDestIfEmpty(prioSelect(queueContentUpdatedSel, readyMask), sends);
+		stayMask <= TMP_setUntil(readyMask, nextAccepting);
 
 		newContent <= newArr;
 
 		queueContentNext <= iqContentNext(queueContentUpdated,
 														newContent,
+														stayMask,
+														fullMask,
 														livingMask,
-														stayMask,--readyMask2, --_C,
+														sendPossible,
 														sends,
 														nextAccepting,
 														binFlowNum(flowResponseQ.living),
@@ -223,8 +226,8 @@ begin
 		queueContentUpdated <= updateForWaitingArrayFNI2(queueContent, readyRegFlags, fni);
 		queueContentUpdatedSel <= updateForSelectionArrayFNI2(queueContent, readyRegFlags, fni);
 
-	readyMask2 <= extractReadyMaskNew(queueContentUpdatedSel);	
-	readyMask_C <= readyMask2 and livingMask;
+	readyMask <= extractReadyMaskNew(queueContentUpdatedSel);	
+	readyMaskLive <= readyMask and livingMask;
 			
 	SLOTS_IQ: entity work.BufferPipeLogic(BehavioralIQ) -- IQ)
 	generic map(
@@ -242,7 +245,10 @@ begin
 	acceptingVec <= not fullMask(IQ_SIZE-PIPE_WIDTH to IQ_SIZE-1);
 	acceptingOut <= not isNonzero(fullMask(IQ_SIZE-PIPE_WIDTH to IQ_SIZE-1)); 
 	
-	anyReady <= isNonzero(readyMask_C);
+	anyReadyLive <= isNonzero(readyMaskLive);
+	anyReadyFull <= isNonzero(readyMask);
+	
+	anyReady <= anyReadyLive; -- OUTPUT
 	
 	schedulerOut <= (sends, dispatchDataNew.ins, dispatchDataNew.state);
 	sending <= sends;

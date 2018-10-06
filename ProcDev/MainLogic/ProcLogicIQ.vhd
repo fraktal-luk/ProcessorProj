@@ -37,12 +37,10 @@ return SchedulerEntrySlot;
 
 
 
-function iqContentNext(queueContent: SchedulerEntrySlotArray;-- inputData: StageDataMulti;
-																					--inputMask: std_logic_vector;
-																					inputDataS: SchedulerEntrySlotArray;
-								 livingMask,
-								 stayMask: std_logic_vector;
-								 sends: std_logic;
+function iqContentNext(queueContent: SchedulerEntrySlotArray; inputDataS: SchedulerEntrySlotArray;
+								 stayMask, fullMask, livingMask
+								 : std_logic_vector;
+								 sendPossible, sends: std_logic;
 								 nextAccepting: std_logic;
 								 living, sending, prevSending: integer;
 								 prevSendingOK: std_logic)
@@ -490,12 +488,10 @@ begin
 end function;
 
 
-function iqContentNext(queueContent: SchedulerEntrySlotArray;-- inputData: StageDataMulti;
-																					--inputMask: std_logic_vector;
-																					inputDataS: SchedulerEntrySlotArray;
-								 livingMask,
-								 stayMask: std_logic_vector;
-								 sends: std_logic;
+function iqContentNext(queueContent: SchedulerEntrySlotArray; inputDataS: SchedulerEntrySlotArray;
+								 stayMask, fullMask, livingMask
+								 : std_logic_vector;
+								 sendPossible, sends: std_logic;
 								 nextAccepting: std_logic;
 								 living, sending, prevSending: integer;
 								 prevSendingOK: std_logic)
