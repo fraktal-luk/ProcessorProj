@@ -897,7 +897,7 @@ return PhysNameArray is
 begin
 	nextResultTags(0) := schedOutputArr(0).ins.physicalArgSpec.dest;
 	nextResultTags(1) := execOutputsPre(1).ins.physicalArgSpec.dest;
-	nextResultTags(2) := execOutputsPre(2).ins.physicalArgSpec.dest;
+	--nextResultTags(2) := execOutputsPre(2).ins.physicalArgSpec.dest;
 	return nextResultTags;
 end function;
 

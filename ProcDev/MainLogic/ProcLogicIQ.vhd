@@ -606,25 +606,20 @@ begin
 	-- nextReady - fast wakeup   
 	-- NOTE: we don't save nextLocs because only the ops that are instantly issued will use it, so no
 	-- 		point to store them for those that'll keep waiting
-	for i in --fni.nextResultTags'range loop
-				0 to 0 loop -- only [0] uses fast wakeup
+	for i in 0 to 0 loop -- only [0] uses fast wakeup
 		if fni.nextResultTags(i)(PHYS_REG_BITS-1 downto 0) = ins.physicalArgSpec.args(0)(PHYS_REG_BITS-1 downto 0) then
 			nextReady(0) := '1';
-			--nextLocs(0) := i2slv(i, SMALL_NUMBER_SIZE);
 		end if;
 		if fni.nextResultTags(i)(PHYS_REG_BITS-1 downto 0) = ins.physicalArgSpec.args(1)(PHYS_REG_BITS-1 downto 0) then
 			nextReady(1) := '1';
-			--nextLocs(1) := i2slv(i, SMALL_NUMBER_SIZE);
 		end if;
 		if fni.nextResultTags(i)(PHYS_REG_BITS-1 downto 0) = ins.physicalArgSpec.args(2)(PHYS_REG_BITS-1 downto 0) then
 			nextReady(2) := '1';
-			--nextLocs(2) := i2slv(i, SMALL_NUMBER_SIZE);
 		end if;			
 	end loop;
 	
 	-- readyM2 - slow wakeup
-	for i in --fni.nextTagsM2'range loop
-				1 to 2 loop -- [0] does not use slow wakeup
+	for i in 1 to 2 loop -- [0] does not use slow wakeup
 		if fni.nextTagsM2(i)(PHYS_REG_BITS-1 downto 0) = ins.physicalArgSpec.args(0)(PHYS_REG_BITS-1 downto 0) then
 			readyM2(0) := '1';
 			locsM2(0) := i2slv(i, SMALL_NUMBER_SIZE);
@@ -651,16 +646,9 @@ begin
 		rrf := readyRegFlags(3*slv2u(tmp8) to 3*slv2u(tmp8) + 2);
 		res.state.argValues.missing := res.state.argValues.missing and not rrf;
 	end if;
-	
-	--res.state.argValues.missing := res.state.argValues.missing and not written;
-	--res.state.argValues.missing := res.state.argValues.missing and not ready;
+
 	res.state.argValues.missing := res.state.argValues.missing and not nextReady;	
-	res.state.argValues.missing := res.state.argValues.missing and not readyM2;	
-	
-	-- CAREFUL! DEPREC statement?
-	--res.state.argValues.newInQueue := isNew;
-	
-	--	res.ins.argValues := res.state.argValues; -- TEMP!
+	res.state.argValues.missing := res.state.argValues.missing and not readyM2;
 	
 	res.ins.ip := (others => '0');
 	return res;
@@ -733,8 +721,7 @@ begin
 		end if;			
 	end loop;
 
-	for i in --fni.nextTagsM2'range loop
-				1 to 2 loop -- [0] does not use slow wakeup
+	for i in 1 to 2 loop -- [0] does not use slow wakeup
 		if fni.nextTagsM2(i)(PHYS_REG_BITS-1 downto 0) = ins.physicalArgSpec.args(0)(PHYS_REG_BITS-1 downto 0) then
 			readyM2(0) := '1';
 			locsM2(0) := i2slv(i, SMALL_NUMBER_SIZE);
@@ -765,12 +752,7 @@ begin
 	res.state.argValues.missing := res.state.argValues.missing and not written;
 	res.state.argValues.missing := res.state.argValues.missing and not ready;
 	res.state.argValues.missing := res.state.argValues.missing and not nextReady;	
-	res.state.argValues.missing := res.state.argValues.missing and not readyM2;	
-	
-	-- CAREFUL! DEPREC statement?
-	--res.state.argValues.newInQueue := isNew;
-	
-	--	res.ins.argValues := res.state.argValues; -- TEMP!
+	res.state.argValues.missing := res.state.argValues.missing and not readyM2;
 	
 	res.ins.ip := (others => '0');
 	return res;
@@ -823,22 +805,9 @@ begin
 	
 	res.state.argValues.missing := res.state.argValues.missing and not nextReady;
 	
-	-- pragma synthesis off				
-	--res.state.argValues := beginHistory(res.state.argValues, ready, nextReady);
-	-- pragma synthesis on
-
-	--res.state.argValues.missing := res.state.argValues.missing and not nextReady;
-	--res.state.argValues.readyNext := nextReady;
-	-- CAREFUL, NOTE: updating 'missing' with ai.ready would increase delay, unneeded with full 'nextReady'
-	
-	--	res.state.argValues.missing := res.state.argValues.missing and not ready;
-
-	--res.state.argValues.readyNow := ready;
 
 	res.state.argValues.locs := locs;	
 	res.state.argValues.nextLocs := nextLocs;
-
-	--	res.ins.argValues := res.state.argValues;
 
 	-- Clear unused fields
 	res.ins.bits := (others => '0');
