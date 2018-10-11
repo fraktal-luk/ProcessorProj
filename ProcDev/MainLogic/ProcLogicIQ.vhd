@@ -49,7 +49,13 @@ return SchedulerEntrySlotArray;
 function extractReadyMaskNew(entryVec: SchedulerEntrySlotArray) return std_logic_vector;
 
 
+
 function updateForWaitingFNI(ins: InstructionState; st: SchedulerState;
+										readyRegFlags: std_logic_vector; fni: ForwardingInfo)--;
+									--isNew: std_logic)
+return SchedulerEntrySlot;
+
+function updateForWaitingNewFNI(ins: InstructionState; st: SchedulerState;
 										readyRegFlags: std_logic_vector; fni: ForwardingInfo)--;
 									--isNew: std_logic)
 return SchedulerEntrySlot;
@@ -63,36 +69,12 @@ function updateForWaitingArrayFNI(insArray: SchedulerEntrySlotArray; readyRegFla
 									fni: ForwardingInfo)--; isNew: std_logic)
 return SchedulerEntrySlotArray;
 
-function updateForSelectionArrayFNI(insArray: SchedulerEntrySlotArray; readyRegFlags: std_logic_vector;
-									fni: ForwardingInfo)
-return SchedulerEntrySlotArray;
-
-
-function updateForWaitingFNI2(ins: InstructionState; st: SchedulerState;
-										readyRegFlags: std_logic_vector; fni: ForwardingInfo)--;
-									--isNew: std_logic)
-return SchedulerEntrySlot;
-
-function updateForWaitingNewFNI(ins: InstructionState; st: SchedulerState;
-										readyRegFlags: std_logic_vector; fni: ForwardingInfo)--;
-									--isNew: std_logic)
-return SchedulerEntrySlot;
-
-function updateForSelectionFNI2(ins: InstructionState; st: SchedulerState;
-											readyRegFlags: std_logic_vector; fni: ForwardingInfo)
-return SchedulerEntrySlot;
-
-
-function updateForWaitingArrayFNI2(insArray: SchedulerEntrySlotArray; readyRegFlags: std_logic_vector;
-									fni: ForwardingInfo)--; isNew: std_logic)
-return SchedulerEntrySlotArray;
-
 function updateForWaitingArrayNewFNI(insArray: SchedulerEntrySlotArray; readyRegFlags: std_logic_vector;
 									fni: ForwardingInfo)--; isNew: std_logic)
 return SchedulerEntrySlotArray;
 
 
-function updateForSelectionArrayFNI2(insArray: SchedulerEntrySlotArray; readyRegFlags: std_logic_vector;
+function updateForSelectionArrayFNI(insArray: SchedulerEntrySlotArray; readyRegFlags: std_logic_vector;
 									fni: ForwardingInfo)
 return SchedulerEntrySlotArray;
 
@@ -606,238 +588,8 @@ begin
 end function;
 
 
+
 function updateForWaitingFNI(ins: InstructionState; st: SchedulerState;
-										readyRegFlags: std_logic_vector; fni: ForwardingInfo)--;
-									--isNew: std_logic)
-return SchedulerEntrySlot is
-	variable res: SchedulerEntrySlot := DEFAULT_SCHEDULER_ENTRY_SLOT;
-	variable tmp8: SmallNumber := (others => '0');
-	variable rrf: std_logic_vector(0 to 2) := (others => '0');
-
-	variable stored, ready, nextReady, readyM2, written: std_logic_vector(0 to 2) := (others=>'0');
-	variable locs, nextLocs, locsM2: SmallNumberArray(0 to 2) := (others=>(others=>'0'));
-begin
-	res.ins := ins;	
-	res.state := st;
-	
-	for i in fni.writtenTags'length-1 downto 0 loop
-		if fni.writtenTags(i)(PHYS_REG_BITS-1 downto 0) = ins.physicalArgSpec.args(0)(PHYS_REG_BITS-1 downto 0) then
-			written(0) := '1';
-		end if;
-
-		if fni.writtenTags(i)(PHYS_REG_BITS-1 downto 0) = ins.physicalArgSpec.args(1)(PHYS_REG_BITS-1 downto 0) then
-			written(1) := '1';
-		end if;
-
-		if fni.writtenTags(i)(PHYS_REG_BITS-1 downto 0) = ins.physicalArgSpec.args(2)(PHYS_REG_BITS-1 downto 0) then
-			written(2) := '1';
-		end if;		
-	end loop;
-	
-	-- Find where tag agrees with s0
-	for i in fni.resultTags'length-1 downto 0 loop		
-		if fni.resultTags(i)(PHYS_REG_BITS-1 downto 0) = ins.physicalArgSpec.args(0)(PHYS_REG_BITS-1 downto 0) then
-			ready(0) := '1';
-			locs(0) := i2slv(i, SMALL_NUMBER_SIZE);
-		end if;
-	end loop;
-		
-	for i in fni.resultTags'length-1 downto 0 loop				
-		if fni.resultTags(i)(PHYS_REG_BITS-1 downto 0) = ins.physicalArgSpec.args(1)(PHYS_REG_BITS-1 downto 0) then
-			ready(1) := '1';
-			locs(1) := i2slv(i, SMALL_NUMBER_SIZE);
-		end if;
-	end loop;		
-		
-	for i in fni.resultTags'length-1 downto 0 loop				
-		if fni.resultTags(i)(PHYS_REG_BITS-1 downto 0) = ins.physicalArgSpec.args(2)(PHYS_REG_BITS-1 downto 0) then
-			ready(2) := '1';
-			locs(2) := i2slv(i, SMALL_NUMBER_SIZE);
-		end if;
-	end loop;
-	
-	for i in fni.nextResultTags'range loop
-		if fni.nextResultTags(i)(PHYS_REG_BITS-1 downto 0) = ins.physicalArgSpec.args(0)(PHYS_REG_BITS-1 downto 0) then
-			nextReady(0) := '1';
-			nextLocs(0) := i2slv(i, SMALL_NUMBER_SIZE);
-		end if;
-		if fni.nextResultTags(i)(PHYS_REG_BITS-1 downto 0) = ins.physicalArgSpec.args(1)(PHYS_REG_BITS-1 downto 0) then
-			nextReady(1) := '1';
-			nextLocs(1) := i2slv(i, SMALL_NUMBER_SIZE);
-		end if;
-		if fni.nextResultTags(i)(PHYS_REG_BITS-1 downto 0) = ins.physicalArgSpec.args(2)(PHYS_REG_BITS-1 downto 0) then
-			nextReady(2) := '1';
-			nextLocs(2) := i2slv(i, SMALL_NUMBER_SIZE);
-		end if;			
-	end loop;
-
-	for i in fni.nextTagsM2'range loop
-		if fni.nextTagsM2(i)(PHYS_REG_BITS-1 downto 0) = ins.physicalArgSpec.args(0)(PHYS_REG_BITS-1 downto 0) then
-			readyM2(0) := '1';
-			locsM2(0) := i2slv(i, SMALL_NUMBER_SIZE);
-		end if;
-		if fni.nextTagsM2(i)(PHYS_REG_BITS-1 downto 0) = ins.physicalArgSpec.args(1)(PHYS_REG_BITS-1 downto 0) then
-			readyM2(1) := '1';
-			locsM2(1) := i2slv(i, SMALL_NUMBER_SIZE);
-		end if;
-		if fni.nextTagsM2(i)(PHYS_REG_BITS-1 downto 0) = ins.physicalArgSpec.args(2)(PHYS_REG_BITS-1 downto 0) then
-			readyM2(2) := '1';
-			locsM2(2) := i2slv(i, SMALL_NUMBER_SIZE);
-		end if;			
-	end loop;
-
-	res.state.argValues.readyNow := (others => '0'); 
-	res.state.argValues.readyNext := (others => '0');
-	
-	res.state.argValues.readyM2 := readyM2;
-	res.state.argValues.locsM2 := locsM2;
-
-	-- 
-	if res.state.argValues.newInQueue = '1' then
-		tmp8 := getTagLowSN(res.ins.tags.renameIndex);-- and i2slv(PIPE_WIDTH-1, SMALL_NUMBER_SIZE);
-		rrf := readyRegFlags(3*slv2u(tmp8) to 3*slv2u(tmp8) + 2);
-		res.state.argValues.missing := res.state.argValues.missing and not rrf;
-	end if;
-	
-	res.state.argValues.missing := res.state.argValues.missing and not written;
-	res.state.argValues.missing := res.state.argValues.missing and not ready;
-	res.state.argValues.missing := res.state.argValues.missing and not nextReady;	
-	
-	-- CAREFUL! DEPREC statement?
-	--res.state.argValues.newInQueue := isNew;
-	
-	--	res.ins.argValues := res.state.argValues; -- TEMP!
-	
-	res.ins.ip := (others => '0');
-	return res;
-end function;
-
-
-function updateForSelectionFNI(ins: InstructionState; st: SchedulerState;
-				readyRegFlags: std_logic_vector; fni: ForwardingInfo)
-return SchedulerEntrySlot is
-	variable res: SchedulerEntrySlot := DEFAULT_SCHEDULER_ENTRY_SLOT;
-	variable tmp8: SmallNumber := (others => '0');
-	variable rrf: std_logic_vector(0 to 2) := (others => '0');
-
-	variable stored, ready, nextReady, written: std_logic_vector(0 to 2) := (others=>'0');
-	variable locs, nextLocs: SmallNumberArray(0 to 2) := (others=>(others=>'0'));
-begin
-	res.ins := ins;
-	res.state := st;
-	
-	-- Find where tag agrees with s0
-	for i in fni.resultTags'length-1 downto 0 loop		
-		if fni.resultTags(i)(PHYS_REG_BITS-1 downto 0) = ins.physicalArgSpec.args(0)(PHYS_REG_BITS-1 downto 0) then
-			ready(0) := '1';
-			locs(0) := i2slv(i, SMALL_NUMBER_SIZE);
-		end if;
-	end loop;
-		
-	for i in fni.resultTags'length-1 downto 0 loop				
-		if fni.resultTags(i)(PHYS_REG_BITS-1 downto 0) = ins.physicalArgSpec.args(1)(PHYS_REG_BITS-1 downto 0) then
-			ready(1) := '1';
-			locs(1) := i2slv(i, SMALL_NUMBER_SIZE);
-		end if;
-	end loop;		
-		
-	for i in fni.resultTags'length-1 downto 0 loop				
-		if fni.resultTags(i)(PHYS_REG_BITS-1 downto 0) = ins.physicalArgSpec.args(2)(PHYS_REG_BITS-1 downto 0) then
-			ready(2) := '1';
-			locs(2) := i2slv(i, SMALL_NUMBER_SIZE);
-		end if;
-	end loop;
-	
-	for i in fni.nextResultTags'range loop
-		if fni.nextResultTags(i)(PHYS_REG_BITS-1 downto 0) = ins.physicalArgSpec.args(0)(PHYS_REG_BITS-1 downto 0) then
-			nextReady(0) := '1';
-			nextLocs(0) := i2slv(i, SMALL_NUMBER_SIZE);
-		end if;
-		if fni.nextResultTags(i)(PHYS_REG_BITS-1 downto 0) = ins.physicalArgSpec.args(1)(PHYS_REG_BITS-1 downto 0) then
-			nextReady(1) := '1';
-			nextLocs(1) := i2slv(i, SMALL_NUMBER_SIZE);
-		end if;
-		if fni.nextResultTags(i)(PHYS_REG_BITS-1 downto 0) = ins.physicalArgSpec.args(2)(PHYS_REG_BITS-1 downto 0) then
-			nextReady(2) := '1';
-			nextLocs(2) := i2slv(i, SMALL_NUMBER_SIZE);
-		end if;			
-	end loop;
-	
-	res.state.argValues.readyNow := (others => '0'); 
-	res.state.argValues.readyNext := (others => '0');
-
-	-- Checking reg ready flags (only for new ops in queue)
-	-- CAREFUL! Which reg ready flags are for this instruction?
-	--				Use groupTag, because it identifies the slot in previous superscalar stage
-	if res.state.argValues.newInQueue = '1' then
-		tmp8 := getTagLowSN(res.ins.tags.renameIndex);-- and i2slv(PIPE_WIDTH-1, SMALL_NUMBER_SIZE);
-		rrf := readyRegFlags(3*slv2u(tmp8) to 3*slv2u(tmp8) + 2);
-		res.state.argValues.missing := res.state.argValues.missing and not rrf;
-	end if;
-
-	-- pragma synthesis off				
-	--res.state.argValues := beginHistory(res.state.argValues, ready, nextReady);
-	-- pragma synthesis on
-
-	res.state.argValues.missing := res.state.argValues.missing and not nextReady;
-	res.state.argValues.readyNext := nextReady;
-	-- CAREFUL, NOTE: updating 'missing' with ai.ready would increase delay, unneeded with full 'nextReady'
-	
-		res.state.argValues.missing := res.state.argValues.missing and not ready;
-
-	res.state.argValues.readyNow := ready;
-
-	res.state.argValues.locs := locs;	
-	res.state.argValues.nextLocs := nextLocs;
-
-	--	res.ins.argValues := res.state.argValues;
-
-	-- Clear unused fields
-	res.ins.bits := (others => '0');
-	res.ins.result := (others => '0');
-	res.ins.target := (others => '0');		
---		
-	res.ins.controlInfo.completed := '0';
-	res.ins.controlInfo.completed2 := '0';
-	res.ins.ip := (others => '0');
-
-	res.ins.controlInfo.newEvent := '0';
-	res.ins.controlInfo.hasInterrupt := '0';
-	res.ins.controlInfo.hasReturn := '0';		
-	res.ins.controlInfo.exceptionCode := (others => '0');
-
-	return res;
-end function;
-
-
-
-function updateForWaitingArrayFNI(insArray: SchedulerEntrySlotArray; readyRegFlags: std_logic_vector;
-									fni: ForwardingInfo)--; isNew: std_logic)
-return SchedulerEntrySlotArray is
-	variable res: SchedulerEntrySlotArray(0 to insArray'length-1);-- := insArray;
-begin
-	for i in insArray'range loop	
-		res(i) := updateForWaitingFNI(insArray(i).ins, insArray(i).state, readyRegFlags, fni);
-	end loop;
-	return res;
-end function;
-
-
-function updateForSelectionArrayFNI(insArray: SchedulerEntrySlotArray; readyRegFlags: std_logic_vector;
-									fni: ForwardingInfo)
-return SchedulerEntrySlotArray is
-	variable res: SchedulerEntrySlotArray(0 to insArray'length-1);-- := insArray;
-begin
-	for i in insArray'range loop
-		res(i) := updateForSelectionFNI(insArray(i).ins, insArray(i).state, readyRegFlags, fni);
-	end loop;	
-	return res;
-end function;
-
-
-
-
-function updateForWaitingFNI2(ins: InstructionState; st: SchedulerState;
 										readyRegFlags: std_logic_vector; fni: ForwardingInfo)--;
 									--isNew: std_logic)
 return SchedulerEntrySlot is
@@ -1025,7 +777,7 @@ begin
 end function;
 
 
-function updateForSelectionFNI2(ins: InstructionState; st: SchedulerState;
+function updateForSelectionFNI(ins: InstructionState; st: SchedulerState;
 				readyRegFlags: std_logic_vector; fni: ForwardingInfo)
 return SchedulerEntrySlot is
 	variable res: SchedulerEntrySlot := DEFAULT_SCHEDULER_ENTRY_SLOT;
@@ -1107,13 +859,13 @@ end function;
 
 
 
-function updateForWaitingArrayFNI2(insArray: SchedulerEntrySlotArray; readyRegFlags: std_logic_vector;
+function updateForWaitingArrayFNI(insArray: SchedulerEntrySlotArray; readyRegFlags: std_logic_vector;
 									fni: ForwardingInfo)--; isNew: std_logic)
 return SchedulerEntrySlotArray is
 	variable res: SchedulerEntrySlotArray(0 to insArray'length-1);-- := insArray;
 begin
 	for i in insArray'range loop	
-		res(i) := updateForWaitingFNI2(insArray(i).ins, insArray(i).state, readyRegFlags, fni);
+		res(i) := updateForWaitingFNI(insArray(i).ins, insArray(i).state, readyRegFlags, fni);
 	end loop;
 	return res;
 end function;
@@ -1133,13 +885,13 @@ end function;
 
 
 
-function updateForSelectionArrayFNI2(insArray: SchedulerEntrySlotArray; readyRegFlags: std_logic_vector;
+function updateForSelectionArrayFNI(insArray: SchedulerEntrySlotArray; readyRegFlags: std_logic_vector;
 									fni: ForwardingInfo)
 return SchedulerEntrySlotArray is
 	variable res: SchedulerEntrySlotArray(0 to insArray'length-1);-- := insArray;
 begin
 	for i in insArray'range loop
-		res(i) := updateForSelectionFNI2(insArray(i).ins, insArray(i).state, readyRegFlags, fni);
+		res(i) := updateForSelectionFNI(insArray(i).ins, insArray(i).state, readyRegFlags, fni);
 	end loop;	
 	return res;
 end function;

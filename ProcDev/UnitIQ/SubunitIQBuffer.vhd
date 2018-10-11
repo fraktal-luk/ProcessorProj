@@ -223,8 +223,8 @@ begin
 														prevSendingOK);
 					
 	-- TODO: below could be optimized because some code is shared (comparators!)
-		queueContentUpdated <= updateForWaitingArrayFNI2(queueContent, readyRegFlags, fni);
-		queueContentUpdatedSel <= updateForSelectionArrayFNI2(queueContent, readyRegFlags, fni);
+		queueContentUpdated <= updateForWaitingArrayFNI(queueContent, readyRegFlags, fni);
+		queueContentUpdatedSel <= updateForSelectionArrayFNI(queueContent, readyRegFlags, fni);
 
 	readyMask <= extractReadyMaskNew(queueContentUpdatedSel) and fullMask;	
 	readyMaskLive <= readyMask and livingMask;
