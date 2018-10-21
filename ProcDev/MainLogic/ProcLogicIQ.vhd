@@ -20,19 +20,13 @@ use work.TEMP_DEV.all;
 use work.GeneralPipeDev.all;
 
 
-package ProcLogicIQ is				
+package ProcLogicIQ is
 
-function getDispatchArgValues(ins: InstructionState; st: SchedulerState; vals: MwordArray; USE_IMM: boolean)
-return SchedulerEntrySlot;
-
-function updateDispatchArgs(ins: InstructionState; st: SchedulerState; vals: MwordArray; regValues: MwordArray)
-return SchedulerEntrySlot;
-
-function getDispatchArgValues2(ins: InstructionState; st: SchedulerState;
+function getDispatchArgValues(ins: InstructionState; st: SchedulerState;
 											resultTags: PhysNameArray; vals: MwordArray; USE_IMM: boolean)
 return SchedulerEntrySlot;
 
-function updateDispatchArgs2(ins: InstructionState; st: SchedulerState; vals: MwordArray; regValues: MwordArray)
+function updateDispatchArgs(ins: InstructionState; st: SchedulerState; vals: MwordArray; regValues: MwordArray)
 return SchedulerEntrySlot;
 
 
@@ -84,106 +78,6 @@ end ProcLogicIQ;
 
 package body ProcLogicIQ is
 
--- pragma synthesis off
-function beginHistory(avs: InstructionArgValues; ready: std_logic_vector; nextReady: std_logic_vector)
-return InstructionArgValues is
-	variable res: InstructionArgValues := avs;
-begin
-	res.hist0(1) := '-';
-	res.hist0(2) := '-';
-	res.hist0(3) := '-';
-	
-	res.hist1(1) := '-';
-	res.hist1(2) := '-';
-	res.hist1(3) := '-';
-
-	res.hist2(1) := '-';
-	res.hist2(2) := '-';
-	res.hist2(3) := '-';	
-	
-	if nextReady(0) = '1' then
-		res.hist0(1) := 'N';
-	end if;		
-
-	if nextReady(1) = '1' then			
-		res.hist1(1) := 'N';
-	end if;
-
-	if nextReady(2) = '1' then				
-		res.hist2(1) := 'N';
-	end if;			
-	
-	if ready(0) = '1' then
-		res.hist0(1) := 'u';
-	end if;		
-
-	if ready(1) = '1' then
-		res.hist1(1) := 'u';
-	end if;
-
-	if ready(2) = '1' then
-		res.hist2(1) := 'u';
-	end if;		
-	
-	return res;
-end function;
-
-function dispatchArgHistory(avs: InstructionArgValues) return InstructionArgValues is
-	variable res: InstructionArgValues := avs;
-begin
-	res.hist0(2) := '-';
-	res.hist1(2) := '-';
-	res.hist2(2) := '-';	
-	
-	if avs.zero(0) = '1' then
-		res.hist0(2) := 'z';	
-	end if;
-	
-	if avs.immediate = '1' then
-		res.hist1(2) := 'i';		
-	elsif avs.zero(1) = '1' then
-		res.hist1(2) := 'z';	
-	end if;
-	
-	if avs.zero(2) = '1' then
-		res.hist2(2) := 'z';	
-	end if;		
-	
-	return res;
-end function;
-
-function updateArgHistory(avs: InstructionArgValues) return InstructionArgValues is
-	variable res: InstructionArgValues := avs;
-begin
-	res.hist0(3) := '-';
-	res.hist1(3) := '-';
-	res.hist2(3) := '-';
-	
-	if (avs.readyNext(0) and not avs.zero(0)) = '1' then
-		res.hist0(3) := 'n';	
-	elsif (avs.readyNow(0) and not avs.zero(0)) = '1' then
-	else
-		res.hist0(3) := 'r';	
-	end if;
-
-	if	(avs.readyNext(1) and not avs.zero(1) and not avs.immediate) = '1' then
-		res.hist1(3) := 'n';	
-	elsif (avs.immediate or (avs.readyNow(1) and not avs.zero(2))) = '1' then
-	else
-		res.hist1(3) := 'r';		
-	end if;
-
-	if (avs.readyNext(2) and not avs.zero(2)) = '1' then
-		res.hist2(3) := 'n';
-	elsif (avs.readyNow(2) and not avs.zero(2)) = '1' then	
-	else
-		res.hist2(3) := 'r';
-	end if;		
-		
-	return res;
-end function;
--- pragma synthesis on
-
 
 function selectUpdatedArg(avs: InstructionArgValues; ind: integer; immed: std_logic; def: Mword;
 								  vals: MwordArray; regValues: MwordArray)
@@ -225,112 +119,8 @@ begin
 end function;
 
 
-function getDispatchArgValues(ins: InstructionState; st: SchedulerState; vals: MwordArray; USE_IMM: boolean)
-return SchedulerEntrySlot is
-	variable res: SchedulerEntrySlot := DEFAULT_SCH_ENTRY_SLOT;
-	variable v0, v1: std_logic_vector(1 downto 0) := "00";
-	variable selected0, selected1: Mword := (others => '0');
-begin
-	res.ins := ins;
-	res.state := st;
 
-	res.state.argValues.arg0 := vals(slv2u(res.state.argValues.locs(0)));
-	
-	if res.state.argValues.immediate = '1' and USE_IMM then
-		res.state.argValues.arg1 := res.ins.constantArgs.imm;
-		res.state.argValues.arg1(31 downto 17) := (others => res.ins.constantArgs.imm(16)); -- 16b + addditional sign bit
-	else
-		res.state.argValues.arg1 := vals(slv2u(res.state.argValues.locs(1)));
-	end if;
-	
------- Different formulation for arg1 to use 2 LUTs rather than 3 per bit.
---		 Doesn't work as expected, probably need to be directly forced in lower level.
----------------------------------------
---	v0 := res.argValues.locs(1)(1 downto 0);
---	
---	if res.argValues.immediate = '1' then
---		v1 := "11";
---	elsif res.argValues.locs(1)(2 downto 0) = "100" then
---		v1 := "01";
---	elsif res.argValues.locs(1)(2 downto 0) = "101" then
---		v1 := "10";
---	else
---		v1 := "00";
---	end if;
---	
---	case v0 is
---		when "00" =>
---			selected0 := vals(0);
---		when "01" => 
---			selected0 := vals(1);
---		when "10" => 
---			selected0 := vals(2);
---		when others => 
---			selected0 := vals(3);
---	end case;		
---	
---	case v1 is
---		when "00" =>
---			selected1 := selected0;
---		when "01" => 
---			selected1 := vals(4);
---		when "10" => 
---			selected1 := vals(5);
---		when others => 
---			selected1 := res.constantArgs.imm;
---	end case;
---	
---	res.argValues.arg1 := selected1;
-----------------------------------
-
-	res.state.argValues.arg2 := vals(slv2u(res.state.argValues.locs(2)));
-
-	-- pragma synthesis off
-	res.state.argValues := dispatchArgHistory(res.state.argValues);
-	-- pragma synthesis on
-	
-	--	res.ins.argValues := res.state.argValues; -- TEMP!
-	return res;
-end function;
-
-
-function updateDispatchArgs(ins: InstructionState; st: SchedulerState; vals: MwordArray; regValues: MwordArray)
-return SchedulerEntrySlot is
-	variable res: SchedulerEntrySlot := DEFAULT_SCH_ENTRY_SLOT;
-	variable aa: MwordArray(0 to 5) := (others => (others => '0'));
-	variable ind: integer := 0;
-	variable selector: std_logic_vector(0 to 1) := "00";
-	variable tbl: MwordArray(0 to 3) := (others => (others => '0'));
-	variable carg0, carg1, carg2: Mword;
-begin
-	res.ins := ins;
-	res.state := st;
-	
-	-- pragma synthesis off
-	res.state.argValues := updateArgHistory(res.state.argValues);
-	-- pragma synthesis on
-
--- readyNext && not zero -> next val, readyNow && not zero -> keep, else -> reg
-	-- Clear 'missing' flag where readyNext indicates.
-	res.state.argValues.missing := res.state.argValues.missing and not (res.state.argValues.readyNext and not res.state.argValues.zero);
-
-	carg0 := selectUpdatedArg(res.state.argValues, 0, '0', res.state.argValues.arg0, vals, regValues);	
-	carg1 := selectUpdatedArg(res.state.argValues, 1, res.state.argValues.immediate, res.state.argValues.arg1, vals, regValues);	
-	carg2 := selectUpdatedArg(res.state.argValues, 2, '0', res.state.argValues.arg2, vals, regValues);	
-
-	res.state.argValues.arg0 := carg0;
-	res.state.argValues.arg1 := carg1;
-	res.state.argValues.arg2 := carg2;
-	
-	--res.ins.argValues := res.state.argValues; -- TEMP!
-	
-	return res;
-end function;
-
-
-
-
-function getDispatchArgValues2(ins: InstructionState; st: SchedulerState;
+function getDispatchArgValues(ins: InstructionState; st: SchedulerState;
 											resultTags: PhysNameArray; vals: MwordArray; USE_IMM: boolean)
 return SchedulerEntrySlot is
 	variable res: SchedulerEntrySlot := DEFAULT_SCH_ENTRY_SLOT;
@@ -376,59 +166,14 @@ begin
 	else
 		res.state.argValues.arg1 := vals(slv2u(res.state.argValues.locs(1)));
 	end if;
-	
------- Different formulation for arg1 to use 2 LUTs rather than 3 per bit.
---		 Doesn't work as expected, probably need to be directly forced in lower level.
----------------------------------------
---	v0 := res.argValues.locs(1)(1 downto 0);
---	
---	if res.argValues.immediate = '1' then
---		v1 := "11";
---	elsif res.argValues.locs(1)(2 downto 0) = "100" then
---		v1 := "01";
---	elsif res.argValues.locs(1)(2 downto 0) = "101" then
---		v1 := "10";
---	else
---		v1 := "00";
---	end if;
---	
---	case v0 is
---		when "00" =>
---			selected0 := vals(0);
---		when "01" => 
---			selected0 := vals(1);
---		when "10" => 
---			selected0 := vals(2);
---		when others => 
---			selected0 := vals(3);
---	end case;		
---	
---	case v1 is
---		when "00" =>
---			selected1 := selected0;
---		when "01" => 
---			selected1 := vals(4);
---		when "10" => 
---			selected1 := vals(5);
---		when others => 
---			selected1 := res.constantArgs.imm;
---	end case;
---	
---	res.argValues.arg1 := selected1;
-----------------------------------
 
 	res.state.argValues.arg2 := vals(slv2u(res.state.argValues.locs(2)));
 
-	-- pragma synthesis off
-	res.state.argValues := dispatchArgHistory(res.state.argValues);
-	-- pragma synthesis on
-	
-	--	res.ins.argValues := res.state.argValues; -- TEMP!
 	return res;
 end function;
 
 
-function updateDispatchArgs2(ins: InstructionState; st: SchedulerState; vals: MwordArray; regValues: MwordArray)
+function updateDispatchArgs(ins: InstructionState; st: SchedulerState; vals: MwordArray; regValues: MwordArray)
 return SchedulerEntrySlot is
 	variable res: SchedulerEntrySlot := DEFAULT_SCH_ENTRY_SLOT;
 	variable aa: MwordArray(0 to 5) := (others => (others => '0'));
@@ -439,10 +184,6 @@ return SchedulerEntrySlot is
 begin
 	res.ins := ins;
 	res.state := st;
-	
-	-- pragma synthesis off
-	res.state.argValues := updateArgHistory(res.state.argValues);
-	-- pragma synthesis on
 
 -- readyNext && not zero -> next val, readyNow && not zero -> keep, else -> reg
 	-- Clear 'missing' flag where readyNext indicates.
@@ -453,8 +194,6 @@ begin
 	res.state.argValues.arg0 := carg0;
 	res.state.argValues.arg1 := carg1;
 	res.state.argValues.arg2 := carg2;
-	
-	--res.ins.argValues := res.state.argValues; -- TEMP!
 	
 	return res;
 end function;

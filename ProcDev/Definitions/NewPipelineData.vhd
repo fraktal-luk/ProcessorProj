@@ -223,9 +223,9 @@ type InstructionArgValues is record
 	arg0: Mword;
 	arg1: Mword;
 	arg2: Mword;
-		-- pragma synthesis off
-		hist0, hist1, hist2: string(1 to 3);
-		-- pragma synthesis on
+	
+	argLocsPipe: SmallNumberArray(0 to 2);
+	argLocsPhase: SmallNumberArray(0 to 2);
 end record;
 
 type InstructionState is record
@@ -335,19 +335,6 @@ constant DEFAULT_STAGE_DATA_MULTI: StageDataMulti := (fullMask=>(others=>'0'),
 																		);
 
 type StageDataMultiArray is array (integer range <>) of StageDataMulti;
---
---					
---type ArgStatusInfo is record
---	stored: std_logic_vector(0 to 2); -- those that were already present in prev cycle	
---	written: std_logic_vector(0 to 2);
---	ready: std_logic_vector(0 to 2);
---	locs: SmallNumberArray(0 to 2);
---	--vals: MwordArray(0 to 2);
---	nextReady: std_logic_vector(0 to 2);
---	nextLocs: SmallNumberArray(0 to 2);
---end record;
---
---type ArgStatusInfoArray is array(integer range <>) of ArgStatusInfo;
 
 end NewPipelineData;
 
@@ -430,13 +417,9 @@ begin
 			  missing => (others=>'0'),
 			  arg0 => (others=>'0'),
 			  arg1 => (others=>'0'),
-			  arg2 => (others=>'0')
-					-- pragma synthesis off
-					,
-					hist0 => "   ",
-					hist1 => "   ",
-					hist2 => "   "
-					-- pragma synthesis on
+			  arg2 => (others=>'0'),
+				argLocsPipe => (others => (others => '0')),
+				argLocsPhase => (others => (others => '0'))
 			  );
 end function;
 

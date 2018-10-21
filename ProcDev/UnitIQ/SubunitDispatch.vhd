@@ -73,27 +73,19 @@ end SubunitDispatch;
 
 
 architecture Alternative of SubunitDispatch is
-	--signal stageDataM, stageDataStored: StageDataMulti := DEFAULT_STAGE_DATA_MULTI;
 	signal inputDataWithArgs, dispatchDataUpdated, inputDataWithArgs_T, dispatchDataUpdated_T:
 						SchedulerEntrySlot := DEFAULT_SCH_ENTRY_SLOT;
 	signal lockSend: std_logic := '0';
 	
-	--signal stageDataIn: InstructionState := DEFAULT_INSTRUCTION_STATE; -- DEPREC
 	signal sendingOut: std_logic := '0';
-	--signal stageDataOut: InstructionState := DEFAULT_INSTRUCTION_STATE;
 	signal stageDataSaved: InstructionSlot := DEFAULT_INSTRUCTION_SLOT;	
-	--	signal stageDataOut_C: SchedulerEntrySlot := DEFAULT_SCH_ENTRY_SLOT;
 
 	signal argState: SchedulerState := DEFAULT_SCHEDULER_STATE;
 	--	signal ch0: std_logic := '0';
 		
 begin
-	--stageDataIn <= input.ins;
 
-	--inputDataWithArgs <= getDispatchArgValues(input.ins, input.state, resultVals, USE_IMM);
-		inputDataWithArgs <= getDispatchArgValues2(input.ins, input.state, resultTags, resultVals, USE_IMM);
-
-	--stageDataM <= makeSDM((0 => (prevSending, inputDataWithArgs.ins)));
+	inputDataWithArgs <= getDispatchArgValues(input.ins, input.state, resultTags, resultVals, USE_IMM);
 	
 	BASIC_LOGIC: entity work.GenericStageMulti(Behavioral)
 	generic map(
@@ -113,31 +105,8 @@ begin
 		execEventSignal => execEventSignal,
 		lateEventSignal => lateEventSignal,
 		execCausing => execCausing
-		--lockCommand => '0'
 	);
 
---			BASIC_LOGIC_SCH: entity work.SchedulerStage(Behavioral)
---			generic map(
---				COMPARE_TAG => '1'
---			)
---			port map(
---				clk => clk, reset => reset, en => en,
---				
---				prevSending => prevSending,
---				nextAccepting => nextAccepting,
---				
---				stageDataIn => (prevSending, inputDataWithArgs.ins, inputDataWithArgs.state),
---				acceptingOut => open,--acceptingOut,
---				sendingOut => open,--sendingOut,
---				stageDataOut => stageDataOut_C,--stageDataStored,
---				
---				execEventSignal => execEventSignal,
---				lateEventSignal => lateEventSignal,
---				execCausing => execCausing,
---				lockCommand => '0'
---			);
---
---		ch0 <= bool2std(stageDataOut_C.state = argState);
 		
 	SAVE_SCH_STATE: process(clk)
 	begin
@@ -146,11 +115,7 @@ begin
 		end if;
 	end process;
 
-
-	--dispatchDataUpdated <= updateDispatchArgs(stageDataSaved.ins, argState,
-	--														resultVals(0 to N_NEXT_RES_TAGS-1),
-	--														regValues);
-		dispatchDataUpdated <= updateDispatchArgs2(stageDataSaved.ins, argState,
+	dispatchDataUpdated <= updateDispatchArgs(stageDataSaved.ins, argState,
 															resultVals(0 to 2),--N_NEXT_RES_TAGS-1),
 															regValues);
 
