@@ -120,6 +120,7 @@ architecture Behavioral of OutOfOrderBox is
 	signal regValsA, regValsB, regValsC, regValsD, regValsE, regValsCE: MwordArray(0 to 2)
 					:= (others => (others => '0'));	
 	signal fni: ForwardingInfo := DEFAULT_FORWARDING_INFO;
+	signal fniNew: ForwardingInfoNew := DEFAULT_FORWARDING_INFO_NEW;
 
 	signal outputA, outputB, outputC, outputD, outputE: InstructionSlot := DEFAULT_INSTRUCTION_SLOT;
 	signal outputOpPreB, outputOpPreC, outputM2B, outputM2C: InstructionState := DEFAULT_INSTRUCTION_STATE;
@@ -397,6 +398,28 @@ begin
 		execOutputs2 <= (		2 => outputE, 3 => outputD, others => DEFAULT_INSTRUCTION_SLOT); -- (-,-,E,D)!
 		execOutputsPre <= (1 => ('0', outputOpPreB), 2 => --('0', outputOpPreC),	others => DEFAULT_INSTRUCTION_SLOT);
 																			('0', outputOpPreC),	others => DEFAULT_INSTRUCTION_SLOT);
+
+
+			RESULTS_1: entity work.GenericStageMulti(Behavioral)
+			generic map(
+				WIDTH => 3
+			)
+			port map(
+				clk => clk, reset => resetSig, en => enSig,
+				
+				prevSending => '0', -- TODO
+				nextAccepting => '1',
+				execEventSignal => '0',
+				lateEventSignal => '0',
+				execCausing => DEFAULT_INSTRUCTION_STATE,--execCausing,
+				stageDataIn2 => execOutputs1(0 to 2),
+				acceptingOut => open,
+				sendingOut => open,
+				stageDataOut2 => open		
+			);
+
+
+
 		COMMIT_QUEUE: entity work.TestCQPart0(Implem2)
 		generic map(
 			INPUT_WIDTH => 3,
@@ -418,21 +441,21 @@ begin
 
 		cqDataLivingOut2(0) <= (cqOutputSig(0).full, cqOutputSig(0).ins);
 
-		-- CAREFUL! This stage is needed to keep result tags 1 for cycle when writing to reg file,
-		--				so that "black hole" of invisible readiness doesn't occur
-		AFTER_CQ: entity work.GenericStageMulti(Behavioral) port map(
-			clk => clk, reset => resetSig, en => enSig,
-			
-			prevSending => cqOutputSig(0).full,
-			nextAccepting => '1',
-			execEventSignal => '0',
-			lateEventSignal => '0',
-			execCausing => DEFAULT_INSTRUCTION_STATE,--execCausing,
-			stageDataIn2 => cqDataLivingOut2,
-			acceptingOut => open,
-			sendingOut => open,
-			stageDataOut2 => stageDataAfterCQ2		
-		);
+			-- CAREFUL! This stage is needed to keep result tags 1 for cycle when writing to reg file,
+			--				so that "black hole" of invisible readiness doesn't occur
+			AFTER_CQ: entity work.GenericStageMulti(Behavioral) port map(
+				clk => clk, reset => resetSig, en => enSig,
+				
+				prevSending => cqOutputSig(0).full,
+				nextAccepting => '1',
+				execEventSignal => '0',
+				lateEventSignal => '0',
+				execCausing => DEFAULT_INSTRUCTION_STATE,--execCausing,
+				stageDataIn2 => cqDataLivingOut2,
+				acceptingOut => open,
+				sendingOut => open,
+				stageDataOut2 => stageDataAfterCQ2		
+			);
 
 		-- writtenTags indicate registers written to GPR file in last cycle, so they can be read from there
 		--		rather than from forw. network, but readyRegFlags are not available in the 1st cycle after WB.
@@ -442,6 +465,17 @@ begin
 		fni.nextTagsM2 <= ((others => '0'), outputM2B.physicalArgSpec.dest, --(others => '0'));
 																									outputOpPreC.physicalArgSpec.dest);
 		fni.resultValues <= getResultValues(execOutputs1, cqBufferOutputSig, DEFAULT_STAGE_DATA_MULTI);
+
+		
+		fniNew.tagsM2 <= ((others => '0'), outputM2B.physicalArgSpec.dest, outputOpPreC.physicalArgSpec.dest);
+		fniNew.tagsM1 <= (schedOutputArr(0).ins.physicalArgSpec.dest, 
+									execOutputsPre(1).ins.physicalArgSpec.dest, execOutputsPre(2).ins.physicalArgSpec.dest);
+		fniNew.tags0 <= (execOutputs1(0).ins.physicalArgSpec.dest,
+									execOutputs1(1).ins.physicalArgSpec.dest, execOutputs1(2).ins.physicalArgSpec.dest);
+		fniNew.tags1 <= (execOutputs1(0).ins.physicalArgSpec.dest,
+									execOutputs1(1).ins.physicalArgSpec.dest, execOutputs1(2).ins.physicalArgSpec.dest); -- TODO
+		fniNew.values0 <= getResults(execOutputs1);
+		fniNew.values1 <= getResults(execOutputs1); -- TODO
 
 		
 		-- Int register block

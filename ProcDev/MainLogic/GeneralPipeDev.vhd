@@ -64,6 +64,24 @@ constant DEFAULT_FORWARDING_INFO: ForwardingInfo := (
 	resultValues => (others => (others => '0'))
 );
 
+	type ForwardingInfoNew is record
+		tagsM2: PhysNameArray(0 to 2);
+		tagsM1: PhysNameArray(0 to 2);
+		tags0: PhysNameArray(0 to 2);
+		tags1: PhysNameArray(0 to 2);
+		values0: MwordArray(0 to 2);
+		values1: MwordArray(0 to 2);
+	end record;
+
+	constant DEFAULT_FORWARDING_INFO_NEW: ForwardingInfoNew := (
+		tagsM2 => (others => (others => '0')),
+		tagsM1 => (others => (others => '0')),
+		tags0 => (others => (others => '0')),
+		tags1 => (others => (others => '0')),
+		values0 => (others => (others => '0')),
+		values1 => (others => (others => '0'))
+	);
+
 
 function makeSDM(arr: InstructionSlotArray) return StageDataMulti;
 function squeezeSD(sd: StageDataMulti; srcVec: std_logic_vector) return StageDataMulti;
@@ -147,6 +165,10 @@ function getPhysicalDestMask(insVec: StageDataMulti) return std_logic_vector;
 function getExceptionMask(insVec: StageDataMulti) return std_logic_vector;
 
 function getEffectiveMask(newContent: StageDataMulti) return std_logic_vector;
+
+function getResults(execOutputs: InstructionSlotArray)
+return MwordArray;
+
 function getLastEffective(newContent: StageDataMulti) return InstructionState;
 
 function getSendingFromCQ(livingMask: std_logic_vector) return std_logic_vector;
@@ -916,8 +938,17 @@ begin
 		resultVals(4-1 + i) := stageDataCQ(i).ins.result;  	
 	end loop;
 	return resultVals;
-end function;	
+end function;
 
+function getResults(execOutputs: InstructionSlotArray)
+return MwordArray is
+	variable resultVals: MwordArray(0 to 2) := (others=>(others=>'0'));		
+begin
+	resultVals(0) := execOutputs(0).ins.result;
+	resultVals(1) := execOutputs(1).ins.result;
+	resultVals(2) := execOutputs(2).ins.result;
+	return resultVals;
+end function;
 
 	function getLastEffective(newContent: StageDataMulti) return InstructionState is
 		variable res: InstructionState := newContent.data(0);
