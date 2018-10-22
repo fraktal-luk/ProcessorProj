@@ -262,7 +262,7 @@ begin
 
 		-- SQ inputs
 		storeAddressDataSig <= addressingData; -- Mem unit interface
-		storeValueDataSig <= setInsResult(inputE.ins, inputE.state.argValues.arg2); -- Mem unit interface		
+		storeValueDataSig <= setInsResult(inputE.ins, inputE.state.argValues.arg0); -- Mem unit interface		
 
 			STORE_QUEUE: entity work.MemoryUnit(Behavioral)
 			generic map(

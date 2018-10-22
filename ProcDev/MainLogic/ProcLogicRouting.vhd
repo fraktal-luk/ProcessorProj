@@ -237,13 +237,21 @@ function prepareForStoreSSA(sa: SchedulerEntrySlotArray) return SchedulerEntrySl
 begin
 	for i in 0 to PIPE_WIDTH-1 loop	
 		res(i).ins.constantArgs.immSel := '0';
+		
+			res(i).ins.virtualArgSpec.args(0) := res(i).ins.virtualArgSpec.args(2);
+			res(i).ins.virtualArgSpec.args(2) := (others => '0');
 
-		res(i).ins.virtualArgSpec.intArgSel(0) := '0';
+			res(i).ins.physicalArgSpec.args(0) := res(i).ins.physicalArgSpec.args(2);
+			res(i).ins.physicalArgSpec.args(2) := (others => '0');
+			
+		res(i).ins.virtualArgSpec.intArgSel(0) := res(i).ins.virtualArgSpec.intArgSel(2);
 		res(i).ins.virtualArgSpec.intArgSel(1) := '0';
+		res(i).ins.virtualArgSpec.intArgSel(2) := '0';		
 		res(i).ins.virtualArgSpec.intDestSel := '0';			
 
-		res(i).ins.physicalArgSpec.intArgSel(0) := '0';
+		res(i).ins.physicalArgSpec.intArgSel(0) := res(i).ins.physicalArgSpec.intArgSel(2);
 		res(i).ins.physicalArgSpec.intArgSel(1) := '0';
+		res(i).ins.physicalArgSpec.intArgSel(2) := '0';
 		res(i).ins.physicalArgSpec.intDestSel := '0';
 		
 		res(i).ins.controlInfo.completed := '0';

@@ -147,12 +147,12 @@ begin
 		end if;
 	end loop;		
 		
-	for i in resultTags'length-1 downto 0 loop				
-		if resultTags(i)(PHYS_REG_BITS-1 downto 0) = ins.physicalArgSpec.args(2)(PHYS_REG_BITS-1 downto 0) then
-			ready(2) := '1';
-			locs(2) := i2slv(i, SMALL_NUMBER_SIZE);
-		end if;
-	end loop;
+--	for i in resultTags'length-1 downto 0 loop				
+--		if resultTags(i)(PHYS_REG_BITS-1 downto 0) = ins.physicalArgSpec.args(2)(PHYS_REG_BITS-1 downto 0) then
+--			ready(2) := '1';
+--			locs(2) := i2slv(i, SMALL_NUMBER_SIZE);
+--		end if;
+--	end loop;
 
 	res.state.argValues.readyNow := ready;
 	res.state.argValues.locs := locs;
@@ -167,7 +167,7 @@ begin
 		res.state.argValues.arg1 := vals(slv2u(res.state.argValues.locs(1)));
 	end if;
 
-	res.state.argValues.arg2 := vals(slv2u(res.state.argValues.locs(2)));
+	--res.state.argValues.arg2 := vals(slv2u(res.state.argValues.locs(2)));
 
 	return res;
 end function;
@@ -190,10 +190,10 @@ begin
 	res.state.argValues.missing := res.state.argValues.missing and not (res.state.argValues.readyNext and not res.state.argValues.zero);
 	carg0 := selectUpdatedArg(res.state.argValues, 0, '0', res.state.argValues.arg0, vals, regValues);
 	carg1 := selectUpdatedArg(res.state.argValues, 1, res.state.argValues.immediate, res.state.argValues.arg1, vals, regValues);	
-	carg2 := selectUpdatedArg(res.state.argValues, 2, '0', res.state.argValues.arg2, vals, regValues);
+	--carg2 := selectUpdatedArg(res.state.argValues, 2, '0', res.state.argValues.arg2, vals, regValues);
 	res.state.argValues.arg0 := carg0;
 	res.state.argValues.arg1 := carg1;
-	res.state.argValues.arg2 := carg2;
+	--res.state.argValues.arg2 := carg2;
 	
 	return res;
 end function;
@@ -203,7 +203,7 @@ function extractReadyMaskNew(entryVec: SchedulerEntrySlotArray) return std_logic
 	variable res: std_logic_vector(entryVec'range);
 begin	
 	for i in res'range loop
-		res(i) := not isNonzero(entryVec(i).state.argValues.missing);
+		res(i) := not isNonzero(entryVec(i).state.argValues.missing(0 to 1));
 	end loop;
 	return res;
 end function;
@@ -349,12 +349,14 @@ begin
 		if fni.nextResultTags(i)(PHYS_REG_BITS-1 downto 0) = ins.physicalArgSpec.args(0)(PHYS_REG_BITS-1 downto 0) then
 			nextReady(0) := '1';
 		end if;
+		
 		if fni.nextResultTags(i)(PHYS_REG_BITS-1 downto 0) = ins.physicalArgSpec.args(1)(PHYS_REG_BITS-1 downto 0) then
 			nextReady(1) := '1';
 		end if;
-		if fni.nextResultTags(i)(PHYS_REG_BITS-1 downto 0) = ins.physicalArgSpec.args(2)(PHYS_REG_BITS-1 downto 0) then
-			nextReady(2) := '1';
-		end if;			
+		
+--		if fni.nextResultTags(i)(PHYS_REG_BITS-1 downto 0) = ins.physicalArgSpec.args(2)(PHYS_REG_BITS-1 downto 0) then
+--			nextReady(2) := '1';
+--		end if;			
 	end loop;
 	
 	-- readyM2 - slow wakeup
@@ -367,10 +369,10 @@ begin
 			readyM2(1) := '1';
 			locsM2(1) := i2slv(i, SMALL_NUMBER_SIZE);
 		end if;
-		if fni.nextTagsM2(i)(PHYS_REG_BITS-1 downto 0) = ins.physicalArgSpec.args(2)(PHYS_REG_BITS-1 downto 0) then
-			readyM2(2) := '1';
-			locsM2(2) := i2slv(i, SMALL_NUMBER_SIZE);
-		end if;			
+--		if fni.nextTagsM2(i)(PHYS_REG_BITS-1 downto 0) = ins.physicalArgSpec.args(2)(PHYS_REG_BITS-1 downto 0) then
+--			readyM2(2) := '1';
+--			locsM2(2) := i2slv(i, SMALL_NUMBER_SIZE);
+--		end if;			
 	end loop;
 
 	--res.state.argValues.readyNow := (others => '0'); 
@@ -418,9 +420,9 @@ begin
 			written(1) := '1';
 		end if;
 
-		if fni.writtenTags(i)(PHYS_REG_BITS-1 downto 0) = ins.physicalArgSpec.args(2)(PHYS_REG_BITS-1 downto 0) then
-			written(2) := '1';
-		end if;		
+--		if fni.writtenTags(i)(PHYS_REG_BITS-1 downto 0) = ins.physicalArgSpec.args(2)(PHYS_REG_BITS-1 downto 0) then
+--			written(2) := '1';
+--		end if;		
 	end loop;
 	
 	-- Find where tag agrees with s0
@@ -438,12 +440,12 @@ begin
 		end if;
 	end loop;		
 		
-	for i in fni.resultTags'length-1 downto 0 loop				
-		if fni.resultTags(i)(PHYS_REG_BITS-1 downto 0) = ins.physicalArgSpec.args(2)(PHYS_REG_BITS-1 downto 0) then
-			ready(2) := '1';
-			locs(2) := i2slv(i, SMALL_NUMBER_SIZE);
-		end if;
-	end loop;
+--	for i in fni.resultTags'length-1 downto 0 loop				
+--		if fni.resultTags(i)(PHYS_REG_BITS-1 downto 0) = ins.physicalArgSpec.args(2)(PHYS_REG_BITS-1 downto 0) then
+--			ready(2) := '1';
+--			locs(2) := i2slv(i, SMALL_NUMBER_SIZE);
+--		end if;
+--	end loop;
 	
 	for i in fni.nextResultTags'range loop
 		if fni.nextResultTags(i)(PHYS_REG_BITS-1 downto 0) = ins.physicalArgSpec.args(0)(PHYS_REG_BITS-1 downto 0) then
@@ -454,10 +456,10 @@ begin
 			nextReady(1) := '1';
 			nextLocs(1) := i2slv(i, SMALL_NUMBER_SIZE);
 		end if;
-		if fni.nextResultTags(i)(PHYS_REG_BITS-1 downto 0) = ins.physicalArgSpec.args(2)(PHYS_REG_BITS-1 downto 0) then
-			nextReady(2) := '1';
-			nextLocs(2) := i2slv(i, SMALL_NUMBER_SIZE);
-		end if;			
+--		if fni.nextResultTags(i)(PHYS_REG_BITS-1 downto 0) = ins.physicalArgSpec.args(2)(PHYS_REG_BITS-1 downto 0) then
+--			nextReady(2) := '1';
+--			nextLocs(2) := i2slv(i, SMALL_NUMBER_SIZE);
+--		end if;			
 	end loop;
 
 	for i in 1 to 2 loop -- [0] does not use slow wakeup
@@ -469,10 +471,10 @@ begin
 			readyM2(1) := '1';
 			locsM2(1) := i2slv(i, SMALL_NUMBER_SIZE);
 		end if;
-		if fni.nextTagsM2(i)(PHYS_REG_BITS-1 downto 0) = ins.physicalArgSpec.args(2)(PHYS_REG_BITS-1 downto 0) then
-			readyM2(2) := '1';
-			locsM2(2) := i2slv(i, SMALL_NUMBER_SIZE);
-		end if;			
+--		if fni.nextTagsM2(i)(PHYS_REG_BITS-1 downto 0) = ins.physicalArgSpec.args(2)(PHYS_REG_BITS-1 downto 0) then
+--			readyM2(2) := '1';
+--			locsM2(2) := i2slv(i, SMALL_NUMBER_SIZE);
+--		end if;			
 	end loop;
 
 	res.state.argValues.readyNow := (others => '0'); 
@@ -524,10 +526,10 @@ begin
 			nextReady(1) := '1';
 			nextLocs(1) := i2slv(i, SMALL_NUMBER_SIZE);
 		end if;
-		if fni.nextResultTags(i)(PHYS_REG_BITS-1 downto 0) = ins.physicalArgSpec.args(2)(PHYS_REG_BITS-1 downto 0) then
-			nextReady(2) := '1';
-			nextLocs(2) := i2slv(i, SMALL_NUMBER_SIZE);
-		end if;			
+--		if fni.nextResultTags(i)(PHYS_REG_BITS-1 downto 0) = ins.physicalArgSpec.args(2)(PHYS_REG_BITS-1 downto 0) then
+--			nextReady(2) := '1';
+--			nextLocs(2) := i2slv(i, SMALL_NUMBER_SIZE);
+--		end if;			
 	end loop;
 
 	res.state.argValues.readyNow := (others => '0'); 

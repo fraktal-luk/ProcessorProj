@@ -442,16 +442,13 @@ begin
 		fni.nextTagsM2 <= ((others => '0'), outputM2B.physicalArgSpec.dest, --(others => '0'));
 																									outputOpPreC.physicalArgSpec.dest);
 		fni.resultValues <= getResultValues(execOutputs1, cqBufferOutputSig, DEFAULT_STAGE_DATA_MULTI);
-		
-		-- TODO:
-		--fni <= getForwardingInfo(execOutput1, execOutputs2, execOutputsPre, schedOutputArray, stageDataAfterCQ2,
-		--									cqBufferOutputSig);
+
 		
 		-- Int register block
 		regsSelCE(0 to 1) <= regsSelC(0 to 1);
-		regsSelCE(2) <= regsSelE(2);
+		regsSelCE(2) <= regsSelE(0);
 		regValsC(0 to 1) <= regValsCE(0 to 1);
-		regValsE(2) <= regValsCE(2);	
+		regValsE(0) <= regValsCE(2);	
 
 		GPR_FILE_DISPATCH: entity work.RegisterFile0 (Behavioral)
 		generic map(WIDTH => 4, WRITE_WIDTH => 1)
