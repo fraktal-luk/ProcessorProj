@@ -133,6 +133,7 @@ architecture Behavioral of OutOfOrderBox is
 	signal cqBufferOutputSig: InstructionSlotArray(0 to CQ_SIZE-1) := (others => DEFAULT_INSTRUCTION_SLOT);
 		
 	signal execOutputs1, execOutputs2, execOutputsPre: InstructionSlotArray(0 to 3) := (others => DEFAULT_INS_SLOT);
+	signal execOutputsDelayed: InstructionSlotArray(0 to 2) := (others => DEFAULT_INS_SLOT);
 
 	signal iqAcceptingVecArr: SLVA(0 to 4) := (others => (others => '0'));	
 	signal iqAcceptingArr: std_logic_vector(0 to 4) := (others => '0');
@@ -400,24 +401,59 @@ begin
 																			('0', outputOpPreC),	others => DEFAULT_INSTRUCTION_SLOT);
 
 
-			RESULTS_1: entity work.GenericStageMulti(Behavioral)
+			RESULTS_D0: entity work.GenericStageMulti(Behavioral)
 			generic map(
-				WIDTH => 3
+				WIDTH => 1
 			)
 			port map(
 				clk => clk, reset => resetSig, en => enSig,
 				
-				prevSending => '0', -- TODO
+				prevSending => execOutputs1(0).full,
 				nextAccepting => '1',
 				execEventSignal => '0',
 				lateEventSignal => '0',
 				execCausing => DEFAULT_INSTRUCTION_STATE,--execCausing,
-				stageDataIn2 => execOutputs1(0 to 2),
+				stageDataIn2 => execOutputs1(0 to 0),
 				acceptingOut => open,
 				sendingOut => open,
-				stageDataOut2 => open		
+				stageDataOut2 => execOutputsDelayed(0 to 0)		
 			);
 
+			RESULTS_D1: entity work.GenericStageMulti(Behavioral)
+			generic map(
+				WIDTH => 1
+			)
+			port map(
+				clk => clk, reset => resetSig, en => enSig,
+				
+				prevSending => execOutputs1(1).full,
+				nextAccepting => '1',
+				execEventSignal => '0',
+				lateEventSignal => '0',
+				execCausing => DEFAULT_INSTRUCTION_STATE,--execCausing,
+				stageDataIn2 => execOutputs1(1 to 1),
+				acceptingOut => open,
+				sendingOut => open,
+				stageDataOut2 => execOutputsDelayed(1 to 1)		
+			);
+			
+			RESULTS_D2: entity work.GenericStageMulti(Behavioral)
+			generic map(
+				WIDTH => 1
+			)
+			port map(
+				clk => clk, reset => resetSig, en => enSig,
+				
+				prevSending => execOutputs1(2).full,
+				nextAccepting => '1',
+				execEventSignal => '0',
+				lateEventSignal => '0',
+				execCausing => DEFAULT_INSTRUCTION_STATE,--execCausing,
+				stageDataIn2 => execOutputs1(2 to 2),
+				acceptingOut => open,
+				sendingOut => open,
+				stageDataOut2 => execOutputsDelayed(2 to 2)
+			);
 
 
 		COMMIT_QUEUE: entity work.TestCQPart0(Implem2)
@@ -472,10 +508,10 @@ begin
 									execOutputsPre(1).ins.physicalArgSpec.dest, execOutputsPre(2).ins.physicalArgSpec.dest);
 		fniNew.tags0 <= (execOutputs1(0).ins.physicalArgSpec.dest,
 									execOutputs1(1).ins.physicalArgSpec.dest, execOutputs1(2).ins.physicalArgSpec.dest);
-		fniNew.tags1 <= (execOutputs1(0).ins.physicalArgSpec.dest,
-									execOutputs1(1).ins.physicalArgSpec.dest, execOutputs1(2).ins.physicalArgSpec.dest); -- TODO
+		fniNew.tags1 <= (execOutputsDelayed(0).ins.physicalArgSpec.dest,
+									execOutputsDelayed(1).ins.physicalArgSpec.dest, execOutputsDelayed(2).ins.physicalArgSpec.dest);
 		fniNew.values0 <= getResults(execOutputs1);
-		fniNew.values1 <= getResults(execOutputs1); -- TODO
+		fniNew.values1 <= getResults(execOutputsDelayed);
 
 		
 		-- Int register block

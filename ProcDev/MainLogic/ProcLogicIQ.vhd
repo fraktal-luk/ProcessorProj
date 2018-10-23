@@ -72,6 +72,18 @@ function updateForSelectionArrayFNI(insArray: SchedulerEntrySlotArray; readyRegF
 									fni: ForwardingInfo)
 return SchedulerEntrySlotArray;
 
+
+function findRegTag(tag: SmallNumber; list: SmallNumberArray) return std_logic_vector is
+	variable res: std_logic_vector(list'range) := (others => '0');
+begin
+	for i in list'range loop
+		if tag = list(i) then
+			res(i) := '1';
+		end if;
+	end loop;
+	return res;
+end function;
+
 end ProcLogicIQ;
 
 
