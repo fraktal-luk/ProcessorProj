@@ -49,15 +49,21 @@ end record;
 
 -- FORWARDING NETWORK
 type ForwardingInfo is record
-	writtenTags: PhysNameArray(0 to PIPE_WIDTH-1);
+	--writtenTags: PhysNameArray(0 to PIPE_WIDTH-1);
+		tags0: PhysNameArray(0 to 2);
+		tags1: PhysNameArray(0 to 2);
+		
 	resultTags: PhysNameArray(0 to N_RES_TAGS-1);
-	nextResultTags: PhysNameArray(0 to N_NEXT_RES_TAGS-1);
-	nextTagsM2:	PhysNameArray(0 to 2); -- TEMP?
+	nextResultTags: PhysNameArray(0 to 2);
+	nextTagsM2:	PhysNameArray(0 to 2);
 	resultValues: MwordArray(0 to N_RES_TAGS-1);
 end record;
 
 constant DEFAULT_FORWARDING_INFO: ForwardingInfo := (
-	writtenTags => (others => (others => '0')),
+	--writtenTags => (others => (others => '0')),
+		tags0 => (others => (others => '0')),
+		tags1 => (others => (others => '0')),
+		
 	resultTags => (others => (others => '0')),
 	nextResultTags => (others => (others => '0')),
 	nextTagsM2 => (others => (others => '0')),
@@ -915,11 +921,11 @@ function getNextResultTags(execOutputsPre: InstructionSlotArray;
 						schedOutputArr: SchedulerEntrySlotArray
 						) 
 return PhysNameArray is
-	variable nextResultTags: PhysNameArray(0 to N_NEXT_RES_TAGS-1) := (others=>(others=>'0'));
+	variable nextResultTags: PhysNameArray(0 to 2) := (others=>(others=>'0'));
 begin
 	nextResultTags(0) := schedOutputArr(0).ins.physicalArgSpec.dest;
 	nextResultTags(1) := execOutputsPre(1).ins.physicalArgSpec.dest;
-	--nextResultTags(2) := execOutputsPre(2).ins.physicalArgSpec.dest;
+	nextResultTags(2) := execOutputsPre(2).ins.physicalArgSpec.dest;
 	return nextResultTags;
 end function;
 

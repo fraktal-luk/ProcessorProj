@@ -495,13 +495,14 @@ begin
 
 		-- writtenTags indicate registers written to GPR file in last cycle, so they can be read from there
 		--		rather than from forw. network, but readyRegFlags are not available in the 1st cycle after WB.
-		fni.writtenTags <= getPhysicalDests(makeSDM(stageDataAfterCQ2));
+		--fni.writtenTags <= getPhysicalDests(makeSDM(stageDataAfterCQ2));
 		fni.resultTags <= getResultTags(execOutputs1, cqBufferOutputSig, DEFAULT_STAGE_DATA_MULTI);
 		fni.nextResultTags <= getNextResultTags(execOutputsPre, schedOutputArr);
 		fni.nextTagsM2 <= ((others => '0'), outputM2B.physicalArgSpec.dest, --(others => '0'));
 																									outputOpPreC.physicalArgSpec.dest);
 		fni.resultValues <= getResultValues(execOutputs1, cqBufferOutputSig, DEFAULT_STAGE_DATA_MULTI);
-
+				fni.tags0 <= fniNew.tags0;
+				fni.tags1 <= fniNew.tags1;
 		
 		fniNew.tagsM2 <= ((others => '0'), outputM2B.physicalArgSpec.dest, outputOpPreC.physicalArgSpec.dest);
 		fniNew.tagsM1 <= (schedOutputArr(0).ins.physicalArgSpec.dest, 

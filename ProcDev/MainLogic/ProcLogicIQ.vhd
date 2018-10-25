@@ -73,14 +73,28 @@ function updateForSelectionArrayFNI(insArray: SchedulerEntrySlotArray; readyRegF
 return SchedulerEntrySlotArray;
 
 
-function findRegTag(tag: SmallNumber; list: SmallNumberArray) return std_logic_vector is
+function findRegTag(tag: SmallNumber; list: PhysNameArray) return std_logic_vector is
 	variable res: std_logic_vector(list'range) := (others => '0');
 begin
 	for i in list'range loop
-		if tag = list(i) then
+		if tag(PHYS_REG_BITS-1 downto 0) = list(i)(PHYS_REG_BITS-1 downto 0) then
 			res(i) := '1';
 		end if;
 	end loop;
+	return res;
+end function;
+
+function findLoc2b(cmp: std_logic_vector) return SmallNumber is
+	variable res: SmallNumber := (others => '0');
+begin
+	if cmp(1) = '1' then
+		res(1 downto 0) := "01";
+	elsif cmp(2) = '1' then
+		res(1 downto 0) := "10";
+	end if;
+	
+		res(0) := cmp(1);
+		res(1) := cmp(2);
 	return res;
 end function;
 
@@ -348,35 +362,22 @@ return SchedulerEntrySlot is
 	variable tmp8: SmallNumber := (others => '0');
 	variable rrf: std_logic_vector(0 to 2) := (others => '0');
 
-	variable stored, ready, nextReady, readyM2, written: std_logic_vector(0 to 2) := (others=>'0');
+	variable cmp0toM1, cmp0toM2, cmp1toM1, cmp1toM2, stored, ready, nextReady, readyM2, written:
+													std_logic_vector(0 to 2) := (others=>'0');
 	variable locs, nextLocs, locsM2: SmallNumberArray(0 to 2) := (others=>(others=>'0'));
 begin
 	res.ins := ins;	
 	res.state := st;
 
-	-- nextReady - fast wakeup   
-	-- NOTE: we don't save nextLocs because only the ops that are instantly issued will use it, so no
-	-- 		point to store them for those that'll keep waiting
-	for i in 0 to 0 loop -- only [0] uses fast wakeup
-		if fni.nextResultTags(i)(PHYS_REG_BITS-1 downto 0) = ins.physicalArgSpec.args(0)(PHYS_REG_BITS-1 downto 0) then
-			nextReady(0) := '1';
-		end if;		
-		if fni.nextResultTags(i)(PHYS_REG_BITS-1 downto 0) = ins.physicalArgSpec.args(1)(PHYS_REG_BITS-1 downto 0) then
-			nextReady(1) := '1';
-		end if;		
-	end loop;
-	
-	-- readyM2 - slow wakeup
-	for i in 1 to 2 loop -- [0] does not use slow wakeup
-		if fni.nextTagsM2(i)(PHYS_REG_BITS-1 downto 0) = ins.physicalArgSpec.args(0)(PHYS_REG_BITS-1 downto 0) then
-			readyM2(0) := '1';
-			locsM2(0) := i2slv(i, SMALL_NUMBER_SIZE);
-		end if;
-		if fni.nextTagsM2(i)(PHYS_REG_BITS-1 downto 0) = ins.physicalArgSpec.args(1)(PHYS_REG_BITS-1 downto 0) then
-			readyM2(1) := '1';
-			locsM2(1) := i2slv(i, SMALL_NUMBER_SIZE);
-		end if;
-	end loop;
+	cmp0toM1 := findRegTag(ins.physicalArgSpec.args(0), fni.nextResultTags); -- CAREFUL: (0)
+	cmp1toM1 := findRegTag(ins.physicalArgSpec.args(1), fni.nextResultTags); --			 (0)
+	cmp0toM2 := findRegTag(ins.physicalArgSpec.args(0), fni.nextTagsM2); --			 (1,2)
+	cmp1toM2 := findRegTag(ins.physicalArgSpec.args(1), fni.nextTagsM2); -- 			 (1,2)
+		
+		nextReady := (isNonzero(cmp0toM1(0 to 0)), isNonzero(cmp1toM1(0 to 0)), '0');
+		readyM2 := (isNonzero(cmp0toM2(1 to 2)), isNonzero(cmp1toM2(1 to 2)), '0');
+	 locsM2 := (findLoc2b(cmp0toM2), findLoc2b(cmp1toM2), (others => '0'));
+
 
 	res.state.argValues.readyNext := nextReady;
 	
@@ -406,48 +407,34 @@ return SchedulerEntrySlot is
 	variable tmp8: SmallNumber := (others => '0');
 	variable rrf: std_logic_vector(0 to 2) := (others => '0');
 
-	variable stored, ready, nextReady, readyM2, written: std_logic_vector(0 to 2) := (others=>'0');
+	variable cmp0toM2, cmp0toM1, cmp0toR0, cmp0toR1, cmp1toM2, cmp1toM1, cmp1toR0, cmp1toR1,
+				readyR0, readyR1,
+				stored, ready, nextReady, readyM2, written: std_logic_vector(0 to 2) := (others=>'0');
 	variable locs, nextLocs, locsM2: SmallNumberArray(0 to 2) := (others=>(others=>'0'));
 begin
 	res.ins := ins;	
-	res.state := st;
-
-	-- Find where tag agrees with s0
-	for i in fni.resultTags'length-1 downto 0 loop		
-		if fni.resultTags(i)(PHYS_REG_BITS-1 downto 0) = ins.physicalArgSpec.args(0)(PHYS_REG_BITS-1 downto 0) then
-			ready(0) := '1';
-			locs(0) := i2slv(i, SMALL_NUMBER_SIZE);
-		end if;
-	end loop;
-		
-	for i in fni.resultTags'length-1 downto 0 loop				
-		if fni.resultTags(i)(PHYS_REG_BITS-1 downto 0) = ins.physicalArgSpec.args(1)(PHYS_REG_BITS-1 downto 0) then
-			ready(1) := '1';
-			locs(1) := i2slv(i, SMALL_NUMBER_SIZE);
-		end if;
-	end loop;		
+	res.state := st;		
 	
-	for i in fni.nextResultTags'range loop
-		if fni.nextResultTags(i)(PHYS_REG_BITS-1 downto 0) = ins.physicalArgSpec.args(0)(PHYS_REG_BITS-1 downto 0) then
-			nextReady(0) := '1';
-			nextLocs(0) := i2slv(i, SMALL_NUMBER_SIZE);
-		end if;
-		if fni.nextResultTags(i)(PHYS_REG_BITS-1 downto 0) = ins.physicalArgSpec.args(1)(PHYS_REG_BITS-1 downto 0) then
-			nextReady(1) := '1';
-			nextLocs(1) := i2slv(i, SMALL_NUMBER_SIZE);
-		end if;		
-	end loop;
+		cmp0toR0 := findRegTag(ins.physicalArgSpec.args(0), fni.tags0);
+		cmp1toR0 := findRegTag(ins.physicalArgSpec.args(1), fni.tags0);
+		cmp0toR1 := findRegTag(ins.physicalArgSpec.args(0), fni.tags1);
+		cmp1toR1 := findRegTag(ins.physicalArgSpec.args(1), fni.tags1);
+		 readyR0 := (isNonzero(cmp0toR0), isNonzero(cmp1toR0), '0');
+		 readyR1 := (isNonzero(cmp0toR1), isNonzero(cmp1toR1), '0');
 
-	for i in 1 to 2 loop -- [0] does not use slow wakeup
-		if fni.nextTagsM2(i)(PHYS_REG_BITS-1 downto 0) = ins.physicalArgSpec.args(0)(PHYS_REG_BITS-1 downto 0) then
-			readyM2(0) := '1';
-			locsM2(0) := i2slv(i, SMALL_NUMBER_SIZE);
-		end if;
-		if fni.nextTagsM2(i)(PHYS_REG_BITS-1 downto 0) = ins.physicalArgSpec.args(1)(PHYS_REG_BITS-1 downto 0) then
-			readyM2(1) := '1';
-			locsM2(1) := i2slv(i, SMALL_NUMBER_SIZE);
-		end if;
-	end loop;
+
+		cmp0toM1 := findRegTag(ins.physicalArgSpec.args(0), fni.nextResultTags);
+		cmp1toM1 := findRegTag(ins.physicalArgSpec.args(1), fni.nextResultTags);
+
+		 nextReady := (isNonzero(cmp0toM1), isNonzero(cmp1toM1), '0');
+		 nextLocs := (findLoc2b(cmp0toM1), findLoc2b(cmp1toM1), (others => '0'));
+
+
+		cmp0toM2 := findRegTag(ins.physicalArgSpec.args(0), fni.nextTagsM2);
+		cmp1toM2 := findRegTag(ins.physicalArgSpec.args(1), fni.nextTagsM2);
+
+		 readyM2 := (isNonzero(cmp0toM2(1 to 2)), isNonzero(cmp1toM2(1 to 2)), '0');
+		 locsM2 := (findLoc2b(cmp0toM2), findLoc2b(cmp1toM2), (others => '0'));
 
 	res.state.argValues.readyNow := (others => '0'); 
 	res.state.argValues.readyNext := (others => '0');
@@ -462,7 +449,10 @@ begin
 		--res.state.argValues.missing := res.state.argValues.missing and not rrf;
 	end if;
 	
-	res.state.argValues.missing := res.state.argValues.missing and not ready;
+	--res.state.argValues.missing := res.state.argValues.missing and not ready;
+	res.state.argValues.missing := res.state.argValues.missing and not readyR0;
+	res.state.argValues.missing := res.state.argValues.missing and not readyR1;	
+	
 	res.state.argValues.missing := res.state.argValues.missing and not nextReady;	
 	res.state.argValues.missing := res.state.argValues.missing and not readyM2;
 	
@@ -478,7 +468,7 @@ return SchedulerEntrySlot is
 	variable tmp8: SmallNumber := (others => '0');
 	variable rrf: std_logic_vector(0 to 2) := (others => '0');
 
-	variable stored, ready, nextReady, written: std_logic_vector(0 to 2) := (others=>'0');
+	variable cmp0toM1, cmp1toM1, stored, ready, nextReady, written: std_logic_vector(0 to 2) := (others=>'0');
 	variable locs, nextLocs: SmallNumberArray(0 to 2) := (others=>(others=>'0'));
 begin
 	res.ins := ins;
@@ -486,18 +476,13 @@ begin
 	
 	nextLocs := st.argValues.locsM2; -- CAREFUL: a cycle has passed so those locs are now 1 cycle ahead
 	nextReady := st.argValues.readyM2;
-	
-	-- Here we consider fast wakeup and readyRegTags
-	for i in 0 to 0 loop --fni.nextResultTags'range loop
-		if fni.nextResultTags(i)(PHYS_REG_BITS-1 downto 0) = ins.physicalArgSpec.args(0)(PHYS_REG_BITS-1 downto 0) then
-			nextReady(0) := '1';
-			nextLocs(0) := i2slv(i, SMALL_NUMBER_SIZE);
-		end if;
-		if fni.nextResultTags(i)(PHYS_REG_BITS-1 downto 0) = ins.physicalArgSpec.args(1)(PHYS_REG_BITS-1 downto 0) then
-			nextReady(1) := '1';
-			nextLocs(1) := i2slv(i, SMALL_NUMBER_SIZE);
-		end if;		
-	end loop;
+
+		cmp0toM1 := findRegTag(ins.physicalArgSpec.args(0), fni.nextResultTags);
+		cmp1toM1 := findRegTag(ins.physicalArgSpec.args(1), fni.nextResultTags);
+			cmp0toM1(1 to 2) := (others => '0');
+			cmp1toM1(1 to 2) := (others => '0');
+		 nextReady := (isNonzero(cmp0toM1(0 to 0)), isNonzero(cmp1toM1(0 to 0)), '0');
+		 nextLocs := (findLoc2b(cmp0toM1), findLoc2b(cmp1toM1), (others => '0'));
 
 	res.state.argValues.readyNow := (others => '0'); 
 	res.state.argValues.readyNext := nextReady;--(others => '0');
