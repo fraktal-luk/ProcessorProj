@@ -98,6 +98,68 @@ begin
 	return res;
 end function;
 
+function updateArgLocs(argValues: InstructionArgValues;
+							  readyBefore, readyReg, ready1, ready0, readyM1, readyM2: std_logic_vector; 
+															 locs1, locs0, locsM1, locsM2: SmallNumberArray;
+							  progress: boolean)
+return InstructionArgValues is
+	variable res: InstructionArgValues := argValues;
+begin
+	for i in 0 to 1 loop
+		if readyBefore(i) = '1' then
+			if progress then
+			-- Progress the location for next cycle?
+				case res.argLocsPhase(i) is
+					when "00000011" =>
+						res.argLocsPhase(i) := "00000000";
+					when "00000000" =>
+						res.argLocsPhase(i) := "00000001";
+					--when "01" =>
+					-- res.argLocsPhase(0) := "10";					
+					when others =>
+						res.argLocsPhase(i) := "00000010";
+				end case;
+			end if;
+		elsif readyReg(i) = '1' then
+			res.argLocsPhase(i) := "00000010";
+		elsif ready1(i) = '1' then
+			res.argLocsPipe(i) := locs1(i);
+			if progress then
+				res.argLocsPhase(i) := "00000010";		
+			else
+				res.argLocsPhase(i) := "00000001";				
+			end if;
+		elsif ready0(i) = '1' then
+			res.argLocsPipe(i) := locs0(i);
+			if progress then
+				res.argLocsPhase(i) := "00000001";		
+			else
+				res.argLocsPhase(i) := "00000000";				
+			end if;			
+		elsif readyM1(i) = '1' then
+		-- Store M1 loc
+			res.argLocsPipe(i) := locsM1(i);
+			if progress then
+				res.argLocsPhase(i) := "00000000";		
+			else
+				res.argLocsPhase(i) := "00000011";				
+			end if;
+		elsif readyM2(i) = '1' then
+		-- Store M2 loc
+			res.argLocsPipe(i) := locsM2(i);
+			if progress then
+				res.argLocsPhase(i) := "00000011";		
+			else
+				report "Slot wakeup can be used only for waiting ops!" severity error;
+				res.argLocsPhase(i) := "00000011";				
+			end if;
+		end if;
+	end loop;
+
+	return res;
+end function;
+
+
 end ProcLogicIQ;
 
 
@@ -360,11 +422,13 @@ function updateForWaitingFNI(ins: InstructionState; st: SchedulerState;
 return SchedulerEntrySlot is
 	variable res: SchedulerEntrySlot := DEFAULT_SCHEDULER_ENTRY_SLOT;
 	variable tmp8: SmallNumber := (others => '0');
-	variable rrf: std_logic_vector(0 to 2) := (others => '0');
+	variable readyBefore, rrf: std_logic_vector(0 to 2) := (others => '0');
 
 	variable cmp0toM1, cmp0toM2, cmp1toM1, cmp1toM2, stored, ready, nextReady, readyM2, written:
 													std_logic_vector(0 to 2) := (others=>'0');
-	variable locs, nextLocs, locsM2: SmallNumberArray(0 to 2) := (others=>(others=>'0'));
+	variable locs, nextLocs, locsM1, locsM2: SmallNumberArray(0 to 2) := (others=>(others=>'0'));
+	constant Z3: std_logic_vector(0 to 2) := (others=>'0');
+	constant ZZ3: SmallNumberArray(0 to 2) := (others=>(others=>'0'));
 begin
 	res.ins := ins;	
 	res.state := st;
@@ -376,6 +440,7 @@ begin
 		
 		nextReady := (isNonzero(cmp0toM1(0 to 0)), isNonzero(cmp1toM1(0 to 0)), '0');
 		readyM2 := (isNonzero(cmp0toM2(1 to 2)), isNonzero(cmp1toM2(1 to 2)), '0');
+	 locsM1 := (findLoc2b(cmp0toM1), findLoc2b(cmp1toM1), (others => '0'));
 	 locsM2 := (findLoc2b(cmp0toM2), findLoc2b(cmp1toM2), (others => '0'));
 
 
@@ -388,8 +453,19 @@ begin
 	if res.state.argValues.newInQueue = '1' then
 		tmp8 := getTagLowSN(res.ins.tags.renameIndex);-- and i2slv(PIPE_WIDTH-1, SMALL_NUMBER_SIZE);
 		rrf := readyRegFlags(3*slv2u(tmp8) to 3*slv2u(tmp8) + 2);
-		res.state.argValues.missing := res.state.argValues.missing and not rrf;
+	else
+		rrf := (others => '0');
 	end if;
+
+		readyBefore := not res.state.argValues.missing;
+
+		-- Update arg tracking
+		res.state.argValues := updateArgLocs(res.state.argValues,
+														readyBefore, rrf, Z3, Z3, nextReady, readyM2,
+																				ZZ3, ZZ3, locsM1, locsM2,
+														true);
+
+	res.state.argValues.missing := res.state.argValues.missing and not rrf;
 
 	res.state.argValues.missing := res.state.argValues.missing and not nextReady;	
 	res.state.argValues.missing := res.state.argValues.missing and not readyM2;
@@ -409,8 +485,8 @@ return SchedulerEntrySlot is
 
 	variable cmp0toM2, cmp0toM1, cmp0toR0, cmp0toR1, cmp1toM2, cmp1toM1, cmp1toR0, cmp1toR1,
 				readyR0, readyR1,
-				stored, ready, nextReady, readyM2, written: std_logic_vector(0 to 2) := (others=>'0');
-	variable locs, nextLocs, locsM2: SmallNumberArray(0 to 2) := (others=>(others=>'0'));
+				stored, ready, nextReady, readyM2, written, readyBefore: std_logic_vector(0 to 2) := (others=>'0');
+	variable locs, locs0, locs1, nextLocs, locsM2: SmallNumberArray(0 to 2) := (others=>(others=>'0'));
 begin
 	res.ins := ins;	
 	res.state := st;		
@@ -421,6 +497,8 @@ begin
 		cmp1toR1 := findRegTag(ins.physicalArgSpec.args(1), fni.tags1);
 		 readyR0 := (isNonzero(cmp0toR0), isNonzero(cmp1toR0), '0');
 		 readyR1 := (isNonzero(cmp0toR1), isNonzero(cmp1toR1), '0');
+		 locs0 := (findLoc2b(cmp0toR0), findLoc2b(cmp1toR0), (others => '0'));
+		 locs1 := (findLoc2b(cmp0toR1), findLoc2b(cmp1toR1), (others => '0'));
 
 
 		cmp0toM1 := findRegTag(ins.physicalArgSpec.args(0), fni.nextResultTags);
@@ -445,9 +523,17 @@ begin
 	-- 
 	if res.state.argValues.newInQueue = '1' then
 		tmp8 := getTagLowSN(res.ins.tags.renameIndex);-- and i2slv(PIPE_WIDTH-1, SMALL_NUMBER_SIZE);
-		rrf := readyRegFlags(3*slv2u(tmp8) to 3*slv2u(tmp8) + 2);
+		--rrf := readyRegFlags(3*slv2u(tmp8) to 3*slv2u(tmp8) + 2);
 		--res.state.argValues.missing := res.state.argValues.missing and not rrf;
 	end if;
+
+		readyBefore := not res.state.argValues.missing;
+
+		-- Update arg tracking
+		res.state.argValues := updateArgLocs(res.state.argValues,
+														readyBefore, rrf, readyR1, readyR0, nextReady, readyM2,
+																				locs1, locs0, nextLocs, locsM2,
+														true);
 	
 	--res.state.argValues.missing := res.state.argValues.missing and not ready;
 	res.state.argValues.missing := res.state.argValues.missing and not readyR0;
@@ -468,8 +554,10 @@ return SchedulerEntrySlot is
 	variable tmp8: SmallNumber := (others => '0');
 	variable rrf: std_logic_vector(0 to 2) := (others => '0');
 
-	variable cmp0toM1, cmp1toM1, stored, ready, nextReady, written: std_logic_vector(0 to 2) := (others=>'0');
+	variable cmp0toM1, cmp1toM1, stored, ready, nextReady, written, readyBefore: std_logic_vector(0 to 2) := (others=>'0');
 	variable locs, nextLocs: SmallNumberArray(0 to 2) := (others=>(others=>'0'));
+	constant Z3: std_logic_vector(0 to 2) := (others=>'0');
+	constant ZZ3: SmallNumberArray(0 to 2) := (others=>(others=>'0'));
 begin
 	res.ins := ins;
 	res.state := st;
@@ -493,8 +581,20 @@ begin
 	if res.state.argValues.newInQueue = '1' then
 		tmp8 := getTagLowSN(res.ins.tags.renameIndex);-- and i2slv(PIPE_WIDTH-1, SMALL_NUMBER_SIZE);
 		rrf := readyRegFlags(3*slv2u(tmp8) to 3*slv2u(tmp8) + 2);
-		res.state.argValues.missing := res.state.argValues.missing and not rrf;
+	else
+		rrf := (others => '0');
 	end if;
+
+
+		-- Update arg tracking
+		res.state.argValues := updateArgLocs(res.state.argValues,
+														readyBefore, rrf, Z3, Z3, nextReady, Z3,
+																				ZZ3, ZZ3, nextLocs, ZZ3,
+														false);
+														
+
+	res.state.argValues.missing := res.state.argValues.missing and not rrf;
+
 	
 	res.state.argValues.missing := res.state.argValues.missing and not nextReady;
 	

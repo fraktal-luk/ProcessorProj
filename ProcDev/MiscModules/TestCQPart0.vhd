@@ -80,27 +80,40 @@ architecture Implem2 of TestCQPart0 is
 	return InstructionSlotArray is
 		variable res: InstructionSlotArray(0 to 1) := (others => DEFAULT_INSTRUCTION_SLOT);
 	begin
-		--  Slot 0
-		if stageData(1).full = '1' then
-			res(0):= stageData(1);
-		elsif input(0).full = '1' then
+		assert countOnes(input(0).full & input(1).full & input(2).full) <= 1 report "Writeback collision!" severity error;
+	
+		if input(0).full = '1' then
 			res(0) := input(0);
 		elsif input(1).full = '1' then
 			res(0) := input(1);
+		elsif input(2).full = '1' then
+			res(0) := input(2);
 		else
 			res(0).full := '0';
 			res(0).ins.physicalArgSpec.dest := (others => '0');
 		end if;
+--		
+--		--  Slot 0
+--		if stageData(1).full = '1' then
+--			res(0):= stageData(1);
+--		elsif input(0).full = '1' then
+--			res(0) := input(0);
+--		elsif input(1).full = '1' then
+--			res(0) := input(1);
+--		else
+--			res(0).full := '0';
+--			res(0).ins.physicalArgSpec.dest := (others => '0');
+--		end if;
 		
-		-- Slot 1
-		if stageData(1).full = '1' and input(1).full = '1' then
-			res(1):= input(1);
-		elsif input(2).full = '1' then
-			res(1) := input(2);
-		else
-			res(1).full := '0';
-			res(1).ins.physicalArgSpec.dest := (others => '0');
-		end if;
+--		-- Slot 1
+--		if stageData(1).full = '1' and input(1).full = '1' then
+--			res(1):= input(1);
+--		elsif input(2).full = '1' then
+--			res(1) := input(2);
+--		else
+--			res(1).full := '0';
+--			res(1).ins.physicalArgSpec.dest := (others => '0');
+--		end if;
 		
 		return res;
 	end function;
