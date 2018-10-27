@@ -65,6 +65,8 @@ entity SubunitDispatch is
 		lateEventSignal: in std_logic;
 		execCausing: in InstructionState;
 		
+			fni: in ForwardingInfo;
+		
 		resultTags: in PhysNameArray(0 to N_RES_TAGS-1);
 		resultVals: in MwordArray(0 to N_RES_TAGS-1);
 		regValues: in MwordArray(0 to 2)		
@@ -85,7 +87,7 @@ architecture Alternative of SubunitDispatch is
 		
 begin
 
-	inputDataWithArgs <= getDispatchArgValues(input.ins, input.state, resultTags, resultVals, USE_IMM);
+	inputDataWithArgs <= getDispatchArgValues(input.ins, input.state, fni, resultTags, resultVals, USE_IMM);
 	
 	BASIC_LOGIC: entity work.GenericStageMulti(Behavioral)
 	generic map(

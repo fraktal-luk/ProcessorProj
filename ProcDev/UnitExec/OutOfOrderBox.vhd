@@ -260,6 +260,7 @@ begin
 				execEventSignal => execEventSignal,
 				lateEventSignal => lateEventSignal,
 				execCausing => execCausing,
+				fni => fni,
 				resultTags => fni.resultTags,
 				resultVals => fni.resultValues,
 				regValues => regValsArr(3*i to 3*i + 2),--
@@ -296,7 +297,7 @@ begin
 			end process;
 			
 			-- 
-			blockA <= e0B or e1C;
+			blockA <= e0B or e0C;
 			-- e0B and e0C;
 			blockBC <= (schedB and schedC) or wasBlockedA;
 			blockC <= blockBC or sendingFromDLQ or not dlqAccepting 
@@ -503,6 +504,8 @@ begin
 		fni.resultValues <= getResultValues(execOutputs1, cqBufferOutputSig, DEFAULT_STAGE_DATA_MULTI);
 				fni.tags0 <= fniNew.tags0;
 				fni.tags1 <= fniNew.tags1;
+					fni.values0 <= fniNew.values0;
+					fni.values1 <= fniNew.values1;
 		
 		fniNew.tagsM2 <= ((others => '0'), outputM2B.physicalArgSpec.dest, outputOpPreC.physicalArgSpec.dest);
 		fniNew.tagsM1 <= (schedOutputArr(0).ins.physicalArgSpec.dest, 

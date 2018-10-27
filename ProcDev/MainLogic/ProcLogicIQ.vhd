@@ -22,7 +22,7 @@ use work.GeneralPipeDev.all;
 
 package ProcLogicIQ is
 
-function getDispatchArgValues(ins: InstructionState; st: SchedulerState;
+function getDispatchArgValues(ins: InstructionState; st: SchedulerState; fni: ForwardingInfo;
 											resultTags: PhysNameArray; vals: MwordArray; USE_IMM: boolean)
 return SchedulerEntrySlot;
 
@@ -208,7 +208,7 @@ end function;
 
 
 
-function getDispatchArgValues(ins: InstructionState; st: SchedulerState;
+function getDispatchArgValues(ins: InstructionState; st: SchedulerState; fni: ForwardingInfo;
 											resultTags: PhysNameArray; vals: MwordArray; USE_IMM: boolean)
 return SchedulerEntrySlot is
 	variable res: SchedulerEntrySlot := DEFAULT_SCH_ENTRY_SLOT;
@@ -247,6 +247,14 @@ begin
 
 
 	res.state.argValues.arg0 := vals(slv2u(res.state.argValues.locs(0)));
+		-- phase 0: vals0(argLocs), phase 1: vals1(argLocs)
+		if res.state.argValues.zero(0) = '1' then
+			res.state.argValues.arg2 := (others => '0');
+		elsif res.state.argValues.argLocsPhase(0)(1 downto 0) = "00" then
+			res.state.argValues.arg2 := fni.values0(slv2u(res.state.argValues.argLocsPipe(0)(1 downto 0)));
+		else --elsif res.state.argValues.argPhase(1 downto 0) := "01" then
+			res.state.argValues.arg2 := fni.values1(slv2u(res.state.argValues.argLocsPipe(0)(1 downto 0)));			
+		end if;
 	
 	if res.state.argValues.immediate = '1' and USE_IMM then
 		res.state.argValues.arg1 := res.ins.constantArgs.imm;
@@ -282,6 +290,12 @@ begin
 	res.state.argValues.arg0 := carg0;
 	res.state.argValues.arg1 := carg1;
 	--res.state.argValues.arg2 := carg2;
+	
+		if res.state.argValues.argLocsPhase(0)(1 downto 0) = "11" and res.state.argValues.zero(0) = '0' then
+			res.state.argValues.arg2 := vals(slv2u(res.state.argValues.argLocsPipe(0)(1 downto 0)));
+		elsif res.state.argValues.argLocsPhase(0)(1 downto 0) = "10" then
+			res.state.argValues.arg2 := regValues(0);
+		end if;
 	
 	return res;
 end function;

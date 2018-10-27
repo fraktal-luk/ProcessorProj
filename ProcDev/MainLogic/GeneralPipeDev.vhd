@@ -52,6 +52,8 @@ type ForwardingInfo is record
 	--writtenTags: PhysNameArray(0 to PIPE_WIDTH-1);
 		tags0: PhysNameArray(0 to 2);
 		tags1: PhysNameArray(0 to 2);
+		values0: MwordArray(0 to 2);
+		values1: MwordArray(0 to 2);
 		
 	resultTags: PhysNameArray(0 to N_RES_TAGS-1);
 	nextResultTags: PhysNameArray(0 to 2);
@@ -63,6 +65,8 @@ constant DEFAULT_FORWARDING_INFO: ForwardingInfo := (
 	--writtenTags => (others => (others => '0')),
 		tags0 => (others => (others => '0')),
 		tags1 => (others => (others => '0')),
+		values0 => (others => (others => '0')),
+		values1 => (others => (others => '0')),
 		
 	resultTags => (others => (others => '0')),
 	nextResultTags => (others => (others => '0')),
